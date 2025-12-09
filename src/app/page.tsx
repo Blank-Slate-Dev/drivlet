@@ -445,7 +445,7 @@ export default function Home() {
 
           {/* Desktop Nav */}
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            
+            <a
               href="#how-it-works"
               className="transition hover:text-emerald-600"
             >
@@ -534,7 +534,6 @@ export default function Home() {
                       />
                     ))}
                   </div>
-                  <span>Trusted service</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-emerald-300" />
@@ -897,14 +896,14 @@ export default function Home() {
             out.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            
+            <a
               href="tel:+61400000000"
               className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-3 font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
             >
               <Phone className="h-5 w-5" />
               Call us
             </a>
-            
+            <a
               href="mailto:hello@drivlet.com.au"
               className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-6 py-3 font-medium text-white transition hover:bg-white/10"
             >
@@ -935,7 +934,9 @@ export default function Home() {
                 <div key={index} className="py-4">
                   <button
                     type="button"
-                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                    onClick={() =>
+                      setOpenFaq(openFaq === index ? null : index)
+                    }
                     className="flex w-full items-center justify-between text-left"
                   >
                     <span className="text-base font-medium text-slate-900 sm:text-lg">
@@ -965,7 +966,7 @@ export default function Home() {
                 </div>
               ))}
               <div className="pt-4">
-                
+                <a
                   href="#"
                   className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
                 >
@@ -1114,7 +1115,7 @@ export default function Home() {
                   </a>
                 </li>
                 <li>
-                  
+                  <a
                     href="#how-it-works"
                     className="transition hover:text-white"
                   >
@@ -1178,7 +1179,7 @@ export default function Home() {
               </ul>
               <div className="mt-6">
                 <h4 className="mb-2 font-semibold">For Garages</h4>
-                
+                <a
                   href="#"
                   className="text-sm text-emerald-200 transition hover:text-white"
                 >
