@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Car,
-  Clock,
   ShieldCheck,
   Wrench,
   ArrowRight,
@@ -473,7 +472,10 @@ export default function Home() {
               Book a service
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <button className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block">
+            <button
+              type="button"
+              className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block"
+            >
               Login
             </button>
           </div>
@@ -786,13 +788,14 @@ export default function Home() {
                     {service.title}
                   </h3>
                   <p className="mb-4 text-sm text-slate-500">{service.price}</p>
-                  
-                    href="#booking"
+                  <button
+                    type="button"
+                    onClick={() => setShowBookingModal(true)}
                     className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 transition hover:text-emerald-700"
                   >
                     Get a quote
                     <ArrowRight className="h-4 w-4" />
-                  </a>
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -931,6 +934,7 @@ export default function Home() {
               {faqs.map((faq, index) => (
                 <div key={index} className="py-4">
                   <button
+                    type="button"
                     onClick={() => setOpenFaq(openFaq === index ? null : index)}
                     className="flex w-full items-center justify-between text-left"
                   >
@@ -1052,7 +1056,9 @@ export default function Home() {
                   Service type
                 </label>
                 <select className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2">
-                  <option value="standard">Standard service ($89 pick-up)</option>
+                  <option value="standard">
+                    Standard service ($89 pick-up)
+                  </option>
                   <option value="major">Major service ($139 pick-up)</option>
                   <option value="logbook">Logbook service</option>
                   <option value="diagnostic">Diagnostic / other</option>
