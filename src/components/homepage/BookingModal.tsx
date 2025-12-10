@@ -1,7 +1,7 @@
 // src/components/homepage/BookingModal.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
@@ -20,32 +20,43 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
+interface TimeOption {
+  value: string;
+  label: string;
+  minutes: number; // Total minutes from midnight for easy comparison
+}
+
 // Generate time options in 15-minute intervals with 12-hour format
-function generateTimeOptions(startHour: number, endHour: number): { value: string; label: string }[] {
-  const options: { value: string; label: string }[] = [];
+function generateTimeOptions(startHour: number, endHour: number): TimeOption[] {
+  const options: TimeOption[] = [];
   for (let hour = startHour; hour <= endHour; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
       // Skip times past the end hour (e.g., 14:15, 14:30, 14:45 if endHour is 14)
       if (hour === endHour && minute > 0) continue;
-      
+
       const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-      
+
       // Convert to 12-hour format for display
       const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
       const ampm = hour < 12 ? 'am' : 'pm';
       const label = `${displayHour}:${minute.toString().padStart(2, '0')}${ampm}`;
-      
-      options.push({ value, label });
+
+      const minutes = hour * 60 + minute;
+
+      options.push({ value, label, minutes });
     }
   }
   return options;
 }
 
 // Pick-up: 6am - 2pm (6:00 - 14:00)
-const pickupTimeOptions = generateTimeOptions(6, 14);
+const allPickupTimeOptions = generateTimeOptions(6, 14);
 
 // Drop-off: 9am - 7pm (9:00 - 19:00)
-const dropoffTimeOptions = generateTimeOptions(9, 19);
+const allDropoffTimeOptions = generateTimeOptions(9, 19);
+
+// Minimum gap between pickup and dropoff in minutes (2 hours = 120 minutes)
+const MIN_GAP_MINUTES = 120;
 
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
@@ -55,6 +66,52 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [regoState, setRegoState] = useState<StateCode>('NSW');
   const [earliestPickup, setEarliestPickup] = useState('09:00');
   const [latestDropoff, setLatestDropoff] = useState('17:00');
+
+  // Get the selected pickup time's minutes value
+  const selectedPickupMinutes = useMemo(() => {
+    const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
+    return selected?.minutes ?? 0;
+  }, [earliestPickup]);
+
+  // Get the selected dropoff time's minutes value
+  const selectedDropoffMinutes = useMemo(() => {
+    const selected = allDropoffTimeOptions.find((t) => t.value === latestDropoff);
+    return selected?.minutes ?? 0;
+  }, [latestDropoff]);
+
+  // Filter pickup options: only show times that are at least 2 hours before the selected dropoff
+  const availablePickupOptions = useMemo(() => {
+    return allPickupTimeOptions.filter(
+      (time) => time.minutes <= selectedDropoffMinutes - MIN_GAP_MINUTES
+    );
+  }, [selectedDropoffMinutes]);
+
+  // Filter dropoff options: only show times that are at least 2 hours after the selected pickup
+  const availableDropoffOptions = useMemo(() => {
+    return allDropoffTimeOptions.filter(
+      (time) => time.minutes >= selectedPickupMinutes + MIN_GAP_MINUTES
+    );
+  }, [selectedPickupMinutes]);
+
+  // If current pickup selection becomes invalid, reset to first available option
+  useEffect(() => {
+    const isCurrentPickupValid = availablePickupOptions.some(
+      (t) => t.value === earliestPickup
+    );
+    if (!isCurrentPickupValid && availablePickupOptions.length > 0) {
+      setEarliestPickup(availablePickupOptions[0].value);
+    }
+  }, [availablePickupOptions, earliestPickup]);
+
+  // If current dropoff selection becomes invalid, reset to first available option
+  useEffect(() => {
+    const isCurrentDropoffValid = availableDropoffOptions.some(
+      (t) => t.value === latestDropoff
+    );
+    if (!isCurrentDropoffValid && availableDropoffOptions.length > 0) {
+      setLatestDropoff(availableDropoffOptions[0].value);
+    }
+  }, [availableDropoffOptions, latestDropoff]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -168,12 +225,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         onChange={(e) => setEarliestPickup(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                       >
-                        {pickupTimeOptions.map((time) => (
+                        {availablePickupOptions.map((time) => (
                           <option key={`earliest-${time.value}`} value={time.value}>
                             {time.label}
                           </option>
                         ))}
                       </select>
+                      <p className="text-xs text-slate-400">
+                        Available 6:00am – 2:00pm
+                      </p>
                     </div>
 
                     <div className="space-y-1.5">
@@ -185,12 +245,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         onChange={(e) => setLatestDropoff(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                       >
-                        {dropoffTimeOptions.map((time) => (
+                        {availableDropoffOptions.map((time) => (
                           <option key={`latest-${time.value}`} value={time.value}>
                             {time.label}
                           </option>
                         ))}
                       </select>
+                      <p className="text-xs text-slate-400">
+                        Available 9:00am – 7:00pm (min. 2hr gap)
+                      </p>
                     </div>
                   </div>
 
