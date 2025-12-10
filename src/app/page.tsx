@@ -1,12 +1,11 @@
 // src/app/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Car,
-  Clock,
   ShieldCheck,
   Wrench,
   ArrowRight,
@@ -21,6 +20,7 @@ import {
   Settings,
   Gauge,
   Zap,
+  X,
 } from 'lucide-react';
 
 type VehicleDetails = {
@@ -32,14 +32,137 @@ type VehicleDetails = {
   transmission?: string;
 };
 
+type StateCode = 'NSW' | 'QLD' | 'VIC' | 'SA' | 'WA' | 'TAS' | 'NT' | 'ACT';
+
+const statePlateTemplates: Record<StateCode, string | null> = {
+  NSW: '/nsw_registration_plate_template.png',
+  QLD: '/qld_registration_plate_template.png',
+  WA: '/wa_registration_plate_template.png',
+  SA: '/sa_registration_plate_template.png',
+  VIC: '/vic_registration_plate_template.png',
+  TAS: '/tas_registration_plate_template.png',
+  NT: '/nt_registration_plate_template.png',
+  ACT: '/act_registration_plate_template.png',
+};
+
+// States that have templates ready
+const availablePlateTemplates: StateCode[] = ['NSW', 'QLD', 'WA', 'SA'];
+
+function RegistrationPlate({
+  plate,
+  state,
+}: {
+  plate: string;
+  state: StateCode;
+}) {
+  const templatePath = statePlateTemplates[state];
+  const hasTemplate = availablePlateTemplates.includes(state);
+
+  // Format plate to uppercase and limit to 6 characters
+  const formattedPlate = plate.toUpperCase().slice(0, 6);
+
+  if (!hasTemplate || !templatePath) {
+    // Fallback: simple styled plate for states without templates
+    return (
+      <div className="relative flex h-[70px] w-[247px] items-center justify-center rounded-lg border-4 border-slate-700 bg-slate-900">
+        <span className="text-2xl font-bold tracking-[0.3em] text-white">
+          {formattedPlate || '------'}
+        </span>
+        <span className="absolute bottom-1 right-2 text-[8px] text-slate-400">
+          {state}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-[70px] w-[247px]">
+      {/* Plate template image - scaled from 1993x565 to ~247x70 (maintaining aspect ratio) */}
+      <Image
+        src={templatePath}
+        alt={`${state} registration plate`}
+        fill
+        className="rounded-md object-contain"
+      />
+      {/* Plate text overlay - positioned in center of plate */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span
+          className="text-2xl font-bold tracking-[0.25em] text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]"
+          style={{
+            fontFamily: 'Arial, sans-serif',
+            textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+          }}
+        >
+          {formattedPlate || '------'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [showBookingPanel, setShowBookingPanel] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
   const [regoError, setRegoError] = useState<string | null>(null);
   const [vehicleDetails, setVehicleDetails] = useState<VehicleDetails | null>(
     null
   );
+  const [regoPlate, setRegoPlate] = useState('');
+  const [regoState, setRegoState] = useState<StateCode>('NSW');
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showBookingModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showBookingModal]);
+
+  const handleRegoLookup = async () => {
+    setRegoError(null);
+    setVehicleDetails(null);
+
+    if (!regoPlate.trim()) {
+      setRegoError('Please enter a registration plate.');
+      return;
+    }
+
+    setIsLookingUpRego(true);
+    try {
+      const res = await fetch(
+        `/api/rego?plate=${encodeURIComponent(regoPlate)}&state=${regoState}`
+      );
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setRegoError(data.error || 'Unable to find vehicle details.');
+        return;
+      }
+
+      // AutoGrab returns data in a specific structure
+      const vehicle = data.vehicles?.[0] || data;
+
+      setVehicleDetails({
+        make: vehicle.make ?? 'Unknown',
+        model: vehicle.model ?? 'Unknown',
+        year: vehicle.year ?? 0,
+        series: vehicle.series,
+        fuel_type: vehicle.fuel_type,
+        transmission: vehicle.transmission,
+      });
+    } catch (error) {
+      console.error(error);
+      setRegoError('Something went wrong. Please try again.');
+    } finally {
+      setIsLookingUpRego(false);
+    }
+  };
 
   const faqs = [
     {
@@ -76,6 +199,234 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
+      {/* BOOKING MODAL - Slides down from top */}
+      <AnimatePresence>
+        {showBookingModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowBookingModal(false)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ y: '-100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '-100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed left-1/2 top-1/2 z-[101] w-[95%] max-w-2xl -translate-x-1/2 -translate-y-1/2"
+            >
+              <div className="relative rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                {/* Close button */}
+                <button
+                  type="button"
+                  onClick={() => setShowBookingModal(false)}
+                  className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+
+                {/* Modal content */}
+                <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+                  <div className="mb-6">
+                    <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                      Start a quick booking
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Tell us when and where – we&apos;ll match you with a
+                      vetted local garage.
+                    </p>
+                  </div>
+
+                  <form
+                    className="space-y-5"
+                    onSubmit={(e) => e.preventDefault()}
+                  >
+                    {/* Time inputs */}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">
+                          Earliest pick-up time
+                        </label>
+                        <input
+                          type="time"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">
+                          Latest drop-off time
+                        </label>
+                        <input
+                          type="time"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">
+                        Pick-up address
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 123 King St, Newcastle NSW"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
+                      />
+                    </div>
+
+                    {/* Registration Section with Plate Visual */}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                        Vehicle Registration
+                      </h3>
+
+                      <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+                        {/* Plate visual */}
+                        <div className="flex-shrink-0">
+                          <RegistrationPlate
+                            plate={regoPlate}
+                            state={regoState}
+                          />
+                        </div>
+
+                        {/* Inputs */}
+                        <div className="w-full flex-1 space-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              State
+                            </label>
+                            <select
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                              value={regoState}
+                              onChange={(e) =>
+                                setRegoState(e.target.value as StateCode)
+                              }
+                            >
+                              <option value="NSW">NSW</option>
+                              <option value="QLD">QLD</option>
+                              <option value="VIC">VIC</option>
+                              <option value="SA">SA</option>
+                              <option value="WA">WA</option>
+                              <option value="TAS">TAS</option>
+                              <option value="NT">NT</option>
+                              <option value="ACT">ACT</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Registration number
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="ABC123"
+                                maxLength={6}
+                                value={regoPlate}
+                                onChange={(e) =>
+                                  setRegoPlate(
+                                    e.target.value.toUpperCase().slice(0, 6)
+                                  )
+                                }
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleRegoLookup}
+                                disabled={isLookingUpRego}
+                                className="whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {isLookingUpRego ? 'Looking up…' : 'Lookup'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {regoError && (
+                            <p className="text-xs text-red-600">{regoError}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Vehicle details result */}
+                      {vehicleDetails && (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
+                            <div>
+                              <p className="font-semibold text-emerald-900">
+                                Vehicle found:{' '}
+                                {vehicleDetails.year
+                                  ? `${vehicleDetails.year} `
+                                  : ''}
+                                {vehicleDetails.make} {vehicleDetails.model}
+                              </p>
+                              <p className="mt-0.5 text-sm text-emerald-700">
+                                {vehicleDetails.series && (
+                                  <>Series: {vehicleDetails.series}</>
+                                )}
+                                {vehicleDetails.series &&
+                                  vehicleDetails.fuel_type && <> • </>}
+                                {vehicleDetails.fuel_type && (
+                                  <>Fuel: {vehicleDetails.fuel_type}</>
+                                )}
+                                {(vehicleDetails.series ||
+                                  vehicleDetails.fuel_type) &&
+                                  vehicleDetails.transmission && <> • </>}
+                                {vehicleDetails.transmission && (
+                                  <>Trans: {vehicleDetails.transmission}</>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Service type */}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">
+                        Service type
+                      </label>
+                      <select className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2">
+                        <option value="standard">
+                          Standard service ($89 pick-up)
+                        </option>
+                        <option value="major">
+                          Major service ($139 pick-up)
+                        </option>
+                        <option value="logbook">Logbook service</option>
+                        <option value="diagnostic">Diagnostic / other</option>
+                      </select>
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                    >
+                      Continue to detailed booking
+                    </button>
+
+                    <p className="text-center text-xs text-slate-500">
+                      No payment taken yet. We&apos;ll confirm availability and
+                      get back to you.
+                    </p>
+                  </form>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -94,7 +445,10 @@ export default function Home() {
 
           {/* Desktop Nav */}
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            <a href="#how-it-works" className="transition hover:text-emerald-600">
+            <a
+              href="#how-it-works"
+              className="transition hover:text-emerald-600"
+            >
               How it works
             </a>
             <a href="#services" className="transition hover:text-emerald-600">
@@ -112,229 +466,21 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setShowBookingPanel((prev) => !prev)}
+              onClick={() => setShowBookingModal(true)}
               className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
             >
               Book a service
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <button className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block">
+            <button
+              type="button"
+              className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block"
+            >
               Login
             </button>
           </div>
         </div>
       </header>
-
-      {/* SLIDE-DOWN BOOKING PANEL */}
-      <AnimatePresence>
-        {showBookingPanel && (
-          <motion.section
-            initial={{ height: 0, opacity: 0, y: -20 }}
-            animate={{ height: 'auto', opacity: 1, y: 0 }}
-            exit={{ height: 0, opacity: 0, y: -20 }}
-            transition={{ duration: 0.25 }}
-            className="border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm"
-          >
-            <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-                    Start a quick booking
-                  </h2>
-                  <p className="text-xs text-slate-500 sm:text-sm">
-                    Tell us when and where – we&apos;ll match you with a vetted
-                    local garage.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowBookingPanel(false)}
-                  className="text-xs font-medium text-slate-500 hover:text-slate-700"
-                >
-                  Close
-                </button>
-              </div>
-
-              <form
-                className="grid gap-4 sm:grid-cols-2"
-                onSubmit={(e) => e.preventDefault()}
-              >
-                {/* Earliest pick-up time */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 sm:text-sm">
-                    Earliest pick-up time
-                  </label>
-                  <input
-                    type="time"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-
-                {/* Latest drop-off time */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 sm:text-sm">
-                    Latest drop-off time
-                  </label>
-                  <input
-                    type="time"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-
-                {/* Address */}
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-medium text-slate-700 sm:text-sm">
-                    Pick-up address
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 123 King St, Newcastle NSW"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                  />
-                  {/* Later we can plug in Google Maps / Places here */}
-                </div>
-
-                {/* State */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 sm:text-sm">
-                    State
-                  </label>
-                  <select
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
-                    defaultValue="NSW"
-                    id="rego-state"
-                  >
-                    <option value="NSW">NSW</option>
-                    <option value="QLD">QLD</option>
-                    <option value="VIC">VIC</option>
-                    <option value="SA">SA</option>
-                    <option value="WA">WA</option>
-                    <option value="TAS">TAS</option>
-                    <option value="NT">NT</option>
-                    <option value="ACT">ACT</option>
-                  </select>
-                </div>
-
-                {/* Registration + lookup */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 sm:text-sm">
-                    Registration (rego)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. ABC123"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                      id="rego-plate"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setRegoError(null);
-                        setVehicleDetails(null);
-
-                        const plateInput = document.getElementById(
-                          'rego-plate'
-                        ) as HTMLInputElement | null;
-                        const stateSelect = document.getElementById(
-                          'rego-state'
-                        ) as HTMLSelectElement | null;
-
-                        const plate = plateInput?.value || '';
-                        const state = stateSelect?.value || '';
-
-                        if (!plate.trim()) {
-                          setRegoError('Please enter a registration plate.');
-                          return;
-                        }
-
-                        setIsLookingUpRego(true);
-                        try {
-                          const res = await fetch('/api/rego', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ plate, state }),
-                          });
-
-                          const data = await res.json();
-
-                          if (!res.ok || data.error) {
-                            setRegoError(
-                              data.error || 'Unable to find vehicle details.'
-                            );
-                            return;
-                          }
-
-                          setVehicleDetails({
-                            make: data.make ?? 'Unknown',
-                            model: data.model ?? 'Unknown',
-                            year: data.year ?? 0,
-                            series: data.series,
-                            fuel_type: data.fuel_type,
-                            transmission: data.transmission,
-                          });
-                        } catch (error) {
-                          console.error(error);
-                          setRegoError('Something went wrong. Please try again.');
-                        } finally {
-                          setIsLookingUpRego(false);
-                        }
-                      }}
-                      className="whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500"
-                    >
-                      {isLookingUpRego ? 'Looking up…' : 'Lookup'}
-                    </button>
-                  </div>
-                  {regoError && (
-                    <p className="mt-1 text-xs text-red-600">{regoError}</p>
-                  )}
-                </div>
-
-                {/* Vehicle summary (from API/mock) */}
-                {vehicleDetails && (
-                  <div className="sm:col-span-2">
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 sm:text-sm">
-                      <p className="font-semibold">
-                        Vehicle found:{' '}
-                        {vehicleDetails.year
-                          ? `${vehicleDetails.year} `
-                          : ''}
-                        {vehicleDetails.make} {vehicleDetails.model}
-                      </p>
-                      <p className="mt-1">
-                        {vehicleDetails.series && (
-                          <>
-                            Series: {vehicleDetails.series}
-                            {' • '}
-                          </>
-                        )}
-                        {vehicleDetails.fuel_type && (
-                              <>Fuel: {vehicleDetails.fuel_type} {' • '}</>
-                        )}
-                        {vehicleDetails.transmission && (
-                          <>Transmission: {vehicleDetails.transmission}</>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Submit CTA */}
-                <div className="sm:col-span-2">
-                  <button
-                    type="button"
-                    className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/35 transition hover:bg-emerald-600"
-                  >
-                    Continue to detailed booking
-                  </button>
-                </div>
-              </form>
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
 
       {/* HERO - Fixter-style bold colored section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
@@ -369,7 +515,7 @@ export default function Home() {
               <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
                 <button
                   type="button"
-                  onClick={() => setShowBookingPanel(true)}
+                  onClick={() => setShowBookingModal(true)}
                   className="group inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
                 >
                   Book a service
@@ -388,7 +534,6 @@ export default function Home() {
                       />
                     ))}
                   </div>
-                  <span>Trusted service</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-emerald-300" />
@@ -641,16 +786,15 @@ export default function Home() {
                   <h3 className="mb-1 text-lg font-semibold text-slate-900">
                     {service.title}
                   </h3>
-                  <p className="mb-4 text-sm text-slate-500">
-                    {service.price}
-                  </p>
-                  <a
-                    href="#booking"
+                  <p className="mb-4 text-sm text-slate-500">{service.price}</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowBookingModal(true)}
                     className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 transition hover:text-emerald-700"
                   >
                     Get a quote
                     <ArrowRight className="h-4 w-4" />
-                  </a>
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -789,6 +933,7 @@ export default function Home() {
               {faqs.map((faq, index) => (
                 <div key={index} className="py-4">
                   <button
+                    type="button"
                     onClick={() =>
                       setOpenFaq(openFaq === index ? null : index)
                     }
@@ -995,34 +1140,22 @@ export default function Home() {
               <h4 className="mb-4 font-semibold">Popular Services</h4>
               <ul className="space-y-2 text-sm text-emerald-200">
                 <li>
-                  <a
-                    href="#services"
-                    className="transition hover:text-white"
-                  >
+                  <a href="#services" className="transition hover:text-white">
                     Standard service
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#services"
-                    className="transition hover:text-white"
-                  >
+                  <a href="#services" className="transition hover:text-white">
                     Major service
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#services"
-                    className="transition hover:text-white"
-                  >
+                  <a href="#services" className="transition hover:text-white">
                     Logbook service
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#services"
-                    className="transition hover:text-white"
-                  >
+                  <a href="#services" className="transition hover:text-white">
                     Car diagnostic
                   </a>
                 </li>
