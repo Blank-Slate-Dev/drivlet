@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, User, LogOut, ChevronDown } from "lucide-react";
+import { ArrowRight, User, LogOut, ChevronDown, Settings } from "lucide-react";
 
 interface HeaderProps {
   onBookingClick: () => void;
@@ -113,6 +113,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
                     >
                       <User className="h-4 w-4" />
                       Dashboard
+                    </Link>
+                    <Link
+                      href="/account"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Account Settings
                     </Link>
                     <button
                       type="button"
