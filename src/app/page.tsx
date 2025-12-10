@@ -472,12 +472,12 @@ export default function Home() {
               Book a service
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <button
-              type="button"
+            <a
+              href="/login"
               className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block"
             >
               Login
-            </button>
+            </a>
           </div>
         </div>
       </header>
