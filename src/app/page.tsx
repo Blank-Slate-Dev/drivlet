@@ -255,6 +255,7 @@ export default function Home() {
                         </label>
                         <input
                           type="time"
+                          step={900}
                           className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                         />
                       </div>
@@ -265,6 +266,7 @@ export default function Home() {
                         </label>
                         <input
                           type="time"
+                          step={900}
                           className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                         />
                       </div>
@@ -472,12 +474,12 @@ export default function Home() {
               Book a service
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <a
-              href="/login"
+            <button
+              type="button"
               className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block"
             >
               Login
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -485,7 +487,7 @@ export default function Home() {
       {/* HERO - Fixter-style bold colored section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
         {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 z-0 opacity-10">
           <div
             className="h-full w-full"
             style={{
@@ -494,7 +496,19 @@ export default function Home() {
           />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
+        {/* Road image - top-left corner */}
+        <div className="pointer-events-none absolute left-0 top-0 z-0">
+          <Image
+            src="/road.png"
+            alt="Road background"
+            width={800}
+            height={800}
+            className="origin-top-left scale-75 object-contain"
+            priority
+          />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             {/* Left: Hero text */}
             <motion.div
@@ -574,162 +588,185 @@ export default function Home() {
         </div>
       </section>
 
-      {/* VALUE PROPS - "Simply book online" section */}
-      <section className="border-b border-slate-200 bg-white py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              Simply{' '}
-              <span className="relative inline-block">
-                book online
-                <svg
-                  className="absolute -bottom-1 left-0 w-full"
-                  height="8"
-                  viewBox="0 0 100 8"
-                  preserveAspectRatio="none"
+      {/* WRAPPER FOR VALUE PROPS + HOW IT WORKS with overlapping car */}
+      <div className="relative">
+        {/* Floating Toyota car image - positioned to overlap both sections */}
+        <motion.div
+          initial={{ opacity: 0, x: -100 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="pointer-events-none absolute left-0 top-1/2 z-20 hidden -translate-y-1/2 lg:block"
+          style={{ marginTop: '-40px' }}
+        >
+          <Image
+            src="/toyota_ariel_view.png"
+            alt="Toyota aerial view"
+            width={500}
+            height={350}
+            className="w-[380px] object-contain drop-shadow-2xl xl:w-[450px] 2xl:w-[500px]"
+          />
+        </motion.div>
+
+        {/* VALUE PROPS - "Simply book online" section */}
+        <section className="relative border-b border-slate-200 bg-white py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mb-12 text-center">
+              <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
+                Simply{' '}
+                <span className="relative inline-block">
+                  book online
+                  <svg
+                    className="absolute -bottom-1 left-0 w-full"
+                    height="8"
+                    viewBox="0 0 100 8"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d="M0 7 Q 50 0 100 7"
+                      stroke="#fbbf24"
+                      strokeWidth="3"
+                      fill="none"
+                    />
+                  </svg>
+                </span>{' '}
+                and we&apos;ll handle the rest
+              </h2>
+            </div>
+
+            {/* Offset grid to make room for the car on the left */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:pl-[200px] xl:pl-[240px] 2xl:pl-[280px]">
+              {[
+                {
+                  icon: Users,
+                  title: 'Advisors on your side',
+                  description:
+                    'Our in-house experts make sure any quotes you receive are relevant and fairly priced, so no nasty surprises!',
+                },
+                {
+                  icon: Gauge,
+                  title: 'Fair pricing',
+                  description:
+                    'We negotiate competitive rates with garages to offer the best prices, on average 30% cheaper than main dealerships.',
+                },
+                {
+                  icon: ShieldCheck,
+                  title: 'Vetted garages',
+                  description:
+                    'We personally select and vet only the best local garages, fully covered by a 12-month warranty on parts and labour.',
+                },
+                {
+                  icon: Car,
+                  title: 'Collection from your door',
+                  description:
+                    'Our fully insured drivers offer a contact-free collection and delivery service, with flexible time slots that suit you.',
+                },
+              ].map((item, index) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-60px' }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:shadow-md"
                 >
-                  <path
-                    d="M0 7 Q 50 0 100 7"
-                    stroke="#fbbf24"
-                    strokeWidth="3"
-                    fill="none"
-                  />
-                </svg>
-              </span>{' '}
-              and we&apos;ll handle the rest
-            </h2>
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+                    <item.icon className="h-7 w-7 text-emerald-600" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-slate-900">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    {item.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
           </div>
+        </section>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Users,
-                title: 'Advisors on your side',
-                description:
-                  'Our in-house experts make sure any quotes you receive are relevant and fairly priced, so no nasty surprises!',
-              },
-              {
-                icon: Gauge,
-                title: 'Fair pricing',
-                description:
-                  'We negotiate competitive rates with garages to offer the best prices, on average 30% cheaper than main dealerships.',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'Vetted garages',
-                description:
-                  'We personally select and vet only the best local garages, fully covered by a 12-month warranty on parts and labour.',
-              },
-              {
-                icon: Car,
-                title: 'Collection from your door',
-                description:
-                  'Our fully insured drivers offer a contact-free collection and delivery service, with flexible time slots that suit you.',
-              },
-            ].map((item, index) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-60px' }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:shadow-md"
-              >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
-                  <item.icon className="h-7 w-7 text-emerald-600" />
-                </div>
-                <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                  {item.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-slate-600">
-                  {item.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+        {/* HOW IT WORKS - 4 steps */}
+        <section
+          id="how-it-works"
+          className="relative border-b border-slate-200 bg-slate-50 py-16 sm:py-20"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mb-12 text-center">
+              <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
+                How it works
+              </h2>
+              <p className="mt-3 text-lg text-slate-600">
+                Car servicing, made easy in{' '}
+                <span className="relative inline-block font-semibold">
+                  4 steps
+                  <svg
+                    className="absolute -bottom-1 left-0 w-full"
+                    height="6"
+                    viewBox="0 0 100 6"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d="M0 5 Q 50 0 100 5"
+                      stroke="#fbbf24"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+              </p>
+            </div>
 
-      {/* HOW IT WORKS - 4 steps */}
-      <section
-        id="how-it-works"
-        className="border-b border-slate-200 bg-slate-50 py-16 sm:py-20"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              How it works
-            </h2>
-            <p className="mt-3 text-lg text-slate-600">
-              Car servicing, made easy in{' '}
-              <span className="relative inline-block font-semibold">
-                4 steps
-                <svg
-                  className="absolute -bottom-1 left-0 w-full"
-                  height="6"
-                  viewBox="0 0 100 6"
-                  preserveAspectRatio="none"
+            {/* Offset grid to make room for the car on the left */}
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 lg:pl-[200px] xl:pl-[240px] 2xl:pl-[280px]">
+              {[
+                {
+                  step: '1',
+                  title: 'Book online in 2 clicks',
+                  description:
+                    'Share your rego, pick-up location, and service type. We handle the rest.',
+                },
+                {
+                  step: '2',
+                  title: 'We collect your car',
+                  description:
+                    'Our fully insured drivers collect your car right from your doorstep or workplace.',
+                },
+                {
+                  step: '3',
+                  title: 'Your car gets serviced',
+                  description:
+                    'We coordinate with our vetted garage network and keep you updated throughout.',
+                },
+                {
+                  step: '4',
+                  title: 'We return your car',
+                  description:
+                    'Your serviced car is returned before the end of your workday, ready to drive home.',
+                },
+              ].map((item, index) => (
+                <motion.div
+                  key={item.step}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-60px' }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  className="relative"
                 >
-                  <path
-                    d="M0 5 Q 50 0 100 5"
-                    stroke="#fbbf24"
-                    strokeWidth="2"
-                    fill="none"
-                  />
-                </svg>
-              </span>
-            </p>
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-400">
+                    {item.step}
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-slate-900">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    {item.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
           </div>
-
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                step: '1',
-                title: 'Book online in 2 clicks',
-                description:
-                  'Share your rego, pick-up location, and service type. We handle the rest.',
-              },
-              {
-                step: '2',
-                title: 'We collect your car',
-                description:
-                  'Our fully insured drivers collect your car right from your doorstep or workplace.',
-              },
-              {
-                step: '3',
-                title: 'Your car gets serviced',
-                description:
-                  'We coordinate with our vetted garage network and keep you updated throughout.',
-              },
-              {
-                step: '4',
-                title: 'We return your car',
-                description:
-                  'Your serviced car is returned before the end of your workday, ready to drive home.',
-              },
-            ].map((item, index) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-60px' }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="relative"
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-400">
-                  {item.step}
-                </div>
-                <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                  {item.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-slate-600">
-                  {item.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/* SERVICES SECTION */}
       <section
@@ -786,7 +823,9 @@ export default function Home() {
                   <h3 className="mb-1 text-lg font-semibold text-slate-900">
                     {service.title}
                   </h3>
-                  <p className="mb-4 text-sm text-slate-500">{service.price}</p>
+                  <p className="mb-4 text-sm text-slate-500">
+                    {service.price}
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowBookingModal(true)}
@@ -885,8 +924,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA BANNER */}
-      <section className="bg-gradient-to-r from-emerald-700 to-teal-700 py-16">
+      {/* CTA BANNER (Contact) */}
+      <section
+        id="contact"
+        className="bg-gradient-to-r from-emerald-700 to-teal-700 py-16"
+      >
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">
             Need a hand understanding your car needs?
@@ -978,110 +1020,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BOOKING FORM SECTION */}
-      <section
-        id="booking"
-        className="border-b border-slate-200 bg-slate-50 py-16 sm:py-20"
-      >
-        <div className="mx-auto max-w-2xl px-4 sm:px-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg sm:p-10">
-            <div className="mb-6 text-center">
-              <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                Start a provisional booking
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Fill in your details and we&apos;ll confirm availability with
-                our partner garages.
-              </p>
-            </div>
-
-            <form className="space-y-5">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Your name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="John Smith"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Your email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="john@example.com"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Where will your car be?
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Newcastle CBD office carpark"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                />
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Registration (rego)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ABC 123"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Preferred date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Service type
-                </label>
-                <select className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2">
-                  <option value="standard">
-                    Standard service ($89 pick-up)
-                  </option>
-                  <option value="major">Major service ($139 pick-up)</option>
-                  <option value="logbook">Logbook service</option>
-                  <option value="diagnostic">Diagnostic / other</option>
-                </select>
-              </div>
-
-              <button
-                type="button"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-              >
-                Request provisional booking
-              </button>
-
-              <p className="text-center text-xs leading-relaxed text-slate-500">
-                No payment taken yet. A drivlet team member will confirm
-                availability with our partner garages and get back to you.
-              </p>
-            </form>
-          </div>
-        </div>
-      </section>
-
       {/* FOOTER */}
       <footer className="bg-emerald-900 text-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
@@ -1128,7 +1066,7 @@ export default function Home() {
                   </a>
                 </li>
                 <li>
-                  <a href="#booking" className="transition hover:text-white">
+                  <a href="#contact" className="transition hover:text-white">
                     Contact
                   </a>
                 </li>
