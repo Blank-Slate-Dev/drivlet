@@ -6,12 +6,27 @@ import User from "@/models/User";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { username, email, password } = await request.json();
 
     // Validate input
-    if (!email || !password) {
+    if (!username || !email || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Username, email, and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate username
+    if (username.length < 3) {
+      return NextResponse.json(
+        { error: "Username must be at least 3 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (username.length > 30) {
+      return NextResponse.json(
+        { error: "Username cannot exceed 30 characters" },
         { status: 400 }
       );
     }
@@ -36,11 +51,20 @@ export async function POST(request: NextRequest) {
     // Connect to database
     await connectDB();
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
       return NextResponse.json(
         { error: "Email already registered" },
+        { status: 409 }
+      );
+    }
+
+    // Check if username already exists
+    const existingUsername = await User.findOne({ username: username.trim() });
+    if (existingUsername) {
+      return NextResponse.json(
+        { error: "Username already taken" },
         { status: 409 }
       );
     }
@@ -51,6 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Create new user
     const user = new User({
+      username: username.trim(),
       email: email.toLowerCase(),
       password: hashedPassword,
     });

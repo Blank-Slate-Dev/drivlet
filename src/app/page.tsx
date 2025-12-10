@@ -22,6 +22,7 @@ import {
   Zap,
   X,
 } from 'lucide-react';
+import Header from '@/components/Header';
 
 type VehicleDetails = {
   make: string;
@@ -430,59 +431,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo */}
-          <a href="/" className="flex items-center gap-2">
-            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-              <Image
-                src="/logo.png"
-                alt="drivlet"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
-          </a>
-
-          {/* Desktop Nav */}
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            <a
-              href="#how-it-works"
-              className="transition hover:text-emerald-600"
-            >
-              How it works
-            </a>
-            <a href="#services" className="transition hover:text-emerald-600">
-              Our services
-            </a>
-            <a href="#pricing" className="transition hover:text-emerald-600">
-              Pricing
-            </a>
-            <a href="#faq" className="transition hover:text-emerald-600">
-              FAQ
-            </a>
-          </nav>
-
-          {/* CTA buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowBookingModal(true)}
-              className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
-            >
-              Book a service
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </button>
-            <button
-              type="button"
-              className="hidden text-sm font-medium text-slate-700 transition hover:text-emerald-600 sm:block"
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header onBookingClick={() => setShowBookingModal(true)} />
 
       {/* HERO - Fixter-style bold colored section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
