@@ -497,16 +497,16 @@ export default function Home() {
         </div>
 
         {/* Road image - top-left corner */}
-        <div className="pointer-events-none absolute left-0 top-0 z-0">
-          <Image
-            src="/road.png"
-            alt="Road background"
-            width={800}
-            height={800}
-            className="origin-top-left scale-75 object-contain"
-            priority
-          />
-        </div>
+        <div className="pointer-events-none absolute left-0 -top-10 z-0">
+  <Image
+    src="/road_image.png"
+    alt="Road background"
+    width={800}
+    height={800}
+    className="origin-top-left scale-75 object-contain"
+    priority
+  />
+</div>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
