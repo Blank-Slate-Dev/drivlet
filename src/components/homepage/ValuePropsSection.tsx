@@ -58,8 +58,8 @@ export default function ValuePropsSection() {
           </h2>
         </div>
 
-        {/* Offset grid to make room for the car on the left */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:pl-[200px] xl:pl-[240px] 2xl:pl-[280px]">
+        {/* Centered grid - no offset */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {valueProps.map((item, index) => (
             <motion.div
               key={item.title}
