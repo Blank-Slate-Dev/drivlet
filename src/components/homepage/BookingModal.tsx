@@ -20,20 +20,32 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
-// Generate time options in 15-minute intervals
-function generateTimeOptions(): string[] {
-  const options: string[] = [];
-  for (let hour = 0; hour < 24; hour++) {
+// Generate time options in 15-minute intervals with 12-hour format
+function generateTimeOptions(startHour: number, endHour: number): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  for (let hour = startHour; hour <= endHour; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
-      const h = hour.toString().padStart(2, '0');
-      const m = minute.toString().padStart(2, '0');
-      options.push(`${h}:${m}`);
+      // Skip times past the end hour (e.g., 14:15, 14:30, 14:45 if endHour is 14)
+      if (hour === endHour && minute > 0) continue;
+      
+      const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      
+      // Convert to 12-hour format for display
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const ampm = hour < 12 ? 'am' : 'pm';
+      const label = `${displayHour}:${minute.toString().padStart(2, '0')}${ampm}`;
+      
+      options.push({ value, label });
     }
   }
   return options;
 }
 
-const timeOptions = generateTimeOptions();
+// Pick-up: 6am - 2pm (6:00 - 14:00)
+const pickupTimeOptions = generateTimeOptions(6, 14);
+
+// Drop-off: 9am - 7pm (9:00 - 19:00)
+const dropoffTimeOptions = generateTimeOptions(9, 19);
 
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
@@ -156,9 +168,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         onChange={(e) => setEarliestPickup(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                       >
-                        {timeOptions.map((time) => (
-                          <option key={`earliest-${time}`} value={time}>
-                            {time}
+                        {pickupTimeOptions.map((time) => (
+                          <option key={`earliest-${time.value}`} value={time.value}>
+                            {time.label}
                           </option>
                         ))}
                       </select>
@@ -173,9 +185,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         onChange={(e) => setLatestDropoff(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
                       >
-                        {timeOptions.map((time) => (
-                          <option key={`latest-${time}`} value={time}>
-                            {time}
+                        {dropoffTimeOptions.map((time) => (
+                          <option key={`latest-${time.value}`} value={time.value}>
+                            {time.label}
                           </option>
                         ))}
                       </select>
