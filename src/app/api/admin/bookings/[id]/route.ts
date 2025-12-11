@@ -119,7 +119,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         stage: data.currentStage,
         timestamp: new Date(),
         message: data.message || STAGE_MESSAGES[data.currentStage] || `Stage updated to ${data.currentStage}`,
-        updatedBy: adminCheck.session?.user.email || "admin",
+        updatedBy: adminCheck.session.user.email || "admin",
       });
 
       // Auto-update status based on stage
@@ -219,7 +219,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         stage: data.currentStage,
         timestamp: new Date(),
         message: updateMessage,
-        updatedBy: adminCheck.session?.user.email || "admin",
+        updatedBy: adminCheck.session.user.email || "admin",
       });
 
       // Auto-update status based on stage
@@ -250,7 +250,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           stage: booking.currentStage,
           timestamp: new Date(),
           message: statusMessage,
-          updatedBy: adminCheck.session?.user.email || "admin",
+          updatedBy: adminCheck.session.user.email || "admin",
         });
       }
 

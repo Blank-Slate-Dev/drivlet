@@ -2,6 +2,11 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
+import { Session } from "next-auth";
+
+type AdminCheckResult =
+  | { authorized: false; response: NextResponse; session: null }
+  | { authorized: true; response: null; session: Session };
 
 /**
  * Check if the current user is an admin
@@ -28,12 +33,13 @@ export async function getAdminSession() {
  * Middleware helper for API routes
  * Returns a 403 response if user is not an admin
  */
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<AdminCheckResult> {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
     return {
       authorized: false,
+      session: null,
       response: NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -44,6 +50,7 @@ export async function requireAdmin() {
   if (session.user.role !== "admin") {
     return {
       authorized: false,
+      session: null,
       response: NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
