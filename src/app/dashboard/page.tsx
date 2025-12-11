@@ -8,71 +8,69 @@ import {
   Clock,
   CheckCircle2,
   MapPin,
-  Calendar,
   Car,
-  Wrench,
   ChevronRight,
   Loader2,
   Plus,
   AlertCircle,
 } from "lucide-react";
+import { BookingModal } from "@/components/homepage";
 
-type JourneyStage =
-  | "Booking Confirmed"
-  | "Driver En Route To You"
-  | "Car Picked Up"
-  | "At Garage"
-  | "Service In Progress"
-  | "Driver En Route Back"
-  | "Delivered";
+// Stage definitions
+const STAGES = [
+  { id: "booking_confirmed", label: "Confirmed" },
+  { id: "driver_en_route", label: "En Route" },
+  { id: "car_picked_up", label: "Picked Up" },
+  { id: "at_garage", label: "At Garage" },
+  { id: "service_in_progress", label: "In Progress" },
+  { id: "driver_returning", label: "Returning" },
+  { id: "delivered", label: "Delivered" },
+];
 
-interface JourneyEvent {
-  stage: JourneyStage;
-  timestamp: string | null;
-  completed: boolean;
-  notes?: string;
+interface Update {
+  stage: string;
+  timestamp: string;
+  message: string;
+  updatedBy: string;
 }
 
 interface Booking {
   _id: string;
-  vehicle: {
-    make: string;
-    model: string;
-    plate: string;
-    state: string;
-  };
+  vehicleRegistration: string;
+  vehicleState: string;
   serviceType: string;
-  currentStage: JourneyStage;
+  currentStage: string;
   overallProgress: number;
-  pickupDate: string;
-  pickupTimeStart: string;
-  pickupTimeEnd: string;
-  garageName: string;
-  garageAddress: string;
-  etaReturn?: string;
-  statusMessage: string;
-  journeyEvents: JourneyEvent[];
+  pickupTime: string;
+  dropoffTime: string;
+  pickupAddress: string;
   status: string;
+  updates: Update[];
+  createdAt: string;
   updatedAt: string;
 }
 
-interface CarHeaderProps {
+interface BookingHeaderProps {
   booking: Booking;
 }
 
-function CarHeader({ booking }: CarHeaderProps) {
+function BookingHeader({ booking }: BookingHeaderProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-emerald-600">Your Car Journey</p>
+          <p className="text-sm font-medium text-emerald-600">Your Car Service</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-            {booking.vehicle.make} {booking.vehicle.model}
+            {booking.vehicleRegistration}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1.5">
               <Car className="h-4 w-4 text-slate-400" />
-              {booking.vehicle.plate} ({booking.vehicle.state})
+              {booking.vehicleState}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 text-slate-400" />
+              {booking.pickupAddress}
             </span>
           </div>
         </div>
@@ -81,7 +79,7 @@ function CarHeader({ booking }: CarHeaderProps) {
         </div>
       </div>
       <p className="mt-4 text-sm text-slate-500">
-        Sit back while we handle the pick-up, drop-off, and return.
+        Sit back while we handle the pick-up, service, and return.
       </p>
     </div>
   );
@@ -92,14 +90,6 @@ interface StatusSummaryProps {
 }
 
 function StatusSummary({ booking }: StatusSummaryProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-AU", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
-
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("en-AU", {
       day: "numeric",
@@ -109,7 +99,12 @@ function StatusSummary({ booking }: StatusSummaryProps) {
     });
   };
 
-  const pickupWindow = `${formatDate(booking.pickupDate)}, ${booking.pickupTimeStart}–${booking.pickupTimeEnd}`;
+  const getStageLabel = (stageId: string) => {
+    const stage = STAGES.find(s => s.id === stageId);
+    return stage?.label || stageId;
+  };
+
+  const latestUpdate = booking.updates[booking.updates.length - 1];
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -117,53 +112,27 @@ function StatusSummary({ booking }: StatusSummaryProps) {
         <span
           className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700"
           role="status"
-          aria-label={`Current stage: ${booking.currentStage}`}
+          aria-label={`Current stage: ${getStageLabel(booking.currentStage)}`}
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-          {booking.currentStage}
+          {getStageLabel(booking.currentStage)}
         </span>
         <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
           {booking.serviceType}
         </span>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-            <Calendar className="h-5 w-5 text-slate-600" />
+            <Clock className="h-5 w-5 text-slate-600" />
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Pickup Window
+              Pickup Time
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {pickupWindow}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-            <Wrench className="h-5 w-5 text-slate-600" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Garage
-            </p>
-            <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {booking.garageName || "To be assigned"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-            <MapPin className="h-5 w-5 text-slate-600" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Location
-            </p>
-            <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {booking.garageAddress || "TBD"}
+              {booking.pickupTime}
             </p>
           </div>
         </div>
@@ -173,10 +142,10 @@ function StatusSummary({ booking }: StatusSummaryProps) {
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Est. Return
+              Dropoff Time
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {booking.etaReturn ? formatDateTime(booking.etaReturn) : "TBD"}
+              {booking.dropoffTime}
             </p>
           </div>
         </div>
@@ -202,12 +171,12 @@ function StatusSummary({ booking }: StatusSummaryProps) {
         </div>
       </div>
 
-      {booking.statusMessage && (
+      {latestUpdate && (
         <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            What's Happening Now
+            Latest Update
           </p>
-          <p className="mt-1 text-sm text-emerald-800">{booking.statusMessage}</p>
+          <p className="mt-1 text-sm text-emerald-800">{latestUpdate.message}</p>
         </div>
       )}
 
@@ -219,11 +188,12 @@ function StatusSummary({ booking }: StatusSummaryProps) {
 }
 
 interface ActivityTimelineProps {
-  events: JourneyEvent[];
+  currentStage: string;
+  updates: Update[];
 }
 
-function ActivityTimeline({ events }: ActivityTimelineProps) {
-  const formatTimestamp = (timestamp: string | null) => {
+function ActivityTimeline({ currentStage, updates }: ActivityTimelineProps) {
+  const formatTimestamp = (timestamp: string | undefined) => {
     if (!timestamp) return "—";
     return new Date(timestamp).toLocaleDateString("en-AU", {
       day: "numeric",
@@ -231,67 +201,75 @@ function ActivityTimeline({ events }: ActivityTimelineProps) {
     });
   };
 
-  const eventTitles: Record<JourneyStage, string> = {
-    "Booking Confirmed": "Confirmed",
-    "Driver En Route To You": "En Route",
-    "Car Picked Up": "Picked Up",
-    "At Garage": "At Garage",
-    "Service In Progress": "In Progress",
-    "Driver En Route Back": "Returning",
-    "Delivered": "Delivered",
-  };
+  // Find which stages are completed based on currentStage
+  const currentStageIndex = STAGES.findIndex(s => s.id === currentStage);
+
+  // Create a map of updates by stage for timestamps
+  const updatesByStage = updates.reduce((acc, update) => {
+    acc[update.stage] = update;
+    return acc;
+  }, {} as Record<string, Update>);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-slate-900">Live Updates</h2>
 
       <div className="relative flex w-full items-start justify-between">
-        {events.map((event, index) => (
-          <div
-            key={event.stage}
-            className="relative flex flex-1 flex-col items-center"
-          >
+        {STAGES.map((stage, index) => {
+          const isCompleted = index <= currentStageIndex;
+          const update = updatesByStage[stage.id];
+
+          return (
             <div
-              className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7 ${
-                event.completed
-                  ? "bg-emerald-500"
-                  : "border-2 border-slate-300 bg-white"
-              }`}
+              key={stage.id}
+              className="relative flex flex-1 flex-col items-center"
             >
-              {event.completed && (
-                <CheckCircle2 className="h-3.5 w-3.5 text-white sm:h-4 sm:w-4" />
-              )}
-            </div>
-
-            {index < events.length - 1 && (
               <div
-                className={`absolute top-3 left-[50%] h-0.5 w-full sm:top-3.5 ${
-                  event.completed ? "bg-emerald-300" : "bg-slate-200"
-                }`}
-                style={{ zIndex: 0 }}
-              />
-            )}
-
-            <div className="mt-2 w-full px-0.5 text-center">
-              <p
-                className={`text-[9px] font-medium leading-tight sm:text-[10px] ${
-                  event.completed ? "text-slate-700" : "text-slate-400"
+                className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7 ${
+                  isCompleted
+                    ? "bg-emerald-500"
+                    : "border-2 border-slate-300 bg-white"
                 }`}
               >
-                {eventTitles[event.stage]}
-              </p>
-              <p className="mt-0.5 hidden text-[8px] text-slate-400 sm:block">
-                {formatTimestamp(event.timestamp)}
-              </p>
+                {isCompleted && (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-white sm:h-4 sm:w-4" />
+                )}
+              </div>
+
+              {index < STAGES.length - 1 && (
+                <div
+                  className={`absolute top-3 left-[50%] h-0.5 w-full sm:top-3.5 ${
+                    isCompleted ? "bg-emerald-300" : "bg-slate-200"
+                  }`}
+                  style={{ zIndex: 0 }}
+                />
+              )}
+
+              <div className="mt-2 w-full px-0.5 text-center">
+                <p
+                  className={`text-[9px] font-medium leading-tight sm:text-[10px] ${
+                    isCompleted ? "text-slate-700" : "text-slate-400"
+                  }`}
+                >
+                  {stage.label}
+                </p>
+                <p className="mt-0.5 hidden text-[8px] text-slate-400 sm:block">
+                  {formatTimestamp(update?.timestamp)}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function NoBookings() {
+interface NoBookingsProps {
+  onBookingClick: () => void;
+}
+
+function NoBookings({ onBookingClick }: NoBookingsProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
       <Car className="mx-auto h-12 w-12 text-slate-300" />
@@ -301,13 +279,14 @@ function NoBookings() {
       <p className="mt-2 text-sm text-slate-500">
         You don't have any car service bookings yet. Book your first service to get started!
       </p>
-      <Link
-        href="/"
+      <button
+        type="button"
+        onClick={onBookingClick}
         className="mt-6 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
       >
         <Plus className="h-4 w-4" />
         Book a Service
-      </Link>
+      </button>
     </div>
   );
 }
@@ -345,6 +324,10 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showBookingModal, setShowBookingModal] = useState(false);
+
+  const openBookingModal = () => setShowBookingModal(true);
+  const closeBookingModal = () => setShowBookingModal(false);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -408,19 +391,25 @@ export default function DashboardPage() {
 
   // Get the most recent active booking (not completed or cancelled)
   const activeBooking = bookings.find(
-    (b) => b.status === "active" || b.status === "pending"
+    (b) => b.status === "in_progress" || b.status === "pending"
   );
 
   return (
     <main className="min-h-screen bg-slate-50">
+      {/* Booking Modal */}
+      <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
+
       <DashboardHeader />
 
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
         {activeBooking ? (
           <>
-            <CarHeader booking={activeBooking} />
+            <BookingHeader booking={activeBooking} />
             <StatusSummary booking={activeBooking} />
-            <ActivityTimeline events={activeBooking.journeyEvents} />
+            <ActivityTimeline
+              currentStage={activeBooking.currentStage}
+              updates={activeBooking.updates}
+            />
 
             {/* Past Bookings */}
             {bookings.filter((b) => b._id !== activeBooking._id).length > 0 && (
@@ -439,11 +428,11 @@ export default function DashboardPage() {
                       >
                         <div>
                           <p className="font-medium text-slate-900">
-                            {booking.vehicle.make} {booking.vehicle.model}
+                            {booking.vehicleRegistration} ({booking.vehicleState})
                           </p>
                           <p className="text-xs text-slate-500">
                             {booking.serviceType} •{" "}
-                            {new Date(booking.pickupDate).toLocaleDateString()}
+                            {new Date(booking.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                         <span
@@ -464,7 +453,7 @@ export default function DashboardPage() {
             )}
           </>
         ) : (
-          <NoBookings />
+          <NoBookings onBookingClick={openBookingModal} />
         )}
       </div>
     </main>

@@ -38,9 +38,8 @@ export async function GET(request: NextRequest) {
       query.$or = [
         { userName: { $regex: search, $options: "i" } },
         { userEmail: { $regex: search, $options: "i" } },
-        { "vehicle.plate": { $regex: search, $options: "i" } },
-        { "vehicle.make": { $regex: search, $options: "i" } },
-        { "vehicle.model": { $regex: search, $options: "i" } },
+        { vehicleRegistration: { $regex: search, $options: "i" } },
+        { serviceType: { $regex: search, $options: "i" } },
       ];
     }
 

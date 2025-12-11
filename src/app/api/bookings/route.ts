@@ -51,14 +51,12 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     const requiredFields = [
-      "vehicle",
-      "serviceType",
+      "pickupTime",
+      "dropoffTime",
       "pickupAddress",
-      "pickupDate",
-      "pickupTimeStart",
-      "pickupTimeEnd",
-      "dropoffTimeStart",
-      "dropoffTimeEnd",
+      "vehicleRegistration",
+      "vehicleState",
+      "serviceType",
     ];
 
     for (const field of requiredFields) {
@@ -72,10 +70,23 @@ export async function POST(request: NextRequest) {
 
     // Create booking with user info
     const booking = new Booking({
-      ...data,
       userId: session.user.id,
       userEmail: session.user.email,
       userName: session.user.username || session.user.email,
+      pickupTime: data.pickupTime,
+      dropoffTime: data.dropoffTime,
+      pickupAddress: data.pickupAddress,
+      vehicleRegistration: data.vehicleRegistration,
+      vehicleState: data.vehicleState,
+      serviceType: data.serviceType,
+      updates: [
+        {
+          stage: "booking_confirmed",
+          timestamp: new Date(),
+          message: "Booking has been confirmed",
+          updatedBy: "system",
+        },
+      ],
     });
 
     await booking.save();

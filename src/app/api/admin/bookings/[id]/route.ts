@@ -1,11 +1,28 @@
 // src/app/api/admin/bookings/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import Booking, { JourneyStage } from "@/models/Booking";
+import Booking from "@/models/Booking";
 import { requireAdmin } from "@/lib/admin";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+// Stage progression for progress calculation
+const STAGES = [
+  "booking_confirmed",
+  "driver_en_route",
+  "car_picked_up",
+  "at_garage",
+  "service_in_progress",
+  "driver_returning",
+  "delivered",
+];
+
+function calculateProgress(stage: string): number {
+  const stageIndex = STAGES.indexOf(stage);
+  if (stageIndex === -1) return 14;
+  return Math.round(((stageIndex + 1) / STAGES.length) * 100);
 }
 
 // GET /api/admin/bookings/[id] - Get single booking
@@ -54,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       id,
       {
         ...data,
-        lastUpdatedBy: adminCheck.session?.user.id,
+        updatedAt: new Date(),
       },
       { new: true, runValidators: true }
     );
@@ -99,17 +116,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Handle stage update with automatic progress calculation
     if (data.currentStage) {
-      const stages: JourneyStage[] = [
-        "Booking Confirmed",
-        "Driver En Route To You",
-        "Car Picked Up",
-        "At Garage",
-        "Service In Progress",
-        "Driver En Route Back",
-        "Delivered",
-      ];
-
-      const stageIndex = stages.indexOf(data.currentStage);
+      const stageIndex = STAGES.indexOf(data.currentStage);
       if (stageIndex === -1) {
         return NextResponse.json(
           { error: "Invalid stage" },
@@ -117,67 +124,48 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // Update currentStage
+      // Update currentStage and calculate progress
       booking.currentStage = data.currentStage;
+      booking.overallProgress = calculateProgress(data.currentStage);
 
-      // Calculate and update progress
-      booking.overallProgress = Math.round(((stageIndex + 1) / stages.length) * 100);
-
-      // Update journey events
-      booking.journeyEvents = booking.journeyEvents.map((event, index) => ({
-        ...event,
-        completed: index <= stageIndex,
-        timestamp: index <= stageIndex && !event.timestamp ? new Date() : event.timestamp,
-      }));
+      // Add update entry
+      booking.updates.push({
+        stage: data.currentStage,
+        timestamp: new Date(),
+        message: data.message || `Stage updated to ${data.currentStage}`,
+        updatedBy: adminCheck.session?.user.email || "admin",
+      });
 
       // Update status based on stage
-      if (data.currentStage === "Delivered") {
+      if (data.currentStage === "delivered") {
         booking.status = "completed";
       } else if (stageIndex > 0) {
-        booking.status = "active";
+        booking.status = "in_progress";
       }
     }
 
     // Update other fields if provided
-    if (data.statusMessage !== undefined) {
-      booking.statusMessage = data.statusMessage;
-    }
-
-    if (data.adminNotes !== undefined) {
-      booking.adminNotes = data.adminNotes;
-    }
-
-    if (data.etaToGarage !== undefined) {
-      booking.etaToGarage = data.etaToGarage ? new Date(data.etaToGarage) : undefined;
-    }
-
-    if (data.etaReturn !== undefined) {
-      booking.etaReturn = data.etaReturn ? new Date(data.etaReturn) : undefined;
-    }
-
-    if (data.garageName !== undefined) {
-      booking.garageName = data.garageName;
-    }
-
-    if (data.garageAddress !== undefined) {
-      booking.garageAddress = data.garageAddress;
-    }
-
     if (data.status !== undefined) {
       booking.status = data.status;
     }
 
-    // Update event notes if provided
-    if (data.eventNotes && typeof data.eventNotes === "object") {
-      for (const [stage, notes] of Object.entries(data.eventNotes)) {
-        const eventIndex = booking.journeyEvents.findIndex(e => e.stage === stage);
-        if (eventIndex !== -1) {
-          booking.journeyEvents[eventIndex].notes = notes as string;
-        }
-      }
+    if (data.pickupTime !== undefined) {
+      booking.pickupTime = data.pickupTime;
     }
 
-    booking.lastUpdatedBy = adminCheck.session?.user.id;
+    if (data.dropoffTime !== undefined) {
+      booking.dropoffTime = data.dropoffTime;
+    }
+
+    if (data.pickupAddress !== undefined) {
+      booking.pickupAddress = data.pickupAddress;
+    }
+
+    if (data.serviceType !== undefined) {
+      booking.serviceType = data.serviceType;
+    }
+
+    booking.updatedAt = new Date();
     await booking.save();
 
     return NextResponse.json(booking);
