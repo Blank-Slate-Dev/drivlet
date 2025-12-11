@@ -53,7 +53,7 @@ function LoginForm() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative overflow-hidden">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
       {/* Subtle pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
@@ -64,8 +64,8 @@ function LoginForm() {
         />
       </div>
 
-      {/* Header */}
-      <header className="relative z-10">
+      {/* Header - matches homepage Header.tsx structure exactly */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-emerald-800/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="relative h-12 w-40 sm:h-14 sm:w-48">
@@ -82,7 +82,7 @@ function LoginForm() {
       </header>
 
       {/* Main content */}
-      <div className="relative z-10 flex min-h-[calc(100vh-80px)] items-center justify-center px-4 pb-12">
+      <div className="relative z-10 flex min-h-[calc(100vh-73px)] items-center justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
