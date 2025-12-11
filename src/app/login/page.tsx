@@ -64,8 +64,8 @@ function LoginForm() {
         />
       </div>
 
-      {/* Header - matches homepage Header.tsx structure exactly */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-emerald-800/80 backdrop-blur-sm">
+      {/* Header - matches homepage Header.tsx positioning exactly */}
+      <header className="sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="relative h-12 w-40 sm:h-14 sm:w-48">
