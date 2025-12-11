@@ -6,7 +6,7 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // GET /api/bookings/[id] - Get a specific booking (user can only see their own)
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   try {
     await connectDB();
-    const { id } = params;
+    const { id } = await params;
 
     const booking = await Booking.findById(id).lean();
 
@@ -33,16 +33,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Safety check: booking must have a userId
-    if (!("userId" in booking) || !booking.userId) {
+    // Make sure booking has a userId before comparing
+    const bookingWithUser = booking as { userId?: unknown };
+
+    if (!bookingWithUser.userId) {
       return NextResponse.json(
         { error: "Booking has no associated user" },
         { status: 500 }
       );
     }
 
+    const bookingUserId = String(bookingWithUser.userId);
+
     // Users can only see their own bookings (admins can see all via admin API)
-    if (String(booking.userId) !== session.user.id) {
+    if (bookingUserId !== session.user.id) {
       return NextResponse.json(
         { error: "Not authorized to view this booking" },
         { status: 403 }
