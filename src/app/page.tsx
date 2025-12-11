@@ -6,7 +6,6 @@ import Header from '@/components/Header';
 import {
   BookingModal,
   HeroSection,
-  FloatingCarWrapper,
   ValuePropsSection,
   HowItWorksSection,
   ServicesSection,
@@ -34,10 +33,8 @@ export default function Home() {
       <HeroSection onBookingClick={openBookingModal} />
 
       {/* Value Props + How It Works with floating car */}
-      <FloatingCarWrapper>
         <ValuePropsSection />
         <HowItWorksSection />
-      </FloatingCarWrapper>
 
       {/* Services Section */}
       <ServicesSection onBookingClick={openBookingModal} />
