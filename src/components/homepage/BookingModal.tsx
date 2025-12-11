@@ -2,8 +2,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 
 type VehicleDetails = {
@@ -58,7 +60,19 @@ const allDropoffTimeOptions = generateTimeOptions(9, 19);
 // Minimum gap between pickup and dropoff in minutes (2 hours = 120 minutes)
 const MIN_GAP_MINUTES = 120;
 
+// Service type mapping
+const SERVICE_TYPES: Record<string, string> = {
+  standard: 'Standard Service',
+  major: 'Major Service',
+  logbook: 'Logbook Service',
+  diagnostic: 'Diagnostic Check',
+};
+
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
+  const router = useRouter();
+  const { data: session, status: authStatus } = useSession();
+
+  // Form state
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
   const [regoError, setRegoError] = useState<string | null>(null);
   const [vehicleDetails, setVehicleDetails] = useState<VehicleDetails | null>(null);
@@ -66,6 +80,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [regoState, setRegoState] = useState<StateCode>('NSW');
   const [earliestPickup, setEarliestPickup] = useState('09:00');
   const [latestDropoff, setLatestDropoff] = useState('17:00');
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [serviceType, setServiceType] = useState('standard');
+
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Get the selected pickup time's minutes value
   const selectedPickupMinutes = useMemo(() => {
@@ -125,6 +146,26 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     };
   }, [isOpen]);
 
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Delay reset to allow exit animation
+      const timer = setTimeout(() => {
+        setRegoPlate('');
+        setRegoState('NSW');
+        setPickupAddress('');
+        setServiceType('standard');
+        setVehicleDetails(null);
+        setRegoError(null);
+        setSubmitError(null);
+        setShowSuccess(false);
+        setEarliestPickup('09:00');
+        setLatestDropoff('17:00');
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   const handleRegoLookup = async () => {
     setRegoError(null);
     setVehicleDetails(null);
@@ -166,6 +207,129 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   };
 
+  const validateForm = (): string | null => {
+    if (!regoPlate.trim()) {
+      return 'Please enter your vehicle registration number.';
+    }
+    if (!pickupAddress.trim()) {
+      return 'Please enter your pick-up address.';
+    }
+    if (!earliestPickup) {
+      return 'Please select a pick-up time.';
+    }
+    if (!latestDropoff) {
+      return 'Please select a drop-off time.';
+    }
+    return null;
+  };
+
+  const getTimeLabel = (value: string, options: TimeOption[]): string => {
+    const option = options.find(t => t.value === value);
+    return option?.label || value;
+  };
+
+  const handleSubmit = async () => {
+    // Check if user is logged in
+    if (authStatus !== 'authenticated' || !session?.user) {
+      // Redirect to login with return URL
+      router.push('/login?callbackUrl=/dashboard');
+      onClose();
+      return;
+    }
+
+    // Validate form
+    const validationError = validateForm();
+    if (validationError) {
+      setSubmitError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pickupTime: getTimeLabel(earliestPickup, allPickupTimeOptions),
+          dropoffTime: getTimeLabel(latestDropoff, allDropoffTimeOptions),
+          pickupAddress: pickupAddress.trim(),
+          vehicleRegistration: regoPlate.trim().toUpperCase(),
+          vehicleState: regoState,
+          serviceType: SERVICE_TYPES[serviceType] || serviceType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create booking');
+      }
+
+      // Success!
+      setShowSuccess(true);
+
+      // Wait a moment to show success state, then close and redirect
+      setTimeout(() => {
+        onClose();
+        router.push('/dashboard');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Booking submission error:', error);
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Success state UI
+  if (showSuccess) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="fixed left-1/2 top-1/2 z-[101] w-[90%] max-w-md -translate-x-1/2 -translate-y-1/2"
+            >
+              <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-2xl">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h3 className="mt-4 text-xl font-bold text-slate-900">
+                  Booking Confirmed!
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Check your dashboard for updates.
+                </p>
+                <p className="mt-4 text-xs text-slate-400">
+                  Redirecting to dashboard...
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    );
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -193,7 +357,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600"
+                disabled={isSubmitting}
+                className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600 disabled:opacity-50"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -210,9 +375,24 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </p>
                 </div>
 
+                {/* Error message */}
+                {submitError && (
+                  <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
+                    <div>
+                      <p className="text-sm font-medium text-red-800">
+                        {submitError}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <form
                   className="space-y-5"
-                  onSubmit={(e) => e.preventDefault()}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmit();
+                  }}
                 >
                   {/* Time inputs */}
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -223,7 +403,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <select
                         value={earliestPickup}
                         onChange={(e) => setEarliestPickup(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                        disabled={isSubmitting}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                       >
                         {availablePickupOptions.map((time) => (
                           <option key={`earliest-${time.value}`} value={time.value}>
@@ -243,7 +424,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <select
                         value={latestDropoff}
                         onChange={(e) => setLatestDropoff(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                        disabled={isSubmitting}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                       >
                         {availableDropoffOptions.map((time) => (
                           <option key={`latest-${time.value}`} value={time.value}>
@@ -265,7 +447,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     <input
                       type="text"
                       placeholder="e.g. 123 King St, Newcastle NSW"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
+                      value={pickupAddress}
+                      onChange={(e) => setPickupAddress(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                     />
                   </div>
 
@@ -291,11 +476,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             State
                           </label>
                           <select
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             value={regoState}
                             onChange={(e) =>
                               setRegoState(e.target.value as StateCode)
                             }
+                            disabled={isSubmitting}
                           >
                             <option value="NSW">NSW</option>
                             <option value="QLD">QLD</option>
@@ -323,12 +509,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                   e.target.value.toUpperCase().slice(0, 6)
                                 )
                               }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2"
+                              disabled={isSubmitting}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             />
                             <button
                               type="button"
                               onClick={handleRegoLookup}
-                              disabled={isLookingUpRego}
+                              disabled={isLookingUpRego || isSubmitting}
                               className="whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isLookingUpRego ? 'Looking up…' : 'Lookup'}
@@ -382,7 +569,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     <label className="text-sm font-medium text-slate-700">
                       Service type
                     </label>
-                    <select className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2">
+                    <select
+                      value={serviceType}
+                      onChange={(e) => setServiceType(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                    >
                       <option value="standard">
                         Standard service ($89 pick-up)
                       </option>
@@ -396,15 +588,24 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                   {/* Submit */}
                   <button
-                    type="button"
-                    className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Continue to detailed booking
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Confirming booking...
+                      </>
+                    ) : (
+                      'Confirm Booking'
+                    )}
                   </button>
 
                   <p className="text-center text-xs text-slate-500">
-                    No payment taken yet. We&apos;ll confirm availability and
-                    get back to you.
+                    {authStatus === 'authenticated'
+                      ? "No payment taken yet. We'll confirm availability and get back to you."
+                      : "You'll be asked to sign in to complete your booking."}
                   </p>
                 </form>
               </div>

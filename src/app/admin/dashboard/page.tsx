@@ -29,7 +29,8 @@ interface Stats {
     _id: string;
     userName: string;
     userEmail: string;
-    vehicle: { make: string; model: string; plate: string };
+    vehicleRegistration: string;
+    vehicleState: string;
     serviceType: string;
     currentStage: string;
     status: string;
@@ -260,11 +261,11 @@ export default function AdminDashboardPage() {
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-900">
-                        {booking.vehicle.make} {booking.vehicle.model}
+                      <p className="text-sm font-medium text-slate-900">
+                        {booking.vehicleRegistration}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {booking.vehicle.plate}
+                        {booking.vehicleState}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">

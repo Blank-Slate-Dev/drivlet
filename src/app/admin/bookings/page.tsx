@@ -18,67 +18,47 @@ import {
   MapPin,
   Wrench,
   User,
-  Calendar,
   MessageSquare,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 
-type JourneyStage =
-  | "Booking Confirmed"
-  | "Driver En Route To You"
-  | "Car Picked Up"
-  | "At Garage"
-  | "Service In Progress"
-  | "Driver En Route Back"
-  | "Delivered";
+// Stage definitions with progress percentages
+const STAGES = [
+  { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
+  { id: "driver_en_route", label: "Driver En Route", progress: 28 },
+  { id: "car_picked_up", label: "Car Picked Up", progress: 42 },
+  { id: "at_garage", label: "At Garage", progress: 57 },
+  { id: "service_in_progress", label: "Service In Progress", progress: 72 },
+  { id: "driver_returning", label: "Driver Returning", progress: 86 },
+  { id: "delivered", label: "Delivered", progress: 100 },
+];
+
+interface Update {
+  stage: string;
+  timestamp: string;
+  message: string;
+  updatedBy: string;
+}
 
 interface Booking {
   _id: string;
   userId: string;
   userEmail: string;
   userName: string;
-  vehicle: {
-    make: string;
-    model: string;
-    year?: string;
-    color?: string;
-    plate: string;
-    state: string;
-  };
+  vehicleRegistration: string;
+  vehicleState: string;
   serviceType: string;
   pickupAddress: string;
-  pickupDate: string;
-  pickupTimeStart: string;
-  pickupTimeEnd: string;
-  dropoffTimeStart: string;
-  dropoffTimeEnd: string;
-  garageName: string;
-  garageAddress: string;
-  currentStage: JourneyStage;
-  journeyEvents: Array<{
-    stage: JourneyStage;
-    timestamp: string | null;
-    completed: boolean;
-    notes?: string;
-  }>;
+  pickupTime: string;
+  dropoffTime: string;
+  currentStage: string;
   overallProgress: number;
   status: string;
-  statusMessage: string;
-  etaToGarage?: string;
-  etaReturn?: string;
-  adminNotes?: string;
+  updates: Update[];
   createdAt: string;
   updatedAt: string;
 }
-
-const JOURNEY_STAGES: JourneyStage[] = [
-  "Booking Confirmed",
-  "Driver En Route To You",
-  "Car Picked Up",
-  "At Garage",
-  "Service In Progress",
-  "Driver En Route Back",
-  "Delivered",
-];
 
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -86,12 +66,14 @@ export default function AdminBookingsPage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -110,6 +92,7 @@ export default function AdminBookingsPage() {
       const data = await response.json();
       setBookings(data.bookings);
       setTotalPages(data.pagination.totalPages);
+      setTotal(data.pagination.total);
       setError("");
     } catch {
       setError("Failed to load bookings");
@@ -122,13 +105,13 @@ export default function AdminBookingsPage() {
     fetchBookings();
   }, [fetchBookings]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-AU", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("en-AU", {
@@ -139,11 +122,19 @@ export default function AdminBookingsPage() {
     });
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
         return "bg-yellow-100 text-yellow-700";
-      case "active":
+      case "in_progress":
         return "bg-blue-100 text-blue-700";
       case "completed":
         return "bg-green-100 text-green-700";
@@ -154,10 +145,28 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const handleUpdateProgress = async (
-    bookingId: string,
-    newStage: JourneyStage
-  ) => {
+  const getStageLabel = (stageId: string) => {
+    const stage = STAGES.find((s) => s.id === stageId);
+    return stage?.label || stageId;
+  };
+
+  const getStageIndex = (stageId: string) => {
+    return STAGES.findIndex((s) => s.id === stageId);
+  };
+
+  const handleQuickStageUpdate = async (bookingId: string, newStage: string) => {
+    const booking = bookings.find((b) => b._id === bookingId);
+    if (!booking) return;
+
+    const currentIndex = getStageIndex(booking.currentStage);
+    const newIndex = getStageIndex(newStage);
+
+    // Check if trying to go backwards
+    if (newIndex < currentIndex) {
+      alert("Cannot move to an earlier stage from the table. Use the Edit modal to override this.");
+      return;
+    }
+
     try {
       setSaving(true);
       const response = await fetch(`/api/admin/bookings/${bookingId}`, {
@@ -166,7 +175,10 @@ export default function AdminBookingsPage() {
         body: JSON.stringify({ currentStage: newStage }),
       });
 
-      if (!response.ok) throw new Error("Failed to update");
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update");
+      }
 
       const updated = await response.json();
       setBookings((prev) =>
@@ -175,14 +187,15 @@ export default function AdminBookingsPage() {
       if (selectedBooking?._id === bookingId) {
         setSelectedBooking(updated);
       }
-    } catch {
-      alert("Failed to update booking progress");
+      setSuccessMessage("Progress updated successfully!");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update booking progress");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveBooking = async (data: Partial<Booking>) => {
+  const handleSaveBooking = async (data: Record<string, unknown>) => {
     if (!selectedBooking) return;
 
     try {
@@ -196,7 +209,10 @@ export default function AdminBookingsPage() {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to save");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save");
+      }
 
       const updated = await response.json();
       setBookings((prev) =>
@@ -204,8 +220,9 @@ export default function AdminBookingsPage() {
       );
       setSelectedBooking(updated);
       setShowEditModal(false);
-    } catch {
-      alert("Failed to save booking");
+      setSuccessMessage("Booking updated successfully!");
+    } catch (err) {
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -213,12 +230,20 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
+      {/* Success Toast */}
+      {successMessage && (
+        <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          <CheckCircle2 className="h-4 w-4" />
+          {successMessage}
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Manage Bookings</h1>
           <p className="mt-1 text-sm text-slate-600">
-            View and manage all customer bookings
+            {total} total bookings • View and manage all customer bookings
           </p>
         </div>
         <button
@@ -236,7 +261,7 @@ export default function AdminBookingsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by name, email, plate..."
+            placeholder="Search by name, email, registration..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -258,7 +283,7 @@ export default function AdminBookingsPage() {
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
-              <option value="active">Active</option>
+              <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -272,9 +297,9 @@ export default function AdminBookingsPage() {
             className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
             <option value="all">All Stages</option>
-            {JOURNEY_STAGES.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
+            {STAGES.map((stage) => (
+              <option key={stage.id} value={stage.id}>
+                {stage.label}
               </option>
             ))}
           </select>
@@ -286,6 +311,12 @@ export default function AdminBookingsPage() {
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center">
           <AlertCircle className="mx-auto h-6 w-6 text-red-500" />
           <p className="mt-2 text-sm text-red-700">{error}</p>
+          <button
+            onClick={fetchBookings}
+            className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -328,11 +359,11 @@ export default function AdminBookingsPage() {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-sm text-slate-900">
-                        {booking.vehicle.make} {booking.vehicle.model}
+                      <p className="font-medium text-slate-900">
+                        {booking.vehicleRegistration}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {booking.vehicle.plate}
+                        {booking.vehicleState}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
@@ -340,27 +371,24 @@ export default function AdminBookingsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm text-slate-900">
-                        {formatDate(booking.pickupDate)}
+                        {booking.pickupTime}
                       </p>
-                      <p className="text-xs text-slate-500">
-                        {booking.pickupTimeStart} - {booking.pickupTimeEnd}
+                      <p className="text-xs text-slate-500 truncate max-w-[150px]">
+                        {booking.pickupAddress}
                       </p>
                     </td>
                     <td className="px-4 py-3">
                       <select
                         value={booking.currentStage}
                         onChange={(e) =>
-                          handleUpdateProgress(
-                            booking._id,
-                            e.target.value as JourneyStage
-                          )
+                          handleQuickStageUpdate(booking._id, e.target.value)
                         }
-                        disabled={saving}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs focus:border-emerald-500 focus:outline-none"
+                        disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
+                        className="rounded border border-slate-200 px-2 py-1 text-xs focus:border-emerald-500 focus:outline-none disabled:opacity-50"
                       >
-                        {JOURNEY_STAGES.map((stage) => (
-                          <option key={stage} value={stage}>
-                            {stage}
+                        {STAGES.map((stage) => (
+                          <option key={stage.id} value={stage.id}>
+                            {stage.label}
                           </option>
                         ))}
                       </select>
@@ -382,7 +410,7 @@ export default function AdminBookingsPage() {
                       <span
                         className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}
                       >
-                        {booking.status}
+                        {booking.status.replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -417,7 +445,7 @@ export default function AdminBookingsPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
             <p className="text-sm text-slate-500">
-              Page {page} of {totalPages}
+              Page {page} of {totalPages} ({total} bookings)
             </p>
             <div className="flex gap-2">
               <button
@@ -443,190 +471,14 @@ export default function AdminBookingsPage() {
 
       {/* View Details Modal */}
       {selectedBooking && !showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Booking Details
-              </h2>
-              <button
-                onClick={() => setSelectedBooking(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-6 p-6">
-              {/* Customer Info */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <User className="h-4 w-4" />
-                  Customer
-                </div>
-                <div className="mt-2">
-                  <p className="font-medium text-slate-900">
-                    {selectedBooking.userName}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {selectedBooking.userEmail}
-                  </p>
-                </div>
-              </div>
-
-              {/* Vehicle Info */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Car className="h-4 w-4" />
-                  Vehicle
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500">Make/Model</p>
-                    <p className="font-medium text-slate-900">
-                      {selectedBooking.vehicle.make}{" "}
-                      {selectedBooking.vehicle.model}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Plate</p>
-                    <p className="font-medium text-slate-900">
-                      {selectedBooking.vehicle.plate} (
-                      {selectedBooking.vehicle.state})
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Service Info */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Wrench className="h-4 w-4" />
-                  Service Details
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500">Service Type</p>
-                    <p className="font-medium text-slate-900">
-                      {selectedBooking.serviceType}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Garage</p>
-                    <p className="font-medium text-slate-900">
-                      {selectedBooking.garageName || "TBD"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Schedule */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Calendar className="h-4 w-4" />
-                  Schedule
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500">Pickup</p>
-                    <p className="font-medium text-slate-900">
-                      {formatDate(selectedBooking.pickupDate)}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {selectedBooking.pickupTimeStart} -{" "}
-                      {selectedBooking.pickupTimeEnd}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Address</p>
-                    <p className="text-sm text-slate-900">
-                      {selectedBooking.pickupAddress}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Timeline */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Clock className="h-4 w-4" />
-                  Progress ({selectedBooking.overallProgress}%)
-                </div>
-                <div className="mt-4 space-y-3">
-                  {selectedBooking.journeyEvents.map((event, index) => (
-                    <div key={event.stage} className="flex items-start gap-3">
-                      <div
-                        className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full ${
-                          event.completed
-                            ? "bg-emerald-500 text-white"
-                            : "border-2 border-slate-300 bg-white"
-                        }`}
-                      >
-                        {event.completed && <Check className="h-3 w-3" />}
-                      </div>
-                      <div className="flex-1">
-                        <p
-                          className={`text-sm font-medium ${event.completed ? "text-slate-900" : "text-slate-400"}`}
-                        >
-                          {event.stage}
-                        </p>
-                        {event.timestamp && (
-                          <p className="text-xs text-slate-500">
-                            {formatDateTime(event.timestamp)}
-                          </p>
-                        )}
-                        {event.notes && (
-                          <p className="mt-1 text-xs text-slate-600">
-                            {event.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Status Message */}
-              <div className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <MessageSquare className="h-4 w-4" />
-                  Status Message (shown to customer)
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  {selectedBooking.statusMessage}
-                </p>
-              </div>
-
-              {/* Admin Notes */}
-              {selectedBooking.adminNotes && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-medium text-amber-700">
-                    Admin Notes
-                  </p>
-                  <p className="mt-1 text-sm text-amber-900">
-                    {selectedBooking.adminNotes}
-                  </p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500"
-                >
-                  Edit Booking
-                </button>
-                <button
-                  onClick={() => setSelectedBooking(null)}
-                  className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ViewDetailsModal
+          booking={selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          onEdit={() => setShowEditModal(true)}
+          getStageLabel={getStageLabel}
+          formatDateTime={formatDateTime}
+          formatDate={formatDate}
+        />
       )}
 
       {/* Edit Modal */}
@@ -642,7 +494,199 @@ export default function AdminBookingsPage() {
   );
 }
 
-// Edit Modal Component
+// View Details Modal Component
+function ViewDetailsModal({
+  booking,
+  onClose,
+  onEdit,
+  getStageLabel,
+  formatDateTime,
+  formatDate,
+}: {
+  booking: Booking;
+  onClose: () => void;
+  onEdit: () => void;
+  getStageLabel: (id: string) => string;
+  formatDateTime: (date: string) => string;
+  formatDate: (date: string) => string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white">
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Booking Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6 p-6">
+          {/* Booking ID */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs text-slate-500">Booking ID</p>
+            <p className="font-mono text-sm text-slate-900">{booking._id}</p>
+          </div>
+
+          {/* Customer Info */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <User className="h-4 w-4" />
+              Customer
+            </div>
+            <div className="mt-2">
+              <p className="font-medium text-slate-900">{booking.userName}</p>
+              <p className="text-sm text-slate-500">{booking.userEmail}</p>
+            </div>
+          </div>
+
+          {/* Vehicle Info */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Car className="h-4 w-4" />
+              Vehicle
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Registration</p>
+                <p className="font-medium text-slate-900">
+                  {booking.vehicleRegistration}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">State</p>
+                <p className="font-medium text-slate-900">
+                  {booking.vehicleState}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Service Info */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Wrench className="h-4 w-4" />
+              Service Details
+            </div>
+            <div className="mt-2">
+              <p className="text-xs text-slate-500">Service Type</p>
+              <p className="font-medium text-slate-900">{booking.serviceType}</p>
+            </div>
+          </div>
+
+          {/* Schedule */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Clock className="h-4 w-4" />
+              Schedule
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Pickup Time</p>
+                <p className="font-medium text-slate-900">{booking.pickupTime}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Dropoff Time</p>
+                <p className="font-medium text-slate-900">{booking.dropoffTime}</p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-xs text-slate-500">Pickup Address</p>
+              <p className="text-sm text-slate-900">{booking.pickupAddress}</p>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <MapPin className="h-4 w-4" />
+                Progress
+              </div>
+              <span className="text-sm font-semibold text-emerald-600">
+                {booking.overallProgress}%
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${booking.overallProgress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Current Stage:{" "}
+              <span className="font-medium">
+                {getStageLabel(booking.currentStage)}
+              </span>
+            </p>
+          </div>
+
+          {/* Updates Timeline */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <MessageSquare className="h-4 w-4" />
+              Updates History
+            </div>
+            <div className="mt-4 space-y-3">
+              {booking.updates.length > 0 ? (
+                booking.updates.map((update, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                      <Check className="h-3 w-3" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">
+                        {getStageLabel(update.stage)}
+                      </p>
+                      <p className="text-sm text-slate-600">{update.message}</p>
+                      <p className="text-xs text-slate-400">
+                        {formatDateTime(update.timestamp)} • {update.updatedBy}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">No updates yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Metadata */}
+          <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+            <div>
+              <p>Created: {formatDate(booking.createdAt)}</p>
+            </div>
+            <div>
+              <p>Updated: {formatDateTime(booking.updatedAt)}</p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={onEdit}
+              className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              Edit Booking
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Edit Modal Component with enhanced features
 function EditBookingModal({
   booking,
   onSave,
@@ -650,28 +694,59 @@ function EditBookingModal({
   saving,
 }: {
   booking: Booking;
-  onSave: (data: Partial<Booking>) => void;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   saving: boolean;
 }) {
   const [formData, setFormData] = useState({
     currentStage: booking.currentStage,
-    statusMessage: booking.statusMessage,
-    adminNotes: booking.adminNotes || "",
-    garageName: booking.garageName,
-    garageAddress: booking.garageAddress,
     status: booking.status,
-    etaReturn: booking.etaReturn
-      ? new Date(booking.etaReturn).toISOString().slice(0, 16)
-      : "",
+    message: "",
+    pickupTime: booking.pickupTime,
+    dropoffTime: booking.dropoffTime,
+    pickupAddress: booking.pickupAddress,
+    allowBackwardsProgression: false,
   });
+  const [error, setError] = useState("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState<"cancelled" | "completed" | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const currentStageIndex = STAGES.findIndex((s) => s.id === booking.currentStage);
+  const newStageIndex = STAGES.findIndex((s) => s.id === formData.currentStage);
+  const isBackwardsProgression = newStageIndex < currentStageIndex;
+  const newProgress = STAGES[newStageIndex]?.progress || booking.overallProgress;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...formData,
-      etaReturn: formData.etaReturn || undefined,
-    });
+    setError("");
+
+    // Check if status change requires confirmation
+    if (formData.status !== booking.status && (formData.status === "cancelled" || formData.status === "completed")) {
+      setShowConfirmDialog(formData.status as "cancelled" | "completed");
+      return;
+    }
+
+    await submitForm();
+  };
+
+  const submitForm = async () => {
+    try {
+      await onSave({
+        ...formData,
+        currentStage: formData.currentStage !== booking.currentStage ? formData.currentStage : undefined,
+        status: formData.status !== booking.status ? formData.status : undefined,
+        message: formData.message || undefined,
+        pickupTime: formData.pickupTime !== booking.pickupTime ? formData.pickupTime : undefined,
+        dropoffTime: formData.dropoffTime !== booking.dropoffTime ? formData.dropoffTime : undefined,
+        pickupAddress: formData.pickupAddress !== booking.pickupAddress ? formData.pickupAddress : undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save booking");
+    }
+  };
+
+  const handleConfirmedStatusChange = async () => {
+    setShowConfirmDialog(null);
+    await submitForm();
   };
 
   return (
@@ -688,7 +763,15 @@ function EditBookingModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
-          {/* Current Stage */}
+          {/* Error message */}
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Current Stage with Progress Preview */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Current Stage
@@ -698,17 +781,67 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  currentStage: e.target.value as JourneyStage,
+                  currentStage: e.target.value,
                 })
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
-              {JOURNEY_STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {stage}
+              {STAGES.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.label} ({stage.progress}%)
                 </option>
               ))}
             </select>
+
+            {/* Progress preview */}
+            {formData.currentStage !== booking.currentStage && (
+              <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <span>Progress: {booking.overallProgress}%</span>
+                  <span>→</span>
+                  <span className="font-semibold">{newProgress}%</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${newProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Backwards progression warning */}
+            {isBackwardsProgression && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">
+                      Going back to an earlier stage
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700">
+                      This will move the booking from "{STAGES[currentStageIndex]?.label}" back to "{STAGES[newStageIndex]?.label}".
+                    </p>
+                    <label className="mt-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.allowBackwardsProgression}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            allowBackwardsProgression: e.target.checked,
+                          })
+                        }
+                        className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm text-amber-800">
+                        I confirm this change
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Status */}
@@ -724,86 +857,79 @@ function EditBookingModal({
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               <option value="pending">Pending</option>
-              <option value="active">Active</option>
+              <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            {formData.status === "cancelled" && formData.status !== booking.status && (
+              <p className="mt-1 text-xs text-red-600">
+                ⚠️ This will cancel the booking
+              </p>
+            )}
           </div>
 
-          {/* Status Message */}
+          {/* Update Message */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Status Message (shown to customer)
+              Update Message
+              <span className="ml-1 font-normal text-slate-400">(shown to customer)</span>
             </label>
             <textarea
-              value={formData.statusMessage}
+              value={formData.message}
               onChange={(e) =>
-                setFormData({ ...formData, statusMessage: e.target.value })
+                setFormData({ ...formData, message: e.target.value })
               }
               rows={3}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              placeholder="What's happening with this booking..."
+              placeholder="Optional: Custom message for this update..."
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Leave empty to use the default message for the selected stage.
+            </p>
           </div>
 
-          {/* Garage Name */}
+          {/* Pickup Time */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Garage Name
+              Pickup Time
             </label>
             <input
               type="text"
-              value={formData.garageName}
+              value={formData.pickupTime}
               onChange={(e) =>
-                setFormData({ ...formData, garageName: e.target.value })
+                setFormData({ ...formData, pickupTime: e.target.value })
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
-          {/* Garage Address */}
+          {/* Dropoff Time */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Garage Address
+              Dropoff Time
             </label>
             <input
               type="text"
-              value={formData.garageAddress}
+              value={formData.dropoffTime}
               onChange={(e) =>
-                setFormData({ ...formData, garageAddress: e.target.value })
+                setFormData({ ...formData, dropoffTime: e.target.value })
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
-          {/* ETA Return */}
+          {/* Pickup Address */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Estimated Return Time
+              Pickup Address
             </label>
             <input
-              type="datetime-local"
-              value={formData.etaReturn}
+              type="text"
+              value={formData.pickupAddress}
               onChange={(e) =>
-                setFormData({ ...formData, etaReturn: e.target.value })
+                setFormData({ ...formData, pickupAddress: e.target.value })
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          {/* Admin Notes */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Admin Notes (internal only)
-            </label>
-            <textarea
-              value={formData.adminNotes}
-              onChange={(e) =>
-                setFormData({ ...formData, adminNotes: e.target.value })
-              }
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              placeholder="Internal notes..."
             />
           </div>
 
@@ -811,10 +937,10 @@ function EditBookingModal({
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              disabled={saving}
-              className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              disabled={saving || (isBackwardsProgression && !formData.allowBackwardsProgression)}
+              className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving..." : "Update Booking"}
             </button>
             <button
               type="button"
@@ -826,6 +952,42 @@ function EditBookingModal({
           </div>
         </form>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${showConfirmDialog === "cancelled" ? "bg-red-100" : "bg-green-100"}`}>
+                <AlertTriangle className={`h-5 w-5 ${showConfirmDialog === "cancelled" ? "text-red-600" : "text-green-600"}`} />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {showConfirmDialog === "cancelled" ? "Cancel Booking?" : "Complete Booking?"}
+              </h3>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">
+              {showConfirmDialog === "cancelled"
+                ? "Are you sure you want to cancel this booking? The customer will be notified."
+                : "Are you sure you want to mark this booking as completed? This indicates the service is finished and the car has been returned."}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleConfirmedStatusChange}
+                disabled={saving}
+                className={`flex-1 rounded-lg py-2.5 text-sm font-medium text-white ${showConfirmDialog === "cancelled" ? "bg-red-600 hover:bg-red-500" : "bg-green-600 hover:bg-green-500"} disabled:opacity-50`}
+              >
+                {saving ? "Saving..." : "Yes, Confirm"}
+              </button>
+              <button
+                onClick={() => setShowConfirmDialog(null)}
+                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

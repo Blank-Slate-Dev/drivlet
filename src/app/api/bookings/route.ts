@@ -79,11 +79,14 @@ export async function POST(request: NextRequest) {
       vehicleRegistration: data.vehicleRegistration,
       vehicleState: data.vehicleState,
       serviceType: data.serviceType,
+      currentStage: "booking_confirmed",
+      overallProgress: 14,
+      status: "pending",
       updates: [
         {
           stage: "booking_confirmed",
           timestamp: new Date(),
-          message: "Booking has been confirmed",
+          message: "We've locked in your pick-up and service details.",
           updatedBy: "system",
         },
       ],
@@ -91,7 +94,15 @@ export async function POST(request: NextRequest) {
 
     await booking.save();
 
-    return NextResponse.json(booking, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        bookingId: booking._id,
+        message: "Booking confirmed successfully",
+        booking,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating booking:", error);
     return NextResponse.json(

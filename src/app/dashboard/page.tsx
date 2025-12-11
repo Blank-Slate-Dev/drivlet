@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -13,8 +13,12 @@ import {
   Loader2,
   Plus,
   AlertCircle,
+  Bell,
+  X,
 } from "lucide-react";
 import { BookingModal } from "@/components/homepage";
+
+const POLLING_INTERVAL = 30000; // 30 seconds
 
 // Stage definitions
 const STAGES = [
@@ -325,10 +329,90 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [updateNotification, setUpdateNotification] = useState<string | null>(null);
+
+  // Track previous booking state for comparison
+  const previousBookingsRef = useRef<Booking[]>([]);
+  const isInitialLoadRef = useRef(true);
 
   const openBookingModal = () => setShowBookingModal(true);
   const closeBookingModal = () => setShowBookingModal(false);
 
+  // Check if booking has been updated
+  const detectBookingChanges = useCallback((newBookings: Booking[]) => {
+    if (isInitialLoadRef.current || previousBookingsRef.current.length === 0) {
+      return null;
+    }
+
+    for (const newBooking of newBookings) {
+      const prevBooking = previousBookingsRef.current.find(b => b._id === newBooking._id);
+
+      if (prevBooking) {
+        // Check if stage changed
+        if (newBooking.currentStage !== prevBooking.currentStage) {
+          const newStage = STAGES.find(s => s.id === newBooking.currentStage);
+          return `Your booking has progressed to: ${newStage?.label || newBooking.currentStage}`;
+        }
+
+        // Check if status changed
+        if (newBooking.status !== prevBooking.status) {
+          if (newBooking.status === "completed") {
+            return "Your car service has been completed!";
+          }
+          if (newBooking.status === "cancelled") {
+            return "Your booking has been cancelled";
+          }
+        }
+
+        // Check if there are new updates
+        if (newBooking.updates.length > prevBooking.updates.length) {
+          const latestUpdate = newBooking.updates[newBooking.updates.length - 1];
+          return latestUpdate.message;
+        }
+      }
+    }
+
+    return null;
+  }, []);
+
+  const fetchBookings = useCallback(async (isPolling = false) => {
+    try {
+      if (!isPolling) {
+        setLoading(true);
+      }
+
+      const response = await fetch("/api/bookings");
+      if (!response.ok) throw new Error("Failed to fetch bookings");
+      const data = await response.json();
+
+      // Check for changes if polling
+      if (isPolling) {
+        const changeMessage = detectBookingChanges(data);
+        if (changeMessage) {
+          setUpdateNotification(changeMessage);
+        }
+      }
+
+      // Store current bookings for future comparison
+      previousBookingsRef.current = data;
+      setBookings(data);
+      setError("");
+
+      if (!isPolling) {
+        isInitialLoadRef.current = false;
+      }
+    } catch {
+      if (!isPolling) {
+        setError("Failed to load your bookings");
+      }
+    } finally {
+      if (!isPolling) {
+        setLoading(false);
+      }
+    }
+  }, [detectBookingChanges]);
+
+  // Initial load effect
   useEffect(() => {
     if (authStatus === "loading") return;
 
@@ -337,23 +421,27 @@ export default function DashboardPage() {
       return;
     }
 
-    fetchBookings();
-  }, [session, authStatus, router]);
+    fetchBookings(false);
+  }, [session, authStatus, router, fetchBookings]);
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/bookings");
-      if (!response.ok) throw new Error("Failed to fetch bookings");
-      const data = await response.json();
-      setBookings(data);
-      setError("");
-    } catch {
-      setError("Failed to load your bookings");
-    } finally {
-      setLoading(false);
+  // Polling effect - check for updates every 30 seconds
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !session?.user) return;
+
+    const pollInterval = setInterval(() => {
+      fetchBookings(true);
+    }, POLLING_INTERVAL);
+
+    return () => clearInterval(pollInterval);
+  }, [authStatus, session, fetchBookings]);
+
+  // Auto-dismiss notification after 5 seconds
+  useEffect(() => {
+    if (updateNotification) {
+      const timer = setTimeout(() => setUpdateNotification(null), 5000);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [updateNotification]);
 
   if (authStatus === "loading" || loading) {
     return (
@@ -378,7 +466,7 @@ export default function DashboardPage() {
             <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
             <p className="mt-2 text-red-700">{error}</p>
             <button
-              onClick={fetchBookings}
+              onClick={() => fetchBookings(false)}
               className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
             >
               Retry
@@ -398,6 +486,28 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-slate-50">
       {/* Booking Modal */}
       <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
+
+      {/* Update Notification Toast */}
+      {updateNotification && (
+        <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-lg">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
+              <Bell className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-emerald-800">Booking Updated</p>
+              <p className="text-sm text-emerald-700">{updateNotification}</p>
+            </div>
+            <button
+              onClick={() => setUpdateNotification(null)}
+              className="ml-2 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100"
+              aria-label="Dismiss notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <DashboardHeader />
 
