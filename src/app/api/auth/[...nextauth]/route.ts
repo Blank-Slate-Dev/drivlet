@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import type { UserRole } from "@/models/User";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -41,6 +42,7 @@ export const authOptions: NextAuthOptions = {
           id: user._id.toString(),
           username: user.username,
           email: user.email,
+          role: user.role || "user",
         };
       },
     }),
@@ -58,14 +60,16 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.username = user.username;
         token.email = user.email;
+        token.role = user.role as UserRole;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
-        session.user.username = token.username;
-        session.user.email = token.email;
+        session.user.id = token.id as string;
+        session.user.username = token.username as string;
+        session.user.email = token.email as string;
+        session.user.role = token.role as UserRole;
       }
       return session;
     },

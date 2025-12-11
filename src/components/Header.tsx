@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, User, LogOut, ChevronDown, Settings } from "lucide-react";
+import { ArrowRight, User, LogOut, ChevronDown, Settings, Shield, ClipboardList } from "lucide-react";
 
 interface HeaderProps {
   onBookingClick: () => void;
@@ -21,6 +21,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
 
   const displayName = session?.user?.username ?? session?.user?.email ?? "User";
   const avatarLetter = displayName.charAt(0).toUpperCase();
+  const isAdmin = session?.user?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -105,14 +106,43 @@ export default function Header({ onBookingClick }: HeaderProps) {
                       <p className="text-xs text-slate-500 truncate">
                         {session.user.email}
                       </p>
+                      {isAdmin && (
+                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          <Shield className="h-3 w-3" />
+                          Admin
+                        </span>
+                      )}
                     </div>
+
+                    {/* Admin Links */}
+                    {isAdmin && (
+                      <div className="border-b border-slate-100 py-1">
+                        <Link
+                          href="/admin/dashboard"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 hover:bg-amber-50"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <Shield className="h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                        <Link
+                          href="/admin/bookings"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 hover:bg-amber-50"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                          Manage Bookings
+                        </Link>
+                      </div>
+                    )}
+
                     <Link
                       href="/dashboard"
                       className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                       onClick={() => setShowUserMenu(false)}
                     >
                       <User className="h-4 w-4" />
-                      Dashboard
+                      My Dashboard
                     </Link>
                     <Link
                       href="/account"

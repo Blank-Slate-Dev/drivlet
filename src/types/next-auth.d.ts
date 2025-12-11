@@ -1,5 +1,6 @@
 // src/types/next-auth.d.ts
 import "next-auth";
+import type { UserRole } from "@/models/User";
 
 declare module "next-auth" {
   interface Session {
@@ -7,6 +8,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       username: string;
+      role: UserRole;
     };
   }
 
@@ -14,6 +16,7 @@ declare module "next-auth" {
     id: string;
     email: string;
     username: string;
+    role: UserRole;
   }
 }
 
@@ -22,5 +25,6 @@ declare module "next-auth/jwt" {
     id: string;
     email: string;
     username: string;
+    role: UserRole;
   }
 }

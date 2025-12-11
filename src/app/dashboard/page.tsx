@@ -1,18 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Clock,
-  Briefcase,
-  ArrowLeftRight,
-  ShieldCheck,
   CheckCircle2,
-  Circle,
   MapPin,
   Calendar,
   Car,
   Wrench,
   ChevronRight,
+  Loader2,
+  Plus,
+  AlertCircle,
 } from "lucide-react";
 
 type JourneyStage =
@@ -24,129 +26,54 @@ type JourneyStage =
   | "Driver En Route Back"
   | "Delivered";
 
-type BusinessStage = "Stage 1" | "Stage 2" | "Stage 3";
+interface JourneyEvent {
+  stage: JourneyStage;
+  timestamp: string | null;
+  completed: boolean;
+  notes?: string;
+}
 
-interface CarJourneyStatus {
-  ownerName: string;
-  carNickname?: string;
-  make: string;
-  model: string;
-  plate: string;
+interface Booking {
+  _id: string;
+  vehicle: {
+    make: string;
+    model: string;
+    plate: string;
+    state: string;
+  };
   serviceType: string;
   currentStage: JourneyStage;
   overallProgress: number;
-  pickupWindow: string;
+  pickupDate: string;
+  pickupTimeStart: string;
+  pickupTimeEnd: string;
   garageName: string;
   garageAddress: string;
-  etaToGarage?: string;
   etaReturn?: string;
-  lastUpdated: string;
-  notes?: string;
-  businessStage: BusinessStage;
+  statusMessage: string;
+  journeyEvents: JourneyEvent[];
+  status: string;
+  updatedAt: string;
 }
-
-const mockCarJourney: CarJourneyStatus = {
-  ownerName: "Gerome",
-  carNickname: "Daily Driver",
-  make: "Toyota",
-  model: "Corolla",
-  plate: "DRIVLET-01",
-  serviceType: "Logbook Service",
-  currentStage: "Service In Progress",
-  overallProgress: 72,
-  pickupWindow: "Today, 8:30–9:00 AM",
-  garageName: "Sydney Auto Care",
-  garageAddress: "123 Example Street, Sydney NSW",
-  etaToGarage: "Today, 9:15 AM",
-  etaReturn: "Today, 4:30 PM",
-  lastUpdated: "11 Dec 2025, 1:45 PM",
-  notes:
-    "Your car is currently on the hoist. Mechanic is completing the scheduled service.",
-  businessStage: "Stage 1",
-};
-
-interface JourneyEvent {
-  stage: JourneyStage;
-  title: string;
-  timestamp: string;
-  description: string;
-  completed: boolean;
-}
-
-const mockJourneyEvents: JourneyEvent[] = [
-  {
-    stage: "Booking Confirmed",
-    title: "Booking Confirmed",
-    timestamp: "10 Dec 2025, 3:15 PM",
-    description: "We've locked in your pick-up and service details.",
-    completed: true,
-  },
-  {
-    stage: "Driver En Route To You",
-    title: "Driver En Route",
-    timestamp: "11 Dec 2025, 8:35 AM",
-    description: "Your Drivlet driver is on the way to your location.",
-    completed: true,
-  },
-  {
-    stage: "Car Picked Up",
-    title: "Car Picked Up",
-    timestamp: "11 Dec 2025, 8:55 AM",
-    description: "We've picked up your car and are heading to the garage.",
-    completed: true,
-  },
-  {
-    stage: "At Garage",
-    title: "Arrived At Garage",
-    timestamp: "11 Dec 2025, 9:20 AM",
-    description: "Your car has arrived at the selected garage.",
-    completed: true,
-  },
-  {
-    stage: "Service In Progress",
-    title: "Service In Progress",
-    timestamp: "11 Dec 2025, 11:00 AM",
-    description: "The mechanic is currently working on your car.",
-    completed: false,
-  },
-  {
-    stage: "Driver En Route Back",
-    title: "Driver En Route Back",
-    timestamp: "-",
-    description:
-      "Once the service is complete, we'll drive your car back to you.",
-    completed: false,
-  },
-  {
-    stage: "Delivered",
-    title: "Car Delivered",
-    timestamp: "-",
-    description: "Your car is back with you and the journey is complete.",
-    completed: false,
-  },
-];
 
 interface CarHeaderProps {
-  status: CarJourneyStatus;
+  booking: Booking;
 }
 
-function CarHeader({ status }: CarHeaderProps) {
+function CarHeader({ booking }: CarHeaderProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-emerald-600">Your Car Journey</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-            {status.make} {status.model}
+            {booking.vehicle.make} {booking.vehicle.model}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1.5">
               <Car className="h-4 w-4 text-slate-400" />
-              {status.plate}
+              {booking.vehicle.plate} ({booking.vehicle.state})
             </span>
-            {status.carNickname && (
-              <span className="text-slate-400">"{status.carNickname}"</span>
-            )}
           </div>
         </div>
         <div className="hidden sm:flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
@@ -161,23 +88,42 @@ function CarHeader({ status }: CarHeaderProps) {
 }
 
 interface StatusSummaryProps {
-  status: CarJourneyStatus;
+  booking: Booking;
 }
 
-function StatusSummary({ status }: StatusSummaryProps) {
+function StatusSummary({ booking }: StatusSummaryProps) {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-AU", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-AU", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const pickupWindow = `${formatDate(booking.pickupDate)}, ${booking.pickupTimeStart}–${booking.pickupTimeEnd}`;
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <span
           className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700"
           role="status"
-          aria-label={`Current stage: ${status.currentStage}`}
+          aria-label={`Current stage: ${booking.currentStage}`}
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-          {status.currentStage}
+          {booking.currentStage}
         </span>
         <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
-          {status.serviceType}
+          {booking.serviceType}
         </span>
       </div>
 
@@ -191,7 +137,7 @@ function StatusSummary({ status }: StatusSummaryProps) {
               Pickup Window
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {status.pickupWindow}
+              {pickupWindow}
             </p>
           </div>
         </div>
@@ -204,7 +150,7 @@ function StatusSummary({ status }: StatusSummaryProps) {
               Garage
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {status.garageName}
+              {booking.garageName || "To be assigned"}
             </p>
           </div>
         </div>
@@ -217,7 +163,7 @@ function StatusSummary({ status }: StatusSummaryProps) {
               Location
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {status.garageAddress}
+              {booking.garageAddress || "TBD"}
             </p>
           </div>
         </div>
@@ -230,7 +176,7 @@ function StatusSummary({ status }: StatusSummaryProps) {
               Est. Return
             </p>
             <p className="mt-0.5 text-sm font-medium text-slate-900">
-              {status.etaReturn || "TBD"}
+              {booking.etaReturn ? formatDateTime(booking.etaReturn) : "TBD"}
             </p>
           </div>
         </div>
@@ -240,162 +186,34 @@ function StatusSummary({ status }: StatusSummaryProps) {
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="font-medium text-slate-700">Overall Progress</span>
           <span className="font-semibold text-emerald-600">
-            {status.overallProgress}%
+            {booking.overallProgress}%
           </span>
         </div>
         <div className="h-3 overflow-hidden rounded-full bg-slate-100">
           <div
             className="h-3 rounded-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${status.overallProgress}%` }}
+            style={{ width: `${booking.overallProgress}%` }}
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={status.overallProgress}
-            aria-label={`Journey progress: ${status.overallProgress}%`}
+            aria-valuenow={booking.overallProgress}
+            aria-label={`Journey progress: ${booking.overallProgress}%`}
           />
         </div>
       </div>
 
-      {status.notes && (
+      {booking.statusMessage && (
         <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
             What's Happening Now
           </p>
-          <p className="mt-1 text-sm text-emerald-800">{status.notes}</p>
+          <p className="mt-1 text-sm text-emerald-800">{booking.statusMessage}</p>
         </div>
       )}
 
       <p className="mt-4 text-xs text-slate-400">
-        Last updated: {status.lastUpdated}
+        Last updated: {formatDateTime(booking.updatedAt)}
       </p>
-    </div>
-  );
-}
-
-interface JourneyStepperProps {
-  events: JourneyEvent[];
-  currentStage: JourneyStage;
-}
-
-function JourneyStepper({ events, currentStage }: JourneyStepperProps) {
-  const getStepStatus = (event: JourneyEvent) => {
-    if (event.completed) return "completed";
-    if (event.stage === currentStage) return "current";
-    return "upcoming";
-  };
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-6 text-lg font-semibold text-slate-900">
-        Journey Stages
-      </h2>
-
-      {/* Desktop horizontal stepper */}
-      <div className="hidden lg:block">
-        <div className="relative flex items-start justify-between">
-          {/* Connecting line background */}
-          <div className="absolute left-0 right-0 top-5 z-0 h-0.5 bg-slate-200" />
-
-          {events.map((event, index) => {
-            const stepStatus = getStepStatus(event);
-            return (
-              <div
-                key={event.stage}
-                className="relative z-10 flex flex-1 flex-col items-center"
-              >
-                {/* Progress line */}
-                {index > 0 && (
-                  <div
-                    className={`absolute right-1/2 top-5 h-0.5 w-full ${
-                      events[index - 1].completed
-                        ? "bg-emerald-500"
-                        : "bg-slate-200"
-                    }`}
-                  />
-                )}
-                <div
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all ${
-                    stepStatus === "completed"
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : stepStatus === "current"
-                        ? "border-emerald-500 bg-white text-emerald-600 ring-4 ring-emerald-50"
-                        : "border-slate-300 bg-white text-slate-400"
-                  }`}
-                  aria-label={`${event.title}: ${stepStatus}`}
-                >
-                  {stepStatus === "completed" ? (
-                    <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                    <span className="text-xs font-bold">{index + 1}</span>
-                  )}
-                </div>
-                <p
-                  className={`mt-3 max-w-[100px] text-center text-xs font-medium ${
-                    stepStatus === "completed"
-                      ? "text-emerald-600"
-                      : stepStatus === "current"
-                        ? "text-slate-900"
-                        : "text-slate-400"
-                  }`}
-                >
-                  {event.title}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Mobile vertical stepper */}
-      <div className="lg:hidden">
-        <div className="relative">
-          {events.map((event, index) => {
-            const stepStatus = getStepStatus(event);
-            return (
-              <div key={event.stage} className="relative flex gap-4 pb-6">
-                {/* Vertical line */}
-                {index < events.length - 1 && (
-                  <div
-                    className={`absolute left-[15px] top-10 h-[calc(100%-24px)] w-0.5 ${
-                      event.completed ? "bg-emerald-500" : "bg-slate-200"
-                    }`}
-                  />
-                )}
-                {/* Circle */}
-                <div
-                  className={`relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 ${
-                    stepStatus === "completed"
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : stepStatus === "current"
-                        ? "border-emerald-500 bg-white text-emerald-600 ring-4 ring-emerald-50"
-                        : "border-slate-300 bg-white text-slate-400"
-                  }`}
-                >
-                  {stepStatus === "completed" ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    <span className="text-xs font-bold">{index + 1}</span>
-                  )}
-                </div>
-                {/* Content */}
-                <div className="flex-1 pt-1">
-                  <p
-                    className={`text-sm font-medium ${
-                      stepStatus === "completed"
-                        ? "text-emerald-600"
-                        : stepStatus === "current"
-                          ? "text-slate-900"
-                          : "text-slate-400"
-                    }`}
-                  >
-                    {event.title}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -405,45 +223,66 @@ interface ActivityTimelineProps {
 }
 
 function ActivityTimeline({ events }: ActivityTimelineProps) {
+  const formatTimestamp = (timestamp: string | null) => {
+    if (!timestamp) return "—";
+    return new Date(timestamp).toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const eventTitles: Record<JourneyStage, string> = {
+    "Booking Confirmed": "Confirmed",
+    "Driver En Route To You": "En Route",
+    "Car Picked Up": "Picked Up",
+    "At Garage": "At Garage",
+    "Service In Progress": "In Progress",
+    "Driver En Route Back": "Returning",
+    "Delivered": "Delivered",
+  };
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-6 text-lg font-semibold text-slate-900">Live Updates</h2>
-      <div className="relative">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">Live Updates</h2>
+
+      <div className="relative flex w-full items-start justify-between">
         {events.map((event, index) => (
-          <div key={event.stage} className="relative flex gap-4 pb-6 last:pb-0">
-            {/* Vertical line */}
-            {index < events.length - 1 && (
-              <div
-                className={`absolute left-[7px] top-4 h-[calc(100%-8px)] w-0.5 ${
-                  event.completed ? "bg-emerald-200" : "bg-slate-200"
-                }`}
-              />
-            )}
-            {/* Dot */}
+          <div
+            key={event.stage}
+            className="relative flex flex-1 flex-col items-center"
+          >
             <div
-              className={`relative z-10 mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full ${
+              className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7 ${
                 event.completed
                   ? "bg-emerald-500"
                   : "border-2 border-slate-300 bg-white"
               }`}
             >
               {event.completed && (
-                <CheckCircle2 className="h-4 w-4 text-white" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-white sm:h-4 sm:w-4" />
               )}
             </div>
-            {/* Content */}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3
-                  className={`text-sm font-medium ${
-                    event.completed ? "text-slate-900" : "text-slate-400"
-                  }`}
-                >
-                  {event.title}
-                </h3>
-                <span className="text-xs text-slate-400">{event.timestamp}</span>
-              </div>
-              <p className="mt-1 text-sm text-slate-500">{event.description}</p>
+
+            {index < events.length - 1 && (
+              <div
+                className={`absolute top-3 left-[50%] h-0.5 w-full sm:top-3.5 ${
+                  event.completed ? "bg-emerald-300" : "bg-slate-200"
+                }`}
+                style={{ zIndex: 0 }}
+              />
+            )}
+
+            <div className="mt-2 w-full px-0.5 text-center">
+              <p
+                className={`text-[9px] font-medium leading-tight sm:text-[10px] ${
+                  event.completed ? "text-slate-700" : "text-slate-400"
+                }`}
+              >
+                {eventTitles[event.stage]}
+              </p>
+              <p className="mt-0.5 hidden text-[8px] text-slate-400 sm:block">
+                {formatTimestamp(event.timestamp)}
+              </p>
             </div>
           </div>
         ))}
@@ -452,127 +291,23 @@ function ActivityTimeline({ events }: ActivityTimelineProps) {
   );
 }
 
-function StageOneBenefits() {
-  const benefits = [
-    {
-      icon: Clock,
-      text: "No waiting at the mechanic",
-    },
-    {
-      icon: Briefcase,
-      text: "No time off work to drop off or pick up your car",
-    },
-    {
-      icon: ArrowLeftRight,
-      text: "No transport hassles — we bring the car back to you",
-    },
-    {
-      icon: ShieldCheck,
-      text: "No awkward upsells — you stay in control of approvals",
-    },
-  ];
-
+function NoBookings() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">
-        What Drivlet Handles For You
+    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <Car className="mx-auto h-12 w-12 text-slate-300" />
+      <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        No Active Bookings
       </h2>
-      <ul className="space-y-3">
-        {benefits.map((benefit, index) => (
-          <li key={index} className="flex items-start gap-3">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50">
-              <benefit.icon className="h-4 w-4 text-emerald-600" />
-            </div>
-            <span className="pt-1 text-sm text-slate-600">{benefit.text}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-5 text-sm text-slate-500">
-        Right now, Drivlet is in Stage 1 of our model: we specialise in pick-up
-        and drop-off while your trusted garage completes the work.
+      <p className="mt-2 text-sm text-slate-500">
+        You don't have any car service bookings yet. Book your first service to get started!
       </p>
-    </div>
-  );
-}
-
-interface RoadmapCardProps {
-  currentBusinessStage: BusinessStage;
-}
-
-function RoadmapCard({ currentBusinessStage }: RoadmapCardProps) {
-  const stages = [
-    {
-      stage: "Stage 1" as BusinessStage,
-      title: "Pick-Up & Drop-Off",
-      description:
-        "We collect your car, deliver it to the garage, and return it when done.",
-    },
-    {
-      stage: "Stage 2" as BusinessStage,
-      title: "Better Pricing",
-      description:
-        "We negotiate discounted rates with partner garages on your behalf.",
-    },
-    {
-      stage: "Stage 3" as BusinessStage,
-      title: "Full Booking Integration",
-      description:
-        "Book everything in Drivlet — garages operate as fulfilment partners.",
-    },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-2 text-lg font-semibold text-slate-900">
-        The Drivlet Roadmap
-      </h2>
-      <p className="mb-5 text-sm text-slate-500">
-        Where we're heading — building the future of car servicing.
-      </p>
-      <div className="space-y-3">
-        {stages.map((item) => {
-          const isCurrentStage = item.stage === currentBusinessStage;
-          return (
-            <div
-              key={item.stage}
-              className={`rounded-xl border p-4 transition-all ${
-                isCurrentStage
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-slate-100 bg-slate-50"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wide ${
-                    isCurrentStage ? "text-emerald-600" : "text-slate-400"
-                  }`}
-                >
-                  {item.stage}
-                </span>
-                {isCurrentStage && (
-                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                    Current
-                  </span>
-                )}
-              </div>
-              <h3
-                className={`mt-1 font-medium ${
-                  isCurrentStage ? "text-slate-900" : "text-slate-500"
-                }`}
-              >
-                {item.title}
-              </h3>
-              <p
-                className={`mt-1 text-sm ${
-                  isCurrentStage ? "text-slate-600" : "text-slate-400"
-                }`}
-              >
-                {item.description}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+      <Link
+        href="/"
+        className="mt-6 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
+      >
+        <Plus className="h-4 w-4" />
+        Book a Service
+      </Link>
     </div>
   );
 }
@@ -605,27 +340,132 @@ function DashboardHeader() {
 }
 
 export default function DashboardPage() {
+  const { data: session, status: authStatus } = useSession();
+  const router = useRouter();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (authStatus === "loading") return;
+
+    if (!session?.user) {
+      router.push("/login");
+      return;
+    }
+
+    fetchBookings();
+  }, [session, authStatus, router]);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/bookings");
+      if (!response.ok) throw new Error("Failed to fetch bookings");
+      const data = await response.json();
+      setBookings(data);
+      setError("");
+    } catch {
+      setError("Failed to load your bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authStatus === "loading" || loading) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <DashboardHeader />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" />
+            <p className="mt-2 text-sm text-slate-600">Loading your dashboard...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <DashboardHeader />
+        <div className="mx-auto max-w-5xl px-4 py-8">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
+            <p className="mt-2 text-red-700">{error}</p>
+            <button
+              onClick={fetchBookings}
+              className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Get the most recent active booking (not completed or cancelled)
+  const activeBooking = bookings.find(
+    (b) => b.status === "active" || b.status === "pending"
+  );
+
   return (
     <main className="min-h-screen bg-slate-50">
       <DashboardHeader />
 
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-        <CarHeader status={mockCarJourney} />
+        {activeBooking ? (
+          <>
+            <CarHeader booking={activeBooking} />
+            <StatusSummary booking={activeBooking} />
+            <ActivityTimeline events={activeBooking.journeyEvents} />
 
-        <StatusSummary status={mockCarJourney} />
-
-        <JourneyStepper
-          events={mockJourneyEvents}
-          currentStage={mockCarJourney.currentStage}
-        />
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ActivityTimeline events={mockJourneyEvents} />
-          <div className="space-y-6">
-            <StageOneBenefits />
-            <RoadmapCard currentBusinessStage={mockCarJourney.businessStage} />
-          </div>
-        </div>
+            {/* Past Bookings */}
+            {bookings.filter((b) => b._id !== activeBooking._id).length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                  Previous Bookings
+                </h2>
+                <div className="space-y-3">
+                  {bookings
+                    .filter((b) => b._id !== activeBooking._id)
+                    .slice(0, 5)
+                    .map((booking) => (
+                      <div
+                        key={booking._id}
+                        className="flex items-center justify-between rounded-lg border border-slate-100 p-3"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {booking.vehicle.make} {booking.vehicle.model}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {booking.serviceType} •{" "}
+                            {new Date(booking.pickupDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${
+                            booking.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : booking.status === "cancelled"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {booking.status}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <NoBookings />
+        )}
       </div>
     </main>
   );
