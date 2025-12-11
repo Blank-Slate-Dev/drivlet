@@ -79,7 +79,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative overflow-hidden">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
       {/* Subtle pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
