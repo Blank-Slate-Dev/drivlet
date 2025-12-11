@@ -11,19 +11,36 @@ export interface IUpdate {
 }
 
 export interface IBooking extends Document {
-  userId: Types.ObjectId;
+  // User info (userId is optional for guests)
+  userId: Types.ObjectId | null;
   userEmail: string;
   userName: string;
+  
+  // Guest-specific fields
+  isGuest: boolean;
+  guestPhone?: string;
+  
+  // Core booking details
   pickupTime: string;
   dropoffTime: string;
   pickupAddress: string;
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  
+  // Existing booking fields (for stage 1)
+  hasExistingBooking: boolean;
+  garageName?: string;
+  existingBookingRef?: string;
+  existingBookingNotes?: string;
+  
+  // Progress tracking
   currentStage: string;
   overallProgress: number;
   status: BookingStatus;
   updates: IUpdate[];
+  
+  // Timestamps
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,20 +69,35 @@ const UpdateSchema = new Schema<IUpdate>(
 
 const BookingSchema = new Schema<IBooking>(
   {
+    // User info - userId is optional for guest bookings
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
       index: true,
+      default: null,
     },
     userEmail: {
       type: String,
       required: true,
+      index: true,
     },
     userName: {
       type: String,
       required: true,
     },
+    
+    // Guest-specific fields
+    isGuest: {
+      type: Boolean,
+      default: false,
+    },
+    guestPhone: {
+      type: String,
+      required: false,
+    },
+    
+    // Core booking details
     pickupTime: {
       type: String,
       required: true,
@@ -90,6 +122,26 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
     },
+    
+    // Existing booking fields (for stage 1 - attending existing bookings)
+    hasExistingBooking: {
+      type: Boolean,
+      default: false,
+    },
+    garageName: {
+      type: String,
+      required: false,
+    },
+    existingBookingRef: {
+      type: String,
+      required: false,
+    },
+    existingBookingNotes: {
+      type: String,
+      required: false,
+    },
+    
+    // Progress tracking
     currentStage: {
       type: String,
       default: "booking_confirmed",
@@ -109,6 +161,8 @@ const BookingSchema = new Schema<IBooking>(
       type: [UpdateSchema],
       default: [],
     },
+    
+    // Timestamps
     createdAt: {
       type: Date,
       default: Date.now,
@@ -123,9 +177,11 @@ const BookingSchema = new Schema<IBooking>(
   }
 );
 
-// Index for efficient queries
+// Indexes for efficient queries
 BookingSchema.index({ status: 1, createdAt: -1 });
 BookingSchema.index({ userEmail: 1 });
+BookingSchema.index({ isGuest: 1 });
+BookingSchema.index({ hasExistingBooking: 1 });
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =

@@ -33,20 +33,10 @@ export async function GET() {
   }
 }
 
-// POST /api/bookings - Create a new booking
+// POST /api/bookings - Create a new booking (authenticated or guest)
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user) {
-    return NextResponse.json(
-      { error: "Authentication required" },
-      { status: 401 }
-    );
-  }
-
   try {
-    await connectDB();
-
+    const session = await getServerSession(authOptions);
     const data = await request.json();
 
     // Validate required fields
@@ -56,7 +46,6 @@ export async function POST(request: NextRequest) {
       "pickupAddress",
       "vehicleRegistration",
       "vehicleState",
-      "serviceType",
     ];
 
     for (const field of requiredFields) {
@@ -68,37 +57,120 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create booking with user info
-    const booking = new Booking({
-      userId: session.user.id,
-      userEmail: session.user.email,
-      userName: session.user.username || session.user.email,
+    // Guest validation
+    const isGuest = !session?.user;
+    if (isGuest) {
+      if (!data.guestName?.trim()) {
+        return NextResponse.json(
+          { error: "Guest name is required" },
+          { status: 400 }
+        );
+      }
+      if (!data.guestEmail?.trim()) {
+        return NextResponse.json(
+          { error: "Guest email is required" },
+          { status: 400 }
+        );
+      }
+      if (!data.guestPhone?.trim()) {
+        return NextResponse.json(
+          { error: "Guest phone is required" },
+          { status: 400 }
+        );
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(data.guestEmail)) {
+        return NextResponse.json(
+          { error: "Invalid email format" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Existing booking validation
+    if (data.hasExistingBooking && !data.garageName?.trim()) {
+      return NextResponse.json(
+        { error: "Garage name is required for existing bookings" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    // Determine service type based on existing booking
+    let serviceType = data.serviceType || "Standard Service";
+    if (data.hasExistingBooking) {
+      serviceType = `Existing Booking - ${data.garageName}`;
+    }
+
+    // Build the initial update message
+    let initialMessage = "We've received your booking request and will confirm shortly.";
+    if (data.hasExistingBooking) {
+      initialMessage = `We've received your pick-up request for your existing booking at ${data.garageName}.`;
+    }
+
+    // Create booking object
+    const bookingData: Record<string, unknown> = {
+      // User info - either from session or guest details
+      userId: session?.user?.id || null,
+      userEmail: session?.user?.email || data.guestEmail?.toLowerCase(),
+      userName: session?.user?.username || data.guestName,
+      
+      // Core booking details
       pickupTime: data.pickupTime,
       dropoffTime: data.dropoffTime,
-      pickupAddress: data.pickupAddress,
-      vehicleRegistration: data.vehicleRegistration,
+      pickupAddress: data.pickupAddress.trim(),
+      vehicleRegistration: data.vehicleRegistration.trim().toUpperCase(),
       vehicleState: data.vehicleState,
-      serviceType: data.serviceType,
+      serviceType,
+      
+      // Status
       currentStage: "booking_confirmed",
       overallProgress: 14,
       status: "pending",
+      
+      // Guest specific fields
+      isGuest,
+      ...(isGuest && {
+        guestPhone: data.guestPhone?.trim(),
+      }),
+      
+      // Existing booking fields
+      hasExistingBooking: data.hasExistingBooking || false,
+      ...(data.hasExistingBooking && {
+        garageName: data.garageName?.trim(),
+        existingBookingRef: data.existingBookingRef?.trim() || null,
+        existingBookingNotes: data.existingBookingNotes?.trim() || null,
+      }),
+      
+      // Updates array
       updates: [
         {
           stage: "booking_confirmed",
           timestamp: new Date(),
-          message: "We've locked in your pick-up and service details.",
+          message: initialMessage,
           updatedBy: "system",
         },
       ],
-    });
+    };
 
+    const booking = new Booking(bookingData);
     await booking.save();
+
+    // TODO: Send confirmation email to guest
+    // if (isGuest) {
+    //   await sendGuestConfirmationEmail(data.guestEmail, booking);
+    // }
 
     return NextResponse.json(
       {
         success: true,
         bookingId: booking._id,
-        message: "Booking confirmed successfully",
+        message: data.hasExistingBooking 
+          ? "Pick-up request received. We'll confirm and contact you shortly."
+          : "Booking request received. We'll confirm availability and get back to you.",
         booking,
       },
       { status: 201 }

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, Loader2, AlertCircle, User } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 
 type VehicleDetails = {
@@ -25,24 +25,19 @@ interface BookingModalProps {
 interface TimeOption {
   value: string;
   label: string;
-  minutes: number; // Total minutes from midnight for easy comparison
+  minutes: number;
 }
 
-// Generate time options in 15-minute intervals with 12-hour format
 function generateTimeOptions(startHour: number, endHour: number): TimeOption[] {
   const options: TimeOption[] = [];
   for (let hour = startHour; hour <= endHour; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
-      // Skip times past the end hour (e.g., 14:15, 14:30, 14:45 if endHour is 14)
       if (hour === endHour && minute > 0) continue;
 
       const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-
-      // Convert to 12-hour format for display
       const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
       const ampm = hour < 12 ? 'am' : 'pm';
       const label = `${displayHour}:${minute.toString().padStart(2, '0')}${ampm}`;
-
       const minutes = hour * 60 + minute;
 
       options.push({ value, label, minutes });
@@ -51,16 +46,10 @@ function generateTimeOptions(startHour: number, endHour: number): TimeOption[] {
   return options;
 }
 
-// Pick-up: 6am - 2pm (6:00 - 14:00)
 const allPickupTimeOptions = generateTimeOptions(6, 14);
-
-// Drop-off: 9am - 7pm (9:00 - 19:00)
 const allDropoffTimeOptions = generateTimeOptions(9, 19);
-
-// Minimum gap between pickup and dropoff in minutes (2 hours = 120 minutes)
 const MIN_GAP_MINUTES = 120;
 
-// Service type mapping
 const SERVICE_TYPES: Record<string, string> = {
   standard: 'Standard Service',
   major: 'Major Service',
@@ -83,38 +72,46 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [pickupAddress, setPickupAddress] = useState('');
   const [serviceType, setServiceType] = useState('standard');
 
+  // Guest details
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+
+  // Existing booking details (for stage 1 - attending existing bookings)
+  const [hasExistingBooking, setHasExistingBooking] = useState(false);
+  const [garageName, setGarageName] = useState('');
+  const [existingBookingRef, setExistingBookingRef] = useState('');
+  const [existingBookingNotes, setExistingBookingNotes] = useState('');
+
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Get the selected pickup time's minutes value
+  const isGuest = authStatus !== 'authenticated';
+
   const selectedPickupMinutes = useMemo(() => {
     const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
     return selected?.minutes ?? 0;
   }, [earliestPickup]);
 
-  // Get the selected dropoff time's minutes value
   const selectedDropoffMinutes = useMemo(() => {
     const selected = allDropoffTimeOptions.find((t) => t.value === latestDropoff);
     return selected?.minutes ?? 0;
   }, [latestDropoff]);
 
-  // Filter pickup options: only show times that are at least 2 hours before the selected dropoff
   const availablePickupOptions = useMemo(() => {
     return allPickupTimeOptions.filter(
       (time) => time.minutes <= selectedDropoffMinutes - MIN_GAP_MINUTES
     );
   }, [selectedDropoffMinutes]);
 
-  // Filter dropoff options: only show times that are at least 2 hours after the selected pickup
   const availableDropoffOptions = useMemo(() => {
     return allDropoffTimeOptions.filter(
       (time) => time.minutes >= selectedPickupMinutes + MIN_GAP_MINUTES
     );
   }, [selectedPickupMinutes]);
 
-  // If current pickup selection becomes invalid, reset to first available option
   useEffect(() => {
     const isCurrentPickupValid = availablePickupOptions.some(
       (t) => t.value === earliestPickup
@@ -124,7 +121,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   }, [availablePickupOptions, earliestPickup]);
 
-  // If current dropoff selection becomes invalid, reset to first available option
   useEffect(() => {
     const isCurrentDropoffValid = availableDropoffOptions.some(
       (t) => t.value === latestDropoff
@@ -134,7 +130,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   }, [availableDropoffOptions, latestDropoff]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -146,10 +141,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     };
   }, [isOpen]);
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
-      // Delay reset to allow exit animation
       const timer = setTimeout(() => {
         setRegoPlate('');
         setRegoState('NSW');
@@ -161,6 +154,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setShowSuccess(false);
         setEarliestPickup('09:00');
         setLatestDropoff('17:00');
+        setGuestName('');
+        setGuestEmail('');
+        setGuestPhone('');
+        setHasExistingBooking(false);
+        setGarageName('');
+        setExistingBookingRef('');
+        setExistingBookingNotes('');
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -188,7 +188,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return;
       }
 
-      // AutoGrab returns data in a specific structure
       const vehicle = data.vehicles?.[0] || data;
 
       setVehicleDetails({
@@ -220,6 +219,31 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (!latestDropoff) {
       return 'Please select a drop-off time.';
     }
+
+    // Guest validation
+    if (isGuest) {
+      if (!guestName.trim()) {
+        return 'Please enter your name.';
+      }
+      if (!guestEmail.trim()) {
+        return 'Please enter your email address.';
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(guestEmail)) {
+        return 'Please enter a valid email address.';
+      }
+      if (!guestPhone.trim()) {
+        return 'Please enter your phone number.';
+      }
+    }
+
+    // Existing booking validation
+    if (hasExistingBooking) {
+      if (!garageName.trim()) {
+        return 'Please enter the garage name for your existing booking.';
+      }
+    }
+
     return null;
   };
 
@@ -229,15 +253,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   };
 
   const handleSubmit = async () => {
-    // Check if user is logged in
-    if (authStatus !== 'authenticated' || !session?.user) {
-      // Redirect to login with return URL
-      router.push('/login?callbackUrl=/dashboard');
-      onClose();
-      return;
-    }
-
-    // Validate form
     const validationError = validateForm();
     if (validationError) {
       setSubmitError(validationError);
@@ -248,19 +263,34 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSubmitError(null);
 
     try {
+      const bookingData = {
+        pickupTime: getTimeLabel(earliestPickup, allPickupTimeOptions),
+        dropoffTime: getTimeLabel(latestDropoff, allDropoffTimeOptions),
+        pickupAddress: pickupAddress.trim(),
+        vehicleRegistration: regoPlate.trim().toUpperCase(),
+        vehicleState: regoState,
+        serviceType: SERVICE_TYPES[serviceType] || serviceType,
+        // Guest details (only if not logged in)
+        ...(isGuest && {
+          guestName: guestName.trim(),
+          guestEmail: guestEmail.trim().toLowerCase(),
+          guestPhone: guestPhone.trim(),
+        }),
+        // Existing booking details
+        hasExistingBooking,
+        ...(hasExistingBooking && {
+          garageName: garageName.trim(),
+          existingBookingRef: existingBookingRef.trim(),
+          existingBookingNotes: existingBookingNotes.trim(),
+        }),
+      };
+
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          pickupTime: getTimeLabel(earliestPickup, allPickupTimeOptions),
-          dropoffTime: getTimeLabel(latestDropoff, allDropoffTimeOptions),
-          pickupAddress: pickupAddress.trim(),
-          vehicleRegistration: regoPlate.trim().toUpperCase(),
-          vehicleState: regoState,
-          serviceType: SERVICE_TYPES[serviceType] || serviceType,
-        }),
+        body: JSON.stringify(bookingData),
       });
 
       const data = await response.json();
@@ -269,14 +299,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         throw new Error(data.error || 'Failed to create booking');
       }
 
-      // Success!
       setShowSuccess(true);
 
-      // Wait a moment to show success state, then close and redirect
       setTimeout(() => {
         onClose();
-        router.push('/dashboard');
-      }, 1500);
+        if (!isGuest) {
+          router.push('/dashboard');
+        }
+      }, 2000);
 
     } catch (error) {
       console.error('Booking submission error:', error);
@@ -290,7 +320,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   };
 
-  // Success state UI
   if (showSuccess) {
     return (
       <AnimatePresence>
@@ -314,14 +343,18 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                 </div>
                 <h3 className="mt-4 text-xl font-bold text-slate-900">
-                  Booking Confirmed!
+                  Booking Request Received!
                 </h3>
                 <p className="mt-2 text-sm text-slate-600">
-                  Check your dashboard for updates.
+                  {isGuest
+                    ? "We'll contact you shortly to confirm your booking and arrange payment."
+                    : 'Check your dashboard for updates.'}
                 </p>
-                <p className="mt-4 text-xs text-slate-400">
-                  Redirecting to dashboard...
-                </p>
+                {isGuest && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    A confirmation email has been sent to {guestEmail}
+                  </p>
+                )}
               </div>
             </motion.div>
           </>
@@ -334,7 +367,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -344,7 +376,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
             onClick={onClose}
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ y: '-100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -353,7 +384,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
             className="fixed left-1/2 top-1/2 z-[101] w-[95%] max-w-2xl -translate-x-1/2 -translate-y-1/2"
           >
             <div className="relative rounded-3xl border border-slate-200 bg-white shadow-2xl">
-              {/* Close button */}
               <button
                 type="button"
                 onClick={onClose}
@@ -363,27 +393,20 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <X className="h-5 w-5" />
               </button>
 
-              {/* Modal content */}
               <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-8">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                    Start a quick booking
+                    Book a Pick-up & Drop-off
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Tell us when and where – we&apos;ll match you with a
-                    vetted local garage.
+                    We&apos;ll collect your car, take it to the garage, and return it to you.
                   </p>
                 </div>
 
-                {/* Error message */}
                 {submitError && (
                   <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
                     <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
-                    <div>
-                      <p className="text-sm font-medium text-red-800">
-                        {submitError}
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium text-red-800">{submitError}</p>
                   </div>
                 )}
 
@@ -394,6 +417,64 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     handleSubmit();
                   }}
                 >
+                  {/* Guest Details Section */}
+                  {isGuest && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="mb-4 flex items-center gap-2">
+                        <User className="h-5 w-5 text-slate-600" />
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Your Details
+                        </h3>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">
+                            Full Name *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="John Smith"
+                            value={guestName}
+                            onChange={(e) => setGuestName(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Email *
+                            </label>
+                            <input
+                              type="email"
+                              placeholder="john@example.com"
+                              value={guestEmail}
+                              onChange={(e) => setGuestEmail(e.target.value)}
+                              disabled={isSubmitting}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Phone *
+                            </label>
+                            <input
+                              type="tel"
+                              placeholder="0412 345 678"
+                              value={guestPhone}
+                              onChange={(e) => setGuestPhone(e.target.value)}
+                              disabled={isSubmitting}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Time inputs */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
@@ -454,22 +535,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     />
                   </div>
 
-                  {/* Registration Section with Plate Visual */}
+                  {/* Registration Section */}
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                     <h3 className="mb-4 text-sm font-semibold text-slate-900">
                       Vehicle Registration
                     </h3>
 
                     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                      {/* Plate visual */}
                       <div className="flex-shrink-0">
-                        <RegistrationPlate
-                          plate={regoPlate}
-                          state={regoState}
-                        />
+                        <RegistrationPlate plate={regoPlate} state={regoState} />
                       </div>
 
-                      {/* Inputs */}
                       <div className="w-full flex-1 space-y-3">
                         <div className="space-y-1.5">
                           <label className="text-xs font-medium text-slate-600">
@@ -478,9 +554,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <select
                             className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             value={regoState}
-                            onChange={(e) =>
-                              setRegoState(e.target.value as StateCode)
-                            }
+                            onChange={(e) => setRegoState(e.target.value as StateCode)}
                             disabled={isSubmitting}
                           >
                             <option value="NSW">NSW</option>
@@ -505,9 +579,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               maxLength={6}
                               value={regoPlate}
                               onChange={(e) =>
-                                setRegoPlate(
-                                  e.target.value.toUpperCase().slice(0, 6)
-                                )
+                                setRegoPlate(e.target.value.toUpperCase().slice(0, 6))
                               }
                               disabled={isSubmitting}
                               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
@@ -529,7 +601,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       </div>
                     </div>
 
-                    {/* Vehicle details result */}
                     {vehicleDetails && (
                       <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                         <div className="flex items-start gap-3">
@@ -537,22 +608,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <div>
                             <p className="font-semibold text-emerald-900">
                               Vehicle found:{' '}
-                              {vehicleDetails.year
-                                ? `${vehicleDetails.year} `
-                                : ''}
+                              {vehicleDetails.year ? `${vehicleDetails.year} ` : ''}
                               {vehicleDetails.make} {vehicleDetails.model}
                             </p>
                             <p className="mt-0.5 text-sm text-emerald-700">
-                              {vehicleDetails.series && (
-                                <>Series: {vehicleDetails.series}</>
-                              )}
-                              {vehicleDetails.series &&
-                                vehicleDetails.fuel_type && <> • </>}
-                              {vehicleDetails.fuel_type && (
-                                <>Fuel: {vehicleDetails.fuel_type}</>
-                              )}
-                              {(vehicleDetails.series ||
-                                vehicleDetails.fuel_type) &&
+                              {vehicleDetails.series && <>Series: {vehicleDetails.series}</>}
+                              {vehicleDetails.series && vehicleDetails.fuel_type && <> • </>}
+                              {vehicleDetails.fuel_type && <>Fuel: {vehicleDetails.fuel_type}</>}
+                              {(vehicleDetails.series || vehicleDetails.fuel_type) &&
                                 vehicleDetails.transmission && <> • </>}
                               {vehicleDetails.transmission && (
                                 <>Trans: {vehicleDetails.transmission}</>
@@ -564,27 +627,104 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     )}
                   </div>
 
-                  {/* Service type */}
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      Service type
+                  {/* Existing Booking Section */}
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={hasExistingBooking}
+                        onChange={(e) => setHasExistingBooking(e.target.checked)}
+                        disabled={isSubmitting}
+                        className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-amber-900">
+                          I already have a service booking at a garage
+                        </span>
+                        <p className="mt-0.5 text-xs text-amber-700">
+                          We&apos;ll pick up your car, take it to your booked garage, and return it
+                        </p>
+                      </div>
                     </label>
-                    <select
-                      value={serviceType}
-                      onChange={(e) => setServiceType(e.target.value)}
-                      disabled={isSubmitting}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                    >
-                      <option value="standard">
-                        Standard service ($89 pick-up)
-                      </option>
-                      <option value="major">
-                        Major service ($139 pick-up)
-                      </option>
-                      <option value="logbook">Logbook service</option>
-                      <option value="diagnostic">Diagnostic / other</option>
-                    </select>
+
+                    {hasExistingBooking && (
+                      <div className="mt-4 space-y-3 border-t border-amber-200 pt-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-amber-800">
+                            Garage Name *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Smith's Auto Service"
+                            value={garageName}
+                            onChange={(e) => setGarageName(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-amber-800">
+                            Booking Reference (optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. BK12345"
+                            value={existingBookingRef}
+                            onChange={(e) => setExistingBookingRef(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-amber-800">
+                            Additional Notes (optional)
+                          </label>
+                          <textarea
+                            placeholder="Any special instructions or details about your booking..."
+                            value={existingBookingNotes}
+                            onChange={(e) => setExistingBookingNotes(e.target.value)}
+                            disabled={isSubmitting}
+                            rows={2}
+                            className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Service type - only show if no existing booking */}
+                  {!hasExistingBooking && (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">
+                        Service type
+                      </label>
+                      <select
+                        value={serviceType}
+                        onChange={(e) => setServiceType(e.target.value)}
+                        disabled={isSubmitting}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                      >
+                        <option value="standard">Standard service ($89 pick-up)</option>
+                        <option value="major">Major service ($139 pick-up)</option>
+                        <option value="logbook">Logbook service</option>
+                        <option value="diagnostic">Diagnostic / other</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Pricing info for existing bookings */}
+                  {hasExistingBooking && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                      <p className="text-sm font-medium text-emerald-900">
+                        Pick-up & Drop-off Fee: $49
+                      </p>
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Flat rate for collecting your car, taking it to your booked garage, and returning it.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Submit */}
                   <button
@@ -595,17 +735,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        Confirming booking...
+                        Processing...
                       </>
                     ) : (
-                      'Confirm Booking'
+                      'Request Booking'
                     )}
                   </button>
 
                   <p className="text-center text-xs text-slate-500">
-                    {authStatus === 'authenticated'
-                      ? "No payment taken yet. We'll confirm availability and get back to you."
-                      : "You'll be asked to sign in to complete your booking."}
+                    {hasExistingBooking
+                      ? "We'll confirm availability and contact you to arrange payment."
+                      : "No payment taken yet. We'll confirm availability and get back to you."}
                   </p>
                 </form>
               </div>

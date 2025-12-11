@@ -21,9 +21,11 @@ import {
   MessageSquare,
   AlertTriangle,
   CheckCircle2,
+  Phone,
+  Mail,
+  Building,
 } from "lucide-react";
 
-// Stage definitions with progress percentages
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
   { id: "driver_en_route", label: "Driver En Route", progress: 28 },
@@ -43,15 +45,21 @@ interface Update {
 
 interface Booking {
   _id: string;
-  userId: string;
+  userId: string | null;
   userEmail: string;
   userName: string;
+  isGuest: boolean;
+  guestPhone?: string;
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
   pickupAddress: string;
   pickupTime: string;
   dropoffTime: string;
+  hasExistingBooking: boolean;
+  garageName?: string;
+  existingBookingRef?: string;
+  existingBookingNotes?: string;
   currentStage: string;
   overallProgress: number;
   status: string;
@@ -105,7 +113,6 @@ export default function AdminBookingsPage() {
     fetchBookings();
   }, [fetchBookings]);
 
-  // Clear success message after 3 seconds
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(""), 3000);
@@ -161,7 +168,6 @@ export default function AdminBookingsPage() {
     const currentIndex = getStageIndex(booking.currentStage);
     const newIndex = getStageIndex(newStage);
 
-    // Check if trying to go backwards
     if (newIndex < currentIndex) {
       alert("Cannot move to an earlier stage from the table. Use the Edit modal to override this.");
       return;
@@ -230,7 +236,6 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      {/* Success Toast */}
       {successMessage && (
         <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
           <CheckCircle2 className="h-4 w-4" />
@@ -238,7 +243,6 @@ export default function AdminBookingsPage() {
         </div>
       )}
 
-      {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Manage Bookings</h1>
@@ -255,7 +259,6 @@ export default function AdminBookingsPage() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -306,7 +309,6 @@ export default function AdminBookingsPage() {
         </div>
       </div>
 
-      {/* Error State */}
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center">
           <AlertCircle className="mx-auto h-6 w-6 text-red-500" />
@@ -320,7 +322,6 @@ export default function AdminBookingsPage() {
         </div>
       )}
 
-      {/* Bookings Table */}
       <div className="rounded-xl border border-slate-200 bg-white">
         {loading ? (
           <div className="p-8 text-center">
@@ -351,12 +352,24 @@ export default function AdminBookingsPage() {
                 {bookings.map((booking) => (
                   <tr key={booking._id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">
-                        {booking.userName}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-900">
+                          {booking.userName}
+                        </p>
+                        {booking.isGuest && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Guest
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">
                         {booking.userEmail}
                       </p>
+                      {booking.guestPhone && (
+                        <p className="text-xs text-slate-400">
+                          {booking.guestPhone}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">
@@ -366,8 +379,16 @@ export default function AdminBookingsPage() {
                         {booking.vehicleState}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {booking.serviceType}
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-slate-700">
+                        {booking.serviceType}
+                      </p>
+                      {booking.hasExistingBooking && (
+                        <span className="mt-1 inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                          <Building className="h-3 w-3" />
+                          Existing
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm text-slate-900">
@@ -441,7 +462,6 @@ export default function AdminBookingsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
             <p className="text-sm text-slate-500">
@@ -469,7 +489,6 @@ export default function AdminBookingsPage() {
         )}
       </div>
 
-      {/* View Details Modal */}
       {selectedBooking && !showEditModal && (
         <ViewDetailsModal
           booking={selectedBooking}
@@ -481,7 +500,6 @@ export default function AdminBookingsPage() {
         />
       )}
 
-      {/* Edit Modal */}
       {selectedBooking && showEditModal && (
         <EditBookingModal
           booking={selectedBooking}
@@ -494,7 +512,6 @@ export default function AdminBookingsPage() {
   );
 }
 
-// View Details Modal Component
 function ViewDetailsModal({
   booking,
   onClose,
@@ -514,9 +531,21 @@ function ViewDetailsModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white">
         <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Booking Details
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Booking Details
+            </h2>
+            {booking.isGuest && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                Guest
+              </span>
+            )}
+            {booking.hasExistingBooking && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                Existing Booking
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
@@ -526,25 +555,36 @@ function ViewDetailsModal({
         </div>
 
         <div className="space-y-6 p-6">
-          {/* Booking ID */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs text-slate-500">Booking ID</p>
             <p className="font-mono text-sm text-slate-900">{booking._id}</p>
           </div>
 
-          {/* Customer Info */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <User className="h-4 w-4" />
               Customer
+              {booking.isGuest && (
+                <span className="ml-auto rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                  Guest Checkout
+                </span>
+              )}
             </div>
             <div className="mt-2">
               <p className="font-medium text-slate-900">{booking.userName}</p>
-              <p className="text-sm text-slate-500">{booking.userEmail}</p>
+              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                <Mail className="h-3.5 w-3.5" />
+                {booking.userEmail}
+              </div>
+              {booking.guestPhone && (
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                  <Phone className="h-3.5 w-3.5" />
+                  {booking.guestPhone}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Vehicle Info */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Car className="h-4 w-4" />
@@ -566,7 +606,6 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Service Info */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Wrench className="h-4 w-4" />
@@ -578,7 +617,33 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Schedule */}
+          {booking.hasExistingBooking && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                <Building className="h-4 w-4" />
+                Existing Garage Booking
+              </div>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <p className="text-xs text-blue-600">Garage Name</p>
+                  <p className="font-medium text-blue-900">{booking.garageName}</p>
+                </div>
+                {booking.existingBookingRef && (
+                  <div>
+                    <p className="text-xs text-blue-600">Booking Reference</p>
+                    <p className="font-medium text-blue-900">{booking.existingBookingRef}</p>
+                  </div>
+                )}
+                {booking.existingBookingNotes && (
+                  <div>
+                    <p className="text-xs text-blue-600">Notes</p>
+                    <p className="text-sm text-blue-800">{booking.existingBookingNotes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Clock className="h-4 w-4" />
@@ -600,7 +665,6 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Progress */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -625,7 +689,6 @@ function ViewDetailsModal({
             </p>
           </div>
 
-          {/* Updates Timeline */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <MessageSquare className="h-4 w-4" />
@@ -655,7 +718,6 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Metadata */}
           <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
             <div>
               <p>Created: {formatDate(booking.createdAt)}</p>
@@ -665,7 +727,6 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3">
             <button
               onClick={onEdit}
@@ -686,7 +747,6 @@ function ViewDetailsModal({
   );
 }
 
-// Edit Modal Component with enhanced features
 function EditBookingModal({
   booking,
   onSave,
@@ -719,7 +779,6 @@ function EditBookingModal({
     e.preventDefault();
     setError("");
 
-    // Check if status change requires confirmation
     if (formData.status !== booking.status && (formData.status === "cancelled" || formData.status === "completed")) {
       setShowConfirmDialog(formData.status as "cancelled" | "completed");
       return;
@@ -763,7 +822,6 @@ function EditBookingModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
-          {/* Error message */}
           {error && (
             <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
               <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
@@ -771,7 +829,6 @@ function EditBookingModal({
             </div>
           )}
 
-          {/* Current Stage with Progress Preview */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Current Stage
@@ -793,7 +850,6 @@ function EditBookingModal({
               ))}
             </select>
 
-            {/* Progress preview */}
             {formData.currentStage !== booking.currentStage && (
               <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <div className="flex items-center gap-2 text-sm text-blue-700">
@@ -810,7 +866,6 @@ function EditBookingModal({
               </div>
             )}
 
-            {/* Backwards progression warning */}
             {isBackwardsProgression && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <div className="flex items-start gap-2">
@@ -820,7 +875,7 @@ function EditBookingModal({
                       Going back to an earlier stage
                     </p>
                     <p className="mt-1 text-xs text-amber-700">
-                      This will move the booking from "{STAGES[currentStageIndex]?.label}" back to "{STAGES[newStageIndex]?.label}".
+                      This will move the booking from &quot;{STAGES[currentStageIndex]?.label}&quot; back to &quot;{STAGES[newStageIndex]?.label}&quot;.
                     </p>
                     <label className="mt-2 flex items-center gap-2">
                       <input
@@ -844,7 +899,6 @@ function EditBookingModal({
             )}
           </div>
 
-          {/* Status */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Status
@@ -868,7 +922,6 @@ function EditBookingModal({
             )}
           </div>
 
-          {/* Update Message */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Update Message
@@ -888,7 +941,6 @@ function EditBookingModal({
             </p>
           </div>
 
-          {/* Pickup Time */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Pickup Time
@@ -903,7 +955,6 @@ function EditBookingModal({
             />
           </div>
 
-          {/* Dropoff Time */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Dropoff Time
@@ -918,7 +969,6 @@ function EditBookingModal({
             />
           </div>
 
-          {/* Pickup Address */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Pickup Address
@@ -933,7 +983,6 @@ function EditBookingModal({
             />
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
@@ -953,7 +1002,6 @@ function EditBookingModal({
         </form>
       </div>
 
-      {/* Confirmation Dialog */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
