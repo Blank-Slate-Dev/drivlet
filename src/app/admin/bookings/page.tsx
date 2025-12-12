@@ -237,7 +237,7 @@ export default function AdminBookingsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       {successMessage && (
-        <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+        <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
           <CheckCircle2 className="h-4 w-4" />
           {successMessage}
         </div>
@@ -270,7 +270,7 @@ export default function AdminBookingsPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
           />
         </div>
         <div className="flex gap-2">
@@ -282,7 +282,7 @@ export default function AdminBookingsPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -297,7 +297,7 @@ export default function AdminBookingsPage() {
               setStageFilter(e.target.value);
               setPage(1);
             }}
-            className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
           >
             <option value="all">All Stages</option>
             {STAGES.map((stage) => (
@@ -405,7 +405,7 @@ export default function AdminBookingsPage() {
                           handleQuickStageUpdate(booking._id, e.target.value)
                         }
                         disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+                        className="rounded border border-slate-200 px-2 py-1 text-xs focus:border-violet-500 focus:outline-none disabled:opacity-50"
                       >
                         {STAGES.map((stage) => (
                           <option key={stage.id} value={stage.id}>
@@ -418,7 +418,7 @@ export default function AdminBookingsPage() {
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
                           <div
-                            className="h-full rounded-full bg-emerald-500"
+                            className="h-full rounded-full bg-violet-500"
                             style={{ width: `${booking.overallProgress}%` }}
                           />
                         </div>
@@ -671,13 +671,13 @@ function ViewDetailsModal({
                 <MapPin className="h-4 w-4" />
                 Progress
               </div>
-              <span className="text-sm font-semibold text-emerald-600">
+              <span className="text-sm font-semibold text-violet-600">
                 {booking.overallProgress}%
               </span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-emerald-500"
+                className="h-full rounded-full bg-violet-500"
                 style={{ width: `${booking.overallProgress}%` }}
               />
             </div>
@@ -698,7 +698,7 @@ function ViewDetailsModal({
               {booking.updates.length > 0 ? (
                 booking.updates.map((update, index) => (
                   <div key={index} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white">
                       <Check className="h-3 w-3" />
                     </div>
                     <div className="flex-1">
@@ -730,7 +730,7 @@ function ViewDetailsModal({
           <div className="flex gap-3">
             <button
               onClick={onEdit}
-              className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500"
+              className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-500"
             >
               Edit Booking
             </button>
@@ -841,7 +841,7 @@ function EditBookingModal({
                   currentStage: e.target.value,
                 })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             >
               {STAGES.map((stage) => (
                 <option key={stage.id} value={stage.id}>
@@ -908,7 +908,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             >
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
@@ -933,7 +933,7 @@ function EditBookingModal({
                 setFormData({ ...formData, message: e.target.value })
               }
               rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
               placeholder="Optional: Custom message for this update..."
             />
             <p className="mt-1 text-xs text-slate-500">
@@ -951,7 +951,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupTime: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
 
@@ -965,7 +965,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, dropoffTime: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
 
@@ -979,7 +979,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupAddress: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
 
@@ -987,7 +987,7 @@ function EditBookingModal({
             <button
               type="submit"
               disabled={saving || (isBackwardsProgression && !formData.allowBackwardsProgression)}
-              className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Update Booking"}
             </button>
