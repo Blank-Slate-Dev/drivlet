@@ -270,7 +270,7 @@ export default function AdminBookingsPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
           />
         </div>
         <div className="flex gap-2">
@@ -282,7 +282,7 @@ export default function AdminBookingsPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -297,7 +297,7 @@ export default function AdminBookingsPage() {
               setStageFilter(e.target.value);
               setPage(1);
             }}
-            className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
           >
             <option value="all">All Stages</option>
             {STAGES.map((stage) => (
@@ -405,7 +405,7 @@ export default function AdminBookingsPage() {
                           handleQuickStageUpdate(booking._id, e.target.value)
                         }
                         disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs focus:border-violet-500 focus:outline-none disabled:opacity-50"
+                        className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:border-violet-500 focus:outline-none disabled:opacity-50"
                       >
                         {STAGES.map((stage) => (
                           <option key={stage.id} value={stage.id}>
