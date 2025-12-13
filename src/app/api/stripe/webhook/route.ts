@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    // Verify webhook signature
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -40,10 +39,58 @@ export async function POST(request: NextRequest) {
 
   // Handle the event
   switch (event.type) {
+    // Handle embedded payment flow (PaymentIntent)
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const metadata = paymentIntent.metadata;
+      
+      if (!metadata || !metadata.customerEmail) {
+        console.log('PaymentIntent without booking metadata, skipping');
+        break;
+      }
+
+      try {
+        await client.connect();
+        const db = client.db();
+        
+        const booking = {
+          userName: metadata.customerName,
+          userEmail: metadata.customerEmail,
+          userPhone: metadata.customerPhone,
+          isGuest: true,
+          vehicleRegistration: metadata.vehicleRegistration,
+          vehicleState: metadata.vehicleState,
+          serviceType: metadata.serviceType,
+          pickupAddress: metadata.pickupAddress,
+          pickupTime: metadata.earliestPickup,
+          dropoffTime: metadata.latestDropoff,
+          hasExistingBooking: metadata.hasExistingBooking === 'true',
+          garageName: metadata.garageName || null,
+          existingBookingRef: metadata.existingBookingRef || null,
+          paymentStatus: 'paid',
+          paymentId: paymentIntent.id,
+          paymentAmount: paymentIntent.amount,
+          status: 'pending',
+          currentStage: 'booking_confirmed',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const result = await db.collection('bookings').insertOne(booking);
+        console.log('Booking created from PaymentIntent:', result.insertedId);
+        
+      } catch (dbError) {
+        console.error('Failed to create booking:', dbError);
+      } finally {
+        await client.close();
+      }
+      
+      break;
+    }
+
+    // Handle hosted checkout flow (CheckoutSession) - keep for backwards compatibility
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
-      
-      // Extract booking details from metadata
       const metadata = session.metadata;
       
       if (!metadata) {
@@ -55,51 +102,35 @@ export async function POST(request: NextRequest) {
         await client.connect();
         const db = client.db();
         
-        // Create the booking in database
         const booking = {
-          // Customer info
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
           userPhone: metadata.customerPhone,
           isGuest: true,
-          
-          // Vehicle info
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
-          
-          // Service details
           serviceType: metadata.serviceType,
           pickupAddress: metadata.pickupAddress,
           pickupTime: metadata.earliestPickup,
           dropoffTime: metadata.latestDropoff,
-          
-          // Existing booking details (if applicable)
           hasExistingBooking: metadata.hasExistingBooking === 'true',
           garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
-          
-          // Payment info
           paymentStatus: 'paid',
           paymentId: session.payment_intent as string,
           paymentAmount: session.amount_total,
           stripeSessionId: session.id,
-          
-          // Booking status
           status: 'pending',
           currentStage: 'booking_confirmed',
-          
-          // Timestamps
           createdAt: new Date(),
           updatedAt: new Date(),
         };
 
         const result = await db.collection('bookings').insertOne(booking);
-        
-        console.log('Booking created successfully:', result.insertedId);
+        console.log('Booking created from CheckoutSession:', result.insertedId);
         
       } catch (dbError) {
         console.error('Failed to create booking:', dbError);
-        // Still return 200 to Stripe so it doesn't retry
       } finally {
         await client.close();
       }
@@ -107,14 +138,9 @@ export async function POST(request: NextRequest) {
       break;
     }
     
-    case 'checkout.session.expired': {
-      console.log('Checkout session expired:', event.data.object.id);
-      break;
-    }
-    
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      console.log('Payment failed:', paymentIntent.id);
+      console.log('Payment failed:', paymentIntent.id, paymentIntent.last_payment_error?.message);
       break;
     }
     
