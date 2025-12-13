@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, Loader2, AlertCircle, User } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
+import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
 
 type VehicleDetails = {
   make: string;
@@ -70,6 +71,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [earliestPickup, setEarliestPickup] = useState('09:00');
   const [latestDropoff, setLatestDropoff] = useState('17:00');
   const [pickupAddress, setPickupAddress] = useState('');
+  const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [serviceType, setServiceType] = useState('standard');
 
   // Guest details
@@ -147,6 +149,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setRegoPlate('');
         setRegoState('NSW');
         setPickupAddress('');
+        setSelectedPlaceDetails(null);
         setServiceType('standard');
         setVehicleDetails(null);
         setRegoError(null);
@@ -204,6 +207,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     } finally {
       setIsLookingUpRego(false);
     }
+  };
+
+  const handleAddressSelect = (details: PlaceDetails) => {
+    setSelectedPlaceDetails(details);
+    // You could store additional details like lat/lng, suburb, etc. if needed
   };
 
   const validateForm = (): string | null => {
@@ -270,6 +278,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         vehicleRegistration: regoPlate.trim().toUpperCase(),
         vehicleState: regoState,
         serviceType: SERVICE_TYPES[serviceType] || serviceType,
+        // Include place details if available (for future use like coordinates)
+        ...(selectedPlaceDetails && {
+          pickupSuburb: selectedPlaceDetails.suburb,
+          pickupPostcode: selectedPlaceDetails.postcode,
+          pickupLat: selectedPlaceDetails.lat,
+          pickupLng: selectedPlaceDetails.lng,
+        }),
         // Guest details (only if not logged in)
         ...(isGuest && {
           guestName: guestName.trim(),
@@ -520,18 +535,18 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     </div>
                   </div>
 
-                  {/* Address */}
+                  {/* Address with Autocomplete */}
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-700">
                       Pick-up address
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 123 King St, Newcastle NSW"
+                    <AddressAutocomplete
                       value={pickupAddress}
-                      onChange={(e) => setPickupAddress(e.target.value)}
+                      onChange={setPickupAddress}
+                      onSelect={handleAddressSelect}
+                      placeholder="Start typing your address..."
                       disabled={isSubmitting}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                      biasToNewcastle={true}
                     />
                   </div>
 
