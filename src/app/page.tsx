@@ -2,6 +2,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import {
   BookingModal,
@@ -16,9 +18,17 @@ import {
 } from '@/components/homepage';
 
 export default function Home() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const [showBookingModal, setShowBookingModal] = useState(false);
 
-  const openBookingModal = () => setShowBookingModal(true);
+  const openBookingModal = () => {
+    if (!session?.user) {
+      router.push('/login?message=booking');
+      return;
+    }
+    setShowBookingModal(true);
+  };
   const closeBookingModal = () => setShowBookingModal(false);
 
   return (

@@ -23,6 +23,9 @@ function LoginForm() {
     if (searchParams.get("registered") === "true") {
       setSuccess("Account created successfully! Please sign in.");
     }
+    if (searchParams.get("message") === "booking") {
+      setSuccess("Please sign in to continue with your booking.");
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
