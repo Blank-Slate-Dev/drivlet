@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Shield,
@@ -41,10 +42,10 @@ export default function AdminLayout({
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-violet-600" />
-          <p className="mt-2 text-sm text-slate-600">Loading...</p>
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-white" />
+          <p className="mt-2 text-sm text-emerald-100">Loading...</p>
         </div>
       </div>
     );
@@ -52,8 +53,8 @@ export default function AdminLayout({
 
   if (!session?.user || session.user.role !== "admin") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-center">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
+        <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 text-center shadow-2xl">
           <Shield className="mx-auto h-12 w-12 text-red-500" />
           <h1 className="mt-4 text-xl font-semibold text-slate-900">
             Access Denied
@@ -63,7 +64,7 @@ export default function AdminLayout({
           </p>
           <Link
             href="/"
-            className="mt-4 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
           >
             Go Home
           </Link>
@@ -75,13 +76,30 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Admin Header */}
-      <header className="sticky top-0 z-50 border-b border-violet-900/20 bg-gradient-to-r from-violet-950 to-purple-950">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-700">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 z-0 opacity-10">
+          <div
+            className="h-full w-full"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          />
+        </div>
+        <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold text-white">
-              drivlet
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+                <Image
+                  src="/logo.png"
+                  alt="drivlet"
+                  fill
+                  className="object-contain brightness-0 invert"
+                  priority
+                />
+              </div>
             </Link>
-            <span className="flex items-center gap-1.5 rounded-full bg-violet-500/20 px-3 py-1 text-xs font-medium text-violet-300">
+            <span className="flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-300">
               <Shield className="h-3.5 w-3.5" />
               Admin Panel
             </span>
@@ -89,44 +107,44 @@ export default function AdminLayout({
           <nav className="flex items-center gap-1">
             <Link
               href="/admin/dashboard"
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                 isActive("/admin/dashboard")
-                  ? "bg-violet-600/30 text-white"
-                  : "text-violet-200 hover:bg-violet-800/50 hover:text-white"
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </Link>
             <Link
               href="/admin/bookings"
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                 isActive("/admin/bookings")
-                  ? "bg-violet-600/30 text-white"
-                  : "text-violet-200 hover:bg-violet-800/50 hover:text-white"
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
               }`}
             >
               <ClipboardList className="h-4 w-4" />
-              Bookings
+              <span className="hidden sm:inline">Bookings</span>
             </Link>
             <Link
               href="/admin/users"
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                 isActive("/admin/users")
-                  ? "bg-violet-600/30 text-white"
-                  : "text-violet-200 hover:bg-violet-800/50 hover:text-white"
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
               }`}
             >
               <Users className="h-4 w-4" />
-              Users
+              <span className="hidden sm:inline">Users</span>
             </Link>
-            <div className="mx-2 h-6 w-px bg-violet-700/50" />
+            <div className="mx-2 h-6 w-px bg-white/20" />
             <Link
               href="/"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-violet-200 transition hover:bg-violet-800/50 hover:text-white"
+              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-white/10 hover:text-white"
             >
               <Home className="h-4 w-4" />
-              Main Site
+              <span className="hidden sm:inline">Main Site</span>
             </Link>
           </nav>
         </div>

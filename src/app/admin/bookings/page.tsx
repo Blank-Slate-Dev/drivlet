@@ -140,9 +140,9 @@ export default function AdminBookingsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-700";
+        return "bg-amber-100 text-amber-700";
       case "in_progress":
-        return "bg-blue-100 text-blue-700";
+        return "bg-emerald-100 text-emerald-700";
       case "completed":
         return "bg-green-100 text-green-700";
       case "cancelled":
@@ -235,279 +235,283 @@ export default function AdminBookingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      {successMessage && (
-        <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
-          <CheckCircle2 className="h-4 w-4" />
-          {successMessage}
-        </div>
-      )}
-
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Manage Bookings</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {total} total bookings • View and manage all customer bookings
-          </p>
-        </div>
-        <button
-          onClick={fetchBookings}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by name, email, registration..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-          />
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {successMessage && (
+          <div className="fixed top-20 right-4 z-50 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg">
+            <CheckCircle2 className="h-4 w-4" />
+            {successMessage}
           </div>
-          <select
-            value={stageFilter}
-            onChange={(e) => {
-              setStageFilter(e.target.value);
-              setPage(1);
-            }}
-            className="appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-          >
-            <option value="all">All Stages</option>
-            {STAGES.map((stage) => (
-              <option key={stage.id} value={stage.id}>
-                {stage.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+        )}
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-          <AlertCircle className="mx-auto h-6 w-6 text-red-500" />
-          <p className="mt-2 text-sm text-red-700">{error}</p>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Manage Bookings</h1>
+            <p className="mt-1 text-slate-600">
+              {total} total bookings • View and manage all customer bookings
+            </p>
+          </div>
           <button
             onClick={fetchBookings}
-            className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
+            className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
           >
-            Try again
+            <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
+            Refresh
           </button>
         </div>
-      )}
 
-      <div className="rounded-xl border border-slate-200 bg-white">
-        {loading ? (
-          <div className="p-8 text-center">
-            <RefreshCw className="mx-auto h-8 w-8 animate-spin text-slate-400" />
-            <p className="mt-2 text-sm text-slate-500">Loading bookings...</p>
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email, registration..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
           </div>
-        ) : bookings.length === 0 ? (
-          <div className="p-8 text-center">
-            <Car className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-500">No bookings found</p>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <select
+              value={stageFilter}
+              onChange={(e) => {
+                setStageFilter(e.target.value);
+                setPage(1);
+              }}
+              className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="all">All Stages</option>
+              {STAGES.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.label}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Vehicle</th>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">Pickup</th>
-                  <th className="px-4 py-3">Stage</th>
-                  <th className="px-4 py-3">Progress</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {bookings.map((booking) => (
-                  <tr key={booking._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-900">
-                          {booking.userName}
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
+            <p className="mt-2 text-sm font-medium text-red-700">{error}</p>
+            <button
+              onClick={fetchBookings}
+              className="mt-3 text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {loading ? (
+            <div className="p-12 text-center">
+              <RefreshCw className="mx-auto h-8 w-8 animate-spin text-emerald-500" />
+              <p className="mt-3 text-sm text-slate-500">Loading bookings...</p>
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                <Car className="h-8 w-8 text-slate-400" />
+              </div>
+              <p className="mt-4 text-sm font-medium text-slate-600">No bookings found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-4">Customer</th>
+                    <th className="px-4 py-4">Vehicle</th>
+                    <th className="px-4 py-4">Service</th>
+                    <th className="px-4 py-4">Pickup</th>
+                    <th className="px-4 py-4">Stage</th>
+                    <th className="px-4 py-4">Progress</th>
+                    <th className="px-4 py-4">Status</th>
+                    <th className="px-4 py-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bookings.map((booking) => (
+                    <tr key={booking._id} className="transition hover:bg-slate-50">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900">
+                            {booking.userName}
+                          </p>
+                          {booking.isGuest && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                              Guest
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {booking.userEmail}
                         </p>
-                        {booking.isGuest && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                            Guest
+                        {booking.guestPhone && (
+                          <p className="text-xs text-slate-400">
+                            {booking.guestPhone}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-slate-900">
+                          {booking.vehicleRegistration}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {booking.vehicleState}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-slate-700">
+                          {booking.serviceType}
+                        </p>
+                        {booking.hasExistingBooking && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                            <Building className="h-3 w-3" />
+                            Existing
                           </span>
                         )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        {booking.userEmail}
-                      </p>
-                      {booking.guestPhone && (
-                        <p className="text-xs text-slate-400">
-                          {booking.guestPhone}
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-slate-900">
+                          {booking.pickupTime}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">
-                        {booking.vehicleRegistration}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {booking.vehicleState}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-slate-700">
-                        {booking.serviceType}
-                      </p>
-                      {booking.hasExistingBooking && (
-                        <span className="mt-1 inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                          <Building className="h-3 w-3" />
-                          Existing
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-slate-900">
-                        {booking.pickupTime}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate max-w-[150px]">
-                        {booking.pickupAddress}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={booking.currentStage}
-                        onChange={(e) =>
-                          handleQuickStageUpdate(booking._id, e.target.value)
-                        }
-                        disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
-                        className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:border-violet-500 focus:outline-none disabled:opacity-50"
-                      >
-                        {STAGES.map((stage) => (
-                          <option key={stage.id} value={stage.id}>
-                            {stage.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-violet-500"
-                            style={{ width: `${booking.overallProgress}%` }}
-                          />
+                        <p className="text-xs text-slate-500 truncate max-w-[150px]">
+                          {booking.pickupAddress}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <select
+                          value={booking.currentStage}
+                          onChange={(e) =>
+                            handleQuickStageUpdate(booking._id, e.target.value)
+                          }
+                          disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                        >
+                          {STAGES.map((stage) => (
+                            <option key={stage.id} value={stage.id}>
+                              {stage.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all"
+                              style={{ width: `${booking.overallProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-slate-600">
+                            {booking.overallProgress}%
+                          </span>
                         </div>
-                        <span className="text-xs text-slate-500">
-                          {booking.overallProgress}%
+                      </td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}
+                        >
+                          {booking.status.replace("_", " ")}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}
-                      >
-                        {booking.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setSelectedBooking(booking)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setShowEditModal(true);
-                          }}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setSelectedBooking(booking)}
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setShowEditModal(true);
+                            }}
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-4">
+              <p className="text-sm text-slate-500">
+                Page {page} of {totalPages} ({total} bookings)
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {selectedBooking && !showEditModal && (
+          <ViewDetailsModal
+            booking={selectedBooking}
+            onClose={() => setSelectedBooking(null)}
+            onEdit={() => setShowEditModal(true)}
+            getStageLabel={getStageLabel}
+            formatDateTime={formatDateTime}
+            formatDate={formatDate}
+          />
         )}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-            <p className="text-sm text-slate-500">
-              Page {page} of {totalPages} ({total} bookings)
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Prev
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+        {selectedBooking && showEditModal && (
+          <EditBookingModal
+            booking={selectedBooking}
+            onSave={handleSaveBooking}
+            onClose={() => setShowEditModal(false)}
+            saving={saving}
+          />
         )}
       </div>
-
-      {selectedBooking && !showEditModal && (
-        <ViewDetailsModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-          onEdit={() => setShowEditModal(true)}
-          getStageLabel={getStageLabel}
-          formatDateTime={formatDateTime}
-          formatDate={formatDate}
-        />
-      )}
-
-      {selectedBooking && showEditModal && (
-        <EditBookingModal
-          booking={selectedBooking}
-          onSave={handleSaveBooking}
-          onClose={() => setShowEditModal(false)}
-          saving={saving}
-        />
-      )}
     </div>
   );
 }
@@ -528,49 +532,49 @@ function ViewDetailsModal({
   formatDate: (date: string) => string;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-slate-900">
               Booking Details
             </h2>
             {booking.isGuest && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                 Guest
               </span>
             )}
             {booking.hasExistingBooking && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                 Existing Booking
               </span>
             )}
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="space-y-6 p-6">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">Booking ID</p>
+        <div className="space-y-5 p-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-medium text-slate-500">Booking ID</p>
             <p className="font-mono text-sm text-slate-900">{booking._id}</p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <User className="h-4 w-4" />
+              <User className="h-4 w-4 text-emerald-600" />
               Customer
               {booking.isGuest && (
-                <span className="ml-auto rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
                   Guest Checkout
                 </span>
               )}
             </div>
-            <div className="mt-2">
+            <div className="mt-3">
               <p className="font-medium text-slate-900">{booking.userName}</p>
               <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
                 <Mail className="h-3.5 w-3.5" />
@@ -585,12 +589,12 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Car className="h-4 w-4" />
+              <Car className="h-4 w-4 text-emerald-600" />
               Vehicle
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-4">
+            <div className="mt-3 grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-slate-500">Registration</p>
                 <p className="font-medium text-slate-900">
@@ -606,24 +610,24 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Wrench className="h-4 w-4" />
+              <Wrench className="h-4 w-4 text-emerald-600" />
               Service Details
             </div>
-            <div className="mt-2">
+            <div className="mt-3">
               <p className="text-xs text-slate-500">Service Type</p>
               <p className="font-medium text-slate-900">{booking.serviceType}</p>
             </div>
           </div>
 
           {booking.hasExistingBooking && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
                 <Building className="h-4 w-4" />
                 Existing Garage Booking
               </div>
-              <div className="mt-2 space-y-2">
+              <div className="mt-3 space-y-2">
                 <div>
                   <p className="text-xs text-blue-600">Garage Name</p>
                   <p className="font-medium text-blue-900">{booking.garageName}</p>
@@ -644,12 +648,12 @@ function ViewDetailsModal({
             </div>
           )}
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 text-emerald-600" />
               Schedule
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-4">
+            <div className="mt-3 grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-slate-500">Pickup Time</p>
                 <p className="font-medium text-slate-900">{booking.pickupTime}</p>
@@ -665,19 +669,19 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <MapPin className="h-4 w-4" />
+                <MapPin className="h-4 w-4 text-emerald-600" />
                 Progress
               </div>
-              <span className="text-sm font-semibold text-violet-600">
+              <span className="text-sm font-semibold text-emerald-600">
                 {booking.overallProgress}%
               </span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-violet-500"
+                className="h-full rounded-full bg-emerald-500 transition-all"
                 style={{ width: `${booking.overallProgress}%` }}
               />
             </div>
@@ -689,16 +693,16 @@ function ViewDetailsModal({
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-4 w-4 text-emerald-600" />
               Updates History
             </div>
             <div className="mt-4 space-y-3">
               {booking.updates.length > 0 ? (
                 booking.updates.map((update, index) => (
                   <div key={index} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white">
+                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
                       <Check className="h-3 w-3" />
                     </div>
                     <div className="flex-1">
@@ -727,16 +731,16 @@ function ViewDetailsModal({
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-2">
             <button
               onClick={onEdit}
-              className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-500"
+              className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
             >
               Edit Booking
             </button>
             <button
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Close
             </button>
@@ -809,28 +813,28 @@ function EditBookingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
           <h2 className="text-lg font-semibold text-slate-900">Edit Booking</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Current Stage
             </label>
             <select
@@ -841,7 +845,7 @@ function EditBookingModal({
                   currentStage: e.target.value,
                 })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               {STAGES.map((stage) => (
                 <option key={stage.id} value={stage.id}>
@@ -851,15 +855,15 @@ function EditBookingModal({
             </select>
 
             {formData.currentStage !== booking.currentStage && (
-              <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <div className="flex items-center gap-2 text-sm text-blue-700">
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center gap-2 text-sm text-emerald-700">
                   <span>Progress: {booking.overallProgress}%</span>
                   <span>→</span>
                   <span className="font-semibold">{newProgress}%</span>
                 </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100">
                   <div
-                    className="h-full rounded-full bg-blue-500 transition-all"
+                    className="h-full rounded-full bg-emerald-500 transition-all"
                     style={{ width: `${newProgress}%` }}
                   />
                 </div>
@@ -867,9 +871,9 @@ function EditBookingModal({
             )}
 
             {isBackwardsProgression && (
-              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
                   <div>
                     <p className="text-sm font-medium text-amber-800">
                       Going back to an earlier stage
@@ -877,7 +881,7 @@ function EditBookingModal({
                     <p className="mt-1 text-xs text-amber-700">
                       This will move the booking from &quot;{STAGES[currentStageIndex]?.label}&quot; back to &quot;{STAGES[newStageIndex]?.label}&quot;.
                     </p>
-                    <label className="mt-2 flex items-center gap-2">
+                    <label className="mt-3 flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={formData.allowBackwardsProgression}
@@ -900,7 +904,7 @@ function EditBookingModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Status
             </label>
             <select
@@ -908,7 +912,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
@@ -916,14 +920,14 @@ function EditBookingModal({
               <option value="cancelled">Cancelled</option>
             </select>
             {formData.status === "cancelled" && formData.status !== booking.status && (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-2 text-xs text-red-600">
                 ⚠️ This will cancel the booking
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Update Message
               <span className="ml-1 font-normal text-slate-400">(shown to customer)</span>
             </label>
@@ -933,7 +937,7 @@ function EditBookingModal({
                 setFormData({ ...formData, message: e.target.value })
               }
               rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               placeholder="Optional: Custom message for this update..."
             />
             <p className="mt-1 text-xs text-slate-500">
@@ -942,7 +946,7 @@ function EditBookingModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Pickup Time
             </label>
             <input
@@ -951,12 +955,12 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupTime: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Dropoff Time
             </label>
             <input
@@ -965,12 +969,12 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, dropoffTime: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Pickup Address
             </label>
             <input
@@ -979,22 +983,22 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupAddress: e.target.value })
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <button
               type="submit"
               disabled={saving || (isBackwardsProgression && !formData.allowBackwardsProgression)}
-              className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Update Booking"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -1004,10 +1008,10 @@ function EditBookingModal({
 
       {showConfirmDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${showConfirmDialog === "cancelled" ? "bg-red-100" : "bg-green-100"}`}>
-                <AlertTriangle className={`h-5 w-5 ${showConfirmDialog === "cancelled" ? "text-red-600" : "text-green-600"}`} />
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${showConfirmDialog === "cancelled" ? "bg-red-100" : "bg-green-100"}`}>
+                <AlertTriangle className={`h-6 w-6 ${showConfirmDialog === "cancelled" ? "text-red-600" : "text-green-600"}`} />
               </div>
               <h3 className="text-lg font-semibold text-slate-900">
                 {showConfirmDialog === "cancelled" ? "Cancel Booking?" : "Complete Booking?"}
@@ -1022,13 +1026,13 @@ function EditBookingModal({
               <button
                 onClick={handleConfirmedStatusChange}
                 disabled={saving}
-                className={`flex-1 rounded-lg py-2.5 text-sm font-medium text-white ${showConfirmDialog === "cancelled" ? "bg-red-600 hover:bg-red-500" : "bg-green-600 hover:bg-green-500"} disabled:opacity-50`}
+                className={`flex-1 rounded-full py-3 text-sm font-semibold text-white shadow-lg ${showConfirmDialog === "cancelled" ? "bg-red-600 hover:bg-red-500" : "bg-green-600 hover:bg-green-500"} disabled:opacity-50`}
               >
                 {saving ? "Saving..." : "Yes, Confirm"}
               </button>
               <button
                 onClick={() => setShowConfirmDialog(null)}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Go Back
               </button>
