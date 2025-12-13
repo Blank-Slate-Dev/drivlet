@@ -53,25 +53,39 @@ export async function POST(request: NextRequest) {
         await client.connect();
         const db = client.db();
         
+        const hasExisting = metadata.hasExistingBooking === 'true';
         const booking = {
+          userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          userPhone: metadata.customerPhone,
           isGuest: true,
+          guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
-          serviceType: metadata.serviceType,
+          serviceType: hasExisting
+            ? `Existing Booking - ${metadata.garageName}`
+            : (metadata.serviceType || 'Standard Service'),
           pickupAddress: metadata.pickupAddress,
           pickupTime: metadata.earliestPickup,
           dropoffTime: metadata.latestDropoff,
-          hasExistingBooking: metadata.hasExistingBooking === 'true',
+          hasExistingBooking: hasExisting,
           garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
+          existingBookingNotes: null,
           paymentStatus: 'paid',
           paymentId: paymentIntent.id,
           paymentAmount: paymentIntent.amount,
           status: 'pending',
           currentStage: 'booking_confirmed',
+          overallProgress: 14,
+          updates: [{
+            stage: 'booking_confirmed',
+            timestamp: new Date(),
+            message: hasExisting
+              ? `We've received your pick-up request for your existing booking at ${metadata.garageName}.`
+              : 'We\'ve received your booking request and will confirm shortly.',
+            updatedBy: 'system',
+          }],
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -102,26 +116,40 @@ export async function POST(request: NextRequest) {
         await client.connect();
         const db = client.db();
         
+        const hasExistingSession = metadata.hasExistingBooking === 'true';
         const booking = {
+          userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          userPhone: metadata.customerPhone,
           isGuest: true,
+          guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
-          serviceType: metadata.serviceType,
+          serviceType: hasExistingSession
+            ? `Existing Booking - ${metadata.garageName}`
+            : (metadata.serviceType || 'Standard Service'),
           pickupAddress: metadata.pickupAddress,
           pickupTime: metadata.earliestPickup,
           dropoffTime: metadata.latestDropoff,
-          hasExistingBooking: metadata.hasExistingBooking === 'true',
+          hasExistingBooking: hasExistingSession,
           garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
+          existingBookingNotes: null,
           paymentStatus: 'paid',
           paymentId: session.payment_intent as string,
           paymentAmount: session.amount_total,
           stripeSessionId: session.id,
           status: 'pending',
           currentStage: 'booking_confirmed',
+          overallProgress: 14,
+          updates: [{
+            stage: 'booking_confirmed',
+            timestamp: new Date(),
+            message: hasExistingSession
+              ? `We've received your pick-up request for your existing booking at ${metadata.garageName}.`
+              : 'We\'ve received your booking request and will confirm shortly.',
+            updatedBy: 'system',
+          }],
           createdAt: new Date(),
           updatedAt: new Date(),
         };

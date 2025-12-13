@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, User, LogOut, ChevronDown, Settings, Shield, ClipboardList, Menu, X } from "lucide-react";
@@ -14,20 +13,11 @@ interface HeaderProps {
 
 export default function Header({ onBookingClick }: HeaderProps) {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/" });
-  };
-
-  const handleBookingClick = () => {
-    if (!session?.user) {
-      router.push("/login?message=booking&callbackUrl=/");
-      return;
-    }
-    onBookingClick();
   };
 
   const displayName = session?.user?.username ?? session?.user?.email ?? "User";
@@ -70,7 +60,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
         <div className="hidden items-center gap-3 md:flex">
           <button
             type="button"
-            onClick={handleBookingClick}
+            onClick={onBookingClick}
             className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
           >
             Book a service
@@ -328,7 +318,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                     type="button"
                     onClick={() => {
                       setShowMobileMenu(false);
-                      handleBookingClick();
+                      onBookingClick();
                     }}
                     className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
                   >
