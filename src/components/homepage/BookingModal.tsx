@@ -2,12 +2,14 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, Loader2, AlertCircle, CreditCard } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
+
+// Price display
+const PRICE_DISPLAY = '$119.00';
 
 type VehicleDetails = {
   make: string;
@@ -59,25 +61,7 @@ const SERVICE_TYPES: Record<string, string> = {
 };
 
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
-  const router = useRouter();
   const { data: session, status: authStatus } = useSession();
-
-  // Auth failsafe - redirect unauthenticated users
-  useEffect(() => {
-    if (isOpen && authStatus === 'unauthenticated') {
-      router.push('/login?message=booking&callbackUrl=/');
-      onClose();
-    }
-  }, [isOpen, authStatus, router, onClose]);
-
-  // Don't render modal if not authenticated
-  if (authStatus === 'loading') {
-    return null;
-  }
-
-  if (!session?.user) {
-    return null;
-  }
 
   // Form state
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
@@ -91,6 +75,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [serviceType, setServiceType] = useState('standard');
 
+  // Guest checkout fields
+  const [isGuestCheckout, setIsGuestCheckout] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
 
   // Existing booking details (for stage 1 - attending existing bookings)
   const [hasExistingBooking, setHasExistingBooking] = useState(false);
@@ -102,6 +91,16 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Determine if user is authenticated
+  const isAuthenticated = authStatus === 'authenticated' && session?.user;
+
+  // Set guest checkout mode if not authenticated
+  useEffect(() => {
+    if (isOpen && authStatus === 'unauthenticated') {
+      setIsGuestCheckout(true);
+    }
+  }, [isOpen, authStatus]);
 
   const selectedPickupMinutes = useMemo(() => {
     const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
@@ -172,6 +171,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setGarageName('');
         setExistingBookingRef('');
         setExistingBookingNotes('');
+        setGuestName('');
+        setGuestEmail('');
+        setGuestPhone('');
+        setIsGuestCheckout(false);
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -219,10 +222,30 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   const handleAddressSelect = (details: PlaceDetails) => {
     setSelectedPlaceDetails(details);
-    // You could store additional details like lat/lng, suburb, etc. if needed
+  };
+
+  const getTimeLabel = (value: string, options: TimeOption[]): string => {
+    const option = options.find((t) => t.value === value);
+    return option?.label || value;
   };
 
   const validateForm = (): string | null => {
+    // Guest checkout validation
+    if (isGuestCheckout || !isAuthenticated) {
+      if (!guestName.trim()) {
+        return 'Please enter your full name.';
+      }
+      if (!guestEmail.trim()) {
+        return 'Please enter your email address.';
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+        return 'Please enter a valid email address.';
+      }
+      if (!guestPhone.trim()) {
+        return 'Please enter your phone number.';
+      }
+    }
+
     if (!regoPlate.trim()) {
       return 'Please enter your vehicle registration number.';
     }
@@ -246,11 +269,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     return null;
   };
 
-  const getTimeLabel = (value: string, options: TimeOption[]): string => {
-    const option = options.find(t => t.value === value);
-    return option?.label || value;
-  };
-
   const handleSubmit = async () => {
     const validationError = validateForm();
     if (validationError) {
@@ -262,50 +280,49 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSubmitError(null);
 
     try {
-      const bookingData = {
-        pickupTime: getTimeLabel(earliestPickup, allPickupTimeOptions),
-        dropoffTime: getTimeLabel(latestDropoff, allDropoffTimeOptions),
-        pickupAddress: pickupAddress.trim(),
-        vehicleRegistration: regoPlate.trim().toUpperCase(),
-        vehicleState: regoState,
-        serviceType: SERVICE_TYPES[serviceType] || serviceType,
-        // Include place details if available (for future use like coordinates)
-        ...(selectedPlaceDetails && {
-          pickupSuburb: selectedPlaceDetails.suburb,
-          pickupPostcode: selectedPlaceDetails.postcode,
-          pickupLat: selectedPlaceDetails.lat,
-          pickupLng: selectedPlaceDetails.lng,
-        }),
-        // Existing booking details
-        hasExistingBooking,
-        ...(hasExistingBooking && {
+      // Determine customer details - use username for authenticated users
+      const customerName = isGuestCheckout || !isAuthenticated 
+        ? guestName 
+        : session?.user?.username || '';
+      const customerEmail = isGuestCheckout || !isAuthenticated 
+        ? guestEmail 
+        : session?.user?.email || '';
+      const customerPhone = isGuestCheckout || !isAuthenticated 
+        ? guestPhone 
+        : '';
+
+      // Create Stripe Checkout Session
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName,
+          customerEmail,
+          customerPhone,
+          pickupAddress: pickupAddress.trim(),
+          serviceType: SERVICE_TYPES[serviceType] || serviceType,
+          vehicleRegistration: regoPlate.trim().toUpperCase(),
+          vehicleState: regoState,
+          earliestPickup: getTimeLabel(earliestPickup, allPickupTimeOptions),
+          latestDropoff: getTimeLabel(latestDropoff, allDropoffTimeOptions),
+          hasExistingBooking,
           garageName: garageName.trim(),
           existingBookingRef: existingBookingRef.trim(),
-          existingBookingNotes: existingBookingNotes.trim(),
         }),
-      };
-
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingData),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create booking');
+        throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      setShowSuccess(true);
-
-      setTimeout(() => {
-        onClose();
-        router.push('/dashboard');
-      }, 2000);
-
+      // Redirect to Stripe Checkout using the URL from the session
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (error) {
       console.error('Booking submission error:', error);
       setSubmitError(
@@ -313,10 +330,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           ? error.message
           : 'Something went wrong. Please try again.'
       );
-    } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Don't render if loading auth
+  if (authStatus === 'loading') {
+    return null;
+  }
 
   if (showSuccess) {
     return (
@@ -386,12 +407,21 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
               <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-8">
                 <div className="mb-6">
-                  <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                    Book a Pick-up & Drop-off
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    We&apos;ll collect your car, take it to the garage, and return it to you.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                        Book a Pick-up & Drop-off
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        We&apos;ll collect your car, take it to the garage, and return it to you.
+                      </p>
+                    </div>
+                  </div>
+                  {/* Price Badge */}
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-emerald-700">
+                    <CreditCard className="h-4 w-4" />
+                    <span className="font-semibold">{PRICE_DISPLAY} AUD</span>
+                  </div>
                 </div>
 
                 {submitError && (
@@ -408,6 +438,56 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     handleSubmit();
                   }}
                 >
+                  {/* Guest Checkout Fields - Show if not authenticated */}
+                  {(isGuestCheckout || !isAuthenticated) && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                        Your Details
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">
+                            Full Name *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="John Smith"
+                            value={guestName}
+                            onChange={(e) => setGuestName(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">
+                            Email *
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="john@example.com"
+                            value={guestEmail}
+                            onChange={(e) => setGuestEmail(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">
+                            Phone *
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="0412 345 678"
+                            value={guestPhone}
+                            onChange={(e) => setGuestPhone(e.target.value)}
+                            disabled={isSubmitting}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Time inputs */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
@@ -639,23 +719,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         disabled={isSubmitting}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                       >
-                        <option value="standard">Standard service ($89 pick-up)</option>
-                        <option value="major">Major service ($139 pick-up)</option>
+                        <option value="standard">Standard service</option>
+                        <option value="major">Major service</option>
                         <option value="logbook">Logbook service</option>
                         <option value="diagnostic">Diagnostic / other</option>
                       </select>
-                    </div>
-                  )}
-
-                  {/* Pricing info for existing bookings */}
-                  {hasExistingBooking && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="text-sm font-medium text-emerald-900">
-                        Pick-up & Drop-off Fee: $49
-                      </p>
-                      <p className="mt-1 text-xs text-emerald-700">
-                        Flat rate for collecting your car, taking it to your booked garage, and returning it.
-                      </p>
                     </div>
                   )}
 
@@ -668,17 +736,18 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        Processing...
+                        Redirecting to payment...
                       </>
                     ) : (
-                      'Request Booking'
+                      <>
+                        <CreditCard className="h-5 w-5" />
+                        Pay {PRICE_DISPLAY} & Book
+                      </>
                     )}
                   </button>
 
                   <p className="text-center text-xs text-slate-500">
-                    {hasExistingBooking
-                      ? "We'll confirm availability and contact you to arrange payment."
-                      : "No payment taken yet. We'll confirm availability and get back to you."}
+                    Secure payment powered by Stripe. Your card details are never stored on our servers.
                   </p>
                 </form>
               </div>

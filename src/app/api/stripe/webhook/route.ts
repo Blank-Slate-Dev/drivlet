@@ -2,10 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
-import clientPromise from '@/lib/mongodb';
+import { MongoClient } from 'mongodb';
 
-// Disable body parsing - Stripe needs raw body for signature verification
-export const runtime = 'nodejs';
+// Get MongoDB client directly
+const client = new MongoClient(process.env.MONGODB_URI!);
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -16,6 +16,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No signature' }, { status: 400 });
   }
 
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error('STRIPE_WEBHOOK_SECRET not configured');
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+  }
+
   let event: Stripe.Event;
 
   try {
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const client = await clientPromise;
+        await client.connect();
         const db = client.db();
         
         // Create the booking in database
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
           userPhone: metadata.customerPhone,
-          isGuest: true, // For now, treating all as guest bookings
+          isGuest: true,
           
           // Vehicle info
           vehicleRegistration: metadata.vehicleRegistration,
@@ -65,12 +70,13 @@ export async function POST(request: NextRequest) {
           // Service details
           serviceType: metadata.serviceType,
           pickupAddress: metadata.pickupAddress,
-          earliestPickup: metadata.earliestPickup,
-          latestDropoff: metadata.latestDropoff,
+          pickupTime: metadata.earliestPickup,
+          dropoffTime: metadata.latestDropoff,
           
           // Existing booking details (if applicable)
+          hasExistingBooking: metadata.hasExistingBooking === 'true',
+          garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
-          existingGarage: metadata.existingGarage || null,
           
           // Payment info
           paymentStatus: 'paid',
@@ -91,26 +97,22 @@ export async function POST(request: NextRequest) {
         
         console.log('Booking created successfully:', result.insertedId);
         
-        // TODO: Send confirmation email to customer
-        // await sendBookingConfirmationEmail(booking);
-        
       } catch (dbError) {
         console.error('Failed to create booking:', dbError);
         // Still return 200 to Stripe so it doesn't retry
-        // Log the error for manual intervention
+      } finally {
+        await client.close();
       }
       
       break;
     }
     
     case 'checkout.session.expired': {
-      // Payment was not completed in time
       console.log('Checkout session expired:', event.data.object.id);
       break;
     }
     
     case 'payment_intent.payment_failed': {
-      // Payment failed
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log('Payment failed:', paymentIntent.id);
       break;

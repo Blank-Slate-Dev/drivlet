@@ -16,6 +16,8 @@ interface BookingDetails {
   serviceType: string;
   earliestPickup: string;
   latestDropoff: string;
+  hasExistingBooking: boolean;
+  garageName: string;
   amountPaid: number;
 }
 
@@ -32,6 +34,7 @@ function SuccessContent() {
     } else {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   const fetchBookingDetails = async () => {
@@ -130,6 +133,13 @@ function SuccessContent() {
                   </div>
                 </div>
               </div>
+
+              {booking.hasExistingBooking && booking.garageName && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5">
+                  <p className="text-sm text-amber-700">Taking to:</p>
+                  <p className="font-semibold text-amber-900">{booking.garageName}</p>
+                </div>
+              )}
 
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-5">
                 <div className="flex items-center justify-between">

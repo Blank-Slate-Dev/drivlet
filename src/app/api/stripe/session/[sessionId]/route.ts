@@ -34,6 +34,8 @@ export async function GET(
       serviceType: session.metadata.serviceType,
       earliestPickup: session.metadata.earliestPickup,
       latestDropoff: session.metadata.latestDropoff,
+      hasExistingBooking: session.metadata.hasExistingBooking === 'true',
+      garageName: session.metadata.garageName,
       amountPaid: session.amount_total,
     });
   } catch (error) {

@@ -18,9 +18,10 @@ export async function POST(request: NextRequest) {
       vehicleState,
       earliestPickup,
       latestDropoff,
-      // Optional: existing booking reference
+      // Existing booking details
+      hasExistingBooking,
+      garageName,
       existingBookingRef,
-      existingGarage,
     } = body;
 
     // Validate required fields
@@ -30,6 +31,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Build description
+    const serviceDesc = hasExistingBooking 
+      ? `Existing Booking at ${garageName || 'garage'}`
+      : serviceType || 'Standard Service';
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
             currency: 'aud',
             product_data: {
               name: 'Drivlet Car Service Pickup & Delivery',
-              description: `Vehicle: ${vehicleRegistration} (${vehicleState}) - ${serviceType === 'existing_booking' ? 'Existing Booking' : 'Standard Pickup'}`,
+              description: `Vehicle: ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}`,
             },
             unit_amount: DRIVLET_PRICE,
           },
@@ -54,13 +60,14 @@ export async function POST(request: NextRequest) {
         customerEmail,
         customerPhone: customerPhone || '',
         pickupAddress,
-        serviceType,
+        serviceType: serviceType || '',
         vehicleRegistration,
         vehicleState,
         earliestPickup,
         latestDropoff,
+        hasExistingBooking: hasExistingBooking ? 'true' : 'false',
+        garageName: garageName || '',
         existingBookingRef: existingBookingRef || '',
-        existingGarage: existingGarage || '',
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/cancelled`,
