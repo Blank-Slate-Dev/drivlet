@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect to database
+    console.log('Connecting to database...');
     await connectDB();
+    console.log('Database connection established');
 
     // Check if email already exists
     const existingEmail = await User.findOne({ email: email.toLowerCase() });
@@ -73,21 +75,34 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new user
+    // Create new user with explicit role
+    console.log('Creating user with data:', {
+      username: username.trim(),
+      email: email.toLowerCase(),
+      role: 'user'
+    });
+
     const user = new User({
       username: username.trim(),
       email: email.toLowerCase(),
       password: hashedPassword,
+      role: 'user', // Explicitly set role
     });
 
+    console.log('User object created, attempting to save...');
     await user.save();
+    console.log('User saved successfully with ID:', user._id);
 
     return NextResponse.json(
       { success: true, message: "User registered successfully" },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("Detailed registration error:", error);
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

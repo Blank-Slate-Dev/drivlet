@@ -15,11 +15,11 @@ export interface IBooking extends Document {
   userId: Types.ObjectId | null;
   userEmail: string;
   userName: string;
-  
+
   // Guest-specific fields
   isGuest: boolean;
   guestPhone?: string;
-  
+
   // Core booking details
   pickupTime: string;
   dropoffTime: string;
@@ -27,19 +27,25 @@ export interface IBooking extends Document {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
-  
+
   // Existing booking fields (for stage 1)
   hasExistingBooking: boolean;
   garageName?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
-  
+
+  // Payment information
+  paymentId?: string;
+  paymentAmount?: number;
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
+  stripeSessionId?: string;
+
   // Progress tracking
   currentStage: string;
   overallProgress: number;
   status: BookingStatus;
   updates: IUpdate[];
-  
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -140,7 +146,27 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: false,
     },
-    
+
+    // Payment information
+    paymentId: {
+      type: String,
+      required: false,
+      index: true,
+    },
+    paymentAmount: {
+      type: Number,
+      required: false,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'failed', 'refunded'],
+      default: 'pending',
+    },
+    stripeSessionId: {
+      type: String,
+      required: false,
+    },
+
     // Progress tracking
     currentStage: {
       type: String,

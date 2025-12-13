@@ -100,6 +100,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -188,6 +189,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setGuestPhone('');
         setIsGuestCheckout(false);
         setClientSecret(null);
+        setPaymentIntentId(null);
         setIsProcessing(false);
       }, 300);
       return () => clearTimeout(timer);
@@ -328,6 +330,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       }
 
       setClientSecret(data.clientSecret);
+      setPaymentIntentId(data.paymentIntentId);
       setCurrentStep('payment');
     } catch (error) {
       console.error('Payment initialization error:', error);
@@ -341,7 +344,29 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
+    // Save the booking to database after successful payment
+    if (paymentIntentId) {
+      try {
+        console.log('💾 Saving booking to database...');
+        const response = await fetch('/api/bookings/create-after-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          console.log('✅ Booking saved:', data.bookingId);
+        } else {
+          console.error('❌ Failed to save booking:', data.error);
+        }
+      } catch (error) {
+        console.error('❌ Error saving booking:', error);
+      }
+    }
+
     setCurrentStep('success');
   };
 
