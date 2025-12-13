@@ -2,16 +2,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
 
-// Get the app URL - check multiple possible env vars
+// Get the app URL
 function getAppUrl(): string {
-  // Vercel automatically sets VERCEL_URL for deployments
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  // Custom APP_URL (not NEXT_PUBLIC_ since this is server-side)
+  // Use APP_URL env var if set, otherwise use production URL
   if (process.env.APP_URL) {
     return process.env.APP_URL;
   }
+  
+  // Check if we're in production (Vercel sets this)
+  if (process.env.VERCEL_ENV === 'production') {
+    return 'https://drivlet.vercel.app';
+  }
+  
+  // For preview deployments, use the deployment URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
   // Fallback for local development
   return 'http://localhost:3000';
 }
