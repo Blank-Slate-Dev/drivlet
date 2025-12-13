@@ -46,7 +46,9 @@ function LoginForm() {
         return;
       }
 
-      router.push("/");
+      // Redirect to callbackUrl if provided, otherwise home
+      const callbackUrl = searchParams.get("callbackUrl") || "/";
+      router.push(callbackUrl);
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");

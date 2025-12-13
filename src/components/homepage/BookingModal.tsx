@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Loader2, AlertCircle, User } from 'lucide-react';
+import { X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
 
@@ -62,6 +62,23 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const router = useRouter();
   const { data: session, status: authStatus } = useSession();
 
+  // Auth failsafe - redirect unauthenticated users
+  useEffect(() => {
+    if (isOpen && authStatus === 'unauthenticated') {
+      router.push('/login?message=booking&callbackUrl=/');
+      onClose();
+    }
+  }, [isOpen, authStatus, router, onClose]);
+
+  // Don't render modal if not authenticated
+  if (authStatus === 'loading') {
+    return null;
+  }
+
+  if (!session?.user) {
+    return null;
+  }
+
   // Form state
   const [isLookingUpRego, setIsLookingUpRego] = useState(false);
   const [regoError, setRegoError] = useState<string | null>(null);
@@ -74,10 +91,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [serviceType, setServiceType] = useState('standard');
 
-  // Guest details
-  const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
 
   // Existing booking details (for stage 1 - attending existing bookings)
   const [hasExistingBooking, setHasExistingBooking] = useState(false);
@@ -89,8 +102,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-
-  const isGuest = authStatus !== 'authenticated';
 
   const selectedPickupMinutes = useMemo(() => {
     const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
@@ -157,9 +168,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setShowSuccess(false);
         setEarliestPickup('09:00');
         setLatestDropoff('17:00');
-        setGuestName('');
-        setGuestEmail('');
-        setGuestPhone('');
         setHasExistingBooking(false);
         setGarageName('');
         setExistingBookingRef('');
@@ -228,23 +236,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return 'Please select a drop-off time.';
     }
 
-    // Guest validation
-    if (isGuest) {
-      if (!guestName.trim()) {
-        return 'Please enter your name.';
-      }
-      if (!guestEmail.trim()) {
-        return 'Please enter your email address.';
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(guestEmail)) {
-        return 'Please enter a valid email address.';
-      }
-      if (!guestPhone.trim()) {
-        return 'Please enter your phone number.';
-      }
-    }
-
     // Existing booking validation
     if (hasExistingBooking) {
       if (!garageName.trim()) {
@@ -285,12 +276,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           pickupLat: selectedPlaceDetails.lat,
           pickupLng: selectedPlaceDetails.lng,
         }),
-        // Guest details (only if not logged in)
-        ...(isGuest && {
-          guestName: guestName.trim(),
-          guestEmail: guestEmail.trim().toLowerCase(),
-          guestPhone: guestPhone.trim(),
-        }),
         // Existing booking details
         hasExistingBooking,
         ...(hasExistingBooking && {
@@ -318,9 +303,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
       setTimeout(() => {
         onClose();
-        if (!isGuest) {
-          router.push('/dashboard');
-        }
+        router.push('/dashboard');
       }, 2000);
 
     } catch (error) {
@@ -361,15 +344,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   Booking Request Received!
                 </h3>
                 <p className="mt-2 text-sm text-slate-600">
-                  {isGuest
-                    ? "We'll contact you shortly to confirm your booking and arrange payment."
-                    : 'Check your dashboard for updates.'}
+                  Check your dashboard for updates.
                 </p>
-                {isGuest && (
-                  <p className="mt-3 text-xs text-slate-500">
-                    A confirmation email has been sent to {guestEmail}
-                  </p>
-                )}
               </div>
             </motion.div>
           </>
@@ -432,64 +408,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     handleSubmit();
                   }}
                 >
-                  {/* Guest Details Section */}
-                  {isGuest && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4 flex items-center gap-2">
-                        <User className="h-5 w-5 text-slate-600" />
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Your Details
-                        </h3>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">
-                            Full Name *
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="John Smith"
-                            value={guestName}
-                            onChange={(e) => setGuestName(e.target.value)}
-                            disabled={isSubmitting}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                          />
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">
-                              Email *
-                            </label>
-                            <input
-                              type="email"
-                              placeholder="john@example.com"
-                              value={guestEmail}
-                              onChange={(e) => setGuestEmail(e.target.value)}
-                              disabled={isSubmitting}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">
-                              Phone *
-                            </label>
-                            <input
-                              type="tel"
-                              placeholder="0412 345 678"
-                              value={guestPhone}
-                              onChange={(e) => setGuestPhone(e.target.value)}
-                              disabled={isSubmitting}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Time inputs */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">

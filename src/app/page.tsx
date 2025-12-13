@@ -24,7 +24,7 @@ export default function Home() {
 
   const openBookingModal = () => {
     if (!session?.user) {
-      router.push('/login?message=booking');
+      router.push('/login?message=booking&callbackUrl=/');
       return;
     }
     setShowBookingModal(true);

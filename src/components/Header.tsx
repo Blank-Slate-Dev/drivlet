@@ -24,7 +24,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
 
   const handleBookingClick = () => {
     if (!session?.user) {
-      router.push("/login?message=booking");
+      router.push("/login?message=booking&callbackUrl=/");
       return;
     }
     onBookingClick();
