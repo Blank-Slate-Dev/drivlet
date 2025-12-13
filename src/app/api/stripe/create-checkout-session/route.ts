@@ -2,6 +2,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
 
+// Get the app URL - check multiple possible env vars
+function getAppUrl(): string {
+  // Vercel automatically sets VERCEL_URL for deployments
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // Custom APP_URL (not NEXT_PUBLIC_ since this is server-side)
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  // Fallback for local development
+  return 'http://localhost:3000';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -37,6 +51,9 @@ export async function POST(request: NextRequest) {
       ? `Existing Booking at ${garageName || 'garage'}`
       : serviceType || 'Standard Service';
 
+    // Get the base URL for redirects
+    const appUrl = getAppUrl();
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -69,8 +86,8 @@ export async function POST(request: NextRequest) {
         garageName: garageName || '',
         existingBookingRef: existingBookingRef || '',
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/cancelled`,
+      success_url: `${appUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/booking/cancelled`,
     });
 
     return NextResponse.json({ 
