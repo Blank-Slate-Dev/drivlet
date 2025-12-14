@@ -19,10 +19,12 @@ import {
 
 interface User {
   _id: string;
-  username: string;
-  email: string;
-  role: "user" | "admin";
+  username?: string;
+  email?: string;
+  name?: string; // For guest users
+  role: "user" | "admin" | "guest";
   bookingCount: number;
+  isGuest?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,12 +87,24 @@ export default function AdminUsersPage() {
     });
   };
 
-  // Filter users based on search
-  const filteredUsers = users.filter(
-    (user) =>
-      user.username.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase())
-  );
+  // Helper function to get display name for user
+  const getDisplayName = (user: User): string => {
+    return user.username || user.name || user.email || "Unknown";
+  };
+
+  // Filter users based on search with safe null checks
+  const searchLower = search.toLowerCase();
+  const filteredUsers = users.filter((user) => {
+    if (!search) return true;
+    const username = user.username?.toLowerCase() || "";
+    const email = user.email?.toLowerCase() || "";
+    const name = user.name?.toLowerCase() || "";
+    return (
+      username.includes(searchLower) ||
+      email.includes(searchLower) ||
+      name.includes(searchLower)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -233,21 +247,30 @@ export default function AdminUsersPage() {
                     <tr key={user._id} className="transition hover:bg-slate-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">
-                            {user.username.charAt(0).toUpperCase()}
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${user.isGuest ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {getDisplayName(user).charAt(0).toUpperCase()}
                           </div>
-                          <p className="font-medium text-slate-900">
-                            {user.username}
-                          </p>
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              {getDisplayName(user)}
+                            </p>
+                            {user.isGuest && (
+                              <p className="text-xs text-amber-600">Guest</p>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">{user.email}</p>
+                        <p className="text-sm text-slate-600">{user.email || "—"}</p>
                       </td>
                       <td className="px-6 py-4">
                         {user.role === "admin" ? (
                           <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                             Admin
+                          </span>
+                        ) : user.isGuest ? (
+                          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">
+                            Guest
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
@@ -309,6 +332,11 @@ export default function AdminUsersPage() {
                       Admin
                     </span>
                   )}
+                  {selectedUser.isGuest && (
+                    <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+                      Guest
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => setSelectedUser(null)}
@@ -320,10 +348,18 @@ export default function AdminUsersPage() {
 
               <div className="space-y-5 p-6">
                 <div className="flex justify-center">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-2xl font-bold text-emerald-700">
-                    {selectedUser.username.charAt(0).toUpperCase()}
+                  <div className={`flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold ${selectedUser.isGuest ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                    {getDisplayName(selectedUser).charAt(0).toUpperCase()}
                   </div>
                 </div>
+
+                {selectedUser.isGuest && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm text-amber-700">
+                      This is a guest user who made a booking without creating an account.
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-medium text-slate-500">User ID</p>
@@ -339,9 +375,11 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="mt-3 space-y-3">
                     <div>
-                      <p className="text-xs text-slate-500">Username</p>
+                      <p className="text-xs text-slate-500">
+                        {selectedUser.isGuest ? "Name" : "Username"}
+                      </p>
                       <p className="font-medium text-slate-900">
-                        {selectedUser.username}
+                        {getDisplayName(selectedUser)}
                       </p>
                     </div>
                     <div>
@@ -349,7 +387,7 @@ export default function AdminUsersPage() {
                       <div className="flex items-center gap-1.5">
                         <Mail className="h-4 w-4 text-slate-400" />
                         <p className="text-sm text-slate-900">
-                          {selectedUser.email}
+                          {selectedUser.email || "—"}
                         </p>
                       </div>
                     </div>
