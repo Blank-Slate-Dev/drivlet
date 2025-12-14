@@ -85,7 +85,6 @@ export default function GarageAutocomplete({
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
     
     if (existingScript) {
-      // Script exists, wait for it to load
       const checkLoaded = setInterval(() => {
         if (window.google?.maps?.places) {
           clearInterval(checkLoaded);
@@ -93,7 +92,6 @@ export default function GarageAutocomplete({
         }
       }, 100);
       
-      // Timeout after 10 seconds
       setTimeout(() => {
         clearInterval(checkLoaded);
         if (!window.google?.maps?.places) {
@@ -111,7 +109,6 @@ export default function GarageAutocomplete({
     script.defer = true;
     
     script.onload = () => {
-      // Small delay to ensure Places library is ready
       setTimeout(initServices, 100);
     };
     
@@ -122,7 +119,7 @@ export default function GarageAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions - uses car_repair type for mechanics
+  // Search for predictions - dual search for car_repair AND car_dealer
   const searchPredictions = useCallback((input: string) => {
     if (!autocompleteServiceRef.current || !input.trim()) {
       setPredictions([]);
@@ -137,36 +134,63 @@ export default function GarageAutocomplete({
       new google.maps.LatLng(-32.7, 151.9)
     );
 
-    // Use car_repair type - this filters to mechanics/auto repair shops
-    // Note: Google API only supports ONE specific type at a time
-    const request: google.maps.places.AutocompletionRequest = {
+    const baseRequest = {
       input,
       componentRestrictions: { country: 'au' },
-      types: ['car_repair'],
       sessionToken: sessionTokenRef.current || undefined,
+      bounds: biasToNewcastle ? newcastleBounds : undefined,
     };
 
-    if (biasToNewcastle) {
-      request.bounds = newcastleBounds;
-    }
+    // Make two parallel requests: one for car_repair, one for car_dealer
+    const carRepairRequest: google.maps.places.AutocompletionRequest = {
+      ...baseRequest,
+      types: ['car_repair'],
+    };
 
-    autocompleteServiceRef.current.getPlacePredictions(
-      request,
-      (results, status) => {
-        setIsSearching(false);
-        
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const mapped: Prediction[] = results.map((result) => ({
-            placeId: result.place_id,
-            mainText: result.structured_formatting.main_text,
-            secondaryText: result.structured_formatting.secondary_text,
-          }));
-          setPredictions(mapped);
-        } else {
-          setPredictions([]);
-        }
+    const carDealerRequest: google.maps.places.AutocompletionRequest = {
+      ...baseRequest,
+      types: ['car_dealer'],
+    };
+
+    let completedRequests = 0;
+    const allResults: Prediction[] = [];
+    const seenPlaceIds = new Set<string>();
+
+    const handleResults = (results: google.maps.places.AutocompletePrediction[] | null, status: google.maps.places.PlacesServiceStatus) => {
+      completedRequests++;
+      
+      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+        results.forEach((result) => {
+          // Avoid duplicates
+          if (!seenPlaceIds.has(result.place_id)) {
+            seenPlaceIds.add(result.place_id);
+            allResults.push({
+              placeId: result.place_id,
+              mainText: result.structured_formatting.main_text,
+              secondaryText: result.structured_formatting.secondary_text,
+            });
+          }
+        });
       }
-    );
+
+      // When both requests complete, update predictions
+      if (completedRequests === 2) {
+        setIsSearching(false);
+        // Sort by relevance (mainText match) and limit to 5
+        const sorted = allResults.sort((a, b) => {
+          const aMatch = a.mainText.toLowerCase().includes(input.toLowerCase());
+          const bMatch = b.mainText.toLowerCase().includes(input.toLowerCase());
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+          return 0;
+        });
+        setPredictions(sorted.slice(0, 5));
+      }
+    };
+
+    // Execute both searches
+    autocompleteServiceRef.current.getPlacePredictions(carRepairRequest, handleResults);
+    autocompleteServiceRef.current.getPlacePredictions(carDealerRequest, handleResults);
   }, [biasToNewcastle]);
 
   // Debounced search
