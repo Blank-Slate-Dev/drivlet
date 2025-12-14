@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, Loader2, AlertCircle, CreditCard, ArrowLeft } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
+import GarageAutocomplete, { GarageDetails } from '@/components/GarageAutocomplete';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '@/components/StripePaymentForm';
@@ -16,15 +17,6 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 // Price display
 const PRICE_DISPLAY = '$119.00';
-
-type VehicleDetails = {
-  make: string;
-  model: string;
-  year: number;
-  series?: string;
-  fuel_type?: string;
-  transmission?: string;
-};
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -59,12 +51,8 @@ const allPickupTimeOptions = generateTimeOptions(6, 14);
 const allDropoffTimeOptions = generateTimeOptions(9, 19);
 const MIN_GAP_MINUTES = 120;
 
-const SERVICE_TYPES: Record<string, string> = {
-  standard: 'Standard Service',
-  major: 'Major Service',
-  logbook: 'Logbook Service',
-  diagnostic: 'Diagnostic Check',
-};
+// Garage booking time options (typical garage hours)
+const garageBookingTimeOptions = generateTimeOptions(7, 17);
 
 type Step = 'details' | 'payment' | 'success';
 
@@ -75,16 +63,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [currentStep, setCurrentStep] = useState<Step>('details');
 
   // Form state
-  const [isLookingUpRego, setIsLookingUpRego] = useState(false);
-  const [regoError, setRegoError] = useState<string | null>(null);
-  const [vehicleDetails, setVehicleDetails] = useState<VehicleDetails | null>(null);
   const [regoPlate, setRegoPlate] = useState('');
   const [regoState, setRegoState] = useState<StateCode>('NSW');
   const [earliestPickup, setEarliestPickup] = useState('09:00');
   const [latestDropoff, setLatestDropoff] = useState('17:00');
   const [pickupAddress, setPickupAddress] = useState('');
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
-  const [serviceType, setServiceType] = useState('standard');
 
   // Guest checkout fields
   const [isGuestCheckout, setIsGuestCheckout] = useState(false);
@@ -92,11 +76,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
 
-  // Existing booking details
-  const [hasExistingBooking, setHasExistingBooking] = useState(false);
-  const [garageName, setGarageName] = useState('');
-  const [existingBookingRef, setExistingBookingRef] = useState('');
-  const [existingBookingNotes, setExistingBookingNotes] = useState('');
+  // Garage booking details (mandatory)
+  const [garageSearch, setGarageSearch] = useState('');
+  const [garageAddress, setGarageAddress] = useState('');
+  const [garageBookingTime, setGarageBookingTime] = useState('09:00');
+  const [additionalNotes, setAdditionalNotes] = useState('');
 
   // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -174,16 +158,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setRegoState('NSW');
         setPickupAddress('');
         setSelectedPlaceDetails(null);
-        setServiceType('standard');
-        setVehicleDetails(null);
-        setRegoError(null);
         setSubmitError(null);
         setEarliestPickup('09:00');
         setLatestDropoff('17:00');
-        setHasExistingBooking(false);
-        setGarageName('');
-        setExistingBookingRef('');
-        setExistingBookingNotes('');
+        setGarageSearch('');
+        setGarageAddress('');
+        setGarageBookingTime('09:00');
+        setAdditionalNotes('');
         setGuestName('');
         setGuestEmail('');
         setGuestPhone('');
@@ -196,48 +177,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   }, [isOpen]);
 
-  const handleRegoLookup = async () => {
-    setRegoError(null);
-    setVehicleDetails(null);
-
-    if (!regoPlate.trim()) {
-      setRegoError('Please enter a registration plate.');
-      return;
-    }
-
-    setIsLookingUpRego(true);
-    try {
-      const res = await fetch(
-        `/api/rego?plate=${encodeURIComponent(regoPlate)}&state=${regoState}`
-      );
-
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setRegoError(data.error || 'Unable to find vehicle details.');
-        return;
-      }
-
-      const vehicle = data.vehicles?.[0] || data;
-
-      setVehicleDetails({
-        make: vehicle.make ?? 'Unknown',
-        model: vehicle.model ?? 'Unknown',
-        year: vehicle.year ?? 0,
-        series: vehicle.series,
-        fuel_type: vehicle.fuel_type,
-        transmission: vehicle.transmission,
-      });
-    } catch (error) {
-      console.error(error);
-      setRegoError('Something went wrong. Please try again.');
-    } finally {
-      setIsLookingUpRego(false);
-    }
-  };
-
   const handleAddressSelect = (details: PlaceDetails) => {
     setSelectedPlaceDetails(details);
+  };
+
+  const handleGarageSelect = (details: GarageDetails) => {
+    setGarageAddress(details.formattedAddress);
   };
 
   const getTimeLabel = (value: string, options: TimeOption[]): string => {
@@ -274,10 +219,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return 'Please select a drop-off time.';
     }
 
-    if (hasExistingBooking) {
-      if (!garageName.trim()) {
-        return 'Please enter the garage name for your existing booking.';
-      }
+    // Garage is mandatory
+    if (!garageSearch.trim()) {
+      return 'Please enter your garage/mechanic name.';
+    }
+    if (!garageBookingTime) {
+      return 'Please select your garage booking time.';
     }
 
     return null;
@@ -312,14 +259,16 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           customerEmail,
           customerPhone,
           pickupAddress: pickupAddress.trim(),
-          serviceType: SERVICE_TYPES[serviceType] || serviceType,
+          serviceType: 'Existing Garage Booking',
           vehicleRegistration: regoPlate.trim().toUpperCase(),
           vehicleState: regoState,
           earliestPickup: getTimeLabel(earliestPickup, allPickupTimeOptions),
           latestDropoff: getTimeLabel(latestDropoff, allDropoffTimeOptions),
-          hasExistingBooking,
-          garageName: garageName.trim(),
-          existingBookingRef: existingBookingRef.trim(),
+          hasExistingBooking: true,
+          garageName: garageSearch.trim(),
+          garageAddress: garageAddress.trim(),
+          garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions),
+          additionalNotes: additionalNotes.trim(),
         }),
       });
 
@@ -491,6 +440,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <span className="text-slate-600">Return by</span>
                           <span className="font-medium">{getTimeLabel(latestDropoff, allDropoffTimeOptions)}</span>
                         </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Garage</span>
+                          <span className="font-medium">{garageSearch}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Garage booking</span>
+                          <span className="font-medium">{getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</span>
+                        </div>
                         <div className="border-t border-slate-200 pt-2 mt-2">
                           <div className="flex justify-between">
                             <span className="font-semibold text-slate-900">Total</span>
@@ -622,7 +579,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700">
-                            Earliest pick-up time
+                            Earliest pick-up time *
                           </label>
                           <select
                             value={earliestPickup}
@@ -643,7 +600,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700">
-                            Latest drop-off time
+                            Latest drop-off time *
                           </label>
                           <select
                             value={latestDropoff}
@@ -666,7 +623,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       {/* Address with Autocomplete */}
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium text-slate-700">
-                          Pick-up address
+                          Pick-up address *
                         </label>
                         <AddressAutocomplete
                           value={pickupAddress}
@@ -678,184 +635,116 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         />
                       </div>
 
-                      {/* Registration Section */}
+                      {/* Vehicle Registration Section */}
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                         <h3 className="mb-4 text-sm font-semibold text-slate-900">
                           Vehicle Registration
                         </h3>
 
-                        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                          <div className="flex-shrink-0">
-                            <RegistrationPlate plate={regoPlate} state={regoState} />
+                        {/* Registration number (left) and State (right) side by side */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Registration Number *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="ABC123"
+                              maxLength={6}
+                              value={regoPlate}
+                              onChange={(e) =>
+                                setRegoPlate(e.target.value.toUpperCase().slice(0, 6))
+                              }
+                              disabled={isProcessing}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            />
                           </div>
 
-                          <div className="w-full flex-1 space-y-3">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">
-                                State
-                              </label>
-                              <select
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                                value={regoState}
-                                onChange={(e) => setRegoState(e.target.value as StateCode)}
-                                disabled={isProcessing}
-                              >
-                                <option value="NSW">NSW</option>
-                                <option value="QLD">QLD</option>
-                                <option value="VIC">VIC</option>
-                                <option value="SA">SA</option>
-                                <option value="WA">WA</option>
-                                <option value="TAS">TAS</option>
-                                <option value="NT">NT</option>
-                                <option value="ACT">ACT</option>
-                              </select>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">
-                                Registration number
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="ABC123"
-                                  maxLength={6}
-                                  value={regoPlate}
-                                  onChange={(e) =>
-                                    setRegoPlate(e.target.value.toUpperCase().slice(0, 6))
-                                  }
-                                  disabled={isProcessing}
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleRegoLookup}
-                                  disabled={isLookingUpRego || isProcessing}
-                                  className="whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {isLookingUpRego ? 'Looking up…' : 'Lookup'}
-                                </button>
-                              </div>
-                            </div>
-
-                            {regoError && (
-                              <p className="text-xs text-red-600">{regoError}</p>
-                            )}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              State *
+                            </label>
+                            <select
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              value={regoState}
+                              onChange={(e) => setRegoState(e.target.value as StateCode)}
+                              disabled={isProcessing}
+                            >
+                              <option value="NSW">NSW</option>
+                              <option value="QLD">QLD</option>
+                              <option value="VIC">VIC</option>
+                              <option value="SA">SA</option>
+                              <option value="WA">WA</option>
+                              <option value="TAS">TAS</option>
+                              <option value="NT">NT</option>
+                              <option value="ACT">ACT</option>
+                            </select>
                           </div>
                         </div>
 
-                        {vehicleDetails && (
-                          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                            <div className="flex items-start gap-3">
-                              <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
-                              <div>
-                                <p className="font-semibold text-emerald-900">
-                                  Vehicle found:{' '}
-                                  {vehicleDetails.year ? `${vehicleDetails.year} ` : ''}
-                                  {vehicleDetails.make} {vehicleDetails.model}
-                                </p>
-                                <p className="mt-0.5 text-sm text-emerald-700">
-                                  {vehicleDetails.series && <>Series: {vehicleDetails.series}</>}
-                                  {vehicleDetails.series && vehicleDetails.fuel_type && <> • </>}
-                                  {vehicleDetails.fuel_type && <>Fuel: {vehicleDetails.fuel_type}</>}
-                                  {(vehicleDetails.series || vehicleDetails.fuel_type) &&
-                                    vehicleDetails.transmission && <> • </>}
-                                  {vehicleDetails.transmission && (
-                                    <>Trans: {vehicleDetails.transmission}</>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Existing Booking Section */}
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                        <label className="flex cursor-pointer items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={hasExistingBooking}
-                            onChange={(e) => setHasExistingBooking(e.target.checked)}
-                            disabled={isProcessing}
-                            className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                          />
-                          <div>
-                            <span className="text-sm font-semibold text-amber-900">
-                              I already have a service booking at a garage
-                            </span>
-                            <p className="mt-0.5 text-xs text-amber-700">
-                              We&apos;ll pick up your car, take it to your booked garage, and return it
-                            </p>
-                          </div>
-                        </label>
-
-                        {hasExistingBooking && (
-                          <div className="mt-4 space-y-3 border-t border-amber-200 pt-4">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-amber-800">
-                                Garage Name *
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Smith's Auto Service"
-                                value={garageName}
-                                onChange={(e) => setGarageName(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
-                              />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-amber-800">
-                                Booking Reference (optional)
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. BK12345"
-                                value={existingBookingRef}
-                                onChange={(e) => setExistingBookingRef(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
-                              />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-amber-800">
-                                Additional Notes (optional)
-                              </label>
-                              <textarea
-                                placeholder="Any special instructions or details about your booking..."
-                                value={existingBookingNotes}
-                                onChange={(e) => setExistingBookingNotes(e.target.value)}
-                                disabled={isProcessing}
-                                rows={2}
-                                className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-amber-500/60 placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 disabled:opacity-50"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Service type - only show if no existing booking */}
-                      {!hasExistingBooking && (
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700">
-                            Service type
-                          </label>
-                          <select
-                            value={serviceType}
-                            onChange={(e) => setServiceType(e.target.value)}
-                            disabled={isProcessing}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                          >
-                            <option value="standard">Standard service</option>
-                            <option value="major">Major service</option>
-                            <option value="logbook">Logbook service</option>
-                            <option value="diagnostic">Diagnostic / other</option>
-                          </select>
+                        {/* Registration plate image centered below */}
+                        <div className="mt-5 flex justify-center">
+                          <RegistrationPlate plate={regoPlate} state={regoState} />
                         </div>
-                      )}
+                      </div>
+
+                      {/* Garage Booking Section */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                          Your Garage Booking
+                        </h3>
+                        
+                        <div className="space-y-4">
+                          {/* Garage Search */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Garage / Mechanic *
+                            </label>
+                            <GarageAutocomplete
+                              value={garageSearch}
+                              onChange={setGarageSearch}
+                              onSelect={handleGarageSelect}
+                              placeholder="Search for your garage (e.g. Ultra Tune Jesmond)"
+                              disabled={isProcessing}
+                              biasToNewcastle={true}
+                            />
+                          </div>
+
+                          {/* Booking Time */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Your Booking Time at Garage *
+                            </label>
+                            <select
+                              value={garageBookingTime}
+                              onChange={(e) => setGarageBookingTime(e.target.value)}
+                              disabled={isProcessing}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            >
+                              {garageBookingTimeOptions.map((time) => (
+                                <option key={`garage-${time.value}`} value={time.value}>
+                                  {time.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Additional Notes */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Additional Notes
+                            </label>
+                            <textarea
+                              placeholder="Any special instructions for us..."
+                              value={additionalNotes}
+                              onChange={(e) => setAdditionalNotes(e.target.value)}
+                              disabled={isProcessing}
+                              rows={2}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50 resize-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
 
                       {/* Submit */}
                       <button

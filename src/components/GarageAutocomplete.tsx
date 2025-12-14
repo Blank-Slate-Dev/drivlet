@@ -1,19 +1,16 @@
-// src/components/AddressAutocomplete.tsx
+// src/components/GarageAutocomplete.tsx
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { MapPin, Loader2, X } from 'lucide-react';
+import { Wrench, Loader2, X, MapPin } from 'lucide-react';
 
-export interface PlaceDetails {
+export interface GarageDetails {
+  name: string;
   formattedAddress: string;
   placeId?: string;
   lat?: number;
   lng?: number;
-  streetNumber?: string;
-  streetName?: string;
-  suburb?: string;
-  state?: string;
-  postcode?: string;
+  phoneNumber?: string;
 }
 
 interface Prediction {
@@ -22,23 +19,23 @@ interface Prediction {
   secondaryText: string;
 }
 
-interface AddressAutocompleteProps {
+interface GarageAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
-  onSelect?: (details: PlaceDetails) => void;
+  onSelect?: (details: GarageDetails) => void;
   placeholder?: string;
   disabled?: boolean;
   biasToNewcastle?: boolean;
 }
 
-export default function AddressAutocomplete({
+export default function GarageAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = 'Start typing your address...',
+  placeholder = 'Search for a garage...',
   disabled = false,
   biasToNewcastle = true,
-}: AddressAutocompleteProps) {
+}: GarageAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -50,6 +47,7 @@ export default function AddressAutocomplete({
   const [error, setError] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,7 +71,7 @@ export default function AddressAutocomplete({
         setError(null);
       } catch (err) {
         console.error('Error initializing services:', err);
-        setError('Failed to initialize address search');
+        setError('Failed to initialize garage search');
       }
     };
 
@@ -124,7 +122,7 @@ export default function AddressAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions
+  // Search for predictions - uses car_repair type for mechanics
   const searchPredictions = useCallback((input: string) => {
     if (!autocompleteServiceRef.current || !input.trim()) {
       setPredictions([]);
@@ -139,10 +137,12 @@ export default function AddressAutocomplete({
       new google.maps.LatLng(-32.7, 151.9)
     );
 
+    // Use car_repair type - this filters to mechanics/auto repair shops
+    // Note: Google API only supports ONE specific type at a time
     const request: google.maps.places.AutocompletionRequest = {
       input,
       componentRestrictions: { country: 'au' },
-      types: ['address'],
+      types: ['car_repair'],
       sessionToken: sessionTokenRef.current || undefined,
     };
 
@@ -198,13 +198,18 @@ export default function AddressAutocomplete({
     placesServiceRef.current.getDetails(
       {
         placeId: prediction.placeId,
-        fields: ['formatted_address', 'geometry', 'place_id', 'address_components'],
+        fields: ['name', 'formatted_address', 'geometry', 'place_id', 'formatted_phone_number'],
         sessionToken: sessionTokenRef.current || undefined,
       },
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place) {
           const address = place.formatted_address || '';
-          onChange(address);
+          const addressParts = address.split(',');
+          const suburb = addressParts[1]?.trim().split(' ')[0] || '';
+          
+          const displayValue = suburb ? `${place.name} - ${suburb}` : place.name || '';
+          onChange(displayValue);
+          setSelectedAddress(address);
           setPredictions([]);
           setIsFocused(false);
           
@@ -212,20 +217,13 @@ export default function AddressAutocomplete({
           sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
           
           if (onSelect) {
-            const components = place.address_components || [];
-            const getComponent = (type: string) => 
-              components.find(c => c.types.includes(type))?.long_name || '';
-
-            const details: PlaceDetails = {
+            const details: GarageDetails = {
+              name: place.name || '',
               formattedAddress: address,
               placeId: place.place_id,
               lat: place.geometry?.location?.lat(),
               lng: place.geometry?.location?.lng(),
-              streetNumber: getComponent('street_number'),
-              streetName: getComponent('route'),
-              suburb: getComponent('locality'),
-              state: getComponent('administrative_area_level_1'),
-              postcode: getComponent('postal_code'),
+              phoneNumber: place.formatted_phone_number,
             };
             onSelect(details);
           }
@@ -259,10 +257,12 @@ export default function AddressAutocomplete({
 
   const handleClear = () => {
     onChange('');
+    setSelectedAddress('');
     setPredictions([]);
     setIsSearching(false);
     if (onSelect) {
       onSelect({
+        name: '',
         formattedAddress: '',
       });
     }
@@ -273,13 +273,13 @@ export default function AddressAutocomplete({
   const showLoading = !isReady || isSearching;
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="space-y-2" ref={containerRef}>
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
           {showLoading && value.trim() ? (
             <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
           ) : (
-            <MapPin className={`h-4 w-4 ${isFocused ? 'text-emerald-500' : 'text-slate-400'}`} />
+            <Wrench className={`h-4 w-4 ${isFocused ? 'text-emerald-500' : 'text-slate-400'}`} />
           )}
         </div>
         
@@ -319,7 +319,7 @@ export default function AddressAutocomplete({
                     highlightedIndex === index ? 'bg-emerald-50' : 'hover:bg-slate-50'
                   }`}
                 >
-                  <MapPin className="h-5 w-5 flex-shrink-0 text-emerald-500" />
+                  <Wrench className="h-5 w-5 flex-shrink-0 text-emerald-500" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900">
                       {prediction.mainText}
@@ -339,7 +339,14 @@ export default function AddressAutocomplete({
       </div>
 
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className="text-xs text-red-500">{error}</p>
+      )}
+
+      {selectedAddress && (
+        <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
+          <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+          <p className="text-xs text-slate-600">{selectedAddress}</p>
+        </div>
       )}
     </div>
   );
