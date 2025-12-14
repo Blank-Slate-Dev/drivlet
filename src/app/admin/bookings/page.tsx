@@ -576,12 +576,12 @@ function ViewDetailsModal({
             </div>
             <div className="mt-3">
               <p className="font-medium text-slate-900">{booking.userName}</p>
-              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
                 <Mail className="h-3.5 w-3.5" />
                 {booking.userEmail}
               </div>
               {booking.guestPhone && (
-                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
                   <Phone className="h-3.5 w-3.5" />
                   {booking.guestPhone}
                 </div>
@@ -687,7 +687,7 @@ function ViewDetailsModal({
             </div>
             <p className="mt-2 text-sm text-slate-600">
               Current Stage:{" "}
-              <span className="font-medium">
+              <span className="font-medium text-slate-900">
                 {getStageLabel(booking.currentStage)}
               </span>
             </p>
@@ -845,7 +845,7 @@ function EditBookingModal({
                   currentStage: e.target.value,
                 })
               }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               {STAGES.map((stage) => (
                 <option key={stage.id} value={stage.id}>
@@ -912,7 +912,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value })
               }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
@@ -937,7 +937,7 @@ function EditBookingModal({
                 setFormData({ ...formData, message: e.target.value })
               }
               rows={3}
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               placeholder="Optional: Custom message for this update..."
             />
             <p className="mt-1 text-xs text-slate-500">
@@ -955,7 +955,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupTime: e.target.value })
               }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 
@@ -969,7 +969,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, dropoffTime: e.target.value })
               }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 
@@ -983,7 +983,7 @@ function EditBookingModal({
               onChange={(e) =>
                 setFormData({ ...formData, pickupAddress: e.target.value })
               }
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
 

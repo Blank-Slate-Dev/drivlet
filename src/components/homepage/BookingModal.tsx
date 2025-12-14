@@ -430,23 +430,23 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-slate-600">Vehicle</span>
-                          <span className="font-medium">{regoPlate} ({regoState})</span>
+                          <span className="font-medium text-slate-900">{regoPlate} ({regoState})</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600">Pickup</span>
-                          <span className="font-medium">{getTimeLabel(earliestPickup, allPickupTimeOptions)}</span>
+                          <span className="font-medium text-slate-900">{getTimeLabel(earliestPickup, allPickupTimeOptions)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600">Return by</span>
-                          <span className="font-medium">{getTimeLabel(latestDropoff, allDropoffTimeOptions)}</span>
+                          <span className="font-medium text-slate-900">{getTimeLabel(latestDropoff, allDropoffTimeOptions)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600">Garage</span>
-                          <span className="font-medium">{garageSearch}</span>
+                          <span className="font-medium text-slate-900">{garageSearch}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600">Garage booking</span>
-                          <span className="font-medium">{getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</span>
+                          <span className="font-medium text-slate-900">{getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</span>
                         </div>
                         <div className="border-t border-slate-200 pt-2 mt-2">
                           <div className="flex justify-between">
