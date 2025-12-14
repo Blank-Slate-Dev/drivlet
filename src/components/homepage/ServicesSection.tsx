@@ -2,7 +2,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Settings, Wrench, Calendar, Zap, ArrowRight } from 'lucide-react';
+import { Settings, Wrench, Sparkles, Zap, ArrowRight } from 'lucide-react';
 
 const services = [
   {
@@ -18,10 +18,10 @@ const services = [
     icon: Wrench,
   },
   {
-    title: 'Logbook Service',
+    title: 'Detailing',
     price: 'Get a quote',
     color: 'bg-amber-500',
-    icon: Calendar,
+    icon: Sparkles,
   },
   {
     title: 'Diagnostics',
