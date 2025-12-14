@@ -119,15 +119,16 @@ export default function GarageAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions - dual search for car_repair AND car_dealer
-  const searchPredictions = useCallback((input: string) => {
-    if (!autocompleteServiceRef.current || !input.trim()) {
-      setPredictions([]);
-      setIsSearching(false);
+  // Execute dual search (car_repair + car_dealer)
+  const executeDualSearch = useCallback((
+    searchTerm: string,
+    suburbFilter: string | null,
+    onComplete: (results: Prediction[]) => void
+  ) => {
+    if (!autocompleteServiceRef.current) {
+      onComplete([]);
       return;
     }
-
-    setIsSearching(true);
 
     const newcastleBounds = new google.maps.LatLngBounds(
       new google.maps.LatLng(-33.1, 151.4),
@@ -135,13 +136,12 @@ export default function GarageAutocomplete({
     );
 
     const baseRequest = {
-      input,
+      input: searchTerm,
       componentRestrictions: { country: 'au' },
       sessionToken: sessionTokenRef.current || undefined,
       bounds: biasToNewcastle ? newcastleBounds : undefined,
     };
 
-    // Make two parallel requests: one for car_repair, one for car_dealer
     const carRepairRequest: google.maps.places.AutocompletionRequest = {
       ...baseRequest,
       types: ['car_repair'],
@@ -156,12 +156,14 @@ export default function GarageAutocomplete({
     const allResults: Prediction[] = [];
     const seenPlaceIds = new Set<string>();
 
-    const handleResults = (results: google.maps.places.AutocompletePrediction[] | null, status: google.maps.places.PlacesServiceStatus) => {
+    const handleResults = (
+      results: google.maps.places.AutocompletePrediction[] | null,
+      status: google.maps.places.PlacesServiceStatus
+    ) => {
       completedRequests++;
       
       if (status === google.maps.places.PlacesServiceStatus.OK && results) {
         results.forEach((result) => {
-          // Avoid duplicates
           if (!seenPlaceIds.has(result.place_id)) {
             seenPlaceIds.add(result.place_id);
             allResults.push({
@@ -173,25 +175,95 @@ export default function GarageAutocomplete({
         });
       }
 
-      // When both requests complete, update predictions
       if (completedRequests === 2) {
-        setIsSearching(false);
-        // Sort by relevance (mainText match) and limit to 5
-        const sorted = allResults.sort((a, b) => {
-          const aMatch = a.mainText.toLowerCase().includes(input.toLowerCase());
-          const bMatch = b.mainText.toLowerCase().includes(input.toLowerCase());
-          if (aMatch && !bMatch) return -1;
-          if (!aMatch && bMatch) return 1;
-          return 0;
-        });
-        setPredictions(sorted.slice(0, 5));
+        // If suburb filter provided, sort results to prioritize matching suburbs
+        if (suburbFilter) {
+          const suburbLower = suburbFilter.toLowerCase();
+          allResults.sort((a, b) => {
+            const aHasSuburb = a.secondaryText.toLowerCase().includes(suburbLower);
+            const bHasSuburb = b.secondaryText.toLowerCase().includes(suburbLower);
+            if (aHasSuburb && !bHasSuburb) return -1;
+            if (!aHasSuburb && bHasSuburb) return 1;
+            return 0;
+          });
+        }
+        onComplete(allResults.slice(0, 5));
       }
     };
 
-    // Execute both searches
     autocompleteServiceRef.current.getPlacePredictions(carRepairRequest, handleResults);
     autocompleteServiceRef.current.getPlacePredictions(carDealerRequest, handleResults);
   }, [biasToNewcastle]);
+
+  // Search for predictions with fallback
+  const searchPredictions = useCallback((input: string) => {
+    if (!autocompleteServiceRef.current || !input.trim()) {
+      setPredictions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+
+    const words = input.trim().split(/\s+/);
+    
+    // Check if user might have typed "business suburb" format
+    // Common Newcastle suburbs to detect
+    const knownSuburbs = [
+      'hamilton', 'newcastle', 'maitland', 'charlestown', 'kotara', 
+      'lambton', 'mayfield', 'wallsend', 'jesmond', 'waratah',
+      'broadmeadow', 'adamstown', 'merewether', 'cooks hill', 'islington',
+      'cardiff', 'belmont', 'warners bay', 'toronto', 'cessnock',
+      'raymond terrace', 'nelson bay', 'singleton', 'muswellbrook'
+    ];
+
+    let businessName = input;
+    let suburbFilter: string | null = null;
+
+    // If multiple words, check if last word(s) might be a suburb
+    if (words.length >= 2) {
+      const lastWord = words[words.length - 1].toLowerCase();
+      const lastTwoWords = words.length >= 3 
+        ? `${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase() 
+        : null;
+
+      if (lastTwoWords && knownSuburbs.includes(lastTwoWords)) {
+        businessName = words.slice(0, -2).join(' ');
+        suburbFilter = lastTwoWords;
+      } else if (knownSuburbs.includes(lastWord)) {
+        businessName = words.slice(0, -1).join(' ');
+        suburbFilter = lastWord;
+      }
+    }
+
+    // First, try the full input
+    executeDualSearch(input, null, (results) => {
+      if (results.length > 0) {
+        // If suburb filter detected, sort results
+        if (suburbFilter) {
+          const suburbLower = suburbFilter.toLowerCase();
+          results.sort((a, b) => {
+            const aHasSuburb = a.secondaryText.toLowerCase().includes(suburbLower);
+            const bHasSuburb = b.secondaryText.toLowerCase().includes(suburbLower);
+            if (aHasSuburb && !bHasSuburb) return -1;
+            if (!aHasSuburb && bHasSuburb) return 1;
+            return 0;
+          });
+        }
+        setIsSearching(false);
+        setPredictions(results);
+      } else if (businessName !== input && businessName.trim()) {
+        // Fallback: search just the business name and filter by suburb
+        executeDualSearch(businessName, suburbFilter, (fallbackResults) => {
+          setIsSearching(false);
+          setPredictions(fallbackResults);
+        });
+      } else {
+        setIsSearching(false);
+        setPredictions([]);
+      }
+    });
+  }, [executeDualSearch]);
 
   // Debounced search
   useEffect(() => {
@@ -237,7 +309,6 @@ export default function GarageAutocomplete({
           setPredictions([]);
           setIsFocused(false);
           
-          // Create new session token for next search
           sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
           
           if (onSelect) {
