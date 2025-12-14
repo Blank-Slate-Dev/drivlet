@@ -3,8 +3,11 @@
 
 import Image from 'next/image';
 import { MapPin } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 export default function Footer() {
+  const { data: session } = useSession();
+
   return (
     <footer className="bg-emerald-900 text-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
@@ -100,15 +103,17 @@ export default function Footer() {
                 </a>
               </li>
             </ul>
-            <div className="mt-6">
-              <h4 className="mb-2 font-semibold">For Garages</h4>
-              <a
-                href="#"
-                className="text-sm text-emerald-200 transition hover:text-white"
-              >
-                Garage Login →
-              </a>
-            </div>
+            {!session && (
+              <div className="mt-6">
+                <h4 className="mb-2 font-semibold">For Garages</h4>
+                <a
+                  href="#"
+                  className="text-sm text-emerald-200 transition hover:text-white"
+                >
+                  Garage Login →
+                </a>
+              </div>
+            )}
           </div>
         </div>
 

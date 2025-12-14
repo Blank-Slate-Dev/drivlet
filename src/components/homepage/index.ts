@@ -8,6 +8,7 @@ export { default as FloatingCarWrapper } from './FloatingCarWrapper';
 export { default as ServicesSection } from './ServicesSection';
 export { default as TestimonialsSection } from './TestimonialsSection';
 export { default as ContactCTASection } from './ContactCTASection';
+export { default as ContactForm } from './ContactForm';
 export { default as FAQSection } from './FAQSection';
 export { default as Footer } from './Footer';
 
