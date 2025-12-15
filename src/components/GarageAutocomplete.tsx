@@ -30,6 +30,7 @@ interface GarageAutocompleteProps {
 
 /**
  * iOS keyboard detection using VisualViewport.
+ * When the keyboard opens, visualViewport.height shrinks.
  */
 function useKeyboardOpen(): boolean {
   const [open, setOpen] = useState(false);
@@ -69,7 +70,6 @@ export default function GarageAutocomplete({
 }: GarageAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
@@ -77,7 +77,6 @@ export default function GarageAutocomplete({
   const [isReady, setIsReady] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<string>('');
@@ -88,19 +87,18 @@ export default function GarageAutocomplete({
   const keyboardOpen = useKeyboardOpen();
   const isInputFocusedRef = useRef(false);
 
-  // Outside tap/scroll discrimination
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
-  const OUTSIDE_SCROLL_THRESHOLD = 10;
+  const SCROLL_THRESHOLD = 10;
 
-  // ✅ Dropdown item gesture tracking (prevents scroll selecting items)
-  const itemGestureRef = useRef<{
-    pointerId: number | null;
+  const suppressNextFocusRef = useRef(false);
+
+  const itemPointerRef = useRef<{
+    pointerId: number;
     startX: number;
     startY: number;
     moved: boolean;
-  }>({ pointerId: null, startX: 0, startY: 0, moved: false });
-
-  const ITEM_TAP_MOVE_THRESHOLD = 12;
+    prediction: Prediction | null;
+  } | null>(null);
 
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
@@ -112,12 +110,20 @@ export default function GarageAutocomplete({
   };
 
   const handleInputBlur = () => {
-    // don't close here (iOS blur happens on keyboard dismissal taps)
     isInputFocusedRef.current = false;
   };
 
-  // ✅ Outside handler: first tap dismisses keyboard, second tap closes dropdown
+  // ✅ Outside handler matching AddressAutocomplete behavior
   useEffect(() => {
+    const isFocusable = (el: EventTarget | null) => {
+      const node = el as HTMLElement | null;
+      if (!node) return false;
+      const tag = node.tagName?.toLowerCase();
+      if (!tag) return false;
+      if (node.isContentEditable) return true;
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
+    };
+
     const onPointerDownCapture = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
@@ -126,8 +132,17 @@ export default function GarageAutocomplete({
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
 
       if (keyboardOpen || isInputFocusedRef.current) {
+        suppressNextFocusRef.current = true;
+
+        e.preventDefault();
+        e.stopPropagation();
+
         inputRef.current?.blur();
         setIsOpen(true);
+
+        window.setTimeout(() => {
+          suppressNextFocusRef.current = false;
+        }, 350);
       }
     };
 
@@ -142,7 +157,7 @@ export default function GarageAutocomplete({
 
       const dx = Math.abs(e.clientX - start.x);
       const dy = Math.abs(e.clientY - start.y);
-      const isTap = dx < OUTSIDE_SCROLL_THRESHOLD && dy < OUTSIDE_SCROLL_THRESHOLD;
+      const isTap = dx < SCROLL_THRESHOLD && dy < SCROLL_THRESHOLD;
       if (!isTap) return;
 
       if (!keyboardOpen && !isInputFocusedRef.current) {
@@ -150,12 +165,22 @@ export default function GarageAutocomplete({
       }
     };
 
+    const onFocusInCapture = (e: FocusEvent) => {
+      if (!suppressNextFocusRef.current) return;
+      if (!isFocusable(e.target)) return;
+
+      e.preventDefault?.();
+      (e.target as HTMLElement)?.blur?.();
+    };
+
     document.addEventListener('pointerdown', onPointerDownCapture, true);
     document.addEventListener('pointerup', onPointerUpCapture, true);
+    document.addEventListener('focusin', onFocusInCapture, true);
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDownCapture, true);
       document.removeEventListener('pointerup', onPointerUpCapture, true);
+      document.removeEventListener('focusin', onFocusInCapture, true);
     };
   }, [keyboardOpen]);
 
@@ -343,7 +368,9 @@ export default function GarageAutocomplete({
       if (words.length >= 2) {
         const lastWord = words[words.length - 1].toLowerCase();
         const lastTwoWords =
-          words.length >= 3 ? `${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase() : null;
+          words.length >= 3
+            ? `${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase()
+            : null;
 
         if (lastTwoWords && knownSuburbs.includes(lastTwoWords)) {
           businessName = words.slice(0, -2).join(' ');
@@ -384,7 +411,9 @@ export default function GarageAutocomplete({
 
   // Debounced search
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
 
     if (value.trim() && isOpen && isReady) {
       debounceRef.current = setTimeout(() => {
@@ -396,7 +425,9 @@ export default function GarageAutocomplete({
     }
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
     };
   }, [value, isOpen, isReady, searchPredictions]);
 
@@ -472,7 +503,9 @@ export default function GarageAutocomplete({
     setIsSearching(false);
     setIsOpen(false);
     isInputFocusedRef.current = false;
-    if (onSelect) onSelect({ name: '', formattedAddress: '' });
+    if (onSelect) {
+      onSelect({ name: '', formattedAddress: '' });
+    }
     inputRef.current?.focus();
   };
 
@@ -515,41 +548,41 @@ export default function GarageAutocomplete({
 
         {showDropdown && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-            <ul className="py-1 touch-pan-y">
+            <ul className="py-1">
               {predictions.map((prediction, index) => (
                 <li
                   key={prediction.placeId}
                   onPointerDown={(e) => {
-                    if (e.pointerType === 'mouse') return;
-                    itemGestureRef.current = {
+                    itemPointerRef.current = {
                       pointerId: e.pointerId,
                       startX: e.clientX,
                       startY: e.clientY,
                       moved: false,
+                      prediction,
                     };
+                    setHighlightedIndex(index);
                   }}
                   onPointerMove={(e) => {
-                    const g = itemGestureRef.current;
-                    if (g.pointerId !== e.pointerId) return;
-
-                    const dx = Math.abs(e.clientX - g.startX);
-                    const dy = Math.abs(e.clientY - g.startY);
-
-                    if (dx > ITEM_TAP_MOVE_THRESHOLD || dy > ITEM_TAP_MOVE_THRESHOLD) {
-                      g.moved = true;
+                    const st = itemPointerRef.current;
+                    if (!st || st.pointerId !== e.pointerId) return;
+                    const dx = Math.abs(e.clientX - st.startX);
+                    const dy = Math.abs(e.clientY - st.startY);
+                    if (dx > SCROLL_THRESHOLD || dy > SCROLL_THRESHOLD) {
+                      st.moved = true;
+                      itemPointerRef.current = st;
                     }
                   }}
                   onPointerUp={(e) => {
-                    const g = itemGestureRef.current;
-                    if (g.pointerId !== e.pointerId) return;
+                    const st = itemPointerRef.current;
+                    if (!st || st.pointerId !== e.pointerId) return;
+                    itemPointerRef.current = null;
 
-                    itemGestureRef.current.pointerId = null;
-
-                    if (g.moved) return; // scrolling
-                    handleSelect(prediction);
+                    if (!st.moved && st.prediction) {
+                      handleSelect(st.prediction);
+                    }
                   }}
-                  onClick={(e) => {
-                    e.preventDefault(); // prevent ghost click on iOS
+                  onPointerCancel={() => {
+                    itemPointerRef.current = null;
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${

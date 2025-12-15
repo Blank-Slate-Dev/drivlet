@@ -88,22 +88,27 @@ export default function AddressAutocomplete({
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ✅ robust keyboard-open signal (esp. iOS Safari)
   const keyboardOpen = useKeyboardOpen();
+
+  // Track focus ourselves (don’t trust event order)
   const isInputFocusedRef = useRef(false);
 
-  // Outside tap/scroll discrimination
+  // Outside tap handling (tap vs scroll)
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
-  const OUTSIDE_SCROLL_THRESHOLD = 10;
+  const SCROLL_THRESHOLD = 10;
 
-  // ✅ Dropdown item gesture tracking (prevents scroll selecting items)
-  const itemGestureRef = useRef<{
-    pointerId: number | null;
+  // ✅ "focus shield" — first outside tap dismisses keyboard but must NOT focus other fields
+  const suppressNextFocusRef = useRef(false);
+
+  // Dropdown item tap-vs-scroll discrimination (so scrolling list never selects)
+  const itemPointerRef = useRef<{
+    pointerId: number;
     startX: number;
     startY: number;
     moved: boolean;
-  }>({ pointerId: null, startX: 0, startY: 0, moved: false });
-
-  const ITEM_TAP_MOVE_THRESHOLD = 12;
+    prediction: Prediction | null;
+  } | null>(null);
 
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
@@ -115,12 +120,24 @@ export default function AddressAutocomplete({
   };
 
   const handleInputBlur = () => {
-    // Don't close here—iOS blurs when tapping outside to dismiss keyboard
+    // IMPORTANT: do NOT close dropdown here.
+    // iOS will blur when user taps outside to dismiss the keyboard.
     isInputFocusedRef.current = false;
   };
 
-  // ✅ Outside handler: first tap dismisses keyboard, second tap closes dropdown
+  // ✅ Outside handler that:
+  // - first outside tap (keyboard open / focused): dismiss keyboard, KEEP dropdown, and prevent focusing other fields
+  // - second outside tap (keyboard closed): close dropdown
   useEffect(() => {
+    const isFocusable = (el: EventTarget | null) => {
+      const node = el as HTMLElement | null;
+      if (!node) return false;
+      const tag = node.tagName?.toLowerCase();
+      if (!tag) return false;
+      if (node.isContentEditable) return true;
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
+    };
+
     const onPointerDownCapture = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
@@ -128,9 +145,24 @@ export default function AddressAutocomplete({
 
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
 
+      // If keyboard is open OR input is focused, treat this as "dismiss keyboard"
       if (keyboardOpen || isInputFocusedRef.current) {
+        suppressNextFocusRef.current = true;
+
+        // Prevent the tap from focusing another element
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Blur our input to close keyboard
         inputRef.current?.blur();
+
+        // Keep dropdown open
         setIsOpen(true);
+
+        // Release focus shield shortly after
+        window.setTimeout(() => {
+          suppressNextFocusRef.current = false;
+        }, 350);
       }
     };
 
@@ -145,20 +177,32 @@ export default function AddressAutocomplete({
 
       const dx = Math.abs(e.clientX - start.x);
       const dy = Math.abs(e.clientY - start.y);
-      const isTap = dx < OUTSIDE_SCROLL_THRESHOLD && dy < OUTSIDE_SCROLL_THRESHOLD;
+      const isTap = dx < SCROLL_THRESHOLD && dy < SCROLL_THRESHOLD;
       if (!isTap) return;
 
+      // Second outside tap: only close if keyboard is not open and input isn't focused
       if (!keyboardOpen && !isInputFocusedRef.current) {
         setIsOpen(false);
       }
     };
 
+    const onFocusInCapture = (e: FocusEvent) => {
+      if (!suppressNextFocusRef.current) return;
+      if (!isFocusable(e.target)) return;
+
+      // If iOS still tries to focus something, undo it.
+      e.preventDefault?.();
+      (e.target as HTMLElement)?.blur?.();
+    };
+
     document.addEventListener('pointerdown', onPointerDownCapture, true);
     document.addEventListener('pointerup', onPointerUpCapture, true);
+    document.addEventListener('focusin', onFocusInCapture, true);
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDownCapture, true);
       document.removeEventListener('pointerup', onPointerUpCapture, true);
+      document.removeEventListener('focusin', onFocusInCapture, true);
     };
   }, [keyboardOpen]);
 
@@ -405,45 +449,43 @@ export default function AddressAutocomplete({
 
         {showDropdown && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-            <ul className="py-1 touch-pan-y">
+            <ul className="py-1">
               {predictions.map((prediction, index) => (
                 <li
                   key={prediction.placeId}
                   onPointerDown={(e) => {
-                    // track gesture; don't select yet
-                    if (e.pointerType === 'mouse') return;
-                    itemGestureRef.current = {
+                    // allow scrolling; just track for tap-vs-scroll
+                    itemPointerRef.current = {
                       pointerId: e.pointerId,
                       startX: e.clientX,
                       startY: e.clientY,
                       moved: false,
+                      prediction,
                     };
+                    setHighlightedIndex(index);
                   }}
                   onPointerMove={(e) => {
-                    const g = itemGestureRef.current;
-                    if (g.pointerId !== e.pointerId) return;
-
-                    const dx = Math.abs(e.clientX - g.startX);
-                    const dy = Math.abs(e.clientY - g.startY);
-
-                    if (dx > ITEM_TAP_MOVE_THRESHOLD || dy > ITEM_TAP_MOVE_THRESHOLD) {
-                      g.moved = true;
+                    const st = itemPointerRef.current;
+                    if (!st || st.pointerId !== e.pointerId) return;
+                    const dx = Math.abs(e.clientX - st.startX);
+                    const dy = Math.abs(e.clientY - st.startY);
+                    if (dx > SCROLL_THRESHOLD || dy > SCROLL_THRESHOLD) {
+                      st.moved = true;
+                      itemPointerRef.current = st;
                     }
                   }}
                   onPointerUp={(e) => {
-                    const g = itemGestureRef.current;
-                    if (g.pointerId !== e.pointerId) return;
+                    const st = itemPointerRef.current;
+                    if (!st || st.pointerId !== e.pointerId) return;
+                    itemPointerRef.current = null;
 
-                    itemGestureRef.current.pointerId = null;
-
-                    // If user scrolled, do not select
-                    if (g.moved) return;
-
-                    handleSelect(prediction);
+                    // Only select on a true tap (not a scroll)
+                    if (!st.moved && st.prediction) {
+                      handleSelect(st.prediction);
+                    }
                   }}
-                  onClick={(e) => {
-                    // prevent ghost click on iOS after touch
-                    e.preventDefault();
+                  onPointerCancel={() => {
+                    itemPointerRef.current = null;
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
