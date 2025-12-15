@@ -1,7 +1,7 @@
 // src/app/api/admin/garages/route.ts
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import Garage from "@/models/Garage";
+import Garage, { GarageStatus } from "@/models/Garage";
 import User from "@/models/User";
 import { requireAdmin } from "@/lib/admin";
 
@@ -92,8 +92,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Update garage status
-    const statusMap: Record<string, string> = {
+    // Update garage status with proper typing
+    const statusMap: Record<string, GarageStatus> = {
       approve: "approved",
       reject: "rejected",
       suspend: "suspended",
