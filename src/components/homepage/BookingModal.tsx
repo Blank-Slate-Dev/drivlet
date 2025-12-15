@@ -427,26 +427,35 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <X className="h-5 w-5" />
               </button>
 
-              {/* Step Indicator */}
+              {/* Step Indicator - Fixed centering */}
               <div className="border-b border-slate-100 px-6 py-4 sm:px-8">
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex items-start justify-center">
                   {['details', 'review', 'payment'].map((step, index) => (
-                    <div key={step} className="flex items-center">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                          currentStep === step
-                            ? 'bg-emerald-600 text-white'
-                            : ['details'].indexOf(currentStep) < index ||
-                              (currentStep === 'details' && index > 0)
-                            ? 'bg-slate-100 text-slate-400'
-                            : 'bg-emerald-100 text-emerald-600'
-                        }`}
-                      >
-                        {index + 1}
+                    <div key={step} className="flex items-start">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                            currentStep === step
+                              ? 'bg-emerald-600 text-white'
+                              : ['details'].indexOf(currentStep) < index ||
+                                (currentStep === 'details' && index > 0)
+                              ? 'bg-slate-100 text-slate-400'
+                              : 'bg-emerald-100 text-emerald-600'
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <span className={`mt-2 text-xs ${
+                          currentStep === step 
+                            ? 'font-medium text-emerald-600' 
+                            : 'text-slate-500'
+                        }`}>
+                          {step.charAt(0).toUpperCase() + step.slice(1)}
+                        </span>
                       </div>
                       {index < 2 && (
                         <div
-                          className={`mx-2 h-0.5 w-8 ${
+                          className={`mx-3 mt-4 h-0.5 w-12 sm:w-16 ${
                             ['details', 'review'].indexOf(currentStep) > index
                               ? 'bg-emerald-400'
                               : 'bg-slate-200'
@@ -455,11 +464,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       )}
                     </div>
                   ))}
-                </div>
-                <div className="mt-2 flex justify-center gap-8 text-xs text-slate-500">
-                  <span className={currentStep === 'details' ? 'font-medium text-emerald-600' : ''}>Details</span>
-                  <span className={currentStep === 'review' ? 'font-medium text-emerald-600' : ''}>Review</span>
-                  <span className={currentStep === 'payment' ? 'font-medium text-emerald-600' : ''}>Payment</span>
                 </div>
               </div>
 
@@ -714,7 +718,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 value={guestName}
                                 onChange={(e) => setGuestName(e.target.value)}
                                 disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                               />
                             </div>
                             <div className="space-y-1.5">
@@ -727,7 +731,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 value={guestEmail}
                                 onChange={(e) => setGuestEmail(e.target.value)}
                                 disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                               />
                             </div>
                             <div className="space-y-1.5">
@@ -740,7 +744,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 value={guestPhone}
                                 onChange={(e) => setGuestPhone(e.target.value)}
                                 disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                               />
                             </div>
                           </div>
@@ -776,7 +780,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               placeholder="0412 345 678"
                               value={guestPhone}
                               onChange={(e) => setGuestPhone(e.target.value)}
-                              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                             />
                           </div>
                         </div>
@@ -792,7 +796,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             value={earliestPickup}
                             onChange={(e) => setEarliestPickup(e.target.value)}
                             disabled={isProcessing}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                           >
                             {availablePickupOptions.map((time) => (
                               <option key={`earliest-${time.value}`} value={time.value}>
@@ -813,7 +817,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             value={latestDropoff}
                             onChange={(e) => setLatestDropoff(e.target.value)}
                             disabled={isProcessing}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                           >
                             {availableDropoffOptions.map((time) => (
                               <option key={`latest-${time.value}`} value={time.value}>
@@ -862,7 +866,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 setRegoPlate(e.target.value.toUpperCase().slice(0, 6))
                               }
                               disabled={isProcessing}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             />
                           </div>
 
@@ -871,7 +875,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               State *
                             </label>
                             <select
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                               value={regoState}
                               onChange={(e) => setRegoState(e.target.value as StateCode)}
                               disabled={isProcessing}
@@ -922,7 +926,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               value={garageBookingTime}
                               onChange={(e) => setGarageBookingTime(e.target.value)}
                               disabled={isProcessing}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             >
                               {garageBookingTimeOptions.map((time) => (
                                 <option key={`garage-${time.value}`} value={time.value}>
@@ -942,7 +946,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               onChange={(e) => setAdditionalNotes(e.target.value)}
                               disabled={isProcessing}
                               rows={2}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50 resize-none"
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50 resize-none"
                             />
                           </div>
                         </div>

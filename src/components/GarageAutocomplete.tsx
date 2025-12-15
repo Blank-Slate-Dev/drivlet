@@ -45,12 +45,120 @@ export default function GarageAutocomplete({
   const [isReady, setIsReady] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Touch tracking to differentiate taps from scrolls
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const outsideTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const SCROLL_THRESHOLD = 10;
+  
+  // Track focus state ourselves with a protection window after blur
+  const recentlyFocusedRef = useRef(false);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleInputFocus = () => {
+    // Clear any pending blur timeout
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    recentlyFocusedRef.current = true;
+    setIsOpen(true);
+    
+    // Re-search if there's already a value
+    if (value.trim() && isReady) {
+      searchPredictions(value);
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Keep recentlyFocused true for 400ms after blur
+    // This protects against iOS race conditions
+    blurTimeoutRef.current = setTimeout(() => {
+      recentlyFocusedRef.current = false;
+    }, 400);
+  };
+
+  // Cleanup blur timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Click outside handler with scroll detection
+  useEffect(() => {
+    const handleTouchStartOutside = (event: TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        const touch = event.touches[0];
+        outsideTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }
+    };
+
+    const handleTouchEndOutside = (event: TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (outsideTouchStartRef.current) {
+          const touch = event.changedTouches[0];
+          const deltaX = Math.abs(touch.clientX - outsideTouchStartRef.current.x);
+          const deltaY = Math.abs(touch.clientY - outsideTouchStartRef.current.y);
+          
+          outsideTouchStartRef.current = null;
+          
+          // If it was a scroll, don't do anything
+          if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+            return;
+          }
+          
+          // It was a tap - check if input was recently focused
+          if (recentlyFocusedRef.current) {
+            // First tap after focus - just dismiss keyboard, keep dropdown
+            // The blur event will have already fired or will fire
+            // Reset the protection since this was the "keyboard dismiss" tap
+            recentlyFocusedRef.current = false;
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
+              blurTimeoutRef.current = null;
+            }
+            return;
+          }
+          
+          // Not recently focused - close the dropdown
+          setIsOpen(false);
+        }
+      }
+    };
+
+    const handleMouseDownOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (recentlyFocusedRef.current) {
+          recentlyFocusedRef.current = false;
+          if (blurTimeoutRef.current) {
+            clearTimeout(blurTimeoutRef.current);
+            blurTimeoutRef.current = null;
+          }
+          return;
+        }
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDownOutside);
+    document.addEventListener('touchstart', handleTouchStartOutside);
+    document.addEventListener('touchend', handleTouchEndOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDownOutside);
+      document.removeEventListener('touchstart', handleTouchStartOutside);
+      document.removeEventListener('touchend', handleTouchEndOutside);
+    };
+  }, []);
 
   // Initialize Google Maps
   useEffect(() => {
@@ -75,13 +183,11 @@ export default function GarageAutocomplete({
       }
     };
 
-    // Check if Google Maps is already loaded
     if (window.google?.maps?.places) {
       initServices();
       return;
     }
 
-    // Check if script is already in DOM
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
     
     if (existingScript) {
@@ -102,7 +208,6 @@ export default function GarageAutocomplete({
       return () => clearInterval(checkLoaded);
     }
 
-    // Load script
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
@@ -176,7 +281,6 @@ export default function GarageAutocomplete({
       }
 
       if (completedRequests === 2) {
-        // If suburb filter provided, sort results to prioritize matching suburbs
         if (suburbFilter) {
           const suburbLower = suburbFilter.toLowerCase();
           allResults.sort((a, b) => {
@@ -207,8 +311,6 @@ export default function GarageAutocomplete({
 
     const words = input.trim().split(/\s+/);
     
-    // Check if user might have typed "business suburb" format
-    // Common Newcastle suburbs to detect
     const knownSuburbs = [
       'hamilton', 'newcastle', 'maitland', 'charlestown', 'kotara', 
       'lambton', 'mayfield', 'wallsend', 'jesmond', 'waratah',
@@ -220,7 +322,6 @@ export default function GarageAutocomplete({
     let businessName = input;
     let suburbFilter: string | null = null;
 
-    // If multiple words, check if last word(s) might be a suburb
     if (words.length >= 2) {
       const lastWord = words[words.length - 1].toLowerCase();
       const lastTwoWords = words.length >= 3 
@@ -236,10 +337,8 @@ export default function GarageAutocomplete({
       }
     }
 
-    // First, try the full input
     executeDualSearch(input, null, (results) => {
       if (results.length > 0) {
-        // If suburb filter detected, sort results
         if (suburbFilter) {
           const suburbLower = suburbFilter.toLowerCase();
           results.sort((a, b) => {
@@ -253,7 +352,6 @@ export default function GarageAutocomplete({
         setIsSearching(false);
         setPredictions(results);
       } else if (businessName !== input && businessName.trim()) {
-        // Fallback: search just the business name and filter by suburb
         executeDualSearch(businessName, suburbFilter, (fallbackResults) => {
           setIsSearching(false);
           setPredictions(fallbackResults);
@@ -271,11 +369,11 @@ export default function GarageAutocomplete({
       clearTimeout(debounceRef.current);
     }
 
-    if (value.trim() && isFocused && isReady) {
+    if (value.trim() && isOpen && isReady) {
       debounceRef.current = setTimeout(() => {
         searchPredictions(value);
       }, 300);
-    } else {
+    } else if (!value.trim()) {
       setPredictions([]);
       setIsSearching(false);
     }
@@ -285,7 +383,7 @@ export default function GarageAutocomplete({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [value, isFocused, isReady, searchPredictions]);
+  }, [value, isOpen, isReady, searchPredictions]);
 
   // Handle selection
   const handleSelect = useCallback((prediction: Prediction) => {
@@ -307,7 +405,8 @@ export default function GarageAutocomplete({
           onChange(displayValue);
           setSelectedAddress(address);
           setPredictions([]);
-          setIsFocused(false);
+          setIsOpen(false);
+          recentlyFocusedRef.current = false;
           
           sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
           
@@ -326,6 +425,27 @@ export default function GarageAutocomplete({
       }
     );
   }, [onChange, onSelect]);
+
+  // Touch handlers for dropdown items
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent, prediction: Prediction) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    if (deltaX < SCROLL_THRESHOLD && deltaY < SCROLL_THRESHOLD) {
+      e.preventDefault();
+      handleSelect(prediction);
+    }
+    
+    touchStartRef.current = null;
+  }, [handleSelect]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -346,7 +466,8 @@ export default function GarageAutocomplete({
       handleSelect(predictions[highlightedIndex]);
     } else if (e.key === 'Escape') {
       setPredictions([]);
-      setIsFocused(false);
+      setIsOpen(false);
+      recentlyFocusedRef.current = false;
     }
   };
 
@@ -355,16 +476,15 @@ export default function GarageAutocomplete({
     setSelectedAddress('');
     setPredictions([]);
     setIsSearching(false);
+    setIsOpen(false);
+    recentlyFocusedRef.current = false;
     if (onSelect) {
-      onSelect({
-        name: '',
-        formattedAddress: '',
-      });
+      onSelect({ name: '', formattedAddress: '' });
     }
     inputRef.current?.focus();
   };
 
-  const showDropdown = isFocused && predictions.length > 0;
+  const showDropdown = isOpen && predictions.length > 0;
   const showLoading = !isReady || isSearching;
 
   return (
@@ -374,7 +494,7 @@ export default function GarageAutocomplete({
           {showLoading && value.trim() ? (
             <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
           ) : (
-            <Wrench className={`h-4 w-4 ${isFocused ? 'text-emerald-500' : 'text-slate-400'}`} />
+            <Wrench className={`h-4 w-4 ${isOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
           )}
         </div>
         
@@ -383,12 +503,12 @@ export default function GarageAutocomplete({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-10 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 transition focus:border-emerald-500 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-10 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 transition focus:border-emerald-500 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
 
         {value && !disabled && (
@@ -401,7 +521,6 @@ export default function GarageAutocomplete({
           </button>
         )}
 
-        {/* Custom Dropdown */}
         {showDropdown && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
             <ul className="py-1">
@@ -409,6 +528,8 @@ export default function GarageAutocomplete({
                 <li
                   key={prediction.placeId}
                   onClick={() => handleSelect(prediction)}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={(e) => handleTouchEnd(e, prediction)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
                     highlightedIndex === index ? 'bg-emerald-50' : 'hover:bg-slate-50'
