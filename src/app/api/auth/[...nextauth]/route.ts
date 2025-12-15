@@ -43,6 +43,7 @@ export const authOptions: NextAuthOptions = {
           username: user.username,
           email: user.email,
           role: user.role || "user",
+          isApproved: user.isApproved ?? true, // Default to true for existing users
         };
       },
     }),
@@ -61,6 +62,7 @@ export const authOptions: NextAuthOptions = {
         token.username = user.username;
         token.email = user.email;
         token.role = user.role as UserRole;
+        token.isApproved = user.isApproved;
       }
       return token;
     },
@@ -70,6 +72,7 @@ export const authOptions: NextAuthOptions = {
         session.user.username = token.username as string;
         session.user.email = token.email as string;
         session.user.role = token.role as UserRole;
+        session.user.isApproved = token.isApproved as boolean;
       }
       return session;
     },

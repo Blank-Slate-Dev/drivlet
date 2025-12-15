@@ -106,12 +106,20 @@ export default function Footer() {
             {!session && (
               <div className="mt-6">
                 <h4 className="mb-2 font-semibold">For Garages</h4>
-                <a
-                  href="#"
-                  className="text-sm text-emerald-200 transition hover:text-white"
-                >
-                  Garage Login →
-                </a>
+                <div className="space-y-2">
+                  <a
+                    href="/garage/login"
+                    className="block text-sm text-emerald-200 transition hover:text-white"
+                  >
+                    Garage Login →
+                  </a>
+                  <a
+                    href="/garage/register"
+                    className="block text-sm text-emerald-200 transition hover:text-white"
+                  >
+                    Garage Sign Up →
+                  </a>
+                </div>
               </div>
             )}
           </div>

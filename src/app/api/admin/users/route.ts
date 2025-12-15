@@ -10,7 +10,7 @@ interface CombinedUser {
   username?: string;
   email?: string;
   name?: string;
-  role: "user" | "admin" | "guest";
+  role: "user" | "admin" | "guest" | "garage";
   bookingCount: number;
   isGuest: boolean;
   phone?: string;

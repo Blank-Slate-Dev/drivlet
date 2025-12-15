@@ -1,13 +1,15 @@
 // src/models/User.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "garage";
 
 export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
   role: UserRole;
+  garageProfile?: mongoose.Types.ObjectId;
+  isApproved: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,8 +37,16 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "garage"],
       default: "user",
+    },
+    garageProfile: {
+      type: Schema.Types.ObjectId,
+      ref: "Garage",
+    },
+    isApproved: {
+      type: Boolean,
+      default: true, // Auto-approve customers, garages need manual approval
     },
   },
   {
