@@ -587,7 +587,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 {/* Payment Step */}
                 {currentStep === 'payment' && clientSecret && (
                   <>
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <button
                         onClick={() => setCurrentStep('review')}
                         disabled={isProcessing}
@@ -637,7 +637,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 {/* Review Step */}
                 {currentStep === 'review' && (
                   <>
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <button
                         onClick={() => setCurrentStep('details')}
                         className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
@@ -769,7 +769,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     <button
                       onClick={handleProceedToPayment}
                       disabled={isProcessing}
-                      className="mt-6 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
+                      className="mt-5 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
                     >
                       {isProcessing ? (
                         <span className="inline-flex items-center gap-2">
@@ -790,7 +790,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 {/* Details Step */}
                 {currentStep === 'details' && (
                   <>
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Book a Pick-up</h2>
@@ -812,29 +812,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       </div>
                     )}
 
-                    {/* High Value Vehicle Checkbox - At the very top */}
-                    <div className={`rounded-xl border p-4 mb-6 ${isHighValueVehicle ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isHighValueVehicle}
-                          onChange={(e) => setIsHighValueVehicle(e.target.checked)}
-                          disabled={isProcessing}
-                          className={`mt-1 h-5 w-5 rounded border-2 cursor-pointer ${isHighValueVehicle ? 'border-red-500 accent-red-500' : 'border-slate-300 accent-emerald-600'}`}
-                        />
-                        <div>
-                          <span className={`text-sm font-medium ${isHighValueVehicle ? 'text-red-700' : 'text-slate-700'}`}>
-                            My vehicle has a market valuation of $100,000 or more
-                          </span>
-                          {isHighValueVehicle && (
-                            <p className="mt-2 text-sm text-red-600">
-                              Unfortunately, for insurance reasons, Drivlet is currently unable to service vehicles with a market valuation of $100,000 or more. We&apos;re working to expand our coverage in the future. Please contact us if you have any questions.
-                            </p>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-
                     <form
                       className="space-y-5"
                       onSubmit={(e) => {
@@ -842,254 +819,276 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         handleContinueToReview();
                       }}
                     >
+                      {/* High Value Vehicle Checkbox */}
+                      <div className={`rounded-xl border p-4 ${isHighValueVehicle ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isHighValueVehicle}
+                            onChange={(e) => setIsHighValueVehicle(e.target.checked)}
+                            disabled={isProcessing}
+                            className={`mt-1 h-5 w-5 rounded border-2 cursor-pointer ${isHighValueVehicle ? 'border-red-500 accent-red-500' : 'border-slate-300 accent-emerald-600'}`}
+                          />
+                          <div>
+                            <span className={`text-sm font-medium ${isHighValueVehicle ? 'text-red-700' : 'text-slate-700'}`}>
+                              My vehicle has a market valuation of $100,000 or more
+                            </span>
+                            {isHighValueVehicle && (
+                              <p className="mt-2 text-sm text-red-600">
+                                Unfortunately, for insurance reasons, Drivlet is currently unable to service vehicles with a market valuation of $100,000 or more. We&apos;re working to expand our coverage in the future. Please contact us if you have any questions.
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+
                       {/* Form content wrapped for conditional styling */}
-                      <div className={isHighValueVehicle ? 'opacity-50 pointer-events-none' : ''}>
-                      {/* Guest Checkout Fields */}
-                      {!isAuthenticated && (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                          <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Details</h3>
-                          <div className="space-y-3">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Full Name *</label>
-                              <input
-                                type="text"
-                                placeholder="John Smith"
-                                value={guestName}
-                                onChange={(e) => setGuestName(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                              />
+                      <div className={`space-y-5 ${isHighValueVehicle ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {/* Guest Checkout Fields */}
+                        {!isAuthenticated && (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Details</h3>
+                            <div className="space-y-3">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600">Full Name *</label>
+                                <input
+                                  type="text"
+                                  placeholder="John Smith"
+                                  value={guestName}
+                                  onChange={(e) => setGuestName(e.target.value)}
+                                  disabled={isProcessing}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600">Email *</label>
+                                <input
+                                  type="email"
+                                  placeholder="john@example.com"
+                                  value={guestEmail}
+                                  onChange={(e) => setGuestEmail(e.target.value)}
+                                  disabled={isProcessing}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600">Phone *</label>
+                                <input
+                                  type="tel"
+                                  placeholder="0412 345 678"
+                                  value={guestPhone}
+                                  onChange={(e) => setGuestPhone(e.target.value)}
+                                  disabled={isProcessing}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              </div>
                             </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Email *</label>
-                              <input
-                                type="email"
-                                placeholder="john@example.com"
-                                value={guestEmail}
-                                onChange={(e) => setGuestEmail(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                              />
+                            <p className="mt-3 text-xs text-slate-500">
+                              Have an account?{' '}
+                              <Link href="/login" className="font-medium text-emerald-600 hover:underline">
+                                Sign in
+                              </Link>
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Logged in user info */}
+                        {isAuthenticated && (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white">
+                                {(session?.user?.username || session?.user?.email || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium text-emerald-900">{session?.user?.username || 'User'}</p>
+                                <p className="text-sm text-emerald-700">{session?.user?.email}</p>
+                              </div>
                             </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Phone *</label>
+                            <div className="mt-3">
+                              <label className="text-xs font-medium text-emerald-700">Phone (for driver contact)</label>
                               <input
                                 type="tel"
                                 placeholder="0412 345 678"
                                 value={guestPhone}
                                 onChange={(e) => setGuestPhone(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                               />
                             </div>
                           </div>
-                          <p className="mt-3 text-xs text-slate-500">
-                            Have an account?{' '}
-                            <Link href="/login" className="font-medium text-emerald-600 hover:underline">
-                              Sign in
-                            </Link>
-                          </p>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Logged in user info */}
-                      {isAuthenticated && (
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white">
-                              {(session?.user?.username || session?.user?.email || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-medium text-emerald-900">{session?.user?.username || 'User'}</p>
-                              <p className="text-sm text-emerald-700">{session?.user?.email}</p>
-                            </div>
-                          </div>
-                          <div className="mt-3">
-                            <label className="text-xs font-medium text-emerald-700">Phone (for driver contact)</label>
-                            <input
-                              type="tel"
-                              placeholder="0412 345 678"
-                              value={guestPhone}
-                              onChange={(e) => setGuestPhone(e.target.value)}
-                              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Time inputs */}
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700">Earliest pick-up time *</label>
-                          <select
-                            value={earliestPickup}
-                            onChange={(e) => setEarliestPickup(e.target.value)}
-                            disabled={isProcessing}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                          >
-                            {availablePickupOptions.map((time) => (
-                              <option key={`earliest-${time.value}`} value={time.value}>
-                                {time.label}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-slate-400">Available 6:00am – 2:00pm</p>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700">Latest drop-off time *</label>
-                          <select
-                            value={latestDropoff}
-                            onChange={(e) => setLatestDropoff(e.target.value)}
-                            disabled={isProcessing}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                          >
-                            {availableDropoffOptions.map((time) => (
-                              <option key={`latest-${time.value}`} value={time.value}>
-                                {time.label}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-slate-400">Available 9:00am – 7:00pm (min. 2hr gap)</p>
-                        </div>
-                      </div>
-
-                      {/* Address with Autocomplete */}
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-slate-700">Pick-up address *</label>
-                        <AddressAutocomplete
-                          value={pickupAddress}
-                          onChange={setPickupAddress}
-                          onSelect={handleAddressSelect}
-                          placeholder="Start typing your address..."
-                          disabled={isProcessing}
-                          biasToNewcastle={true}
-                        />
-                      </div>
-
-                      {/* Vehicle Registration Section */}
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <h3 className="mb-4 text-sm font-semibold text-slate-900">Vehicle Registration</h3>
-
+                        {/* Time inputs */}
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Registration Number *</label>
-                            <input
-                              type="text"
-                              placeholder="ABC123"
-                              maxLength={6}
-                              value={regoPlate}
-                              onChange={(e) => setRegoPlate(e.target.value.toUpperCase().slice(0, 6))}
-                              disabled={isProcessing}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">State *</label>
+                            <label className="text-sm font-medium text-slate-700">Earliest pick-up time *</label>
                             <select
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                              value={regoState}
-                              onChange={(e) => setRegoState(e.target.value as StateCode)}
-                              disabled={isProcessing}
-                            >
-                              <option value="NSW">NSW</option>
-                              <option value="QLD">QLD</option>
-                              <option value="VIC">VIC</option>
-                              <option value="SA">SA</option>
-                              <option value="WA">WA</option>
-                              <option value="TAS">TAS</option>
-                              <option value="NT">NT</option>
-                              <option value="ACT">ACT</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="mt-5 flex justify-center">
-                          <RegistrationPlate plate={regoPlate} state={regoState} />
-                        </div>
-
-                        {/* Transmission Type */}
-                        <div className="mt-5 space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">
-                            Transmission Type *
-                          </label>
-                          <div className="flex gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="transmission"
-                                value="automatic"
-                                checked={transmissionType === 'automatic'}
-                                onChange={() => setTransmissionType('automatic')}
-                                disabled={isProcessing}
-                                className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                              />
-                              <span className="text-sm text-slate-700">Automatic</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="transmission"
-                                value="manual"
-                                checked={transmissionType === 'manual'}
-                                onChange={() => setTransmissionType('manual')}
-                                disabled={isProcessing}
-                                className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                              />
-                              <span className="text-sm text-slate-700">Manual</span>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Garage Booking Section */}
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Garage Booking</h3>
-
-                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Garage / Mechanic *</label>
-                            <GarageAutocomplete
-                              value={garageSearch}
-                              onChange={setGarageSearch}
-                              onSelect={handleGarageSelect}
-                              placeholder="Search for your garage (e.g. Ultra Tune Jesmond)"
-                              disabled={isProcessing}
-                              biasToNewcastle={true}
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Your Booking Time at Garage *</label>
-                            <select
-                              value={garageBookingTime}
-                              onChange={(e) => setGarageBookingTime(e.target.value)}
+                              value={earliestPickup}
+                              onChange={(e) => setEarliestPickup(e.target.value)}
                               disabled={isProcessing}
                               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                             >
-                              {garageBookingTimeOptions.map((time) => (
-                                <option key={`garage-${time.value}`} value={time.value}>
+                              {availablePickupOptions.map((time) => (
+                                <option key={`earliest-${time.value}`} value={time.value}>
                                   {time.label}
                                 </option>
                               ))}
                             </select>
+                            <p className="text-xs text-slate-400">Available 6:00am – 2:00pm</p>
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Additional Notes</label>
-                            <textarea
-                              placeholder="Any special instructions for us..."
-                              value={additionalNotes}
-                              onChange={(e) => setAdditionalNotes(e.target.value)}
+                            <label className="text-sm font-medium text-slate-700">Latest drop-off time *</label>
+                            <select
+                              value={latestDropoff}
+                              onChange={(e) => setLatestDropoff(e.target.value)}
                               disabled={isProcessing}
-                              rows={2}
-                              className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                            />
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            >
+                              {availableDropoffOptions.map((time) => (
+                                <option key={`latest-${time.value}`} value={time.value}>
+                                  {time.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-slate-400">Available 9:00am – 7:00pm (min. 2hr gap)</p>
                           </div>
                         </div>
-                      </div>
 
+                        {/* Address with Autocomplete */}
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">Pick-up address *</label>
+                          <AddressAutocomplete
+                            value={pickupAddress}
+                            onChange={setPickupAddress}
+                            onSelect={handleAddressSelect}
+                            placeholder="Start typing your address..."
+                            disabled={isProcessing}
+                            biasToNewcastle={true}
+                          />
+                        </div>
+
+                        {/* Vehicle Registration Section */}
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                          <h3 className="mb-4 text-sm font-semibold text-slate-900">Vehicle Registration</h3>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Registration Number *</label>
+                              <input
+                                type="text"
+                                placeholder="ABC123"
+                                maxLength={6}
+                                value={regoPlate}
+                                onChange={(e) => setRegoPlate(e.target.value.toUpperCase().slice(0, 6))}
+                                disabled={isProcessing}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base uppercase tracking-wider text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">State *</label>
+                              <select
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                value={regoState}
+                                onChange={(e) => setRegoState(e.target.value as StateCode)}
+                                disabled={isProcessing}
+                              >
+                                <option value="NSW">NSW</option>
+                                <option value="QLD">QLD</option>
+                                <option value="VIC">VIC</option>
+                                <option value="SA">SA</option>
+                                <option value="WA">WA</option>
+                                <option value="TAS">TAS</option>
+                                <option value="NT">NT</option>
+                                <option value="ACT">ACT</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex justify-center">
+                            <RegistrationPlate plate={regoPlate} state={regoState} />
+                          </div>
+
+                          {/* Transmission Type */}
+                          <div className="mt-5 space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                              Transmission Type *
+                            </label>
+                            <div className="flex gap-4">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="transmission"
+                                  value="automatic"
+                                  checked={transmissionType === 'automatic'}
+                                  onChange={() => setTransmissionType('automatic')}
+                                  disabled={isProcessing}
+                                  className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <span className="text-sm text-slate-700">Automatic</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="transmission"
+                                  value="manual"
+                                  checked={transmissionType === 'manual'}
+                                  onChange={() => setTransmissionType('manual')}
+                                  disabled={isProcessing}
+                                  className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <span className="text-sm text-slate-700">Manual</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Garage Booking Section */}
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                          <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Garage Booking</h3>
+
+                          <div className="space-y-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Garage / Mechanic *</label>
+                              <GarageAutocomplete
+                                value={garageSearch}
+                                onChange={setGarageSearch}
+                                onSelect={handleGarageSelect}
+                                placeholder="Search for your garage (e.g. Ultra Tune Jesmond)"
+                                disabled={isProcessing}
+                                biasToNewcastle={true}
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Your Booking Time at Garage *</label>
+                              <select
+                                value={garageBookingTime}
+                                onChange={(e) => setGarageBookingTime(e.target.value)}
+                                disabled={isProcessing}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              >
+                                {garageBookingTimeOptions.map((time) => (
+                                  <option key={`garage-${time.value}`} value={time.value}>
+                                    {time.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Additional Notes</label>
+                              <textarea
+                                placeholder="Any special instructions for us..."
+                                value={additionalNotes}
+                                onChange={(e) => setAdditionalNotes(e.target.value)}
+                                disabled={isProcessing}
+                                rows={2}
+                                className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       {/* End of greyed-out wrapper */}
 
@@ -1097,7 +1096,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <button
                         type="submit"
                         disabled={isProcessing || isHighValueVehicle}
-                        className="mt-2 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span className="inline-flex items-center gap-2">
                           Continue to Review
