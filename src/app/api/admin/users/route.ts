@@ -5,7 +5,22 @@ import User from "@/models/User";
 import Booking from "@/models/Booking";
 import { requireAdmin } from "@/lib/admin";
 
-// GET /api/admin/users - Get all users with booking counts
+interface CombinedUser {
+  _id: string;
+  username?: string;
+  email?: string;
+  name?: string;
+  role: "user" | "admin" | "guest";
+  bookingCount: number;
+  isGuest: boolean;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastBookingDate?: string;
+  totalSpent?: number;
+}
+
+// GET /api/admin/users - Get all users (registered + guests) with booking counts
 export async function GET() {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
@@ -15,40 +30,116 @@ export async function GET() {
   try {
     await connectDB();
 
-    // Get all users (excluding password)
-    const users = await User.find({})
+    // Get all registered users (excluding password)
+    const registeredUsers = await User.find({})
       .select("-password")
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get booking counts for each user
-    const userIds = users.map((user) => user._id.toString());
-    const bookingCounts = await Booking.aggregate([
+    // Get booking counts and totals for registered users
+    const userIds = registeredUsers.map((user) => user._id.toString());
+    const registeredUserBookings = await Booking.aggregate([
       {
         $match: {
-          userId: { $in: userIds },
+          userId: { $in: userIds.map(id => id) },
         },
       },
       {
         $group: {
           _id: "$userId",
           count: { $sum: 1 },
+          totalSpent: { $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$paymentAmount", 0] } },
+          lastBooking: { $max: "$createdAt" },
         },
       },
     ]);
 
-    // Create a map of userId to booking count
-    const bookingCountMap: Record<string, number> = {};
-    bookingCounts.forEach((item) => {
-      bookingCountMap[item._id] = item.count;
+    // Create a map of userId to booking stats
+    const registeredBookingMap: Record<string, { count: number; totalSpent: number; lastBooking: Date }> = {};
+    registeredUserBookings.forEach((item) => {
+      registeredBookingMap[item._id?.toString() || ''] = {
+        count: item.count,
+        totalSpent: item.totalSpent,
+        lastBooking: item.lastBooking,
+      };
     });
 
-    // Add booking count to each user
-    const usersWithBookings = users.map((user) => ({
-      ...user,
-      _id: user._id.toString(),
-      bookingCount: bookingCountMap[user._id.toString()] || 0,
-    }));
+    // Get unique guest users from bookings (those without userId but with isGuest: true)
+    const guestBookings = await Booking.aggregate([
+      {
+        $match: {
+          isGuest: true,
+          userId: null,
+        },
+      },
+      {
+        $group: {
+          _id: { $toLower: "$userEmail" },
+          userName: { $first: "$userName" },
+          userEmail: { $first: "$userEmail" },
+          guestPhone: { $first: "$guestPhone" },
+          count: { $sum: 1 },
+          totalSpent: { $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$paymentAmount", 0] } },
+          firstBooking: { $min: "$createdAt" },
+          lastBooking: { $max: "$createdAt" },
+        },
+      },
+      {
+        $sort: { lastBooking: -1 },
+      },
+    ]);
+
+    // Combine registered users with booking data
+    const combinedUsers: CombinedUser[] = registeredUsers.map((user) => {
+      const bookingStats = registeredBookingMap[user._id.toString()];
+      return {
+        _id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        role: user.role || "user",
+        bookingCount: bookingStats?.count || 0,
+        isGuest: false,
+        createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: user.updatedAt?.toISOString() || new Date().toISOString(),
+        lastBookingDate: bookingStats?.lastBooking?.toISOString(),
+        totalSpent: bookingStats?.totalSpent || 0,
+      };
+    });
+
+    // Add guest users
+    guestBookings.forEach((guest) => {
+      // Check if this email is already a registered user
+      const existingUser = combinedUsers.find(
+        (u) => u.email?.toLowerCase() === guest._id
+      );
+      
+      if (!existingUser) {
+        combinedUsers.push({
+          _id: `guest_${guest._id}`,
+          name: guest.userName,
+          email: guest.userEmail,
+          phone: guest.guestPhone,
+          role: "guest",
+          bookingCount: guest.count,
+          isGuest: true,
+          createdAt: guest.firstBooking?.toISOString() || new Date().toISOString(),
+          updatedAt: guest.lastBooking?.toISOString() || new Date().toISOString(),
+          lastBookingDate: guest.lastBooking?.toISOString(),
+          totalSpent: guest.totalSpent || 0,
+        });
+      } else {
+        // Update the registered user's booking count to include any guest bookings with same email
+        existingUser.bookingCount += guest.count;
+        existingUser.totalSpent = (existingUser.totalSpent || 0) + (guest.totalSpent || 0);
+      }
+    });
+
+    // Sort by most recent activity
+    combinedUsers.sort((a, b) => {
+      const dateA = new Date(a.lastBookingDate || a.createdAt);
+      const dateB = new Date(b.lastBookingDate || b.createdAt);
+      return dateB.getTime() - dateA.getTime();
+    });
 
     // Calculate statistics
     const now = new Date();
@@ -56,16 +147,18 @@ export async function GET() {
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const stats = {
-      totalUsers: users.length,
-      activeUsers: usersWithBookings.filter((u) => u.bookingCount > 0).length,
-      newThisWeek: users.filter(
+      totalUsers: combinedUsers.length,
+      registeredUsers: registeredUsers.length,
+      guestUsers: combinedUsers.filter((u) => u.isGuest).length,
+      activeUsers: combinedUsers.filter((u) => u.bookingCount > 0).length,
+      newThisWeek: combinedUsers.filter(
         (u) => new Date(u.createdAt) >= weekAgo
       ).length,
-      newToday: users.filter((u) => new Date(u.createdAt) >= today).length,
+      newToday: combinedUsers.filter((u) => new Date(u.createdAt) >= today).length,
     };
 
     return NextResponse.json({
-      users: usersWithBookings,
+      users: combinedUsers,
       stats,
     });
   } catch (error) {

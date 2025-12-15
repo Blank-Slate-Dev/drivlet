@@ -15,31 +15,43 @@ import {
   Mail,
   Clock,
   ClipboardList,
+  Phone,
+  DollarSign,
+  Filter,
 } from "lucide-react";
 
 interface User {
   _id: string;
   username?: string;
   email?: string;
-  name?: string; // For guest users
+  name?: string;
   role: "user" | "admin" | "guest";
   bookingCount: number;
-  isGuest?: boolean;
+  isGuest: boolean;
+  phone?: string;
   createdAt: string;
   updatedAt: string;
+  lastBookingDate?: string;
+  totalSpent?: number;
 }
 
 interface Stats {
   totalUsers: number;
+  registeredUsers: number;
+  guestUsers: number;
   activeUsers: number;
   newThisWeek: number;
   newToday: number;
 }
 
+type UserFilter = "all" | "registered" | "guest" | "active";
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
+    registeredUsers: 0,
+    guestUsers: 0,
     activeUsers: 0,
     newThisWeek: 0,
     newToday: 0,
@@ -47,6 +59,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<UserFilter>("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const fetchUsers = useCallback(async () => {
@@ -87,22 +100,36 @@ export default function AdminUsersPage() {
     });
   };
 
-  // Helper function to get display name for user
-  const getDisplayName = (user: User): string => {
-    return user.username || user.name || user.email || "Unknown";
+  const formatCurrency = (cents: number) => {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD",
+    }).format(cents / 100);
   };
 
-  // Filter users based on search with safe null checks
-  const searchLower = search.toLowerCase();
+  const getDisplayName = (user: User): string => {
+    return user.username || user.name || user.email?.split("@")[0] || "Unknown";
+  };
+
+  // Filter users based on search and filter
   const filteredUsers = users.filter((user) => {
+    // Apply type filter
+    if (filter === "registered" && user.isGuest) return false;
+    if (filter === "guest" && !user.isGuest) return false;
+    if (filter === "active" && user.bookingCount === 0) return false;
+
+    // Apply search filter
     if (!search) return true;
+    const searchLower = search.toLowerCase();
     const username = user.username?.toLowerCase() || "";
     const email = user.email?.toLowerCase() || "";
     const name = user.name?.toLowerCase() || "";
+    const phone = user.phone?.toLowerCase() || "";
     return (
       username.includes(searchLower) ||
       email.includes(searchLower) ||
-      name.includes(searchLower)
+      name.includes(searchLower) ||
+      phone.includes(searchLower)
     );
   });
 
@@ -114,7 +141,7 @@ export default function AdminUsersPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Users Management</h1>
             <p className="mt-1 text-slate-600">
-              View and manage registered users
+              View and manage registered users and guests
             </p>
           </div>
           <button
@@ -127,75 +154,118 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-6">
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
-                <Users className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                <Users className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-xl font-bold text-white">
                   {stats.totalUsers}
                 </p>
-                <p className="text-sm text-emerald-100">Total Users</p>
+                <p className="text-xs text-emerald-100">Total Users</p>
               </div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100">
-                <UserCheck className="h-6 w-6 text-green-600" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
+                <UserCheck className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xl font-bold text-slate-900">
+                  {stats.registeredUsers}
+                </p>
+                <p className="text-xs text-slate-500">Registered</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
+                <UserPlus className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-900">
+                  {stats.guestUsers}
+                </p>
+                <p className="text-xs text-slate-500">Guests</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
+                <ClipboardList className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-900">
                   {stats.activeUsers}
                 </p>
-                <p className="text-sm text-slate-500">Active Users</p>
+                <p className="text-xs text-slate-500">With Bookings</p>
               </div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
-                <UserPlus className="h-6 w-6 text-blue-600" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
+                <Calendar className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xl font-bold text-slate-900">
                   {stats.newThisWeek}
                 </p>
-                <p className="text-sm text-slate-500">New This Week</p>
+                <p className="text-xs text-slate-500">This Week</p>
               </div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
-                <Calendar className="h-6 w-6 text-amber-600" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100">
+                <Clock className="h-5 w-5 text-teal-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xl font-bold text-slate-900">
                   {stats.newToday}
                 </p>
-                <p className="text-sm text-slate-500">New Today</p>
+                <p className="text-xs text-slate-500">Today</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="relative">
+        {/* Search and Filter Bar */}
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+          <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
+          </div>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as UserFilter)}
+                className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="all">All Users</option>
+                <option value="registered">Registered Only</option>
+                <option value="guest">Guests Only</option>
+                <option value="active">With Bookings</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -234,10 +304,11 @@ export default function AdminUsersPage() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-6 py-4">Name</th>
-                    <th className="px-6 py-4">Email</th>
-                    <th className="px-6 py-4">Role</th>
+                    <th className="px-6 py-4">User</th>
+                    <th className="px-6 py-4">Contact</th>
+                    <th className="px-6 py-4">Type</th>
                     <th className="px-6 py-4">Bookings</th>
+                    <th className="px-6 py-4">Total Spent</th>
                     <th className="px-6 py-4">Joined</th>
                     <th className="px-6 py-4">Actions</th>
                   </tr>
@@ -247,34 +318,47 @@ export default function AdminUsersPage() {
                     <tr key={user._id} className="transition hover:bg-slate-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${user.isGuest ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
+                            user.isGuest 
+                              ? "bg-amber-100 text-amber-700" 
+                              : user.role === "admin"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-emerald-100 text-emerald-700"
+                          }`}>
                             {getDisplayName(user).charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">
                               {getDisplayName(user)}
                             </p>
-                            {user.isGuest && (
-                              <p className="text-xs text-amber-600">Guest</p>
+                            {user.lastBookingDate && (
+                              <p className="text-xs text-slate-400">
+                                Last active: {formatDate(user.lastBookingDate)}
+                              </p>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">{user.email || "—"}</p>
+                        <div className="space-y-1">
+                          <p className="text-sm text-slate-600">{user.email || "—"}</p>
+                          {user.phone && (
+                            <p className="text-xs text-slate-400">{user.phone}</p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         {user.role === "admin" ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
                             Admin
                           </span>
                         ) : user.isGuest ? (
-                          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                             Guest
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            User
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            Registered
                           </span>
                         )}
                       </td>
@@ -285,6 +369,11 @@ export default function AdminUsersPage() {
                             {user.bookingCount}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-medium text-slate-700">
+                          {user.totalSpent ? formatCurrency(user.totalSpent) : "—"}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-slate-600">
@@ -313,6 +402,7 @@ export default function AdminUsersPage() {
               <p className="text-sm text-slate-500">
                 Showing {filteredUsers.length} of {users.length} users
                 {search && ` matching "${search}"`}
+                {filter !== "all" && ` (${filter})`}
               </p>
             </div>
           )}
@@ -328,12 +418,12 @@ export default function AdminUsersPage() {
                     User Details
                   </h2>
                   {selectedUser.role === "admin" && (
-                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                    <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
                       Admin
                     </span>
                   )}
                   {selectedUser.isGuest && (
-                    <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                       Guest
                     </span>
                   )}
@@ -348,7 +438,13 @@ export default function AdminUsersPage() {
 
               <div className="space-y-5 p-6">
                 <div className="flex justify-center">
-                  <div className={`flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold ${selectedUser.isGuest ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                  <div className={`flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold ${
+                    selectedUser.isGuest 
+                      ? "bg-amber-100 text-amber-700" 
+                      : selectedUser.role === "admin"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-emerald-100 text-emerald-700"
+                  }`}>
                     {getDisplayName(selectedUser).charAt(0).toUpperCase()}
                   </div>
                 </div>
@@ -363,7 +459,7 @@ export default function AdminUsersPage() {
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-medium text-slate-500">User ID</p>
-                  <p className="font-mono text-sm text-slate-900">
+                  <p className="font-mono text-sm text-slate-900 break-all">
                     {selectedUser._id}
                   </p>
                 </div>
@@ -391,6 +487,17 @@ export default function AdminUsersPage() {
                         </p>
                       </div>
                     </div>
+                    {selectedUser.phone && (
+                      <div>
+                        <p className="text-xs text-slate-500">Phone</p>
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="h-4 w-4 text-slate-400" />
+                          <p className="text-sm text-slate-900">
+                            {selectedUser.phone}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -399,13 +506,32 @@ export default function AdminUsersPage() {
                     <ClipboardList className="h-4 w-4 text-emerald-600" />
                     Activity
                   </div>
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-slate-600">Total Bookings</p>
                       <p className="text-xl font-bold text-emerald-600">
                         {selectedUser.bookingCount}
                       </p>
                     </div>
+                    {selectedUser.totalSpent !== undefined && selectedUser.totalSpent > 0 && (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-slate-600">Total Spent</p>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-emerald-600" />
+                          <p className="text-lg font-bold text-emerald-600">
+                            {formatCurrency(selectedUser.totalSpent)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedUser.lastBookingDate && (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-slate-600">Last Booking</p>
+                        <p className="text-sm text-slate-900">
+                          {formatDate(selectedUser.lastBookingDate)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

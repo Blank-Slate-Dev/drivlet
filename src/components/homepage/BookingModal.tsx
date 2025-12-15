@@ -4,7 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Loader2, AlertCircle, CreditCard, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { X, CheckCircle2, Loader2, AlertCircle, CreditCard, ArrowLeft, ArrowRight, MapPin, Clock, Car, Building, User, Mail, Phone } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
 import GarageAutocomplete, { GarageDetails } from '@/components/GarageAutocomplete';
@@ -54,7 +55,7 @@ const MIN_GAP_MINUTES = 120;
 // Garage booking time options (typical garage hours)
 const garageBookingTimeOptions = generateTimeOptions(7, 17);
 
-type Step = 'details' | 'payment' | 'success';
+type Step = 'details' | 'review' | 'payment' | 'success';
 
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const { data: session, status: authStatus } = useSession();
@@ -71,7 +72,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
 
   // Guest checkout fields
-  const [isGuestCheckout, setIsGuestCheckout] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
@@ -91,12 +91,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Determine if user is authenticated
   const isAuthenticated = authStatus === 'authenticated' && session?.user;
 
-  // Set guest checkout mode if not authenticated
-  useEffect(() => {
-    if (isOpen && authStatus === 'unauthenticated') {
-      setIsGuestCheckout(true);
-    }
-  }, [isOpen, authStatus]);
+  // Get customer info (either from session or guest fields)
+  const customerName = isAuthenticated ? (session?.user?.username || '') : guestName;
+  const customerEmail = isAuthenticated ? (session?.user?.email || '') : guestEmail;
+  const customerPhone = guestPhone;
 
   const selectedPickupMinutes = useMemo(() => {
     const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
@@ -168,7 +166,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setGuestName('');
         setGuestEmail('');
         setGuestPhone('');
-        setIsGuestCheckout(false);
         setClientSecret(null);
         setPaymentIntentId(null);
         setIsProcessing(false);
@@ -190,8 +187,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     return option?.label || value;
   };
 
-  const validateForm = (): string | null => {
-    if (isGuestCheckout || !isAuthenticated) {
+  const validateDetailsStep = (): string | null => {
+    // Guest info validation
+    if (!isAuthenticated) {
       if (!guestName.trim()) {
         return 'Please enter your full name.';
       }
@@ -230,27 +228,21 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     return null;
   };
 
-  const handleProceedToPayment = async () => {
-    const validationError = validateForm();
+  const handleContinueToReview = () => {
+    const validationError = validateDetailsStep();
     if (validationError) {
       setSubmitError(validationError);
       return;
     }
+    setSubmitError(null);
+    setCurrentStep('review');
+  };
 
+  const handleProceedToPayment = async () => {
     setIsProcessing(true);
     setSubmitError(null);
 
     try {
-      const customerName = isGuestCheckout || !isAuthenticated 
-        ? guestName 
-        : session?.user?.username || '';
-      const customerEmail = isGuestCheckout || !isAuthenticated 
-        ? guestEmail 
-        : session?.user?.email || '';
-      const customerPhone = isGuestCheckout || !isAuthenticated 
-        ? guestPhone 
-        : '';
-
       const response = await fetch('/api/stripe/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -328,6 +320,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     return null;
   }
 
+  // Build tracking URL for success page
+  const trackingUrl = `/track?email=${encodeURIComponent(customerEmail)}&rego=${encodeURIComponent(regoPlate.toUpperCase())}`;
+
   // Success state
   if (currentStep === 'success') {
     return (
@@ -348,19 +343,48 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               className="fixed left-1/2 top-1/2 z-[101] w-[90%] max-w-md -translate-x-1/2 -translate-y-1/2"
             >
               <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-2xl">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-600" />
                 </div>
-                <h3 className="mt-4 text-xl font-bold text-slate-900">
-                  Payment Successful!
+                <h3 className="mt-6 text-2xl font-bold text-slate-900">
+                  Booking Confirmed!
                 </h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Your booking has been confirmed. We&apos;ll be in touch shortly.
+                <p className="mt-2 text-slate-600">
+                  We&apos;ve received your booking and payment.
                 </p>
+                
+                {/* Booking Summary */}
+                <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-left">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Vehicle</span>
+                      <span className="font-medium text-slate-900">{regoPlate.toUpperCase()} ({regoState})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Garage</span>
+                      <span className="font-medium text-slate-900">{garageSearch}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Pickup</span>
+                      <span className="font-medium text-slate-900">{getTimeLabel(earliestPickup, allPickupTimeOptions)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm text-slate-500">
+                  A confirmation email has been sent to <span className="font-medium">{customerEmail}</span>
+                </p>
+
                 <div className="mt-6 space-y-3">
+                  <Link
+                    href={trackingUrl}
+                    className="block w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                  >
+                    Track Your Booking
+                  </Link>
                   <button
                     onClick={onClose}
-                    className="w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                    className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Done
                   </button>
@@ -403,18 +427,54 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <X className="h-5 w-5" />
               </button>
 
-              <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+              {/* Step Indicator */}
+              <div className="border-b border-slate-100 px-6 py-4 sm:px-8">
+                <div className="flex items-center justify-center gap-2">
+                  {['details', 'review', 'payment'].map((step, index) => (
+                    <div key={step} className="flex items-center">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                          currentStep === step
+                            ? 'bg-emerald-600 text-white'
+                            : ['details'].indexOf(currentStep) < index ||
+                              (currentStep === 'details' && index > 0)
+                            ? 'bg-slate-100 text-slate-400'
+                            : 'bg-emerald-100 text-emerald-600'
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                      {index < 2 && (
+                        <div
+                          className={`mx-2 h-0.5 w-8 ${
+                            ['details', 'review'].indexOf(currentStep) > index
+                              ? 'bg-emerald-400'
+                              : 'bg-slate-200'
+                          }`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-center gap-8 text-xs text-slate-500">
+                  <span className={currentStep === 'details' ? 'font-medium text-emerald-600' : ''}>Details</span>
+                  <span className={currentStep === 'review' ? 'font-medium text-emerald-600' : ''}>Review</span>
+                  <span className={currentStep === 'payment' ? 'font-medium text-emerald-600' : ''}>Payment</span>
+                </div>
+              </div>
+
+              <div className="max-h-[70vh] overflow-y-auto p-6 sm:p-8">
                 {/* Payment Step */}
                 {currentStep === 'payment' && clientSecret && (
                   <>
                     <div className="mb-6">
                       <button
-                        onClick={() => setCurrentStep('details')}
+                        onClick={() => setCurrentStep('review')}
                         disabled={isProcessing}
                         className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
                       >
                         <ArrowLeft className="h-4 w-4" />
-                        Back to details
+                        Back to review
                       </button>
                       <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
                         Payment Details
@@ -422,39 +482,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <p className="mt-1 text-sm text-slate-500">
                         Complete your booking with secure payment
                       </p>
-                    </div>
-
-                    {/* Order Summary */}
-                    <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                      <h3 className="text-sm font-semibold text-slate-900 mb-3">Order Summary</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Vehicle</span>
-                          <span className="font-medium text-slate-900">{regoPlate} ({regoState})</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Pickup</span>
-                          <span className="font-medium text-slate-900">{getTimeLabel(earliestPickup, allPickupTimeOptions)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Return by</span>
-                          <span className="font-medium text-slate-900">{getTimeLabel(latestDropoff, allDropoffTimeOptions)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Garage</span>
-                          <span className="font-medium text-slate-900">{garageSearch}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Garage booking</span>
-                          <span className="font-medium text-slate-900">{getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</span>
-                        </div>
-                        <div className="border-t border-slate-200 pt-2 mt-2">
-                          <div className="flex justify-between">
-                            <span className="font-semibold text-slate-900">Total</span>
-                            <span className="font-bold text-emerald-600">{PRICE_DISPLAY} AUD</span>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     {submitError && (
@@ -491,6 +518,151 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </>
                 )}
 
+                {/* Review Step */}
+                {currentStep === 'review' && (
+                  <>
+                    <div className="mb-6">
+                      <button
+                        onClick={() => setCurrentStep('details')}
+                        className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Edit details
+                      </button>
+                      <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                        Review Your Booking
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Please confirm the details below before payment
+                      </p>
+                    </div>
+
+                    {submitError && (
+                      <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
+                        <p className="text-sm font-medium text-red-800">{submitError}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      {/* Customer Info */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                          <User className="h-4 w-4 text-emerald-600" />
+                          Customer Details
+                        </h3>
+                        <div className="grid gap-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500 w-20">Name:</span>
+                            <span className="font-medium text-slate-900">{customerName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="text-slate-700">{customerEmail}</span>
+                          </div>
+                          {customerPhone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-3.5 w-3.5 text-slate-400" />
+                              <span className="text-slate-700">{customerPhone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Vehicle */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                          <Car className="h-4 w-4 text-emerald-600" />
+                          Vehicle
+                        </h3>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-700">{regoPlate.toUpperCase()} ({regoState})</span>
+                          <RegistrationPlate plate={regoPlate} state={regoState} />
+                        </div>
+                      </div>
+
+                      {/* Times */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                          <Clock className="h-4 w-4 text-emerald-600" />
+                          Schedule
+                        </h3>
+                        <div className="grid gap-2 text-sm sm:grid-cols-2">
+                          <div>
+                            <span className="text-slate-500">Pickup from:</span>
+                            <p className="font-medium text-slate-900">{getTimeLabel(earliestPickup, allPickupTimeOptions)}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Return by:</span>
+                            <p className="font-medium text-slate-900">{getTimeLabel(latestDropoff, allDropoffTimeOptions)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                          <MapPin className="h-4 w-4 text-emerald-600" />
+                          Pickup Location
+                        </h3>
+                        <p className="text-sm text-slate-900">{pickupAddress}</p>
+                      </div>
+
+                      {/* Garage */}
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-blue-700 mb-3">
+                          <Building className="h-4 w-4" />
+                          Garage Booking
+                        </h3>
+                        <div className="text-sm">
+                          <p className="font-medium text-blue-900">{garageSearch}</p>
+                          {garageAddress && (
+                            <p className="text-blue-700 text-xs mt-1">{garageAddress}</p>
+                          )}
+                          <p className="text-blue-600 mt-2">
+                            Appointment time: {getTimeLabel(garageBookingTime, garageBookingTimeOptions)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Additional Notes */}
+                      {additionalNotes && (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-sm font-semibold text-slate-700 mb-2">Notes</h3>
+                          <p className="text-sm text-slate-600">{additionalNotes}</p>
+                        </div>
+                      )}
+
+                      {/* Price */}
+                      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-semibold text-emerald-800">Total</span>
+                          <span className="text-2xl font-bold text-emerald-700">{PRICE_DISPLAY} AUD</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleProceedToPayment}
+                      disabled={isProcessing}
+                      className="mt-6 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {isProcessing ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Please wait...
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <CreditCard className="h-5 w-5" />
+                          Proceed to Payment
+                          <ArrowRight className="h-5 w-5" />
+                        </span>
+                      )}
+                    </button>
+                  </>
+                )}
+
                 {/* Details Step */}
                 {currentStep === 'details' && (
                   <>
@@ -498,10 +670,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                            Book a Pick-up & Drop-off
+                            Book a Pick-up
                           </h2>
                           <p className="mt-1 text-sm text-slate-500">
-                            We&apos;ll collect your car, take it to the garage, and return it to you.
+                            We&apos;ll collect, service, and return your car
                           </p>
                         </div>
                       </div>
@@ -522,11 +694,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       className="space-y-5"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        handleProceedToPayment();
+                        handleContinueToReview();
                       }}
                     >
                       {/* Guest Checkout Fields */}
-                      {(isGuestCheckout || !isAuthenticated) && (
+                      {!isAuthenticated && (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                           <h3 className="mb-4 text-sm font-semibold text-slate-900">
                             Your Details
@@ -571,6 +743,41 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
                               />
                             </div>
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">
+                            Have an account?{' '}
+                            <Link href="/login" className="text-emerald-600 font-medium hover:underline">
+                              Sign in
+                            </Link>
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Logged in user info */}
+                      {isAuthenticated && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white font-semibold">
+                              {(session?.user?.username || session?.user?.email || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-emerald-900">
+                                {session?.user?.username || 'User'}
+                              </p>
+                              <p className="text-sm text-emerald-700">{session?.user?.email}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <label className="text-xs font-medium text-emerald-700">
+                              Phone (for driver contact)
+                            </label>
+                            <input
+                              type="tel"
+                              placeholder="0412 345 678"
+                              value={guestPhone}
+                              onChange={(e) => setGuestPhone(e.target.value)}
+                              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                            />
                           </div>
                         </div>
                       )}
@@ -641,7 +848,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           Vehicle Registration
                         </h3>
 
-                        {/* Registration number (left) and State (right) side by side */}
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-600">
@@ -682,7 +888,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </div>
                         </div>
 
-                        {/* Registration plate image centered below */}
                         <div className="mt-5 flex justify-center">
                           <RegistrationPlate plate={regoPlate} state={regoState} />
                         </div>
@@ -695,7 +900,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         </h3>
                         
                         <div className="space-y-4">
-                          {/* Garage Search */}
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-600">
                               Garage / Mechanic *
@@ -710,7 +914,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             />
                           </div>
 
-                          {/* Booking Time */}
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-600">
                               Your Booking Time at Garage *
@@ -729,7 +932,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             </select>
                           </div>
 
-                          {/* Additional Notes */}
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-600">
                               Additional Notes
@@ -750,24 +952,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <button
                         type="submit"
                         disabled={isProcessing}
-                        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-2 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
                       >
-                        {isProcessing ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            Please wait...
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="h-5 w-5" />
-                            Continue to Payment
-                          </>
-                        )}
+                        <span className="inline-flex items-center gap-2">
+                          Continue to Review
+                          <ArrowRight className="h-5 w-5" />
+                        </span>
                       </button>
-
-                      <p className="text-center text-xs text-slate-500">
-                        You&apos;ll enter your card details on the next step
-                      </p>
                     </form>
                   </>
                 )}

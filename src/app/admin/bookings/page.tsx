@@ -24,7 +24,10 @@ import {
   Phone,
   Mail,
   Building,
+  CreditCard,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
@@ -60,6 +63,9 @@ interface Booking {
   garageName?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
+  paymentStatus?: string;
+  paymentId?: string;
+  paymentAmount?: number;
   currentStage: string;
   overallProgress: number;
   status: string;
@@ -78,6 +84,7 @@ export default function AdminBookingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const [userTypeFilter, setUserTypeFilter] = useState("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,7 +105,16 @@ export default function AdminBookingsPage() {
       if (!response.ok) throw new Error("Failed to fetch bookings");
 
       const data = await response.json();
-      setBookings(data.bookings);
+      
+      // Filter by user type client-side (API doesn't support this filter)
+      let filteredBookings = data.bookings;
+      if (userTypeFilter === "guest") {
+        filteredBookings = data.bookings.filter((b: Booking) => b.isGuest);
+      } else if (userTypeFilter === "registered") {
+        filteredBookings = data.bookings.filter((b: Booking) => !b.isGuest);
+      }
+
+      setBookings(filteredBookings);
       setTotalPages(data.pagination.totalPages);
       setTotal(data.pagination.total);
       setError("");
@@ -107,7 +123,7 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, stageFilter]);
+  }, [page, search, statusFilter, stageFilter, userTypeFilter]);
 
   useEffect(() => {
     fetchBookings();
@@ -137,6 +153,13 @@ export default function AdminBookingsPage() {
     });
   };
 
+  const formatCurrency = (cents: number) => {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD",
+    }).format(cents / 100);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -147,6 +170,21 @@ export default function AdminBookingsPage() {
         return "bg-green-100 text-green-700";
       case "cancelled":
         return "bg-red-100 text-red-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const getPaymentStatusColor = (status?: string) => {
+    switch (status) {
+      case "paid":
+        return "bg-green-100 text-green-700";
+      case "pending":
+        return "bg-amber-100 text-amber-700";
+      case "failed":
+        return "bg-red-100 text-red-700";
+      case "refunded":
+        return "bg-blue-100 text-blue-700";
       default:
         return "bg-slate-100 text-slate-700";
     }
@@ -234,6 +272,11 @@ export default function AdminBookingsPage() {
     }
   };
 
+  // Generate tracking link for a booking
+  const getTrackingLink = (booking: Booking) => {
+    return `/track?email=${encodeURIComponent(booking.userEmail)}&rego=${encodeURIComponent(booking.vehicleRegistration)}`;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -260,6 +303,7 @@ export default function AdminBookingsPage() {
           </button>
         </div>
 
+        {/* Filters */}
         <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -274,7 +318,7 @@ export default function AdminBookingsPage() {
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <select
@@ -306,6 +350,18 @@ export default function AdminBookingsPage() {
                   {stage.label}
                 </option>
               ))}
+            </select>
+            <select
+              value={userTypeFilter}
+              onChange={(e) => {
+                setUserTypeFilter(e.target.value);
+                setPage(1);
+              }}
+              className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="all">All Users</option>
+              <option value="registered">Registered</option>
+              <option value="guest">Guests</option>
             </select>
           </div>
         </div>
@@ -346,7 +402,7 @@ export default function AdminBookingsPage() {
                     <th className="px-4 py-4">Service</th>
                     <th className="px-4 py-4">Pickup</th>
                     <th className="px-4 py-4">Stage</th>
-                    <th className="px-4 py-4">Progress</th>
+                    <th className="px-4 py-4">Payment</th>
                     <th className="px-4 py-4">Status</th>
                     <th className="px-4 py-4">Actions</th>
                   </tr>
@@ -389,7 +445,7 @@ export default function AdminBookingsPage() {
                         {booking.hasExistingBooking && (
                           <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
                             <Building className="h-3 w-3" />
-                            Existing
+                            {booking.garageName}
                           </span>
                         )}
                       </td>
@@ -418,16 +474,17 @@ export default function AdminBookingsPage() {
                         </select>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-emerald-500 transition-all"
-                              style={{ width: `${booking.overallProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-slate-600">
-                            {booking.overallProgress}%
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${getPaymentStatusColor(booking.paymentStatus)}`}
+                          >
+                            {booking.paymentStatus || "pending"}
                           </span>
+                          {booking.paymentAmount && (
+                            <span className="text-xs text-slate-500">
+                              {formatCurrency(booking.paymentAmount)}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -456,6 +513,14 @@ export default function AdminBookingsPage() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
+                          <Link
+                            href={getTrackingLink(booking)}
+                            target="_blank"
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
+                            title="View Tracking Page"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
                         </div>
                       </td>
                     </tr>
@@ -500,6 +565,8 @@ export default function AdminBookingsPage() {
             getStageLabel={getStageLabel}
             formatDateTime={formatDateTime}
             formatDate={formatDate}
+            formatCurrency={formatCurrency}
+            getTrackingLink={getTrackingLink}
           />
         )}
 
@@ -523,6 +590,8 @@ function ViewDetailsModal({
   getStageLabel,
   formatDateTime,
   formatDate,
+  formatCurrency,
+  getTrackingLink,
 }: {
   booking: Booking;
   onClose: () => void;
@@ -530,6 +599,8 @@ function ViewDetailsModal({
   getStageLabel: (id: string) => string;
   formatDateTime: (date: string) => string;
   formatDate: (date: string) => string;
+  formatCurrency: (cents: number) => string;
+  getTrackingLink: (booking: Booking) => string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -584,6 +655,40 @@ function ViewDetailsModal({
                 <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
                   <Phone className="h-3.5 w-3.5" />
                   {booking.guestPhone}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Info */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <CreditCard className="h-4 w-4 text-emerald-600" />
+              Payment
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Status</p>
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium mt-1 ${
+                  booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                  booking.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-700'
+                }`}>
+                  {booking.paymentStatus || 'pending'}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Amount</p>
+                <p className="font-medium text-slate-900">
+                  {booking.paymentAmount ? formatCurrency(booking.paymentAmount) : '—'}
+                </p>
+              </div>
+              {booking.paymentId && (
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-500">Payment ID</p>
+                  <p className="font-mono text-xs text-slate-600 break-all">
+                    {booking.paymentId}
+                  </p>
                 </div>
               )}
             </div>
@@ -738,6 +843,14 @@ function ViewDetailsModal({
             >
               Edit Booking
             </button>
+            <Link
+              href={getTrackingLink(booking)}
+              target="_blank"
+              className="flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View Tracking
+            </Link>
             <button
               onClick={onClose}
               className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"

@@ -26,23 +26,31 @@ export async function GET() {
       pendingBookings,
       activeBookings,
       completedBookings,
+      cancelledBookings,
       completedToday,
       completedThisWeek,
       totalUsers,
+      guestBookings,
+      paidBookings,
       recentBookings,
       bookingsByStage,
+      todaysBookings,
+      thisWeeksRevenue,
     ] = await Promise.all([
       // Total bookings
       Booking.countDocuments(),
 
-      // Pending bookings
+      // Pending bookings (waiting to be started)
       Booking.countDocuments({ status: "pending" }),
 
-      // Active bookings (in progress)
-      Booking.countDocuments({ status: "active" }),
+      // Active bookings (in progress) - FIXED: was "active", should be "in_progress"
+      Booking.countDocuments({ status: "in_progress" }),
 
       // Completed bookings
       Booking.countDocuments({ status: "completed" }),
+
+      // Cancelled bookings
+      Booking.countDocuments({ status: "cancelled" }),
 
       // Completed today
       Booking.countDocuments({
@@ -56,20 +64,47 @@ export async function GET() {
         updatedAt: { $gte: startOfWeek },
       }),
 
-      // Total users
+      // Total registered users
       User.countDocuments(),
+
+      // Guest bookings count
+      Booking.countDocuments({ isGuest: true }),
+
+      // Paid bookings
+      Booking.countDocuments({ paymentStatus: "paid" }),
 
       // Recent bookings (last 10)
       Booking.find()
         .sort({ createdAt: -1 })
         .limit(10)
-        .select("userName userEmail vehicle serviceType currentStage status createdAt")
+        .select("userName userEmail vehicleRegistration vehicleState serviceType currentStage status isGuest paymentStatus createdAt")
         .lean(),
 
-      // Bookings by stage
+      // Bookings by stage (excluding cancelled)
       Booking.aggregate([
         { $match: { status: { $ne: "cancelled" } } },
         { $group: { _id: "$currentStage", count: { $sum: 1 } } },
+      ]),
+
+      // Today's bookings
+      Booking.countDocuments({
+        createdAt: { $gte: startOfToday },
+      }),
+
+      // This week's revenue (paid bookings)
+      Booking.aggregate([
+        {
+          $match: {
+            paymentStatus: "paid",
+            createdAt: { $gte: startOfWeek },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$paymentAmount" },
+          },
+        },
       ]),
     ]);
 
@@ -79,15 +114,23 @@ export async function GET() {
       return acc;
     }, {} as Record<string, number>);
 
+    // Calculate weekly revenue
+    const weeklyRevenue = thisWeeksRevenue.length > 0 ? thisWeeksRevenue[0].total : 0;
+
     return NextResponse.json({
       overview: {
         totalBookings,
         pendingBookings,
         activeBookings,
         completedBookings,
+        cancelledBookings,
         completedToday,
         completedThisWeek,
         totalUsers,
+        guestBookings,
+        paidBookings,
+        todaysBookings,
+        weeklyRevenue,
       },
       stageStats,
       recentBookings,
