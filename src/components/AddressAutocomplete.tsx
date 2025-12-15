@@ -31,6 +31,38 @@ interface AddressAutocompleteProps {
   biasToNewcastle?: boolean;
 }
 
+/**
+ * iOS keyboard detection using VisualViewport.
+ * When the keyboard opens, visualViewport.height shrinks.
+ */
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const THRESHOLD_PX = 120; // generous to avoid false positives
+    const compute = () => {
+      const delta = window.innerHeight - vv.height;
+      setOpen(delta > THRESHOLD_PX);
+    };
+
+    compute();
+    vv.addEventListener('resize', compute);
+    vv.addEventListener('scroll', compute);
+    window.addEventListener('orientationchange', compute);
+
+    return () => {
+      vv.removeEventListener('resize', compute);
+      vv.removeEventListener('scroll', compute);
+      window.removeEventListener('orientationchange', compute);
+    };
+  }, []);
+
+  return open;
+}
+
 export default function AddressAutocomplete({
   value,
   onChange,
@@ -41,131 +73,99 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  
+
   const [isReady, setIsReady] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Touch tracking to differentiate taps from scrolls
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const outsideTouchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const SCROLL_THRESHOLD = 10;
-  
-  // Track focus state ourselves with a protection window after blur
-  const recentlyFocusedRef = useRef(false);
-  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const keyboardOpen = useKeyboardOpen();
+  const isInputFocusedRef = useRef(false);
+
+  // Outside tap/scroll discrimination
+  const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
+  const OUTSIDE_SCROLL_THRESHOLD = 10;
+
+  // ✅ Dropdown item gesture tracking (prevents scroll selecting items)
+  const itemGestureRef = useRef<{
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  }>({ pointerId: null, startX: 0, startY: 0, moved: false });
+
+  const ITEM_TAP_MOVE_THRESHOLD = 12;
 
   const handleInputFocus = () => {
-    // Clear any pending blur timeout
-    if (blurTimeoutRef.current) {
-      clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
-    }
-    recentlyFocusedRef.current = true;
+    isInputFocusedRef.current = true;
     setIsOpen(true);
-    
-    // Re-search if there's already a value
+
     if (value.trim() && isReady) {
       searchPredictions(value);
     }
   };
 
   const handleInputBlur = () => {
-    // Keep recentlyFocused true for 400ms after blur
-    // This protects against iOS race conditions
-    blurTimeoutRef.current = setTimeout(() => {
-      recentlyFocusedRef.current = false;
-    }, 400);
+    // Don't close here—iOS blurs when tapping outside to dismiss keyboard
+    isInputFocusedRef.current = false;
   };
 
-  // Cleanup blur timeout on unmount
+  // ✅ Outside handler: first tap dismisses keyboard, second tap closes dropdown
   useEffect(() => {
-    return () => {
-      if (blurTimeoutRef.current) {
-        clearTimeout(blurTimeoutRef.current);
-      }
-    };
-  }, []);
+    const onPointerDownCapture = (e: PointerEvent) => {
+      if (!containerRef.current) return;
+      const target = e.target as Node;
+      if (containerRef.current.contains(target)) return;
 
-  // Click outside handler with scroll detection
-  useEffect(() => {
-    const handleTouchStartOutside = (event: TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        const touch = event.touches[0];
-        outsideTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      outsideStartRef.current = { x: e.clientX, y: e.clientY };
+
+      if (keyboardOpen || isInputFocusedRef.current) {
+        inputRef.current?.blur();
+        setIsOpen(true);
       }
     };
 
-    const handleTouchEndOutside = (event: TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (outsideTouchStartRef.current) {
-          const touch = event.changedTouches[0];
-          const deltaX = Math.abs(touch.clientX - outsideTouchStartRef.current.x);
-          const deltaY = Math.abs(touch.clientY - outsideTouchStartRef.current.y);
-          
-          outsideTouchStartRef.current = null;
-          
-          // If it was a scroll, don't do anything
-          if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
-            return;
-          }
-          
-          // It was a tap - check if input was recently focused
-          if (recentlyFocusedRef.current) {
-            // First tap after focus - just dismiss keyboard, keep dropdown
-            // The blur event will have already fired or will fire
-            // Reset the protection since this was the "keyboard dismiss" tap
-            recentlyFocusedRef.current = false;
-            if (blurTimeoutRef.current) {
-              clearTimeout(blurTimeoutRef.current);
-              blurTimeoutRef.current = null;
-            }
-            return;
-          }
-          
-          // Not recently focused - close the dropdown
-          setIsOpen(false);
-        }
-      }
-    };
+    const onPointerUpCapture = (e: PointerEvent) => {
+      if (!containerRef.current) return;
+      const target = e.target as Node;
+      if (containerRef.current.contains(target)) return;
 
-    const handleMouseDownOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (recentlyFocusedRef.current) {
-          recentlyFocusedRef.current = false;
-          if (blurTimeoutRef.current) {
-            clearTimeout(blurTimeoutRef.current);
-            blurTimeoutRef.current = null;
-          }
-          return;
-        }
+      const start = outsideStartRef.current;
+      outsideStartRef.current = null;
+      if (!start) return;
+
+      const dx = Math.abs(e.clientX - start.x);
+      const dy = Math.abs(e.clientY - start.y);
+      const isTap = dx < OUTSIDE_SCROLL_THRESHOLD && dy < OUTSIDE_SCROLL_THRESHOLD;
+      if (!isTap) return;
+
+      if (!keyboardOpen && !isInputFocusedRef.current) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleMouseDownOutside);
-    document.addEventListener('touchstart', handleTouchStartOutside);
-    document.addEventListener('touchend', handleTouchEndOutside);
-    
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    document.addEventListener('pointerup', onPointerUpCapture, true);
+
     return () => {
-      document.removeEventListener('mousedown', handleMouseDownOutside);
-      document.removeEventListener('touchstart', handleTouchStartOutside);
-      document.removeEventListener('touchend', handleTouchEndOutside);
+      document.removeEventListener('pointerdown', onPointerDownCapture, true);
+      document.removeEventListener('pointerup', onPointerUpCapture, true);
     };
-  }, []);
+  }, [keyboardOpen]);
 
   // Initialize Google Maps
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    
+
     if (!apiKey) {
       setError('Google Maps API key not configured');
       return;
@@ -191,7 +191,7 @@ export default function AddressAutocomplete({
     }
 
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
-    
+
     if (existingScript) {
       const checkLoaded = setInterval(() => {
         if (window.google?.maps?.places) {
@@ -199,14 +199,14 @@ export default function AddressAutocomplete({
           initServices();
         }
       }, 100);
-      
+
       setTimeout(() => {
         clearInterval(checkLoaded);
         if (!window.google?.maps?.places) {
           setError('Failed to load Google Maps');
         }
       }, 10000);
-      
+
       return () => clearInterval(checkLoaded);
     }
 
@@ -214,11 +214,11 @@ export default function AddressAutocomplete({
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
-    
+
     script.onload = () => {
       setTimeout(initServices, 100);
     };
-    
+
     script.onerror = () => {
       setError('Failed to load Google Maps');
     };
@@ -227,36 +227,35 @@ export default function AddressAutocomplete({
   }, []);
 
   // Search for predictions
-  const searchPredictions = useCallback((input: string) => {
-    if (!autocompleteServiceRef.current || !input.trim()) {
-      setPredictions([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-
-    const newcastleBounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(-33.1, 151.4),
-      new google.maps.LatLng(-32.7, 151.9)
-    );
-
-    const request: google.maps.places.AutocompletionRequest = {
-      input,
-      componentRestrictions: { country: 'au' },
-      types: ['address'],
-      sessionToken: sessionTokenRef.current || undefined,
-    };
-
-    if (biasToNewcastle) {
-      request.bounds = newcastleBounds;
-    }
-
-    autocompleteServiceRef.current.getPlacePredictions(
-      request,
-      (results, status) => {
+  const searchPredictions = useCallback(
+    (input: string) => {
+      if (!autocompleteServiceRef.current || !input.trim()) {
+        setPredictions([]);
         setIsSearching(false);
-        
+        return;
+      }
+
+      setIsSearching(true);
+
+      const newcastleBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(-33.1, 151.4),
+        new google.maps.LatLng(-32.7, 151.9)
+      );
+
+      const request: google.maps.places.AutocompletionRequest = {
+        input,
+        componentRestrictions: { country: 'au' },
+        types: ['address'],
+        sessionToken: sessionTokenRef.current || undefined,
+      };
+
+      if (biasToNewcastle) {
+        request.bounds = newcastleBounds;
+      }
+
+      autocompleteServiceRef.current.getPlacePredictions(request, (results, status) => {
+        setIsSearching(false);
+
         if (status === google.maps.places.PlacesServiceStatus.OK && results) {
           const mapped: Prediction[] = results.map((result) => ({
             placeId: result.place_id,
@@ -267,15 +266,14 @@ export default function AddressAutocomplete({
         } else {
           setPredictions([]);
         }
-      }
-    );
-  }, [biasToNewcastle]);
+      });
+    },
+    [biasToNewcastle]
+  );
 
   // Debounced search
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (value.trim() && isOpen && isReady) {
       debounceRef.current = setTimeout(() => {
@@ -287,75 +285,55 @@ export default function AddressAutocomplete({
     }
 
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [value, isOpen, isReady, searchPredictions]);
 
   // Handle selection
-  const handleSelect = useCallback((prediction: Prediction) => {
-    if (!placesServiceRef.current) return;
+  const handleSelect = useCallback(
+    (prediction: Prediction) => {
+      if (!placesServiceRef.current) return;
 
-    placesServiceRef.current.getDetails(
-      {
-        placeId: prediction.placeId,
-        fields: ['formatted_address', 'geometry', 'place_id', 'address_components'],
-        sessionToken: sessionTokenRef.current || undefined,
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          const address = place.formatted_address || '';
-          onChange(address);
-          setPredictions([]);
-          setIsOpen(false);
-          recentlyFocusedRef.current = false;
-          
-          sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-          
-          if (onSelect) {
-            const components = place.address_components || [];
-            const getComponent = (type: string) => 
-              components.find(c => c.types.includes(type))?.long_name || '';
+      placesServiceRef.current.getDetails(
+        {
+          placeId: prediction.placeId,
+          fields: ['formatted_address', 'geometry', 'place_id', 'address_components'],
+          sessionToken: sessionTokenRef.current || undefined,
+        },
+        (place, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+            const address = place.formatted_address || '';
+            onChange(address);
+            setPredictions([]);
+            setIsOpen(false);
+            isInputFocusedRef.current = false;
 
-            const details: PlaceDetails = {
-              formattedAddress: address,
-              placeId: place.place_id,
-              lat: place.geometry?.location?.lat(),
-              lng: place.geometry?.location?.lng(),
-              streetNumber: getComponent('street_number'),
-              streetName: getComponent('route'),
-              suburb: getComponent('locality'),
-              state: getComponent('administrative_area_level_1'),
-              postcode: getComponent('postal_code'),
-            };
-            onSelect(details);
+            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+
+            if (onSelect) {
+              const components = place.address_components || [];
+              const getComponent = (type: string) =>
+                components.find((c) => c.types.includes(type))?.long_name || '';
+
+              const details: PlaceDetails = {
+                formattedAddress: address,
+                placeId: place.place_id,
+                lat: place.geometry?.location?.lat(),
+                lng: place.geometry?.location?.lng(),
+                streetNumber: getComponent('street_number'),
+                streetName: getComponent('route'),
+                suburb: getComponent('locality'),
+                state: getComponent('administrative_area_level_1'),
+                postcode: getComponent('postal_code'),
+              };
+              onSelect(details);
+            }
           }
         }
-      }
-    );
-  }, [onChange, onSelect]);
-
-  // Touch handlers for dropdown items
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent, prediction: Prediction) => {
-    if (!touchStartRef.current) return;
-    
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-    
-    if (deltaX < SCROLL_THRESHOLD && deltaY < SCROLL_THRESHOLD) {
-      e.preventDefault();
-      handleSelect(prediction);
-    }
-    
-    touchStartRef.current = null;
-  }, [handleSelect]);
+      );
+    },
+    [onChange, onSelect]
+  );
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -363,21 +341,18 @@ export default function AddressAutocomplete({
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex((prev) => 
-        prev < predictions.length - 1 ? prev + 1 : 0
-      );
+      setHighlightedIndex((prev) => (prev < predictions.length - 1 ? prev + 1 : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlightedIndex((prev) => 
-        prev > 0 ? prev - 1 : predictions.length - 1
-      );
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : predictions.length - 1));
     } else if (e.key === 'Enter' && highlightedIndex >= 0) {
       e.preventDefault();
       handleSelect(predictions[highlightedIndex]);
     } else if (e.key === 'Escape') {
       setPredictions([]);
       setIsOpen(false);
-      recentlyFocusedRef.current = false;
+      isInputFocusedRef.current = false;
+      inputRef.current?.blur();
     }
   };
 
@@ -386,10 +361,8 @@ export default function AddressAutocomplete({
     setPredictions([]);
     setIsSearching(false);
     setIsOpen(false);
-    recentlyFocusedRef.current = false;
-    if (onSelect) {
-      onSelect({ formattedAddress: '' });
-    }
+    isInputFocusedRef.current = false;
+    if (onSelect) onSelect({ formattedAddress: '' });
     inputRef.current?.focus();
   };
 
@@ -406,7 +379,7 @@ export default function AddressAutocomplete({
             <MapPin className={`h-4 w-4 ${isOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
           )}
         </div>
-        
+
         <input
           ref={inputRef}
           type="text"
@@ -432,13 +405,46 @@ export default function AddressAutocomplete({
 
         {showDropdown && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-            <ul className="py-1">
+            <ul className="py-1 touch-pan-y">
               {predictions.map((prediction, index) => (
                 <li
                   key={prediction.placeId}
-                  onClick={() => handleSelect(prediction)}
-                  onTouchStart={handleTouchStart}
-                  onTouchEnd={(e) => handleTouchEnd(e, prediction)}
+                  onPointerDown={(e) => {
+                    // track gesture; don't select yet
+                    if (e.pointerType === 'mouse') return;
+                    itemGestureRef.current = {
+                      pointerId: e.pointerId,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      moved: false,
+                    };
+                  }}
+                  onPointerMove={(e) => {
+                    const g = itemGestureRef.current;
+                    if (g.pointerId !== e.pointerId) return;
+
+                    const dx = Math.abs(e.clientX - g.startX);
+                    const dy = Math.abs(e.clientY - g.startY);
+
+                    if (dx > ITEM_TAP_MOVE_THRESHOLD || dy > ITEM_TAP_MOVE_THRESHOLD) {
+                      g.moved = true;
+                    }
+                  }}
+                  onPointerUp={(e) => {
+                    const g = itemGestureRef.current;
+                    if (g.pointerId !== e.pointerId) return;
+
+                    itemGestureRef.current.pointerId = null;
+
+                    // If user scrolled, do not select
+                    if (g.moved) return;
+
+                    handleSelect(prediction);
+                  }}
+                  onClick={(e) => {
+                    // prevent ghost click on iOS after touch
+                    e.preventDefault();
+                  }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
                     highlightedIndex === index ? 'bg-emerald-50' : 'hover:bg-slate-50'
@@ -446,12 +452,8 @@ export default function AddressAutocomplete({
                 >
                   <MapPin className="h-5 w-5 flex-shrink-0 text-emerald-500" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">
-                      {prediction.mainText}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {prediction.secondaryText}
-                    </p>
+                    <p className="truncate text-sm font-medium text-slate-900">{prediction.mainText}</p>
+                    <p className="truncate text-xs text-slate-500">{prediction.secondaryText}</p>
                   </div>
                 </li>
               ))}
@@ -463,9 +465,7 @@ export default function AddressAutocomplete({
         )}
       </div>
 
-      {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
-      )}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
