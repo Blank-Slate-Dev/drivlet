@@ -14,6 +14,7 @@ import {
   Home,
   Loader2,
   Users,
+  Building2,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -137,6 +138,17 @@ export default function AdminLayout({
             >
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users</span>
+            </Link>
+            <Link
+              href="/admin/garages"
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                isActive("/admin/garages")
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Partners</span>
             </Link>
             <div className="mx-2 h-6 w-px bg-white/20" />
             <Link

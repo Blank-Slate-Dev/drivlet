@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
       hasExistingBooking,
       garageName,
       existingBookingRef,
+      transmissionType,
+      isManualTransmission,
     } = body;
 
     // Validate required fields
@@ -58,6 +60,8 @@ export async function POST(request: NextRequest) {
         hasExistingBooking: hasExistingBooking ? 'true' : 'false',
         garageName: garageName || '',
         existingBookingRef: existingBookingRef || '',
+        transmissionType: transmissionType || 'automatic',
+        isManualTransmission: isManualTransmission ? 'true' : 'false',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}`,

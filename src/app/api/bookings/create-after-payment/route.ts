@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
 
       // Create new booking
       const hasExisting = metadata.hasExistingBooking === 'true';
+      const isManual = metadata.isManualTransmission === 'true';
+      const transmissionType = metadata.transmissionType || 'automatic';
+
+      // Build flags array
+      const flags = [];
+      if (isManual) {
+        flags.push({
+          type: 'manual_transmission',
+          reason: 'Customer selected manual transmission - requires manual-capable driver',
+          createdAt: new Date(),
+        });
+      }
+
       const booking = {
         userId: null,
         userName: metadata.customerName,
@@ -89,6 +102,9 @@ export async function POST(request: NextRequest) {
         garageName: metadata.garageName || null,
         existingBookingRef: metadata.existingBookingRef || null,
         existingBookingNotes: null,
+        transmissionType,
+        isManualTransmission: isManual,
+        flags,
         paymentStatus: 'paid',
         paymentId: paymentIntentId,
         paymentAmount: paymentIntent.amount,

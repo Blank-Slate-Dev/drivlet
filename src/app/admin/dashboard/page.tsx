@@ -20,6 +20,7 @@ import {
   UserPlus,
   XCircle,
   CreditCard,
+  Building2,
 } from "lucide-react";
 
 interface Stats {
@@ -48,6 +49,7 @@ interface Stats {
     currentStage: string;
     status: string;
     isGuest: boolean;
+    isManualTransmission?: boolean;
     paymentStatus: string;
     createdAt: string;
   }>;
@@ -374,7 +376,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Quick Links */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Link
             href="/admin/bookings"
             className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
@@ -421,6 +423,22 @@ export default function AdminDashboardPage() {
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
+          </Link>
+
+          <Link
+            href="/admin/garages"
+            className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-purple-300 hover:shadow-md"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100">
+                <Building2 className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Partner Applications</p>
+                <p className="text-sm text-slate-500">Review garage submissions</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-purple-600" />
           </Link>
         </div>
 
@@ -477,9 +495,16 @@ export default function AdminDashboardPage() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-900">
-                          {booking.vehicleRegistration}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-900">
+                            {booking.vehicleRegistration}
+                          </p>
+                          {booking.isManualTransmission && (
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700" title="Manual transmission">
+                              M
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500">
                           {booking.vehicleState}
                         </p>

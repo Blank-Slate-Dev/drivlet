@@ -10,6 +10,12 @@ export interface IUpdate {
   updatedBy: string;
 }
 
+export interface IFlag {
+  type: 'manual_transmission' | 'high_value_vehicle' | 'other';
+  reason: string;
+  createdAt: Date;
+}
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -40,6 +46,13 @@ export interface IBooking extends Document {
   paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
   stripeSessionId?: string;
 
+  // Vehicle details
+  transmissionType: 'automatic' | 'manual';
+  isManualTransmission: boolean;
+
+  // Flags for special attention
+  flags: IFlag[];
+
   // Progress tracking
   currentStage: string;
   overallProgress: number;
@@ -68,6 +81,25 @@ const UpdateSchema = new Schema<IUpdate>(
     updatedBy: {
       type: String,
       default: "",
+    },
+  },
+  { _id: false }
+);
+
+const FlagSchema = new Schema<IFlag>(
+  {
+    type: {
+      type: String,
+      enum: ['manual_transmission', 'high_value_vehicle', 'other'],
+      required: true,
+    },
+    reason: {
+      type: String,
+      required: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   { _id: false }
@@ -165,6 +197,23 @@ const BookingSchema = new Schema<IBooking>(
     stripeSessionId: {
       type: String,
       required: false,
+    },
+
+    // Vehicle details
+    transmissionType: {
+      type: String,
+      enum: ['automatic', 'manual'],
+      default: 'automatic',
+    },
+    isManualTransmission: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Flags for special attention
+    flags: {
+      type: [FlagSchema],
+      default: [],
     },
 
     // Progress tracking

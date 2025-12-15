@@ -66,6 +66,8 @@ interface Booking {
   paymentStatus?: string;
   paymentId?: string;
   paymentAmount?: number;
+  transmissionType?: 'automatic' | 'manual';
+  isManualTransmission?: boolean;
   currentStage: string;
   overallProgress: number;
   status: string;
@@ -431,9 +433,16 @@ export default function AdminBookingsPage() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-medium text-slate-900">
-                          {booking.vehicleRegistration}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900">
+                            {booking.vehicleRegistration}
+                          </p>
+                          {booking.isManualTransmission && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title="Manual transmission - requires manual-capable driver">
+                              Manual
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500">
                           {booking.vehicleState}
                         </p>
@@ -698,8 +707,13 @@ function ViewDetailsModal({
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Car className="h-4 w-4 text-emerald-600" />
               Vehicle
+              {booking.isManualTransmission && (
+                <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                  Manual Transmission
+                </span>
+              )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-4">
+            <div className="mt-3 grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-slate-500">Registration</p>
                 <p className="font-medium text-slate-900">
@@ -710,6 +724,12 @@ function ViewDetailsModal({
                 <p className="text-xs text-slate-500">State</p>
                 <p className="font-medium text-slate-900">
                   {booking.vehicleState}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Transmission</p>
+                <p className={`font-medium ${booking.isManualTransmission ? 'text-amber-600' : 'text-slate-900'}`}>
+                  {booking.transmissionType === 'manual' ? 'Manual' : 'Automatic'}
                 </p>
               </div>
             </div>

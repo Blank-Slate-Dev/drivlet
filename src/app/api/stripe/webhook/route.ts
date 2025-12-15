@@ -82,6 +82,19 @@ export async function POST(request: NextRequest) {
         }
 
         const hasExisting = metadata.hasExistingBooking === 'true';
+        const isManual = metadata.isManualTransmission === 'true';
+        const transmissionType = metadata.transmissionType || 'automatic';
+
+        // Build flags array
+        const flags = [];
+        if (isManual) {
+          flags.push({
+            type: 'manual_transmission',
+            reason: 'Customer selected manual transmission - requires manual-capable driver',
+            createdAt: new Date(),
+          });
+        }
+
         const booking = {
           userId: null, // Guest booking
           userName: metadata.customerName,
@@ -100,6 +113,9 @@ export async function POST(request: NextRequest) {
           garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
           existingBookingNotes: null,
+          transmissionType,
+          isManualTransmission: isManual,
+          flags,
           paymentStatus: 'paid',
           paymentId: paymentIntent.id,
           paymentAmount: paymentIntent.amount,
@@ -182,6 +198,19 @@ export async function POST(request: NextRequest) {
         }
 
         const hasExistingSession = metadata.hasExistingBooking === 'true';
+        const isManualSession = metadata.isManualTransmission === 'true';
+        const transmissionTypeSession = metadata.transmissionType || 'automatic';
+
+        // Build flags array
+        const flagsSession = [];
+        if (isManualSession) {
+          flagsSession.push({
+            type: 'manual_transmission',
+            reason: 'Customer selected manual transmission - requires manual-capable driver',
+            createdAt: new Date(),
+          });
+        }
+
         const booking = {
           userId: null, // Guest booking
           userName: metadata.customerName,
@@ -200,6 +229,9 @@ export async function POST(request: NextRequest) {
           garageName: metadata.garageName || null,
           existingBookingRef: metadata.existingBookingRef || null,
           existingBookingNotes: null,
+          transmissionType: transmissionTypeSession,
+          isManualTransmission: isManualSession,
+          flags: flagsSession,
           paymentStatus: 'paid',
           paymentId: session.payment_intent as string,
           paymentAmount: session.amount_total,

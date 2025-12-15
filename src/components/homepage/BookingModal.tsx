@@ -100,6 +100,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [garageBookingTime, setGarageBookingTime] = useState('09:00');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
+  // Vehicle valuation and transmission
+  const [isHighValueVehicle, setIsHighValueVehicle] = useState(false);
+  const [transmissionType, setTransmissionType] = useState<'automatic' | 'manual'>('automatic');
+
   // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
@@ -263,6 +267,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setClientSecret(null);
         setPaymentIntentId(null);
         setIsProcessing(false);
+        setIsHighValueVehicle(false);
+        setTransmissionType('automatic');
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -282,6 +288,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   };
 
   const validateDetailsStep = (): string | null => {
+    // Block high-value vehicles
+    if (isHighValueVehicle) {
+      return 'Vehicles valued at $100,000 or more cannot be booked at this time.';
+    }
+
     // Guest info validation
     if (!isAuthenticated) {
       if (!guestName.trim()) {
@@ -355,6 +366,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           garageAddress: garageAddress.trim(),
           garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions),
           additionalNotes: additionalNotes.trim(),
+          transmissionType,
+          isManualTransmission: transmissionType === 'manual',
         }),
       });
 
@@ -682,6 +695,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </span>
                           <RegistrationPlate plate={regoPlate} state={regoState} />
                         </div>
+                        <div className="mt-2 flex justify-between border-t border-slate-200 pt-2">
+                          <span className="text-sm text-slate-500">Transmission</span>
+                          <span className={`text-sm font-medium ${transmissionType === 'manual' ? 'text-amber-600' : 'text-slate-900'}`}>
+                            {transmissionType === 'manual' ? 'Manual' : 'Automatic'}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Times */}
@@ -786,12 +805,35 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       </div>
                     </div>
 
-                    {submitError && (
+                    {submitError && !isHighValueVehicle && (
                       <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
                         <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
                         <p className="text-sm font-medium text-red-800">{submitError}</p>
                       </div>
                     )}
+
+                    {/* High Value Vehicle Checkbox - At the very top */}
+                    <div className={`rounded-xl border p-4 mb-6 ${isHighValueVehicle ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isHighValueVehicle}
+                          onChange={(e) => setIsHighValueVehicle(e.target.checked)}
+                          disabled={isProcessing}
+                          className={`mt-1 h-5 w-5 rounded border-2 cursor-pointer ${isHighValueVehicle ? 'border-red-500 accent-red-500' : 'border-slate-300 accent-emerald-600'}`}
+                        />
+                        <div>
+                          <span className={`text-sm font-medium ${isHighValueVehicle ? 'text-red-700' : 'text-slate-700'}`}>
+                            My vehicle has a market valuation of $100,000 or more
+                          </span>
+                          {isHighValueVehicle && (
+                            <p className="mt-2 text-sm text-red-600">
+                              Unfortunately, for insurance reasons, Drivlet is currently unable to service vehicles with a market valuation of $100,000 or more. We&apos;re working to expand our coverage in the future. Please contact us if you have any questions.
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    </div>
 
                     <form
                       className="space-y-5"
@@ -800,6 +842,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         handleContinueToReview();
                       }}
                     >
+                      {/* Form content wrapped for conditional styling */}
+                      <div className={isHighValueVehicle ? 'opacity-50 pointer-events-none' : ''}>
                       {/* Guest Checkout Fields */}
                       {!isAuthenticated && (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -964,6 +1008,39 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         <div className="mt-5 flex justify-center">
                           <RegistrationPlate plate={regoPlate} state={regoState} />
                         </div>
+
+                        {/* Transmission Type */}
+                        <div className="mt-5 space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">
+                            Transmission Type *
+                          </label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="transmission"
+                                value="automatic"
+                                checked={transmissionType === 'automatic'}
+                                onChange={() => setTransmissionType('automatic')}
+                                disabled={isProcessing}
+                                className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                              />
+                              <span className="text-sm text-slate-700">Automatic</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="transmission"
+                                value="manual"
+                                checked={transmissionType === 'manual'}
+                                onChange={() => setTransmissionType('manual')}
+                                disabled={isProcessing}
+                                className="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                              />
+                              <span className="text-sm text-slate-700">Manual</span>
+                            </label>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Garage Booking Section */}
@@ -1013,11 +1090,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         </div>
                       </div>
 
+                      </div>
+                      {/* End of greyed-out wrapper */}
+
                       {/* Submit */}
                       <button
                         type="submit"
-                        disabled={isProcessing}
-                        className="mt-2 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
+                        disabled={isProcessing || isHighValueVehicle}
+                        className="mt-2 w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span className="inline-flex items-center gap-2">
                           Continue to Review
