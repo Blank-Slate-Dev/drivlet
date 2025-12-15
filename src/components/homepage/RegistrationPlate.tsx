@@ -17,35 +17,37 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
 
   return (
     <div 
-      className="relative flex h-[52px] w-[220px] overflow-hidden rounded-[4px]"
+      className="relative flex h-[70px] w-[280px] overflow-hidden rounded-lg"
       style={{
         // Outer chrome/silver border with gradient to simulate light reflection
-        background: 'linear-gradient(180deg, #e8e8e8 0%, #ffffff 15%, #d0d0d0 50%, #a8a8a8 85%, #c0c0c0 100%)',
-        padding: '3px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.5)',
+        background: 'linear-gradient(180deg, #f0f0f0 0%, #ffffff 20%, #d8d8d8 50%, #b0b0b0 80%, #c8c8c8 100%)',
+        padding: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.1)',
       }}
     >
       {/* Inner plate - black with subtle gradient for depth */}
       <div 
-        className="relative flex h-full w-full items-center overflow-hidden rounded-[2px]"
+        className="relative flex h-full w-full items-center overflow-hidden rounded-md"
         style={{
-          background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 30%, #0f0f0f 70%, #1a1a1a 100%)',
-          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5), inset 0 -1px 2px rgba(255,255,255,0.05)',
+          background: 'linear-gradient(180deg, #1f1f1f 0%, #151515 40%, #0d0d0d 60%, #151515 100%)',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
         }}
       >
         {/* Subtle light reflection overlay on plate */}
         <div 
           className="pointer-events-none absolute inset-0"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.03) 100%)',
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 35%)',
           }}
         />
         
         {/* State letters - vertical on left side */}
         <div 
-          className="flex flex-col items-center justify-center px-2"
+          className="flex flex-col items-center justify-center"
           style={{
-            minWidth: '28px',
+            minWidth: '36px',
+            paddingLeft: '8px',
+            paddingRight: '4px',
           }}
         >
           {stateLetters.map((letter, index) => (
@@ -53,13 +55,12 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
               key={index}
               className="leading-none"
               style={{
-                fontFamily: '"Arial Black", "Helvetica Neue", Arial, sans-serif',
-                fontSize: '11px',
-                fontWeight: 900,
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontSize: '13px',
+                fontWeight: 700,
                 color: '#ffffff',
-                textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 0 1px rgba(255,255,255,0.3)',
-                letterSpacing: '0.5px',
-                lineHeight: '1.1',
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                lineHeight: '1.2',
               }}
             >
               {letter}
@@ -67,39 +68,16 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
           ))}
         </div>
         
-        {/* Vertical separator line */}
-        <div 
-          className="h-[70%] w-[1px] opacity-30"
-          style={{
-            background: 'linear-gradient(180deg, transparent 0%, #666 20%, #888 50%, #666 80%, transparent 100%)',
-          }}
-        />
-        
         {/* Plate number - main text */}
-        <div className="flex flex-1 items-center justify-center px-3">
+        <div className="flex flex-1 items-center justify-center pr-4">
           <span
             style={{
-              fontFamily: '"Arial Black", "Helvetica Neue", Arial, sans-serif',
-              fontSize: '28px',
-              fontWeight: 900,
+              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontSize: '32px',
+              fontWeight: 700,
               color: '#ffffff',
-              letterSpacing: '3px',
-              textShadow: `
-                0 1px 0 #cccccc,
-                0 2px 0 #c9c9c9,
-                0 3px 0 #bbb,
-                0 4px 0 #b9b9b9,
-                0 5px 1px rgba(0,0,0,.1),
-                0 0 5px rgba(0,0,0,.1),
-                0 1px 3px rgba(0,0,0,.3),
-                0 3px 5px rgba(0,0,0,.2),
-                0 5px 10px rgba(0,0,0,.25),
-                0 10px 10px rgba(0,0,0,.2),
-                0 20px 20px rgba(0,0,0,.15),
-                0 0 2px rgba(255,255,255,0.4)
-              `,
-              // Chrome/3D effect
-              WebkitTextStroke: '0.5px rgba(200,200,200,0.3)',
+              letterSpacing: '4px',
+              textShadow: '0 1px 2px rgba(0,0,0,0.4)',
             }}
           >
             {formattedPlate || '------'}
