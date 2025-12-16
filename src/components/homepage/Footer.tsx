@@ -88,7 +88,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Terms */}
+          {/* Terms & Partner Links */}
           <div>
             <h4 className="mb-4 font-semibold">Terms</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
@@ -103,24 +103,47 @@ export default function Footer() {
                 </a>
               </li>
             </ul>
+
             {!session && (
-              <div className="mt-6">
-                <h4 className="mb-2 font-semibold">For Garages</h4>
-                <div className="space-y-2">
-                  <a
-                    href="/garage/login"
-                    className="block text-sm text-emerald-200 transition hover:text-white"
-                  >
-                    Garage Login →
-                  </a>
-                  <a
-                    href="/garage/register"
-                    className="block text-sm text-emerald-200 transition hover:text-white"
-                  >
-                    Garage Sign Up →
-                  </a>
+              <>
+                {/* Garage Links */}
+                <div className="mt-6">
+                  <h4 className="mb-2 font-semibold">For Garages</h4>
+                  <div className="space-y-2">
+                    <a
+                      href="/garage/login"
+                      className="block text-sm text-emerald-200 transition hover:text-white"
+                    >
+                      Garage Login →
+                    </a>
+                    <a
+                      href="/garage/register"
+                      className="block text-sm text-emerald-200 transition hover:text-white"
+                    >
+                      Garage Sign Up →
+                    </a>
+                  </div>
                 </div>
-              </div>
+
+                {/* Driver Links */}
+                <div className="mt-6">
+                  <h4 className="mb-2 font-semibold">For Drivers</h4>
+                  <div className="space-y-2">
+                    <a
+                      href="/driver/login"
+                      className="block text-sm text-emerald-200 transition hover:text-white"
+                    >
+                      Driver Login →
+                    </a>
+                    <a
+                      href="/driver/register"
+                      className="block text-sm text-emerald-200 transition hover:text-white"
+                    >
+                      Become a Driver →
+                    </a>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
