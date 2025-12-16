@@ -5,7 +5,18 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, User, LogOut, ChevronDown, Settings, Shield, ClipboardList, Menu, X } from "lucide-react";
+import {
+  ArrowRight,
+  User,
+  LogOut,
+  ChevronDown,
+  Settings,
+  Shield,
+  ClipboardList,
+  Menu,
+  X,
+  MapPin,
+} from "lucide-react";
 
 interface HeaderProps {
   onBookingClick: () => void;
@@ -30,13 +41,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-            <Image
-              src="/logo.png"
-              alt="drivlet"
-              fill
-              className="object-contain"
-              priority
-            />
+            <Image src="/logo.png" alt="drivlet" fill className="object-contain" priority />
           </div>
         </Link>
 
@@ -58,6 +63,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
 
         {/* Desktop CTA + Auth */}
         <div className="hidden items-center gap-3 md:flex">
+          <Link
+            href="/track"
+            className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600"
+          >
+            <MapPin className="h-4 w-4" />
+            Track my service
+          </Link>
+
           <button
             type="button"
             onClick={onBookingClick}
@@ -81,16 +94,15 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 </div>
                 <span className="max-w-[100px] truncate">{displayName}</span>
                 <ChevronDown
-                  className={`h-4 w-4 text-slate-400 transition-transform ${showUserMenu ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 text-slate-400 transition-transform ${
+                    showUserMenu ? "rotate-180" : ""
+                  }`}
                 />
               </button>
 
               {showUserMenu && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowUserMenu(false)}
-                  />
+                  <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
                   <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-2 shadow-lg">
                     <div className="border-b border-slate-100 px-4 py-2">
                       <p className="text-sm font-medium text-slate-900">{displayName}</p>
@@ -132,6 +144,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                       <User className="h-4 w-4" />
                       My Dashboard
                     </Link>
+
                     <Link
                       href="/account"
                       className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -140,6 +153,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                       <Settings className="h-4 w-4" />
                       Account Settings
                     </Link>
+
                     <button
                       type="button"
                       onClick={handleSignOut}
@@ -184,15 +198,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 {avatarLetter}
               </div>
               <ChevronDown
-                className={`h-4 w-4 text-slate-400 transition-transform ${showUserMenu ? "rotate-180" : ""}`}
+                className={`h-4 w-4 text-slate-400 transition-transform ${
+                  showUserMenu ? "rotate-180" : ""
+                }`}
               />
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                className="px-3 py-2 text-sm font-medium text-slate-700"
-              >
+              <Link href="/login" className="px-3 py-2 text-sm font-medium text-slate-700">
                 Login
               </Link>
               <Link
@@ -259,6 +272,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 <User className="h-4 w-4" />
                 My Dashboard
               </Link>
+
               <Link
                 href="/account"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -267,6 +281,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 <Settings className="h-4 w-4" />
                 Account Settings
               </Link>
+
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -292,6 +307,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   How it works
                 </a>
+
                 <a
                   href="#services"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -299,6 +315,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   Our services
                 </a>
+
                 <a
                   href="#pricing"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -306,6 +323,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   Pricing
                 </a>
+
                 <a
                   href="#faq"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -313,7 +331,17 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   FAQ
                 </a>
-                <div className="pt-2">
+
+                <div className="space-y-2 pt-2">
+                  <Link
+                    href="/track"
+                    className="flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Track my service
+                  </Link>
+
                   <button
                     type="button"
                     onClick={() => {

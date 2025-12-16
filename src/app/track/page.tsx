@@ -172,7 +172,7 @@ function TrackingContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
       {/* Header */}
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
           <div className="relative h-12 w-40 sm:h-14 sm:w-48">
             <Image
