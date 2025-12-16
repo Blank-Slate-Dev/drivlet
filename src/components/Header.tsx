@@ -46,7 +46,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
+        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
           <a href="#how-it-works" className="transition hover:text-emerald-600">
             How it works
           </a>
@@ -59,27 +59,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
           <a href="#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
+          <Link href="/track" className="flex items-center gap-1.5 transition hover:text-emerald-600">
+            <MapPin className="h-4 w-4" />
+            Track my service
+          </Link>
         </nav>
 
         {/* Desktop CTA + Auth */}
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/track"
-            className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600"
-          >
-            <MapPin className="h-4 w-4" />
-            Track my service
-          </Link>
-
-          <button
-            type="button"
-            onClick={onBookingClick}
-            className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
-          >
-            Book a service
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </button>
-
           {status === "loading" ? (
             <div className="h-9 w-20 animate-pulse rounded-lg bg-slate-100" />
           ) : session?.user ? (
@@ -167,7 +154,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <>
               <Link
                 href="/login"
                 className="px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
@@ -176,15 +163,24 @@ export default function Header({ onBookingClick }: HeaderProps) {
               </Link>
               <Link
                 href="/register"
-                className="rounded-full border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-600 transition hover:bg-emerald-50"
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Sign up
               </Link>
-            </div>
+            </>
           )}
+
+          <button
+            type="button"
+            onClick={onBookingClick}
+            className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+          >
+            Book a service
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
         </div>
 
-        {/* Mobile: Auth buttons or user menu + hamburger */}
+        {/* Mobile: user menu + hamburger */}
         <div className="flex items-center gap-2 md:hidden">
           {status === "loading" ? (
             <div className="h-9 w-16 animate-pulse rounded-lg bg-slate-100" />
@@ -203,21 +199,8 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 }`}
               />
             </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/login" className="px-3 py-2 text-sm font-medium text-slate-700">
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white"
-              >
-                Sign up
-              </Link>
-            </div>
-          )}
+          ) : null}
 
-          {/* Mobile menu button */}
           <button
             type="button"
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -332,16 +315,35 @@ export default function Header({ onBookingClick }: HeaderProps) {
                   FAQ
                 </a>
 
-                <div className="space-y-2 pt-2">
-                  <Link
-                    href="/track"
-                    className="flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    <MapPin className="h-4 w-4" />
-                    Track my service
-                  </Link>
+                <Link
+                  href="/track"
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Track my service
+                </Link>
 
+                {!session?.user && (
+                  <div className="mt-2 border-t border-slate-100 pt-3">
+                    <Link
+                      href="/login"
+                      className="block rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      onClick={() => setShowMobileMenu(false)}
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="block rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      onClick={() => setShowMobileMenu(false)}
+                    >
+                      Sign up
+                    </Link>
+                  </div>
+                )}
+
+                <div className="pt-3">
                   <button
                     type="button"
                     onClick={() => {
