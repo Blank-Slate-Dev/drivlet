@@ -6,7 +6,11 @@ import { MapPin } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
 export default function Footer() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  // Don't show garage/driver links if user is logged in OR if we're still loading
+  // This prevents the flash of content while session is being determined
+  const showPartnerLinks = status === 'unauthenticated';
 
   return (
     <footer className="bg-emerald-900 text-white">
@@ -104,7 +108,7 @@ export default function Footer() {
               </li>
             </ul>
 
-            {!session && (
+            {showPartnerLinks && (
               <>
                 {/* Garage Links */}
                 <div className="mt-6">
