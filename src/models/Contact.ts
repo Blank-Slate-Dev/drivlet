@@ -1,7 +1,7 @@
 // src/models/Contact.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type ContactStatus = "new" | "read" | "responded";
+export type ContactStatus = "new" | "in-progress" | "resolved";
 
 export interface IContact extends Document {
   name: string;
@@ -9,6 +9,8 @@ export interface IContact extends Document {
   phone?: string;
   message: string;
   status: ContactStatus;
+  adminNotes?: string;
+  resolvedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,8 +42,16 @@ const ContactSchema = new Schema<IContact>(
     },
     status: {
       type: String,
-      enum: ["new", "read", "responded"],
+      enum: ["new", "in-progress", "resolved"],
       default: "new",
+    },
+    adminNotes: {
+      type: String,
+      trim: true,
+      maxlength: [2000, "Admin notes cannot exceed 2000 characters"],
+    },
+    resolvedAt: {
+      type: Date,
     },
   },
   {

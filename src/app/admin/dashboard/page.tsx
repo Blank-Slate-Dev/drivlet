@@ -21,6 +21,7 @@ import {
   XCircle,
   CreditCard,
   Building2,
+  MessageSquare,
 } from "lucide-react";
 
 interface Stats {
@@ -376,7 +377,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Quick Links */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <Link
             href="/admin/bookings"
             className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
@@ -439,6 +440,22 @@ export default function AdminDashboardPage() {
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-purple-600" />
+          </Link>
+
+          <Link
+            href="/admin/inquiries"
+            className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-cyan-300 hover:shadow-md"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-100">
+                <MessageSquare className="h-6 w-6 text-cyan-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Customer Inquiries</p>
+                <p className="text-sm text-slate-500">View contact submissions</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-cyan-600" />
           </Link>
         </div>
 
