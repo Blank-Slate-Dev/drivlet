@@ -123,6 +123,11 @@ function TrackingContent() {
     handleSearch();
   };
 
+  const clearBooking = () => {
+    setBooking(null);
+    setHasSearched(false);
+  };
+
   const getStageIndex = (stageId: string) => {
     return STAGES.findIndex((s) => s.id === stageId);
   };
@@ -190,81 +195,80 @@ function TrackingContent() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Search Form */}
-        <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-6 shadow-2xl sm:p-8">
-          <div className="text-center mb-6">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-              <Search className="h-8 w-8 text-emerald-600" />
-            </div>
-            <h1 className="mt-4 text-2xl font-bold text-slate-900">
-              Track Your Booking
-            </h1>
-            <p className="mt-2 text-slate-600">
-              Enter your email and vehicle registration to see your booking status
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Vehicle Registration
-              </label>
-              <input
-                type="text"
-                value={registration}
-                onChange={(e) => setRegistration(e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                maxLength={7}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm uppercase tracking-wider text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-full bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching...
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  <Search className="h-4 w-4" />
-                  Track Booking
-                </span>
-              )}
-            </button>
-          </form>
-
-          {error && hasSearched && (
-            <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-800">{error}</p>
-                <p className="mt-1 text-xs text-red-600">
-                  Make sure you&apos;re using the email address and registration number from your booking.
-                </p>
+        {/* Search Form - Only show when no booking */}
+        {!booking && (
+          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-6 shadow-2xl sm:p-8">
+            <div className="text-center mb-6">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                <Search className="h-8 w-8 text-emerald-600" />
               </div>
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">
+                Track Your Booking
+              </h1>
             </div>
-          )}
-        </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Vehicle Registration
+                </label>
+                <input
+                  type="text"
+                  value={registration}
+                  onChange={(e) => setRegistration(e.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  maxLength={7}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm uppercase tracking-wider text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-full bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Track Booking
+                  </span>
+                )}
+              </button>
+            </form>
+
+            {error && hasSearched && (
+              <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-red-800">{error}</p>
+                  <p className="mt-1 text-xs text-red-600">
+                    Make sure you&apos;re using the email address and registration number from your booking.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Booking Status */}
         {booking && (
-          <div className="mt-6 space-y-4">
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Status Card */}
             <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-6 shadow-2xl sm:p-8">
               <div className="flex items-center justify-between mb-6">
@@ -388,15 +392,24 @@ function TrackingContent() {
                 )}
               </div>
 
-              {/* Refresh Button */}
-              <button
-                onClick={() => handleSearch()}
-                disabled={loading}
-                className="mt-6 w-full rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw className={`inline-block h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                Refresh Status
-              </button>
+              {/* Action Buttons */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => handleSearch()}
+                  disabled={loading}
+                  className="flex-1 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <RefreshCw className={`inline-block h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                  Refresh Status
+                </button>
+                <button
+                  onClick={clearBooking}
+                  className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Search className="inline-block h-4 w-4 mr-2" />
+                  New Search
+                </button>
+              </div>
             </div>
 
             {/* Updates Timeline */}
