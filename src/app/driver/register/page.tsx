@@ -117,25 +117,28 @@ export default function DriverRegisterPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* Header */}
+      {/* Header - matching login page style */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/">
-            <div className="relative h-10 w-32 sm:h-12 sm:w-40">
-              <Image src="/logo.png" alt="drivlet" fill className="object-contain" priority />
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+              <Image
+                src="/logo.png"
+                alt="drivlet"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-slate-600">
-              <Car className="h-4 w-4" />
-              <span className="text-sm font-medium">Driver Registration</span>
-            </div>
-            <Link href="/driver/login" className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition">Sign in</Link>
+          <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20">
+            <Car className="h-5 w-5 text-emerald-300" />
+            <span className="text-sm font-medium text-white">Driver Portal</span>
           </div>
         </div>
       </header>
 
-      {/* Benefits Banner - Emerald/Teal gradient matching garage */}
+      {/* Benefits Banner */}
       <div className="bg-gradient-to-r from-emerald-700 to-teal-700 py-6">
         <div className="mx-auto max-w-4xl px-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
