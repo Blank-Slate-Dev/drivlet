@@ -141,7 +141,7 @@ export default function GarageRegisterPage() {
           </Link>
           <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20">
             <Building2 className="h-5 w-5 text-emerald-300" />
-            <span className="text-sm font-medium text-white">Garage Portal</span>
+            <span className="text-sm font-medium text-[#082340]">Garage Portal</span>
           </div>
         </div>
       </header>
