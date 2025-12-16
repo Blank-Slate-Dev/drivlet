@@ -133,7 +133,7 @@ export default function DriverRegisterPage() {
           </Link>
           <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20">
             <Car className="h-5 w-5 text-emerald-300" />
-            <span className="text-sm font-medium text-white">Driver Portal</span>
+            <span className="text-sm font-medium text-[#082340]">Driver Portal</span>
           </div>
         </div>
       </header>
