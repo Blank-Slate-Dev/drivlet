@@ -4,13 +4,14 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Booking from "@/models/Booking";
 import { requireAdmin } from "@/lib/admin";
+import type { UserRole } from "@/models/User";
 
 interface CombinedUser {
   _id: string;
   username?: string;
   email?: string;
   name?: string;
-  role: "user" | "admin" | "guest" | "garage";
+  role: UserRole | "guest";
   bookingCount: number;
   isGuest: boolean;
   phone?: string;

@@ -32,6 +32,32 @@ export default withAuth(
       }
     }
 
+    // Driver dashboard routes require driver role and approval
+    if (
+      pathname.startsWith("/driver/dashboard") ||
+      pathname.startsWith("/driver/jobs") ||
+      pathname.startsWith("/driver/earnings") ||
+      pathname.startsWith("/driver/settings")
+    ) {
+      if (token?.role !== "driver") {
+        return NextResponse.redirect(new URL("/driver/login", req.url));
+      }
+      if (!token?.isApproved) {
+        return NextResponse.redirect(new URL("/driver/pending", req.url));
+      }
+    }
+
+    // Driver pending page - allow driver users who are not approved
+    if (pathname === "/driver/pending") {
+      if (token?.role !== "driver") {
+        return NextResponse.redirect(new URL("/driver/login", req.url));
+      }
+      // If approved, redirect to dashboard
+      if (token?.isApproved) {
+        return NextResponse.redirect(new URL("/driver/dashboard", req.url));
+      }
+    }
+
     // Admin routes require admin role
     if (pathname.startsWith("/admin")) {
       if (token?.role !== "admin") {
@@ -51,6 +77,11 @@ export default withAuth(
           return true;
         }
 
+        // Public driver routes - allow without auth
+        if (pathname === "/driver/login" || pathname === "/driver/register") {
+          return true;
+        }
+
         // All other protected routes require authentication
         return !!token;
       },
@@ -64,6 +95,11 @@ export const config = {
     "/garage/bookings/:path*",
     "/garage/settings/:path*",
     "/garage/pending",
+    "/driver/dashboard/:path*",
+    "/driver/jobs/:path*",
+    "/driver/earnings/:path*",
+    "/driver/settings/:path*",
+    "/driver/pending",
     "/admin/:path*",
   ],
 };
