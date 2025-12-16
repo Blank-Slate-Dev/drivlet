@@ -6,7 +6,8 @@
       "Bash(npm run build:*)",
       "Bash(cat:*)",
       "Bash(find:*)",
-      "Bash(node -e \"require(''c:/PantyPost/drivlet/src/app/api/stripe/webhook/route.ts'')\")"
+      "Bash(node -e \"require(''c:/PantyPost/drivlet/src/app/api/stripe/webhook/route.ts'')\")",
+      "Bash(timeout 10 npm run dev:*)"
     ],
     "deny": [],
     "ask": []

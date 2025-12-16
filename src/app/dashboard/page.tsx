@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Bell,
   X,
+  ClipboardList,
 } from "lucide-react";
 import { BookingModal } from "@/components/homepage";
 
@@ -310,6 +311,13 @@ function DashboardHeader() {
             Home
           </Link>
           <Link
+            href="/dashboard/bookings"
+            className="flex items-center gap-1 text-sm font-medium text-slate-600 transition hover:text-emerald-600"
+          >
+            <ClipboardList className="h-4 w-4" />
+            <span className="hidden sm:inline">Booking History</span>
+          </Link>
+          <Link
             href="/account"
             className="flex items-center gap-1 text-sm font-medium text-slate-600 transition hover:text-emerald-600"
           >
@@ -524,9 +532,18 @@ export default function DashboardPage() {
             {/* Past Bookings */}
             {bookings.filter((b) => b._id !== activeBooking._id).length > 0 && (
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                  Previous Bookings
-                </h2>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Previous Bookings
+                  </h2>
+                  <Link
+                    href="/dashboard/bookings"
+                    className="flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-500"
+                  >
+                    View All
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
                 <div className="space-y-3">
                   {bookings
                     .filter((b) => b._id !== activeBooking._id)
