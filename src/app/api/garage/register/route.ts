@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage, { ServiceType, VehicleType } from "@/models/Garage";
+import Contact from "@/models/Contact";
 import bcrypt from "bcrypt";
 
 // Validate email format
@@ -284,6 +285,15 @@ export async function POST(request: Request) {
 
     // Link garage to user
     await User.findByIdAndUpdate(user._id, { garageProfile: garage._id });
+
+    // Create inquiry for admin review
+    await Contact.create({
+      name: `${businessName.trim()} (${contactName.trim()})`,
+      email: email.toLowerCase(),
+      phone: formattedPhone,
+      message: `🔧 NEW GARAGE APPLICATION\n\nBusiness: ${businessName.trim()}\nABN: ${cleanABN}\nContact: ${contactName.trim()}\nEmail: ${email.toLowerCase()}\nPhone: ${formattedPhone}\n${website ? `Website: ${website}\n` : ''}\nAddress: ${address.trim()}, ${suburb.trim()} ${state} ${postcode}\n\nServices: ${services.join(", ")}\nCapacity: ${capacity || "Not specified"}\nOpening Hours: ${openingHours || "Not specified"}\n\nThis garage application requires verification of:\n- Public liability insurance\n- Bank details\n- ABN verification\n- Business credentials\n\nGarage ID: ${garage._id}`,
+      status: "new",
+    });
 
     return NextResponse.json(
       {
