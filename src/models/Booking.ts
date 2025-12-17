@@ -21,6 +21,8 @@ export interface ISelectedService {
   services: string[];
 }
 
+export type GarageBookingStatus = "new" | "accepted" | "declined" | "in_progress" | "completed";
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -44,6 +46,13 @@ export interface IBooking extends Document {
   garageName?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
+
+  // Garage assignment
+  assignedGarageId?: Types.ObjectId;
+  garageStatus: GarageBookingStatus;
+  garageNotes?: string;
+  garageAcceptedAt?: Date;
+  garageCompletedAt?: Date;
 
   // Payment information
   paymentId?: string;
@@ -203,6 +212,31 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
 
+    // Garage assignment
+    assignedGarageId: {
+      type: Schema.Types.ObjectId,
+      ref: "Garage",
+      required: false,
+      index: true,
+    },
+    garageStatus: {
+      type: String,
+      enum: ["new", "accepted", "declined", "in_progress", "completed"],
+      default: "new",
+    },
+    garageNotes: {
+      type: String,
+      required: false,
+    },
+    garageAcceptedAt: {
+      type: Date,
+      required: false,
+    },
+    garageCompletedAt: {
+      type: Date,
+      required: false,
+    },
+
     // Payment information
     paymentId: {
       type: String,
@@ -295,6 +329,8 @@ BookingSchema.index({ status: 1, createdAt: -1 });
 BookingSchema.index({ userEmail: 1 });
 BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });
+BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
+BookingSchema.index({ garageStatus: 1 });
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =
