@@ -5,20 +5,16 @@ import User from "@/models/User";
 import Driver from "@/models/Driver";
 import bcrypt from "bcrypt";
 
-// Validate Australian phone number
+// Validate Australian phone number (relaxed for initial registration)
 function validatePhone(phone: string): boolean {
   const cleanPhone = phone.replace(/[\s-]/g, "");
-  return /^(\+?61|0)[2-478]\d{8}$/.test(cleanPhone);
+  // Accept various formats during registration
+  return cleanPhone.length >= 8 && /^[\d+]+$/.test(cleanPhone);
 }
 
 // Validate email format
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-// Validate postcode (4 digits)
-function validatePostcode(postcode: string): boolean {
-  return /^\d{4}$/.test(postcode);
 }
 
 // Validate BSB format (6 digits)
@@ -27,76 +23,35 @@ function validateBSB(bsb: string): boolean {
   return /^\d{6}$/.test(cleanBSB);
 }
 
-// Validate ABN format (11 digits) - optional for contractors
+// Validate ABN format (11 digits) - optional
 function validateABN(abn: string): boolean {
   if (!abn) return true;
   const cleanABN = abn.replace(/\s/g, "");
   return /^\d{11}$/.test(cleanABN);
 }
 
-// Calculate age from date of birth
-function calculateAge(dob: Date): number {
-  const today = new Date();
-  const birthDate = new Date(dob);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    // Destructure fields from the simple registration form
     const {
-      // Account
-      email,
-      password,
-      // Personal Information
       firstName,
       lastName,
-      dateOfBirth,
+      email,
       phone,
-      address,
-      // License Information
-      license,
-      // Vehicle Information
-      hasOwnVehicle,
-      vehicle,
-      // Availability
-      availability,
-      maxJobsPerDay,
-      preferredAreas,
-      // Employment Details
-      employmentType,
-      tfn,
+      password,
+      confirmPassword,
+      licenseNumber,
+      licenseState,
+      licenseExpiry,
+      bsb,
+      accountNumber,
+      accountName,
       abn,
-      superannuationFund,
-      superannuationMemberNumber,
-      // Banking
-      bankDetails,
-      // Emergency Contact
-      emergencyContact,
     } = body;
 
     // ===== VALIDATION =====
-
-    // Account validation
-    if (!email || !validateEmail(email)) {
-      return NextResponse.json(
-        { error: "Valid email address is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!password || password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
 
     // Personal information validation
     if (!firstName || firstName.trim().length < 2) {
@@ -113,140 +68,84 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!dateOfBirth) {
+    // Account validation
+    if (!email || !validateEmail(email)) {
       return NextResponse.json(
-        { error: "Date of birth is required" },
-        { status: 400 }
-      );
-    }
-
-    const age = calculateAge(new Date(dateOfBirth));
-    if (age < 18) {
-      return NextResponse.json(
-        { error: "You must be at least 18 years old to register as a driver" },
+        { error: "Valid email address is required" },
         { status: 400 }
       );
     }
 
     if (!phone || !validatePhone(phone)) {
       return NextResponse.json(
-        { error: "Valid Australian phone number is required" },
+        { error: "Valid phone number is required" },
         { status: 400 }
       );
     }
 
-    // Address validation
-    if (
-      !address ||
-      !address.street ||
-      !address.suburb ||
-      !address.state ||
-      !address.postcode
-    ) {
+    if (!password || password.length < 6) {
       return NextResponse.json(
-        { error: "Complete address is required" },
+        { error: "Password must be at least 6 characters" },
         { status: 400 }
       );
     }
 
-    if (!validatePostcode(address.postcode)) {
+    if (password !== confirmPassword) {
       return NextResponse.json(
-        { error: "Valid postcode (4 digits) is required" },
+        { error: "Passwords do not match" },
         { status: 400 }
       );
     }
 
     // License validation
-    if (
-      !license ||
-      !license.number ||
-      !license.state ||
-      !license.class ||
-      !license.expiryDate
-    ) {
+    if (!licenseNumber || licenseNumber.trim().length < 3) {
       return NextResponse.json(
-        { error: "Complete license information is required" },
+        { error: "License number is required" },
         { status: 400 }
       );
     }
 
-    const licenseExpiry = new Date(license.expiryDate);
-    if (licenseExpiry <= new Date()) {
+    if (!licenseExpiry) {
+      return NextResponse.json(
+        { error: "License expiry date is required" },
+        { status: 400 }
+      );
+    }
+
+    const expiryDate = new Date(licenseExpiry);
+    if (expiryDate <= new Date()) {
       return NextResponse.json(
         { error: "Your license must not be expired" },
         { status: 400 }
       );
     }
 
-    // Vehicle validation (if they have one)
-    if (hasOwnVehicle) {
-      if (
-        !vehicle ||
-        !vehicle.make ||
-        !vehicle.model ||
-        !vehicle.year ||
-        !vehicle.registration ||
-        !vehicle.registrationExpiry
-      ) {
-        return NextResponse.json(
-          { error: "Complete vehicle information is required if you have your own vehicle" },
-          { status: 400 }
-        );
-      }
-
-      const regoExpiry = new Date(vehicle.registrationExpiry);
-      if (regoExpiry <= new Date()) {
-        return NextResponse.json(
-          { error: "Vehicle registration must not be expired" },
-          { status: 400 }
-        );
-      }
-    }
-
     // Bank details validation
-    if (
-      !bankDetails ||
-      !bankDetails.accountName ||
-      !bankDetails.bsb ||
-      !bankDetails.accountNumber
-    ) {
-      return NextResponse.json(
-        { error: "Complete bank details are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!validateBSB(bankDetails.bsb)) {
+    if (!bsb || !validateBSB(bsb)) {
       return NextResponse.json(
         { error: "Valid BSB (6 digits) is required" },
         { status: 400 }
       );
     }
 
-    // Emergency contact validation
-    if (
-      !emergencyContact ||
-      !emergencyContact.name ||
-      !emergencyContact.relationship ||
-      !emergencyContact.phone
-    ) {
+    if (!accountNumber || accountNumber.trim().length < 6) {
       return NextResponse.json(
-        { error: "Emergency contact information is required" },
+        { error: "Valid account number is required" },
         { status: 400 }
       );
     }
 
-    if (!validatePhone(emergencyContact.phone)) {
+    if (!accountName || accountName.trim().length < 2) {
       return NextResponse.json(
-        { error: "Valid emergency contact phone number is required" },
+        { error: "Account holder name is required" },
         { status: 400 }
       );
     }
 
-    // Contractor ABN validation
-    if (employmentType === "contractor" && abn && !validateABN(abn)) {
+    // ABN validation (optional)
+    if (abn && !validateABN(abn)) {
       return NextResponse.json(
-        { error: "Valid ABN (11 digits) is required for contractors" },
+        { error: "ABN must be 11 digits if provided" },
         { status: 400 }
       );
     }
@@ -266,8 +165,8 @@ export async function POST(request: Request) {
 
     // Check if license number already registered
     const existingDriver = await Driver.findOne({
-      "license.number": license.number,
-      "license.state": license.state,
+      "license.number": licenseNumber.trim().toUpperCase(),
+      "license.state": licenseState,
     });
     if (existingDriver) {
       return NextResponse.json(
@@ -302,7 +201,11 @@ export async function POST(request: Request) {
       isApproved: false, // Drivers need manual approval
     });
 
-    // Prepare availability with defaults
+    // Format phone number
+    const cleanPhone = phone.replace(/[\s-]/g, "");
+    const formattedPhone = cleanPhone.startsWith("0") ? cleanPhone : `0${cleanPhone}`;
+
+    // Default availability
     const defaultAvailability = {
       monday: { available: true, startTime: "07:00", endTime: "18:00" },
       tuesday: { available: true, startTime: "07:00", endTime: "18:00" },
@@ -313,60 +216,41 @@ export async function POST(request: Request) {
       sunday: { available: false, startTime: "08:00", endTime: "14:00" },
     };
 
-    // Create driver profile
+    // Create driver profile with required fields
+    // Using placeholder values for fields that will be collected during onboarding
     const driver = await Driver.create({
       userId: user._id,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      dateOfBirth: new Date(dateOfBirth),
-      phone: phone.replace(/[\s-]/g, ""),
+      dateOfBirth: new Date("1990-01-01"), // Placeholder - will be updated during verification
+      phone: formattedPhone,
       address: {
-        street: address.street.trim(),
-        suburb: address.suburb.trim(),
-        state: address.state,
-        postcode: address.postcode,
+        street: "PENDING - To be verified",
+        suburb: "Newcastle",
+        state: "NSW",
+        postcode: "2300",
       },
       license: {
-        number: license.number.trim().toUpperCase(),
-        state: license.state,
-        class: license.class,
-        expiryDate: new Date(license.expiryDate),
-        photoUrl: license.photoUrl || undefined,
+        number: licenseNumber.trim().toUpperCase(),
+        state: licenseState || "NSW",
+        class: "C", // Default to standard car license
+        expiryDate: new Date(licenseExpiry),
       },
-      hasOwnVehicle: hasOwnVehicle || false,
-      vehicle: hasOwnVehicle && vehicle
-        ? {
-            make: vehicle.make.trim(),
-            model: vehicle.model.trim(),
-            year: vehicle.year,
-            color: vehicle.color?.trim(),
-            registration: vehicle.registration.trim().toUpperCase(),
-            registrationState: vehicle.registrationState,
-            registrationExpiry: new Date(vehicle.registrationExpiry),
-            insuranceProvider: vehicle.insuranceProvider?.trim(),
-            insurancePolicyNumber: vehicle.insurancePolicyNumber?.trim(),
-            insuranceExpiry: vehicle.insuranceExpiry
-              ? new Date(vehicle.insuranceExpiry)
-              : undefined,
-          }
-        : undefined,
-      availability: availability || defaultAvailability,
-      maxJobsPerDay: maxJobsPerDay || 10,
-      preferredAreas: preferredAreas || [],
-      employmentType: employmentType || "employee",
-      tfn: tfn?.trim() || undefined,
+      hasOwnVehicle: false,
+      availability: defaultAvailability,
+      maxJobsPerDay: 10,
+      preferredAreas: ["Newcastle", "Lake Macquarie", "Maitland"],
+      employmentType: abn ? "contractor" : "employee",
       abn: abn?.replace(/\s/g, "") || undefined,
-      superannuationFund: superannuationFund?.trim() || undefined,
-      superannuationMemberNumber: superannuationMemberNumber?.trim() || undefined,
       bankDetails: {
-        accountName: bankDetails.accountName.trim(),
-        bsb: bankDetails.bsb.replace(/[\s-]/g, ""),
-        accountNumber: bankDetails.accountNumber.replace(/\s/g, ""),
+        accountName: accountName.trim(),
+        bsb: bsb.replace(/[\s-]/g, ""),
+        accountNumber: accountNumber.replace(/\s/g, ""),
       },
       emergencyContact: {
-        name: emergencyContact.name.trim(),
-        relationship: emergencyContact.relationship.trim(),
-        phone: emergencyContact.phone.replace(/[\s-]/g, ""),
+        name: "PENDING - To be provided",
+        relationship: "PENDING",
+        phone: "0000000000",
       },
       status: "pending",
       submittedAt: new Date(),
