@@ -9,7 +9,6 @@ import {
   ValuePropsSection,
   HowItWorksSection,
   ServicesSection,
-  TestimonialsSection,
   ContactCTASection,
   FAQSection,
   Footer,
@@ -38,9 +37,6 @@ export default function Home() {
 
       {/* Services Section */}
       <ServicesSection onBookingClick={openBookingModal} />
-
-      {/* Testimonials Section */}
-      <TestimonialsSection />
 
       {/* Contact CTA Section */}
       <ContactCTASection />
