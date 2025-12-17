@@ -28,6 +28,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
+import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
 
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
@@ -44,6 +45,11 @@ interface Update {
   timestamp: string;
   message: string;
   updatedBy: string;
+}
+
+interface SelectedService {
+  category: string;
+  services: string[];
 }
 
 interface Booking {
@@ -68,6 +74,9 @@ interface Booking {
   paymentAmount?: number;
   transmissionType?: 'automatic' | 'manual';
   isManualTransmission?: boolean;
+  selectedServices?: SelectedService[];
+  primaryServiceCategory?: string | null;
+  serviceNotes?: string;
   currentStage: string;
   overallProgress: number;
   status: string;
@@ -451,12 +460,20 @@ export default function AdminBookingsPage() {
                         <p className="text-sm text-slate-700">
                           {booking.serviceType}
                         </p>
-                        {booking.hasExistingBooking && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                            <Building className="h-3 w-3" />
-                            {booking.garageName}
-                          </span>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {booking.hasExistingBooking && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                              <Building className="h-3 w-3" />
+                              {booking.garageName}
+                            </span>
+                          )}
+                          {booking.selectedServices && booking.selectedServices.length > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                              <Wrench className="h-3 w-3" />
+                              {booking.selectedServices.reduce((acc, s) => acc + s.services.length, 0)} services
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-900">
@@ -744,7 +761,51 @@ function ViewDetailsModal({
               <p className="text-xs text-slate-500">Service Type</p>
               <p className="font-medium text-slate-900">{booking.serviceType}</p>
             </div>
+            {booking.primaryServiceCategory && (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500">Primary Category</p>
+                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                  {getCategoryById(booking.primaryServiceCategory)?.name || booking.primaryServiceCategory}
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* Selected Services */}
+          {booking.selectedServices && booking.selectedServices.length > 0 && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                <Wrench className="h-4 w-4" />
+                Services Requested ({booking.selectedServices.reduce((acc, s) => acc + s.services.length, 0)})
+              </div>
+              <div className="mt-3 space-y-2">
+                {booking.selectedServices.map((sel) => {
+                  const cat = getCategoryById(sel.category);
+                  return (
+                    <div key={sel.category}>
+                      <p className="text-xs font-medium text-emerald-800">{cat?.name || sel.category}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {sel.services.map((service) => (
+                          <span
+                            key={service}
+                            className="inline-flex rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {booking.serviceNotes && (
+                <div className="mt-3 border-t border-emerald-200 pt-3">
+                  <p className="text-xs text-emerald-600">Service Notes:</p>
+                  <p className="mt-1 text-sm text-emerald-800">{booking.serviceNotes}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {booking.hasExistingBooking && (
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">

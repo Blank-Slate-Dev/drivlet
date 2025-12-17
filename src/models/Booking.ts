@@ -16,6 +16,11 @@ export interface IFlag {
   createdAt: Date;
 }
 
+export interface ISelectedService {
+  category: string;
+  services: string[];
+}
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -49,6 +54,11 @@ export interface IBooking extends Document {
   // Vehicle details
   transmissionType: 'automatic' | 'manual';
   isManualTransmission: boolean;
+
+  // Service selection
+  selectedServices: ISelectedService[];
+  primaryServiceCategory: string | null;
+  serviceNotes: string;
 
   // Flags for special attention
   flags: IFlag[];
@@ -100,6 +110,20 @@ const FlagSchema = new Schema<IFlag>(
     createdAt: {
       type: Date,
       default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
+const SelectedServiceSchema = new Schema<ISelectedService>(
+  {
+    category: {
+      type: String,
+      required: true,
+    },
+    services: {
+      type: [String],
+      default: [],
     },
   },
   { _id: false }
@@ -208,6 +232,20 @@ const BookingSchema = new Schema<IBooking>(
     isManualTransmission: {
       type: Boolean,
       default: false,
+    },
+
+    // Service selection
+    selectedServices: {
+      type: [SelectedServiceSchema],
+      default: [],
+    },
+    primaryServiceCategory: {
+      type: String,
+      default: null,
+    },
+    serviceNotes: {
+      type: String,
+      default: '',
     },
 
     // Flags for special attention

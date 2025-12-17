@@ -24,6 +24,8 @@ import {
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
 import GarageAutocomplete, { GarageDetails } from '@/components/GarageAutocomplete';
+import ServiceSelector from '@/components/booking/ServiceSelector';
+import { SERVICE_CATEGORIES, SelectedServiceCategory, getTotalSelectedCount, formatSelectedServices, getCategoryById } from '@/constants/serviceCategories';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '@/components/StripePaymentForm';
@@ -103,6 +105,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Vehicle valuation and transmission
   const [isHighValueVehicle, setIsHighValueVehicle] = useState(false);
   const [transmissionType, setTransmissionType] = useState<'automatic' | 'manual'>('automatic');
+
+  // Service selection
+  const [selectedServices, setSelectedServices] = useState<SelectedServiceCategory[]>([]);
+  const [primaryServiceCategory, setPrimaryServiceCategory] = useState<string | null>(null);
+  const [serviceNotes, setServiceNotes] = useState('');
 
   // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -269,6 +276,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setIsProcessing(false);
         setIsHighValueVehicle(false);
         setTransmissionType('automatic');
+        setSelectedServices([]);
+        setPrimaryServiceCategory(null);
+        setServiceNotes('');
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -330,6 +340,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return 'Please select your garage booking time.';
     }
 
+    // Service selection validation
+    if (getTotalSelectedCount(selectedServices) === 0) {
+      return 'Please select at least one service type for your booking.';
+    }
+
     return null;
   };
 
@@ -368,6 +383,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           additionalNotes: additionalNotes.trim(),
           transmissionType,
           isManualTransmission: transmissionType === 'manual',
+          selectedServices: JSON.stringify(selectedServices),
+          primaryServiceCategory,
+          serviceNotes: serviceNotes.trim(),
         }),
       });
 
@@ -734,6 +752,32 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         <p className="text-sm text-slate-900">{pickupAddress}</p>
                       </div>
 
+                      {/* Selected Services */}
+                      {getTotalSelectedCount(selectedServices) > 0 && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Services Requested ({getTotalSelectedCount(selectedServices)})
+                          </h3>
+                          <div className="space-y-2 text-sm">
+                            {selectedServices.map((sel) => {
+                              const cat = getCategoryById(sel.category);
+                              return (
+                                <div key={sel.category} className="text-emerald-800">
+                                  <span className="font-medium">{cat?.name || sel.category}:</span>{' '}
+                                  <span className="text-emerald-600">{sel.services.join(', ')}</span>
+                                </div>
+                              );
+                            })}
+                            {serviceNotes && (
+                              <div className="mt-2 border-t border-emerald-200 pt-2">
+                                <p className="text-xs text-emerald-600">Notes: {serviceNotes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Garage */}
                       <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-700">
@@ -1041,6 +1085,19 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               </label>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Service Selection Section */}
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                          <ServiceSelector
+                            selectedServices={selectedServices}
+                            onServicesChange={setSelectedServices}
+                            primaryCategory={primaryServiceCategory}
+                            onPrimaryCategoryChange={setPrimaryServiceCategory}
+                            serviceNotes={serviceNotes}
+                            onServiceNotesChange={setServiceNotes}
+                            disabled={isProcessing}
+                          />
                         </div>
 
                         {/* Garage Booking Section */}

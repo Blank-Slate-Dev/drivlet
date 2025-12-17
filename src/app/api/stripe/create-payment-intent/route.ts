@@ -24,6 +24,9 @@ export async function POST(request: NextRequest) {
       existingBookingRef,
       transmissionType,
       isManualTransmission,
+      selectedServices,
+      primaryServiceCategory,
+      serviceNotes,
     } = body;
 
     // Validate required fields
@@ -62,6 +65,9 @@ export async function POST(request: NextRequest) {
         existingBookingRef: existingBookingRef || '',
         transmissionType: transmissionType || 'automatic',
         isManualTransmission: isManualTransmission ? 'true' : 'false',
+        selectedServices: selectedServices || '[]',
+        primaryServiceCategory: primaryServiceCategory || '',
+        serviceNotes: serviceNotes || '',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}`,

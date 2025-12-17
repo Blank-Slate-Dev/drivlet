@@ -85,6 +85,16 @@ export async function POST(request: NextRequest) {
         const isManual = metadata.isManualTransmission === 'true';
         const transmissionType = metadata.transmissionType || 'automatic';
 
+        // Parse selected services
+        let selectedServices = [];
+        try {
+          selectedServices = JSON.parse(metadata.selectedServices || '[]');
+        } catch {
+          console.log('⚠️ Could not parse selectedServices, using empty array');
+        }
+        const primaryServiceCategory = metadata.primaryServiceCategory || null;
+        const serviceNotes = metadata.serviceNotes || '';
+
         // Build flags array
         const flags = [];
         if (isManual) {
@@ -115,6 +125,9 @@ export async function POST(request: NextRequest) {
           existingBookingNotes: null,
           transmissionType,
           isManualTransmission: isManual,
+          selectedServices,
+          primaryServiceCategory,
+          serviceNotes,
           flags,
           paymentStatus: 'paid',
           paymentId: paymentIntent.id,
@@ -201,6 +214,16 @@ export async function POST(request: NextRequest) {
         const isManualSession = metadata.isManualTransmission === 'true';
         const transmissionTypeSession = metadata.transmissionType || 'automatic';
 
+        // Parse selected services
+        let selectedServicesSession = [];
+        try {
+          selectedServicesSession = JSON.parse(metadata.selectedServices || '[]');
+        } catch {
+          console.log('⚠️ Could not parse selectedServices in session, using empty array');
+        }
+        const primaryServiceCategorySession = metadata.primaryServiceCategory || null;
+        const serviceNotesSession = metadata.serviceNotes || '';
+
         // Build flags array
         const flagsSession = [];
         if (isManualSession) {
@@ -231,6 +254,9 @@ export async function POST(request: NextRequest) {
           existingBookingNotes: null,
           transmissionType: transmissionTypeSession,
           isManualTransmission: isManualSession,
+          selectedServices: selectedServicesSession,
+          primaryServiceCategory: primaryServiceCategorySession,
+          serviceNotes: serviceNotesSession,
           flags: flagsSession,
           paymentStatus: 'paid',
           paymentId: session.payment_intent as string,
