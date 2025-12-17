@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Driver from "@/models/Driver";
+import Contact from "@/models/Contact";
 import bcrypt from "bcrypt";
 
 // Validate Australian phone number (relaxed for initial registration)
@@ -267,6 +268,15 @@ export async function POST(request: Request) {
 
     // Link driver profile to user
     await User.findByIdAndUpdate(user._id, { driverProfile: driver._id });
+
+    // Create inquiry for admin review
+    await Contact.create({
+      name: `${firstName.trim()} ${lastName.trim()}`,
+      email: email.toLowerCase(),
+      phone: formattedPhone,
+      message: `🚗 NEW DRIVER APPLICATION\n\nDriver: ${firstName.trim()} ${lastName.trim()}\nEmail: ${email.toLowerCase()}\nPhone: ${formattedPhone}\nLicense: ${licenseNumber.trim().toUpperCase()} (${licenseState})\nLicense Expiry: ${licenseExpiry}\n${abn ? `ABN: ${abn}\n` : ''}\nBank Account: ${accountName.trim()} (BSB: ${bsb})\n\nThis driver application requires verification of:\n- Date of birth\n- Full address\n- Emergency contact details\n- License validity\n\nDriver ID: ${driver._id}`,
+      status: "new",
+    });
 
     return NextResponse.json(
       {
