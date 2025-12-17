@@ -25,6 +25,7 @@ import {
   Wrench,
   Globe,
 } from "lucide-react";
+import AddressAutocomplete, { PlaceDetails } from "@/components/AddressAutocomplete";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -49,10 +50,25 @@ export default function GarageRegisterPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Address autocomplete state
+  const [addressInput, setAddressInput] = useState("");
+
   const [formData, setFormData] = useState({
-    businessName: "", abn: "", address: "", suburb: "", postcode: "", state: "NSW",
-    contactName: "", email: "", phone: "", password: "", confirmPassword: "", website: "",
-    services: [] as string[], openingHours: "8am - 5pm", capacity: "1-5",
+    businessName: "", 
+    abn: "", 
+    address: "", 
+    suburb: "", 
+    postcode: "", 
+    state: "NSW",
+    contactName: "", 
+    email: "", 
+    phone: "", 
+    password: "", 
+    confirmPassword: "", 
+    website: "",
+    services: [] as string[], 
+    openingHours: "8am - 5pm", 
+    capacity: "1-5",
   });
 
   const updateField = (field: string, value: string | string[]) => {
@@ -60,18 +76,44 @@ export default function GarageRegisterPage() {
     if (error) setError("");
   };
 
+  const handleAddressSelect = (details: PlaceDetails) => {
+    if (details.formattedAddress) {
+      // Build street address from components
+      const streetAddress = [details.streetNumber, details.streetName].filter(Boolean).join(" ");
+      
+      // Update the address input to show the full formatted address
+      setAddressInput(details.formattedAddress);
+      
+      setFormData((prev) => ({
+        ...prev,
+        address: streetAddress || details.formattedAddress.split(",")[0] || "",
+        suburb: details.suburb || "",
+        postcode: details.postcode || "",
+        state: details.state || "NSW",
+      }));
+    }
+  };
+
   const toggleService = (service: string) => {
     const current = formData.services;
     updateField("services", current.includes(service) ? current.filter((s) => s !== service) : [...current, service]);
+  };
+
+  // Validate ABN format (11 digits)
+  const isValidABN = (abn: string): boolean => {
+    const cleanABN = abn.replace(/\s/g, "");
+    return /^\d{11}$/.test(cleanABN);
   };
 
   const validateStep = (step: Step): boolean => {
     switch (step) {
       case 1:
         if (!formData.businessName.trim()) { setError("Please enter your business name"); return false; }
-        if (!formData.address.trim()) { setError("Please enter your business address"); return false; }
-        if (!formData.suburb.trim()) { setError("Please enter your suburb"); return false; }
-        if (!formData.postcode.trim() || formData.postcode.length !== 4) { setError("Please enter a valid 4-digit postcode"); return false; }
+        if (!formData.abn.trim()) { setError("ABN is required for garage registration"); return false; }
+        if (!isValidABN(formData.abn)) { setError("Please enter a valid 11-digit ABN"); return false; }
+        if (!formData.address.trim()) { setError("Please select your business address"); return false; }
+        if (!formData.suburb.trim()) { setError("Please select a valid address with suburb"); return false; }
+        if (!formData.postcode.trim() || formData.postcode.length !== 4) { setError("Please select a valid address with postcode"); return false; }
         return true;
       case 2:
         if (!formData.contactName.trim()) { setError("Please enter a contact name"); return false; }
@@ -116,7 +158,7 @@ export default function GarageRegisterPage() {
 
   const isStepComplete = (step: Step): boolean => {
     switch (step) {
-      case 1: return !!(formData.businessName && formData.address && formData.suburb && formData.postcode);
+      case 1: return !!(formData.businessName && formData.abn && isValidABN(formData.abn) && formData.address && formData.suburb && formData.postcode);
       case 2: return !!(formData.contactName && formData.email && formData.phone && formData.password && formData.confirmPassword);
       case 3: return formData.services.length > 0;
       default: return false;
@@ -125,7 +167,7 @@ export default function GarageRegisterPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* Header - matching login page style */}
+      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
@@ -208,6 +250,7 @@ export default function GarageRegisterPage() {
                 </motion.div>
               )}
 
+              {/* Step 1: Business Details */}
               {currentStep === 1 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                   <div className="flex items-center gap-3 mb-6">
@@ -222,43 +265,74 @@ export default function GarageRegisterPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Business name *</label>
-                      <input type="text" value={formData.businessName} onChange={(e) => updateField("businessName", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" placeholder="e.g. Smith's Auto Care" />
+                      <input 
+                        type="text" 
+                        value={formData.businessName} 
+                        onChange={(e) => updateField("businessName", e.target.value)} 
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" 
+                        placeholder="e.g. Smith's Auto Care" 
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">ABN (optional)</label>
-                      <input type="text" value={formData.abn} onChange={(e) => updateField("abn", e.target.value.replace(/\D/g, "").slice(0, 11))} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" placeholder="11 digit ABN" maxLength={11} />
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">ABN *</label>
+                      <input 
+                        type="text" 
+                        value={formData.abn} 
+                        onChange={(e) => updateField("abn", e.target.value.replace(/\D/g, "").slice(0, 11))} 
+                        className={`w-full px-4 py-3 rounded-xl border text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition ${
+                          formData.abn && !isValidABN(formData.abn) ? "border-red-300 bg-red-50" : "border-slate-300"
+                        }`}
+                        placeholder="11 digit ABN" 
+                        maxLength={11} 
+                      />
+                      {formData.abn && !isValidABN(formData.abn) && (
+                        <p className="mt-1 text-xs text-red-500">ABN must be exactly 11 digits</p>
+                      )}
+                      {formData.abn && isValidABN(formData.abn) && (
+                        <p className="mt-1 text-xs text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Valid ABN format
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-slate-500">
+                        Don&apos;t have an ABN? <a href="https://www.abr.gov.au/business-super-funds-702s/applying-abn" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">Apply here</a>
+                      </p>
                     </div>
+                    
+                    {/* Address Autocomplete */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Street address *</label>
-                      <input type="text" value={formData.address} onChange={(e) => updateField("address", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" placeholder="123 Main Street" />
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Business address *</label>
+                      <AddressAutocomplete
+                        value={addressInput}
+                        onChange={setAddressInput}
+                        onSelect={handleAddressSelect}
+                        placeholder="Start typing your business address..."
+                        disabled={loading}
+                        biasToNewcastle={true}
+                      />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Suburb *</label>
-                        <input type="text" value={formData.suburb} onChange={(e) => updateField("suburb", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" placeholder="Newcastle" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Postcode *</label>
-                        <input type="text" value={formData.postcode} onChange={(e) => updateField("postcode", e.target.value.replace(/\D/g, "").slice(0, 4))} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" placeholder="2300" maxLength={4} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">State *</label>
-                      <select value={formData.state} onChange={(e) => updateField("state", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
-                        <option value="NSW">New South Wales</option>
-                        <option value="QLD">Queensland</option>
-                        <option value="VIC">Victoria</option>
-                        <option value="SA">South Australia</option>
-                        <option value="WA">Western Australia</option>
-                        <option value="TAS">Tasmania</option>
-                        <option value="NT">Northern Territory</option>
-                        <option value="ACT">ACT</option>
-                      </select>
-                    </div>
+
+                    {/* Show selected address details */}
+                    {formData.address && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }} 
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl"
+                      >
+                        <div className="flex items-start gap-3">
+                          <MapPin className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-emerald-900">Selected Address</p>
+                            <p className="text-sm text-emerald-700 mt-1">{formData.address}</p>
+                            <p className="text-sm text-emerald-600">{formData.suburb}, {formData.state} {formData.postcode}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </motion.div>
               )}
 
+              {/* Step 2: Contact Details */}
               {currentStep === 2 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                   <div className="flex items-center gap-3 mb-6">
@@ -317,6 +391,7 @@ export default function GarageRegisterPage() {
                 </motion.div>
               )}
 
+              {/* Step 3: Services */}
               {currentStep === 3 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                   <div className="flex items-center gap-3 mb-6">
@@ -368,6 +443,7 @@ export default function GarageRegisterPage() {
                 </motion.div>
               )}
 
+              {/* Step 4: Review */}
               {currentStep === 4 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                   <div className="flex items-center gap-3 mb-6">
@@ -383,18 +459,29 @@ export default function GarageRegisterPage() {
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                       <h3 className="text-sm font-semibold text-slate-700 mb-3">Business Details</h3>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-slate-500">Business:</div><div className="text-slate-900 font-medium">{formData.businessName}</div>
-                        <div className="text-slate-500">Address:</div><div className="text-slate-900 font-medium">{formData.address}, {formData.suburb} {formData.state} {formData.postcode}</div>
-                        {formData.abn && <><div className="text-slate-500">ABN:</div><div className="text-slate-900 font-medium">{formData.abn}</div></>}
+                        <div className="text-slate-500">Business:</div>
+                        <div className="text-slate-900 font-medium">{formData.businessName}</div>
+                        <div className="text-slate-500">ABN:</div>
+                        <div className="text-slate-900 font-medium">{formData.abn}</div>
+                        <div className="text-slate-500">Address:</div>
+                        <div className="text-slate-900 font-medium">{formData.address}, {formData.suburb} {formData.state} {formData.postcode}</div>
                       </div>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                       <h3 className="text-sm font-semibold text-slate-700 mb-3">Contact Details</h3>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-slate-500">Contact:</div><div className="text-slate-900 font-medium">{formData.contactName}</div>
-                        <div className="text-slate-500">Email:</div><div className="text-slate-900 font-medium">{formData.email}</div>
-                        <div className="text-slate-500">Phone:</div><div className="text-slate-900 font-medium">{formData.phone}</div>
-                        {formData.website && <><div className="text-slate-500">Website:</div><div className="text-slate-900 font-medium">{formData.website}</div></>}
+                        <div className="text-slate-500">Contact:</div>
+                        <div className="text-slate-900 font-medium">{formData.contactName}</div>
+                        <div className="text-slate-500">Email:</div>
+                        <div className="text-slate-900 font-medium">{formData.email}</div>
+                        <div className="text-slate-500">Phone:</div>
+                        <div className="text-slate-900 font-medium">{formData.phone}</div>
+                        {formData.website && (
+                          <>
+                            <div className="text-slate-500">Website:</div>
+                            <div className="text-slate-900 font-medium">{formData.website}</div>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -405,9 +492,16 @@ export default function GarageRegisterPage() {
                         ))}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                        <div className="text-slate-500">Hours:</div><div className="text-slate-900 font-medium">{formData.openingHours}</div>
-                        <div className="text-slate-500">Capacity:</div><div className="text-slate-900 font-medium">{formData.capacity} cars/day</div>
+                        <div className="text-slate-500">Hours:</div>
+                        <div className="text-slate-900 font-medium">{formData.openingHours}</div>
+                        <div className="text-slate-500">Capacity:</div>
+                        <div className="text-slate-900 font-medium">{formData.capacity} cars/day</div>
                       </div>
+                    </div>
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-sm text-amber-800">
+                        <strong>Note:</strong> After registration, you&apos;ll need to provide additional details including insurance and banking information during the verification process.
+                      </p>
                     </div>
                     <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                       <p className="text-sm text-emerald-800">By submitting, you agree to our Terms of Service and Privacy Policy. Your application will be reviewed within 1-2 business days.</p>
@@ -416,6 +510,7 @@ export default function GarageRegisterPage() {
                 </motion.div>
               )}
 
+              {/* Navigation Buttons */}
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200">
                 {currentStep > 1 ? (
                   <button type="button" onClick={prevStep} className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
@@ -435,6 +530,7 @@ export default function GarageRegisterPage() {
             </div>
           </div>
 
+          {/* Footer Links */}
           <div className="mt-6 text-center space-y-3">
             <p className="text-slate-600 text-sm">Already have an account? <Link href="/garage/login" className="font-semibold text-emerald-600 hover:text-emerald-700 transition">Sign in</Link></p>
             <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back to home</Link>

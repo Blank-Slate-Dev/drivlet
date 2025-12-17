@@ -2,26 +2,8 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
-import Garage from "@/models/Garage";
+import Garage, { ServiceType, VehicleType } from "@/models/Garage";
 import bcrypt from "bcrypt";
-
-// Validate ABN format (11 digits)
-function validateABN(abn: string): boolean {
-  const cleanABN = abn.replace(/\s/g, "");
-  return /^\d{11}$/.test(cleanABN);
-}
-
-// Validate BSB format (6 digits)
-function validateBSB(bsb: string): boolean {
-  const cleanBSB = bsb.replace(/[\s-]/g, "");
-  return /^\d{6}$/.test(cleanBSB);
-}
-
-// Validate Australian phone number
-function validatePhone(phone: string): boolean {
-  const cleanPhone = phone.replace(/[\s-]/g, "");
-  return /^(\+?61|0)[2-478]\d{8}$/.test(cleanPhone);
-}
 
 // Validate email format
 function validateEmail(email: string): boolean {
@@ -33,60 +15,57 @@ function validatePostcode(postcode: string): boolean {
   return /^\d{4}$/.test(postcode);
 }
 
+// Validate ABN format (11 digits) - optional, only validate if provided
+function validateABN(abn: string): boolean {
+  if (!abn) return true;
+  const cleanABN = abn.replace(/\s/g, "");
+  return /^\d{11}$/.test(cleanABN);
+}
+
+// Map user-friendly service names to ServiceType enum values
+function mapServicesToServiceTypes(services: string[]): ServiceType[] {
+  const serviceMap: Record<string, ServiceType> = {
+    "Logbook Service": "mechanical",
+    "Major Service": "mechanical",
+    "Minor Service": "mechanical",
+    "Brake Service": "mechanical",
+    "Tyre Service": "tyres",
+    "Diagnostics": "electrical",
+    "Air Conditioning": "aircon",
+    "Electrical": "electrical",
+    "Transmission": "mechanical",
+    "Detailing": "detailing",
+  };
+
+  const mapped = services.map(s => serviceMap[s] || "other");
+  // Remove duplicates
+  return [...new Set(mapped)] as ServiceType[];
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Destructure all fields from request body
+    // Destructure fields from the simple registration form
     const {
-      // Account
-      email,
-      password,
-      // Business Information
       businessName,
-      tradingName,
       abn,
-      businessAddress,
-      yearsInOperation,
-      servicesOffered,
-      // Contact Details
-      primaryContact,
-      afterHoursContact,
-      // Operational Capacity
-      operatingHours,
-      serviceBays,
-      vehicleTypes,
-      averageTurnaroundTimes,
-      appointmentPolicy,
-      // Service Coverage
-      serviceRadius,
-      pickupDropoff,
-      // Insurance & Compliance
-      publicLiabilityInsurance,
-      professionalIndemnityInsurance,
-      certifications,
-      // Payment & Billing
-      paymentTerms,
-      bankDetails,
-      gstRegistered,
+      address,
+      suburb,
+      postcode,
+      state,
+      contactName,
+      email,
+      phone,
+      password,
+      confirmPassword,
+      website,
+      services,
+      openingHours,
+      capacity,
     } = body;
 
     // ===== VALIDATION =====
-
-    // Account validation
-    if (!email || !validateEmail(email)) {
-      return NextResponse.json(
-        { error: "Valid email address is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!password || password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
 
     // Business validation
     if (!businessName || businessName.trim().length < 2) {
@@ -96,6 +75,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // ABN is required by the Garage model
     if (!abn || !validateABN(abn)) {
       return NextResponse.json(
         { error: "Valid ABN (11 digits) is required" },
@@ -104,107 +84,75 @@ export async function POST(request: Request) {
     }
 
     // Address validation
-    if (
-      !businessAddress ||
-      !businessAddress.street ||
-      !businessAddress.suburb ||
-      !businessAddress.state ||
-      !businessAddress.postcode
-    ) {
+    if (!address || address.trim().length < 3) {
       return NextResponse.json(
-        { error: "Complete business address is required" },
+        { error: "Street address is required" },
         { status: 400 }
       );
     }
 
-    if (!validatePostcode(businessAddress.postcode)) {
+    if (!suburb || suburb.trim().length < 2) {
+      return NextResponse.json(
+        { error: "Suburb is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!postcode || !validatePostcode(postcode)) {
       return NextResponse.json(
         { error: "Valid postcode (4 digits) is required" },
         { status: 400 }
       );
     }
 
-    // Services validation
-    if (!servicesOffered || servicesOffered.length === 0) {
+    if (!state) {
       return NextResponse.json(
-        { error: "At least one service must be selected" },
+        { error: "State is required" },
         { status: 400 }
       );
     }
 
     // Contact validation
-    if (
-      !primaryContact ||
-      !primaryContact.name ||
-      !primaryContact.role ||
-      !primaryContact.phone ||
-      !primaryContact.email
-    ) {
+    if (!contactName || contactName.trim().length < 2) {
       return NextResponse.json(
-        { error: "Complete primary contact information is required" },
+        { error: "Contact name is required" },
         { status: 400 }
       );
     }
 
-    if (!validatePhone(primaryContact.phone)) {
+    if (!email || !validateEmail(email)) {
       return NextResponse.json(
-        { error: "Valid Australian phone number is required" },
+        { error: "Valid email address is required" },
         { status: 400 }
       );
     }
 
-    if (!validateEmail(primaryContact.email)) {
+    if (!phone || phone.trim().length < 8) {
       return NextResponse.json(
-        { error: "Valid primary contact email is required" },
+        { error: "Phone number is required" },
         { status: 400 }
       );
     }
 
-    // Operational validation
-    if (!serviceBays || serviceBays < 1) {
+    // Password validation
+    if (!password || password.length < 6) {
       return NextResponse.json(
-        { error: "Number of service bays is required" },
+        { error: "Password must be at least 6 characters" },
         { status: 400 }
       );
     }
 
-    if (!vehicleTypes || vehicleTypes.length === 0) {
+    if (password !== confirmPassword) {
       return NextResponse.json(
-        { error: "At least one vehicle type must be selected" },
+        { error: "Passwords do not match" },
         { status: 400 }
       );
     }
 
-    // Insurance validation
-    if (
-      !publicLiabilityInsurance ||
-      !publicLiabilityInsurance.provider ||
-      !publicLiabilityInsurance.policyNumber ||
-      !publicLiabilityInsurance.expiryDate ||
-      !publicLiabilityInsurance.coverAmount
-    ) {
+    // Services validation
+    if (!services || services.length === 0) {
       return NextResponse.json(
-        { error: "Complete public liability insurance details are required" },
-        { status: 400 }
-      );
-    }
-
-    // Bank details validation
-    if (
-      !bankDetails ||
-      !bankDetails.accountName ||
-      !bankDetails.bsb ||
-      !bankDetails.accountNumber
-    ) {
-      return NextResponse.json(
-        { error: "Complete bank details are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!validateBSB(bankDetails.bsb)) {
-      return NextResponse.json(
-        { error: "Valid BSB (6 digits) is required" },
+        { error: "At least one service must be selected" },
         { status: 400 }
       );
     }
@@ -223,9 +171,8 @@ export async function POST(request: Request) {
     }
 
     // Check if ABN already exists
-    const existingGarage = await Garage.findOne({
-      abn: abn.replace(/\s/g, ""),
-    });
+    const cleanABN = abn.replace(/\s/g, "");
+    const existingGarage = await Garage.findOne({ abn: cleanABN });
     if (existingGarage) {
       return NextResponse.json(
         { error: "A garage with this ABN is already registered" },
@@ -259,38 +206,50 @@ export async function POST(request: Request) {
       isApproved: false, // Garage accounts need manual approval
     });
 
-    // Create garage profile
+    // Parse capacity to get serviceBays number
+    const capacityMap: Record<string, number> = {
+      "1-5": 2,
+      "6-10": 4,
+      "11-20": 6,
+      "20+": 10,
+    };
+
+    // Format phone number (ensure it passes validation)
+    const cleanPhone = phone.replace(/[\s-]/g, "");
+    const formattedPhone = cleanPhone.startsWith("0") ? cleanPhone : `0${cleanPhone}`;
+
+    // Default vehicle types that most garages handle
+    const defaultVehicleTypes: VehicleType[] = ["sedan", "suv", "ute", "commercial"];
+
+    // Map services to ServiceType enum
+    const mappedServices = mapServicesToServiceTypes(services);
+
+    // Create garage profile with all required fields
+    // Using placeholder values for fields that will be collected during onboarding
     const garage = await Garage.create({
       userId: user._id,
       businessName: businessName.trim(),
-      tradingName: tradingName?.trim() || undefined,
-      abn: abn.replace(/\s/g, ""),
+      abn: cleanABN,
       businessAddress: {
-        street: businessAddress.street.trim(),
-        suburb: businessAddress.suburb.trim(),
-        state: businessAddress.state,
-        postcode: businessAddress.postcode,
+        street: address.trim(),
+        suburb: suburb.trim(),
+        state: state,
+        postcode: postcode,
       },
       location: {
         type: "Point",
         coordinates: [0, 0], // Will be updated with geocoding later
       },
-      yearsInOperation: yearsInOperation || 0,
-      servicesOffered,
+      yearsInOperation: 0, // Will be updated during onboarding
+      servicesOffered: mappedServices,
       primaryContact: {
-        name: primaryContact.name.trim(),
-        role: primaryContact.role.trim(),
-        phone: primaryContact.phone.replace(/\s/g, ""),
-        email: primaryContact.email.toLowerCase().trim(),
+        name: contactName.trim(),
+        role: "Owner/Manager",
+        phone: formattedPhone,
+        email: email.toLowerCase().trim(),
       },
-      afterHoursContact: afterHoursContact?.name
-        ? {
-            name: afterHoursContact.name.trim(),
-            phone: afterHoursContact.phone?.replace(/\s/g, ""),
-          }
-        : undefined,
-      operatingHours: operatingHours || {
-        monday: { open: "08:00", close: "17:00", closed: false },
+      operatingHours: {
+        monday: { open: openingHours?.split(" - ")[0] || "08:00", close: openingHours?.split(" - ")[1]?.replace("pm", ":00").replace("am", ":00") || "17:00", closed: false },
         tuesday: { open: "08:00", close: "17:00", closed: false },
         wednesday: { open: "08:00", close: "17:00", closed: false },
         thursday: { open: "08:00", close: "17:00", closed: false },
@@ -298,36 +257,27 @@ export async function POST(request: Request) {
         saturday: { open: "08:00", close: "12:00", closed: false },
         sunday: { open: "08:00", close: "17:00", closed: true },
       },
-      serviceBays,
-      vehicleTypes,
-      averageTurnaroundTimes: averageTurnaroundTimes || {},
-      appointmentPolicy: appointmentPolicy || "both",
-      serviceRadius: serviceRadius || 15,
-      pickupDropoff: pickupDropoff || { available: false },
+      serviceBays: capacityMap[capacity] || 2,
+      vehicleTypes: defaultVehicleTypes,
+      appointmentPolicy: "both",
+      serviceRadius: 15,
+      pickupDropoff: { available: false },
+      // Placeholder insurance - will need to be updated during onboarding/verification
       publicLiabilityInsurance: {
-        provider: publicLiabilityInsurance.provider.trim(),
-        policyNumber: publicLiabilityInsurance.policyNumber.trim(),
-        expiryDate: new Date(publicLiabilityInsurance.expiryDate),
-        coverAmount: publicLiabilityInsurance.coverAmount,
+        provider: "PENDING - To be verified",
+        policyNumber: "PENDING",
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        coverAmount: 0,
       },
-      professionalIndemnityInsurance: professionalIndemnityInsurance?.provider
-        ? {
-            provider: professionalIndemnityInsurance.provider.trim(),
-            policyNumber: professionalIndemnityInsurance.policyNumber?.trim(),
-            expiryDate: professionalIndemnityInsurance.expiryDate
-              ? new Date(professionalIndemnityInsurance.expiryDate)
-              : undefined,
-            coverAmount: professionalIndemnityInsurance.coverAmount,
-          }
-        : undefined,
-      certifications: certifications || [],
-      paymentTerms: paymentTerms || "14_days",
+      certifications: [],
+      paymentTerms: "14_days",
+      // Placeholder bank details - will need to be updated during onboarding
       bankDetails: {
-        accountName: bankDetails.accountName.trim(),
-        bsb: bankDetails.bsb.replace(/[\s-]/g, ""),
-        accountNumber: bankDetails.accountNumber.replace(/\s/g, ""),
+        accountName: "PENDING - To be verified",
+        bsb: "000000",
+        accountNumber: "00000000",
       },
-      gstRegistered: gstRegistered || false,
+      gstRegistered: false,
       status: "pending",
       submittedAt: new Date(),
     });
