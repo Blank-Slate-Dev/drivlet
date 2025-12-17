@@ -84,12 +84,27 @@ export default function GarageRegisterPage() {
       // Update the address input to show the full formatted address
       setAddressInput(details.formattedAddress);
       
+      // Map full state names to abbreviations
+      const stateAbbreviations: Record<string, string> = {
+        "New South Wales": "NSW",
+        "Queensland": "QLD",
+        "Victoria": "VIC",
+        "South Australia": "SA",
+        "Western Australia": "WA",
+        "Tasmania": "TAS",
+        "Northern Territory": "NT",
+        "Australian Capital Territory": "ACT",
+      };
+      
+      const stateValue = details.state || "";
+      const stateAbbr = stateAbbreviations[stateValue] || stateValue || "NSW";
+      
       setFormData((prev) => ({
         ...prev,
         address: streetAddress || details.formattedAddress.split(",")[0] || "",
         suburb: details.suburb || "",
         postcode: details.postcode || "",
-        state: details.state || "NSW",
+        state: stateAbbr,
       }));
     }
   };
