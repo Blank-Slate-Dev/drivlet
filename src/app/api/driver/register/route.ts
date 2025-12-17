@@ -250,7 +250,7 @@ export async function POST(request: Request) {
       emergencyContact: {
         name: "PENDING - To be provided",
         relationship: "PENDING",
-        phone: "0000000000",
+        phone: "0400000000", // Placeholder - valid format, to be updated during onboarding
       },
       status: "pending",
       submittedAt: new Date(),
