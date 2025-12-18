@@ -16,6 +16,8 @@ import {
   Menu,
   X,
   MapPin,
+  Car,
+  Building2,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -34,6 +36,33 @@ export default function Header({ onBookingClick }: HeaderProps) {
   const displayName = session?.user?.username ?? session?.user?.email ?? "User";
   const avatarLetter = displayName.charAt(0).toUpperCase();
   const isAdmin = session?.user?.role === "admin";
+  const isDriver = session?.user?.role === "driver";
+  const isGarage = session?.user?.role === "garage";
+
+  // Determine the correct dashboard URL based on role
+  const getDashboardUrl = () => {
+    if (isAdmin) return "/admin/dashboard";
+    if (isDriver) return "/driver/dashboard";
+    if (isGarage) return "/garage/dashboard";
+    return "/dashboard";
+  };
+
+  // Get dashboard label based on role
+  const getDashboardLabel = () => {
+    if (isDriver) return "Driver Dashboard";
+    if (isGarage) return "Garage Dashboard";
+    return "My Dashboard";
+  };
+
+  // Get role badge info
+  const getRoleBadge = () => {
+    if (isAdmin) return { label: "Admin", color: "bg-amber-100 text-amber-700" };
+    if (isDriver) return { label: "Driver", color: "bg-emerald-100 text-emerald-700" };
+    if (isGarage) return { label: "Garage", color: "bg-blue-100 text-blue-700" };
+    return null;
+  };
+
+  const roleBadge = getRoleBadge();
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -76,7 +105,9 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${
+                  isDriver ? "bg-emerald-600" : isGarage ? "bg-blue-600" : isAdmin ? "bg-amber-600" : "bg-emerald-600"
+                }`}>
                   {avatarLetter}
                 </div>
                 <span className="max-w-[100px] truncate">{displayName}</span>
@@ -90,18 +121,21 @@ export default function Header({ onBookingClick }: HeaderProps) {
               {showUserMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-2 shadow-lg">
+                  <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-lg">
                     <div className="border-b border-slate-100 px-4 py-2">
                       <p className="text-sm font-medium text-slate-900">{displayName}</p>
                       <p className="truncate text-xs text-slate-500">{session.user.email}</p>
-                      {isAdmin && (
-                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          <Shield className="h-3 w-3" />
-                          Admin
+                      {roleBadge && (
+                        <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${roleBadge.color}`}>
+                          {isAdmin && <Shield className="h-3 w-3" />}
+                          {isDriver && <Car className="h-3 w-3" />}
+                          {isGarage && <Building2 className="h-3 w-3" />}
+                          {roleBadge.label}
                         </span>
                       )}
                     </div>
 
+                    {/* Admin-specific links */}
                     {isAdmin && (
                       <div className="border-b border-slate-100 py-1">
                         <Link
@@ -123,23 +157,51 @@ export default function Header({ onBookingClick }: HeaderProps) {
                       </div>
                     )}
 
+                    {/* Role-aware dashboard link */}
                     <Link
-                      href="/dashboard"
+                      href={getDashboardUrl()}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      <User className="h-4 w-4" />
-                      My Dashboard
+                      {isDriver ? <Car className="h-4 w-4" /> : isGarage ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                      {getDashboardLabel()}
                     </Link>
 
-                    <Link
-                      href="/account"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <Settings className="h-4 w-4" />
-                      Account Settings
-                    </Link>
+                    {/* Account settings - only for regular users */}
+                    {!isDriver && !isGarage && (
+                      <Link
+                        href="/account"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        Account Settings
+                      </Link>
+                    )}
+
+                    {/* Driver-specific links */}
+                    {isDriver && (
+                      <Link
+                        href="/driver/settings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        Driver Settings
+                      </Link>
+                    )}
+
+                    {/* Garage-specific links */}
+                    {isGarage && (
+                      <Link
+                        href="/garage/settings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        Garage Settings
+                      </Link>
+                    )}
 
                     <button
                       type="button"
@@ -190,7 +252,9 @@ export default function Header({ onBookingClick }: HeaderProps) {
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm font-medium text-slate-700"
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${
+                isDriver ? "bg-emerald-600" : isGarage ? "bg-blue-600" : isAdmin ? "bg-amber-600" : "bg-emerald-600"
+              }`}>
                 {avatarLetter}
               </div>
               <ChevronDown
@@ -218,14 +282,17 @@ export default function Header({ onBookingClick }: HeaderProps) {
               <div className="border-b border-slate-100 px-4 py-2">
                 <p className="text-sm font-medium text-slate-900">{displayName}</p>
                 <p className="truncate text-xs text-slate-500">{session.user.email}</p>
-                {isAdmin && (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                    <Shield className="h-3 w-3" />
-                    Admin
+                {roleBadge && (
+                  <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${roleBadge.color}`}>
+                    {isAdmin && <Shield className="h-3 w-3" />}
+                    {isDriver && <Car className="h-3 w-3" />}
+                    {isGarage && <Building2 className="h-3 w-3" />}
+                    {roleBadge.label}
                   </span>
                 )}
               </div>
 
+              {/* Admin-specific links */}
               {isAdmin && (
                 <div className="border-b border-slate-100 py-1">
                   <Link
@@ -247,23 +314,49 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 </div>
               )}
 
+              {/* Role-aware dashboard link */}
               <Link
-                href="/dashboard"
+                href={getDashboardUrl()}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 onClick={() => setShowUserMenu(false)}
               >
-                <User className="h-4 w-4" />
-                My Dashboard
+                {isDriver ? <Car className="h-4 w-4" /> : isGarage ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                {getDashboardLabel()}
               </Link>
 
-              <Link
-                href="/account"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                onClick={() => setShowUserMenu(false)}
-              >
-                <Settings className="h-4 w-4" />
-                Account Settings
-              </Link>
+              {/* Account/settings link based on role */}
+              {!isDriver && !isGarage && (
+                <Link
+                  href="/account"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Account Settings
+                </Link>
+              )}
+
+              {isDriver && (
+                <Link
+                  href="/driver/settings"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Driver Settings
+                </Link>
+              )}
+
+              {isGarage && (
+                <Link
+                  href="/garage/settings"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Garage Settings
+                </Link>
+              )}
 
               <button
                 type="button"
@@ -281,81 +374,76 @@ export default function Header({ onBookingClick }: HeaderProps) {
         {showMobileMenu && (
           <>
             <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowMobileMenu(false)} />
-            <div className="absolute left-0 right-0 top-full z-50 border-b border-slate-200 bg-white py-4 shadow-lg md:hidden">
-              <nav className="flex flex-col space-y-1 px-4">
+            <div className="absolute left-0 right-0 top-full z-50 border-b border-slate-200 bg-white px-4 py-4 shadow-lg md:hidden">
+              <nav className="flex flex-col gap-3">
                 <a
                   href="#how-it-works"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   How it works
                 </a>
-
                 <a
                   href="#services"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   Our services
                 </a>
-
                 <a
                   href="#pricing"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   Pricing
                 </a>
-
                 <a
                   href="#faq"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   FAQ
                 </a>
-
                 <Link
                   href="/track"
-                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   <MapPin className="h-4 w-4" />
                   Track my service
                 </Link>
 
+                <div className="my-2 h-px bg-slate-200" />
+
                 {!session?.user && (
-                  <div className="mt-2 border-t border-slate-100 pt-3">
+                  <>
                     <Link
                       href="/login"
-                      className="block rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                       onClick={() => setShowMobileMenu(false)}
                     >
                       Login
                     </Link>
                     <Link
                       href="/register"
-                      className="block rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                       onClick={() => setShowMobileMenu(false)}
                     >
                       Sign up
                     </Link>
-                  </div>
+                  </>
                 )}
 
-                <div className="pt-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowMobileMenu(false);
-                      onBookingClick();
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
-                  >
-                    Book a service
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    onBookingClick();
+                  }}
+                  className="mt-2 w-full rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+                >
+                  Book a service
+                </button>
               </nav>
             </div>
           </>

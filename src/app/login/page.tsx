@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowRight, Mail, Lock, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Mail, Lock, CheckCircle2, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -43,16 +43,40 @@ function LoginForm() {
 
       if (result?.error) {
         setError(result.error);
+        setLoading(false);
         return;
       }
 
-      // Redirect to callbackUrl if provided, otherwise home
-      const callbackUrl = searchParams.get("callbackUrl") || "/";
-      router.push(callbackUrl);
-      router.refresh();
+      // Fetch session to check role and determine redirect
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+
+      if (session?.user) {
+        const callbackUrl = searchParams.get("callbackUrl");
+        
+        // Role-based routing
+        switch (session.user.role) {
+          case "admin":
+            router.push(callbackUrl || "/admin/dashboard");
+            break;
+          case "driver":
+            // Redirect drivers to driver login - they shouldn't use this form
+            setError("Please use the driver login portal.");
+            setLoading(false);
+            return;
+          case "garage":
+            // Redirect garages to garage login - they shouldn't use this form
+            setError("Please use the garage partner login portal.");
+            setLoading(false);
+            return;
+          default:
+            // Regular users go to callback or home
+            router.push(callbackUrl || "/");
+        }
+        router.refresh();
+      }
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -69,7 +93,7 @@ function LoginForm() {
         />
       </div>
 
-      {/* Header - matches homepage Header.tsx positioning exactly */}
+      {/* Header */}
       <header className="sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
@@ -96,11 +120,11 @@ function LoginForm() {
         >
           <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+              <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
                 Welcome back
-              </h1>
+              </h2>
               <p className="text-slate-600 mt-2">
-                Sign in to manage your bookings
+                Sign in to your account
               </p>
             </div>
 
@@ -110,7 +134,7 @@ function LoginForm() {
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3"
               >
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
                 <p className="text-emerald-700 text-sm">{success}</p>
               </motion.div>
             )}
@@ -187,26 +211,11 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
+                    <Loader2 className="h-5 w-5 animate-spin" />
                     Signing in...
                   </>
                 ) : (
@@ -218,28 +227,39 @@ function LoginForm() {
               </button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-slate-200 text-center">
-              <p className="text-slate-600">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href="/register"
-                  className="text-emerald-600 hover:text-emerald-700 font-semibold transition"
-                >
-                  Create one
-                </Link>
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <p className="text-center text-slate-500 text-sm mb-4">
+                Don&apos;t have an account?
               </p>
+              <Link
+                href="/register"
+                className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
+              >
+                Create an account
+              </Link>
             </div>
           </div>
 
-          {/* Back to home link */}
-          <div className="mt-6 text-center">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition"
-            >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-              Back to home
-            </Link>
+          {/* Partner login links */}
+          <div className="mt-6 text-center space-y-3">
+            <p className="text-emerald-100 text-sm">
+              Are you a partner?
+            </p>
+            <div className="flex justify-center gap-4">
+              <Link
+                href="/driver/login"
+                className="text-white font-medium hover:text-emerald-200 transition text-sm"
+              >
+                Driver Login →
+              </Link>
+              <span className="text-emerald-300">|</span>
+              <Link
+                href="/garage/login"
+                className="text-white font-medium hover:text-emerald-200 transition text-sm"
+              >
+                Garage Login →
+              </Link>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -251,27 +271,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
-          <div className="text-white flex items-center gap-2">
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            Loading...
-          </div>
-        </main>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
       }
     >
       <LoginForm />
