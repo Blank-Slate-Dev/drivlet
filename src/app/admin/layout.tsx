@@ -16,6 +16,7 @@ import {
   Users,
   Building2,
   MessageSquare,
+  Car,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -141,6 +142,17 @@ export default function AdminLayout({
               <span className="hidden sm:inline">Users</span>
             </Link>
             <Link
+              href="/admin/drivers"
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                isActive("/admin/drivers")
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Car className="h-4 w-4" />
+              <span className="hidden sm:inline">Drivers</span>
+            </Link>
+            <Link
               href="/admin/garages"
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                 isActive("/admin/garages")
@@ -149,7 +161,7 @@ export default function AdminLayout({
               }`}
             >
               <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Partners</span>
+              <span className="hidden sm:inline">Garages</span>
             </Link>
             <Link
               href="/admin/inquiries"
