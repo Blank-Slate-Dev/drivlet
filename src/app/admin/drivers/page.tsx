@@ -265,7 +265,7 @@ export default function AdminDriversPage() {
     if (!search) return true;
     const searchLower = search.toLowerCase();
     const fullName = `${driver.firstName} ${driver.lastName}`.toLowerCase();
-    const email = (driver.userId as { email?: string })?.email?.toLowerCase() || "";
+    const email = driver.userId?.email?.toLowerCase() || "";
     return (
       fullName.includes(searchLower) ||
       email.includes(searchLower) ||
@@ -473,7 +473,7 @@ export default function AdminDriversPage() {
                               {driver.firstName} {driver.lastName}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {(driver.userId as { email?: string })?.email || driver.phone}
+                              {driver.userId?.email || driver.phone}
                             </p>
                           </div>
                         </div>
@@ -613,7 +613,7 @@ export default function AdminDriversPage() {
                       <div className="flex items-center gap-1.5">
                         <Mail className="h-4 w-4 text-slate-400" />
                         <p className="font-medium text-slate-900">
-                          {(selectedDriver.userId as { email?: string })?.email || "—"}
+                          {selectedDriver.userId?.email || "—"}
                         </p>
                       </div>
                     </div>

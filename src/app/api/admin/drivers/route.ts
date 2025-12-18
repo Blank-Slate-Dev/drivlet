@@ -25,9 +25,18 @@ export async function GET(request: Request) {
       query.status = status;
     }
 
+    // Define the shape of populated user data
+    interface PopulatedUser {
+      _id: mongoose.Types.ObjectId;
+      email: string;
+      username: string;
+      createdAt: Date;
+      isApproved: boolean;
+    }
+
     // Fetch drivers with user data
     const drivers = await Driver.find(query)
-      .populate("userId", "email username createdAt isApproved")
+      .populate<{ userId: PopulatedUser | null }>("userId", "email username createdAt isApproved")
       .sort({ submittedAt: -1 })
       .lean();
 
@@ -45,7 +54,14 @@ export async function GET(request: Request) {
       drivers: drivers.map((driver) => ({
         ...driver,
         _id: driver._id.toString(),
-        userId: driver.userId?._id?.toString() || driver.userId?.toString(),
+        // Preserve the populated user data, just convert the nested _id to string
+        userId: driver.userId ? {
+          _id: driver.userId._id?.toString(),
+          email: driver.userId.email,
+          username: driver.userId.username,
+          createdAt: driver.userId.createdAt,
+          isApproved: driver.userId.isApproved,
+        } : null,
       })),
       stats,
     });
