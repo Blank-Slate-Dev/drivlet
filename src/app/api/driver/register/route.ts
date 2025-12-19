@@ -143,13 +143,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ABN validation (optional)
-    if (abn && !validateABN(abn)) {
-      return NextResponse.json(
-        { error: "ABN must be 11 digits if provided" },
-        { status: 400 }
-      );
-    }
+    // NOTE: ABN is no longer accepted - all drivers must be employees, not contractors
 
     // ===== DATABASE OPERATIONS =====
 
@@ -241,8 +235,8 @@ export async function POST(request: Request) {
       availability: defaultAvailability,
       maxJobsPerDay: 10,
       preferredAreas: ["Newcastle", "Lake Macquarie", "Maitland"],
-      employmentType: abn ? "contractor" : "employee",
-      abn: abn?.replace(/\s/g, "") || undefined,
+      // ENFORCED: All drivers are employees, not contractors
+      employmentType: "employee",
       bankDetails: {
         accountName: accountName.trim(),
         bsb: bsb.replace(/[\s-]/g, ""),
@@ -253,10 +247,22 @@ export async function POST(request: Request) {
         relationship: "PENDING",
         phone: "0400000000", // Placeholder - valid format, to be updated during onboarding
       },
+      // Application status
       status: "pending",
       submittedAt: new Date(),
+      
+      // ========== ONBOARDING STATE MACHINE INITIAL VALUES ==========
+      // Driver starts with onboarding not started
+      onboardingStatus: "not_started",
+      // Contracts not yet signed
+      contracts: {},
+      // Cannot accept jobs until fully onboarded
+      canAcceptJobs: false,
+      // NOTE: insuranceEligible is now a VIRTUAL (derived) field
+      // It will be false until onboardingStatus === "active"
+      // =================================================================
+      
       isActive: true,
-      canAcceptJobs: false, // Will be set to true after approval
       metrics: {
         totalJobs: 0,
         completedJobs: 0,

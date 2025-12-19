@@ -7,6 +7,7 @@ export default withAuth(
     const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
 
+    // ========== GARAGE ROUTES ==========
     // Garage dashboard routes require garage role and approval
     if (
       pathname.startsWith("/garage/dashboard") ||
@@ -32,33 +33,73 @@ export default withAuth(
       }
     }
 
-    // Driver dashboard routes require driver role and approval
+    // ========== DRIVER ROUTES - STATE MACHINE ENFORCEMENT ==========
+    
+    // Driver dashboard routes require:
+    // 1. role === "driver"
+    // 2. isApproved === true (admin approved)
+    // 3. onboardingStatus === "active" (contracts signed, fully activated)
+    // NOTE: insuranceEligible is derived from onboardingStatus === "active", so we don't check it separately
     if (
       pathname.startsWith("/driver/dashboard") ||
       pathname.startsWith("/driver/jobs") ||
       pathname.startsWith("/driver/earnings") ||
       pathname.startsWith("/driver/settings")
     ) {
+      // Not a driver? Go to driver login
       if (token?.role !== "driver") {
         return NextResponse.redirect(new URL("/driver/login", req.url));
       }
+      
+      // Not approved by admin? Go to pending page
       if (!token?.isApproved) {
         return NextResponse.redirect(new URL("/driver/pending", req.url));
       }
+      
+      // Approved but not fully onboarded? Go to onboarding
+      // This is the key enforcement: approved ≠ can work
+      if (token?.onboardingStatus !== "active") {
+        return NextResponse.redirect(new URL("/driver/onboarding", req.url));
+      }
     }
 
-    // Driver pending page - allow driver users who are not approved
+    // Driver pending page - for drivers awaiting admin approval
     if (pathname === "/driver/pending") {
       if (token?.role !== "driver") {
         return NextResponse.redirect(new URL("/driver/login", req.url));
       }
-      // If approved, redirect to dashboard
+      
+      // If approved by admin, check onboarding status
       if (token?.isApproved) {
+        // If not fully onboarded, go to onboarding
+        if (token?.onboardingStatus !== "active") {
+          return NextResponse.redirect(new URL("/driver/onboarding", req.url));
+        }
+        // Fully onboarded? Go to dashboard
         return NextResponse.redirect(new URL("/driver/dashboard", req.url));
       }
+      // Otherwise, stay on pending page (not yet approved)
     }
 
-    // Admin routes require admin role
+    // Driver onboarding page - for approved drivers who need to sign contracts
+    if (pathname.startsWith("/driver/onboarding")) {
+      if (token?.role !== "driver") {
+        return NextResponse.redirect(new URL("/driver/login", req.url));
+      }
+      
+      // Not approved yet? Go to pending
+      if (!token?.isApproved) {
+        return NextResponse.redirect(new URL("/driver/pending", req.url));
+      }
+      
+      // Already fully onboarded? Go to dashboard
+      if (token?.onboardingStatus === "active") {
+        return NextResponse.redirect(new URL("/driver/dashboard", req.url));
+      }
+      // Otherwise, stay on onboarding page
+    }
+
+    // ========== ADMIN ROUTES ==========
     if (pathname.startsWith("/admin")) {
       if (token?.role !== "admin") {
         return NextResponse.redirect(new URL("/", req.url));
@@ -100,6 +141,7 @@ export const config = {
     "/driver/earnings/:path*",
     "/driver/settings/:path*",
     "/driver/pending",
+    "/driver/onboarding/:path*", // NEW: Onboarding routes
     "/admin/:path*",
   ],
 };

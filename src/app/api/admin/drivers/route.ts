@@ -18,11 +18,15 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status"); // pending, approved, rejected, suspended, all
+    const onboardingStatus = searchParams.get("onboardingStatus"); // Filter by onboarding status
 
     // Build query
     const query: Record<string, unknown> = {};
     if (status && status !== "all") {
       query.status = status;
+    }
+    if (onboardingStatus && onboardingStatus !== "all") {
+      query.onboardingStatus = onboardingStatus;
     }
 
     // Define the shape of populated user data
@@ -35,6 +39,8 @@ export async function GET(request: Request) {
     }
 
     // Fetch drivers with user data
+    // NOTE: Using lean() for performance - virtuals like insuranceEligible won't be included
+    // We compute derived fields manually in the response
     const drivers = await Driver.find(query)
       .populate<{ userId: PopulatedUser | null }>("userId", "email username createdAt isApproved")
       .sort({ submittedAt: -1 })
@@ -42,18 +48,33 @@ export async function GET(request: Request) {
 
     // Calculate stats
     const allDrivers = await Driver.find({}).lean();
+    
+    // Helper to compute derived insuranceEligible (since virtuals don't work with lean)
+    const isInsuranceEligible = (d: typeof allDrivers[0]) => 
+      d.employmentType === "employee" && d.onboardingStatus === "active";
+    
     const stats = {
       total: allDrivers.length,
       pending: allDrivers.filter((d) => d.status === "pending").length,
       approved: allDrivers.filter((d) => d.status === "approved").length,
       rejected: allDrivers.filter((d) => d.status === "rejected").length,
       suspended: allDrivers.filter((d) => d.status === "suspended").length,
+      // Onboarding stats (3 states only)
+      onboarding: {
+        notStarted: allDrivers.filter((d) => d.onboardingStatus === "not_started").length,
+        contractsPending: allDrivers.filter((d) => d.onboardingStatus === "contracts_pending").length,
+        active: allDrivers.filter((d) => d.onboardingStatus === "active").length,
+      },
+      // Computed from derived logic
+      insuranceEligible: allDrivers.filter(isInsuranceEligible).length,
     };
 
     return NextResponse.json({
       drivers: drivers.map((driver) => ({
         ...driver,
         _id: driver._id.toString(),
+        // Compute insuranceEligible since it's a virtual and lean() doesn't include it
+        insuranceEligible: driver.employmentType === "employee" && driver.onboardingStatus === "active",
         // Preserve the populated user data, just convert the nested _id to string
         userId: driver.userId ? {
           _id: driver.userId._id?.toString(),
@@ -129,12 +150,53 @@ export async function PATCH(request: Request) {
       driver.rejectionReason = rejectionReason;
     }
 
-    // When approving, enable the driver to accept jobs
-    if (action === "approve" || action === "reactivate") {
-      driver.canAcceptJobs = true;
+    // ========== ONBOARDING STATE MACHINE LOGIC ==========
+    
+    if (action === "approve") {
+      // CRITICAL: Approval only advances to "contracts_pending"
+      // Driver CANNOT accept jobs yet - they must complete onboarding
+      driver.onboardingStatus = "contracts_pending";
+      driver.canAcceptJobs = false; // EXPLICITLY FALSE
+      // insuranceEligible is now derived from onboardingStatus, not set directly
+    } else if (action === "reactivate") {
+      // Reactivating a suspended driver
+      // Check if they had completed onboarding before suspension
+      if (driver.contracts?.employmentContractSignedAt && 
+          driver.contracts?.driverAgreementSignedAt &&
+          driver.contracts?.workHealthSafetySignedAt &&
+          driver.contracts?.codeOfConductSignedAt) {
+        // They had completed onboarding, restore to active
+        driver.onboardingStatus = "active";
+        driver.canAcceptJobs = true;
+      } else {
+        // They hadn't completed onboarding, send back to contracts_pending
+        driver.onboardingStatus = "contracts_pending";
+        driver.canAcceptJobs = false;
+      }
     } else if (action === "suspend") {
+      // Suspending a driver removes job access immediately
+      driver.canAcceptJobs = false;
+      // Note: We keep onboardingStatus as-is for record keeping
+      // The canAcceptJobs = false is what matters for blocking
+    } else if (action === "reject") {
+      // PRESERVE AUDIT TRAIL: Add to rejection history before updating
+      if (!driver.rejectionHistory) {
+        driver.rejectionHistory = [];
+      }
+      driver.rejectionHistory.push({
+        rejectedAt: new Date(),
+        rejectedBy: new mongoose.Types.ObjectId(adminCheck.session?.user.id || ""),
+        reason: rejectionReason || "No reason provided",
+      });
+      
+      // STATUS CLARITY:
+      // - driver.status = "rejected" (set by statusMap above) = admin decision, source of truth
+      // - driver.onboardingStatus = "not_started" = reset for potential re-application
+      // We keep submittedAt, contracts, rejectionHistory for full audit trail
+      driver.onboardingStatus = "not_started";
       driver.canAcceptJobs = false;
     }
+    // ==========================================================
 
     await driver.save();
 
@@ -150,6 +212,7 @@ export async function PATCH(request: Request) {
       driver: {
         _id: driver._id.toString(),
         status: driver.status,
+        onboardingStatus: driver.onboardingStatus,
         reviewedAt: driver.reviewedAt,
         canAcceptJobs: driver.canAcceptJobs,
       },

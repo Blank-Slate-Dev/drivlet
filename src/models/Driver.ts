@@ -3,7 +3,23 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type DriverStatus = "pending" | "approved" | "suspended" | "rejected";
 export type LicenseClass = "C" | "LR" | "MR" | "HR" | "HC" | "MC";
-export type EmploymentType = "employee" | "contractor";
+export type EmploymentType = "employee"; // ENFORCED: All drivers must be employees
+
+// Onboarding state machine - this is the core of the insurance-compliant flow
+// SIMPLIFIED MODEL (no extra admin checkpoint needed):
+//   not_started → contracts_pending → active
+export type OnboardingStatus = 
+  | "not_started"       // Initial state after registration (awaiting admin review)
+  | "contracts_pending" // Admin approved, must sign employment contracts
+  | "active";           // Contracts signed, can work, insured
+
+// Contract types that must be signed
+export interface DriverContracts {
+  employmentContractSignedAt?: Date;
+  driverAgreementSignedAt?: Date;
+  workHealthSafetySignedAt?: Date;
+  codeOfConductSignedAt?: Date;
+}
 
 interface OperatingHoursDay {
   available: boolean;
@@ -74,10 +90,9 @@ export interface IDriver extends Document {
   maxJobsPerDay: number;
   preferredAreas: string[]; // Suburbs/postcodes they prefer to work in
 
-  // Employment Details
-  employmentType: EmploymentType;
-  tfn?: string; // Tax File Number (encrypted/hashed in production)
-  abn?: string; // If contractor
+  // Employment Details - ENFORCED EMPLOYEE STATUS
+  employmentType: EmploymentType; // Always "employee"
+  tfn?: string; // Tax File Number (encrypted/hashed in production) - collected during onboarding
   superannuationFund?: string;
   superannuationMemberNumber?: string;
 
@@ -95,12 +110,33 @@ export interface IDriver extends Document {
     phone: string;
   };
 
-  // Status & Verification
+  // Application Status (Admin review)
   status: DriverStatus;
   submittedAt: Date;
   reviewedAt?: Date;
   reviewedBy?: mongoose.Types.ObjectId;
   rejectionReason?: string;
+  
+  // Rejection history for audit trail (preserves history on re-application)
+  rejectionHistory?: Array<{
+    rejectedAt: Date;
+    rejectedBy: mongoose.Types.ObjectId;
+    reason: string;
+  }>;
+
+  // ========== ONBOARDING STATE MACHINE ==========
+  // This controls the insurance-compliant employment flow
+  onboardingStatus: OnboardingStatus;
+  
+  // Contract signatures - required for insurance eligibility
+  contracts: DriverContracts;
+  
+  // NOTE: insuranceEligible is now a VIRTUAL (derived) field, not stored
+  // It is computed as: employmentType === "employee" && onboardingStatus === "active"
+  
+  // Official employee start date - set when onboarding completes
+  employeeStartDate?: Date;
+  // ====================================================
 
   // Performance Metrics (updated over time)
   metrics?: {
@@ -113,7 +149,7 @@ export interface IDriver extends Document {
 
   // Flags
   isActive: boolean; // Can toggle availability
-  canAcceptJobs: boolean; // Admin can disable
+  canAcceptJobs: boolean; // ONLY true when onboardingStatus === "active" AND insuranceEligible
 
   createdAt: Date;
   updatedAt: Date;
@@ -286,26 +322,17 @@ const DriverSchema = new Schema<IDriver>(
       default: [],
     },
 
-    // Employment Details
+    // Employment Details - ENFORCED EMPLOYEE STATUS
     employmentType: {
       type: String,
-      enum: ["employee", "contractor"],
+      enum: ["employee"], // Only "employee" allowed - no contractors
       default: "employee",
+      required: true,
     },
     tfn: {
       type: String,
       trim: true,
-    },
-    abn: {
-      type: String,
-      trim: true,
-      validate: {
-        validator: function (v: string) {
-          if (!v) return true; // Optional
-          return /^\d{11}$/.test(v.replace(/\s/g, ""));
-        },
-        message: "ABN must be 11 digits",
-      },
+      // TFN collected during onboarding, not registration
     },
     superannuationFund: {
       type: String,
@@ -360,7 +387,7 @@ const DriverSchema = new Schema<IDriver>(
       },
     },
 
-    // Status
+    // Application Status (Admin review)
     status: {
       type: String,
       enum: ["pending", "approved", "suspended", "rejected"],
@@ -380,6 +407,36 @@ const DriverSchema = new Schema<IDriver>(
     rejectionReason: {
       type: String,
     },
+    
+    // Rejection history for audit trail (preserves history on re-application)
+    rejectionHistory: [{
+      rejectedAt: { type: Date, required: true },
+      rejectedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      reason: { type: String, required: true },
+    }],
+
+    // ========== ONBOARDING STATE MACHINE ==========
+    // Simplified model: not_started → contracts_pending → active
+    onboardingStatus: {
+      type: String,
+      enum: ["not_started", "contracts_pending", "active"],
+      default: "not_started",
+      required: true,
+    },
+    
+    // Contract signatures with timestamps
+    contracts: {
+      employmentContractSignedAt: { type: Date },
+      driverAgreementSignedAt: { type: Date },
+      workHealthSafetySignedAt: { type: Date },
+      codeOfConductSignedAt: { type: Date },
+    },
+    
+    // Official employee start date
+    employeeStartDate: {
+      type: Date,
+    },
+    // ================================================
 
     // Metrics
     metrics: {
@@ -397,17 +454,20 @@ const DriverSchema = new Schema<IDriver>(
     },
     canAcceptJobs: {
       type: Boolean,
-      default: false, // Set to true after approval
+      default: false, // ONLY true when onboardingStatus === "active"
     },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
 // Create indexes
 DriverSchema.index({ userId: 1 });
 DriverSchema.index({ status: 1 });
+DriverSchema.index({ onboardingStatus: 1 });
 DriverSchema.index({ isActive: 1, canAcceptJobs: 1 });
 DriverSchema.index({ "license.number": 1, "license.state": 1 });
 DriverSchema.index({ preferredAreas: 1 });
@@ -415,6 +475,44 @@ DriverSchema.index({ preferredAreas: 1 });
 // Virtual for full name
 DriverSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;
+});
+
+// DERIVED VIRTUAL: insuranceEligible
+// This is computed, not stored - prevents bypass attacks
+DriverSchema.virtual("insuranceEligible").get(function () {
+  return this.employmentType === "employee" && this.onboardingStatus === "active";
+});
+
+// Virtual to check if driver can work (all requirements met)
+DriverSchema.virtual("canWork").get(function () {
+  return (
+    this.status === "approved" &&
+    this.onboardingStatus === "active" &&
+    this.canAcceptJobs === true &&
+    this.isActive === true
+  );
+});
+
+// Pre-save validation hook - throws errors for invalid state transitions
+DriverSchema.pre("save", async function () {
+  // VALIDATION: canAcceptJobs can only be true if onboardingStatus is "active"
+  if (this.canAcceptJobs === true && this.onboardingStatus !== "active") {
+    throw new Error("Cannot set canAcceptJobs=true when onboardingStatus is not 'active'");
+  }
+  
+  // VALIDATION: Cannot jump to "active" without having contracts signed
+  if (this.onboardingStatus === "active") {
+    const contracts = this.contracts;
+    if (!contracts?.employmentContractSignedAt || 
+        !contracts?.driverAgreementSignedAt ||
+        !contracts?.workHealthSafetySignedAt ||
+        !contracts?.codeOfConductSignedAt) {
+      throw new Error("Cannot set onboardingStatus='active' without all contracts signed");
+    }
+  }
+  
+  // ENFORCEMENT: Employment type must always be "employee"
+  this.employmentType = "employee";
 });
 
 // Prevent OverwriteModelError

@@ -35,8 +35,15 @@ export default function DriverDashboardPage() {
     if (status === "authenticated" && session?.user?.role !== "driver") {
       router.push("/");
     }
+    // Check if driver is approved by admin
     if (status === "authenticated" && !session?.user?.isApproved) {
       router.push("/driver/pending");
+    }
+    // CRITICAL: Check if driver has completed onboarding
+    // This enforces the state machine - approved ≠ can work
+    // insuranceEligible is derived from onboardingStatus === "active"
+    if (status === "authenticated" && session?.user?.onboardingStatus !== "active") {
+      router.push("/driver/onboarding");
     }
   }, [session, status, router]);
 

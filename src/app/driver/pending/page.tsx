@@ -23,24 +23,46 @@ import {
 } from "lucide-react";
 
 export default function DriverPendingPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated") {
-      if (session?.user?.isApproved && session?.user?.role === "driver") {
-        router.push("/driver/dashboard");
-      }
+      // If user is not a driver, redirect home
       if (session?.user?.role !== "driver") {
         router.push("/");
+        return;
       }
+      
+      // If approved by admin, check onboarding status
+      if (session?.user?.isApproved) {
+        // If not fully onboarded, go to onboarding
+        if (session?.user?.onboardingStatus !== "active") {
+          router.push("/driver/onboarding");
+        } else {
+          // Fully onboarded, go to dashboard
+          router.push("/driver/dashboard");
+        }
+      }
+      // Otherwise, stay on pending page (not yet approved by admin)
     }
   }, [session, status, router]);
 
   const handleCheckStatus = async () => {
     setChecking(true);
-    window.location.reload();
+    try {
+      // Trigger session refresh to get latest status from server
+      await update();
+      // Small delay to allow state to update
+      setTimeout(() => {
+        router.refresh();
+        setChecking(false);
+      }, 500);
+    } catch {
+      // Fallback to page reload if update fails
+      window.location.reload();
+    }
   };
 
   const handleSignOut = () => {

@@ -4,7 +4,9 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import Driver from "@/models/Driver";
 import type { UserRole } from "@/models/User";
+import type { OnboardingStatus } from "@/models/Driver";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -38,12 +40,26 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid password");
         }
 
+        // If user is a driver, fetch their onboarding status
+        let onboardingStatus: OnboardingStatus | undefined;
+        let canAcceptJobs: boolean | undefined;
+
+        if (user.role === "driver" && user.driverProfile) {
+          const driver = await Driver.findById(user.driverProfile);
+          if (driver) {
+            onboardingStatus = driver.onboardingStatus;
+            canAcceptJobs = driver.canAcceptJobs;
+          }
+        }
+
         return {
           id: user._id.toString(),
           username: user.username,
           email: user.email,
           role: user.role || "user",
-          isApproved: user.isApproved ?? true, // Default to true for existing users
+          isApproved: user.isApproved ?? true,
+          onboardingStatus,
+          canAcceptJobs,
         };
       },
     }),
@@ -56,14 +72,32 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.username = user.username;
         token.email = user.email;
         token.role = user.role as UserRole;
         token.isApproved = user.isApproved;
+        token.onboardingStatus = user.onboardingStatus;
+        token.canAcceptJobs = user.canAcceptJobs;
       }
+      
+      // Refresh driver status on session update
+      // This handles the JWT staleness issue after admin approval or contract signing
+      if (trigger === "update" && token.role === "driver") {
+        await connectDB();
+        const dbUser = await User.findById(token.id);
+        if (dbUser?.driverProfile) {
+          const driver = await Driver.findById(dbUser.driverProfile);
+          if (driver) {
+            token.isApproved = dbUser.isApproved;
+            token.onboardingStatus = driver.onboardingStatus;
+            token.canAcceptJobs = driver.canAcceptJobs;
+          }
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
@@ -73,6 +107,8 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.role = token.role as UserRole;
         session.user.isApproved = token.isApproved as boolean;
+        session.user.onboardingStatus = token.onboardingStatus as OnboardingStatus | undefined;
+        session.user.canAcceptJobs = token.canAcceptJobs as boolean | undefined;
       }
       return session;
     },
