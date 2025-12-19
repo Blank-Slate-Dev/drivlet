@@ -2,8 +2,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Contact from "@/models/Contact";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { sanitizeString } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting - prevent spam
+  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "contact");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { name, email, phone, message } = body;
@@ -52,17 +68,16 @@ export async function POST(request: NextRequest) {
     // Connect to database
     await connectDB();
 
-    // Create new contact submission
+    // Create new contact submission with sanitized inputs
     const contact = new Contact({
-      name: name.trim(),
+      name: sanitizeString(name, 100),
       email: email.toLowerCase().trim(),
-      phone: phone?.trim() || undefined,
-      message: message.trim(),
+      phone: phone ? sanitizeString(phone, 20) : undefined,
+      message: sanitizeString(message, 1000),
       status: "new",
     });
 
     await contact.save();
-    console.log("Contact form submission saved:", contact._id);
 
     return NextResponse.json(
       { success: true, message: "Message sent successfully" },
