@@ -62,12 +62,13 @@ export interface IDriver extends Document {
     photoUrl?: string;
   };
 
-  // Additional Checks
+  // Police Check - REQUIRED for onboarding
   policeCheck?: {
     completed: boolean;
     certificateNumber?: string;
     issueDate?: Date;
     expiryDate?: Date;
+    documentUrl?: string; // Vercel Blob URL
   };
 
   // Vehicle Information (optional - some drivers may use company vehicles)
@@ -266,12 +267,13 @@ const DriverSchema = new Schema<IDriver>(
       },
     },
 
-    // Police Check
+    // Police Check - REQUIRED for onboarding
     policeCheck: {
       completed: { type: Boolean, default: false },
       certificateNumber: { type: String, trim: true },
       issueDate: { type: Date },
       expiryDate: { type: Date },
+      documentUrl: { type: String }, // Vercel Blob URL
     },
 
     // Vehicle Information
@@ -508,6 +510,11 @@ DriverSchema.pre("save", async function () {
         !contracts?.workHealthSafetySignedAt ||
         !contracts?.codeOfConductSignedAt) {
       throw new Error("Cannot set onboardingStatus='active' without all contracts signed");
+    }
+    
+    // VALIDATION: Cannot be active without police check
+    if (!this.policeCheck?.completed || !this.policeCheck?.documentUrl) {
+      throw new Error("Cannot set onboardingStatus='active' without a completed police check");
     }
   }
   

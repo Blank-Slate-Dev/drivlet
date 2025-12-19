@@ -1,7 +1,7 @@
 // src/app/driver/onboarding/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -22,6 +22,9 @@ import {
   Car,
   Check,
   Building2,
+  Upload,
+  FileCheck,
+  X,
 } from "lucide-react";
 
 interface DriverOnboarding {
@@ -32,6 +35,13 @@ interface DriverOnboarding {
   onboardingStatus: string;
   insuranceEligible: boolean;
   canAcceptJobs: boolean;
+  policeCheck?: {
+    completed: boolean;
+    certificateNumber?: string;
+    issueDate?: string;
+    expiryDate?: string;
+    documentUrl?: string;
+  };
   contracts?: {
     employmentContractSignedAt?: string;
     driverAgreementSignedAt?: string;
@@ -40,17 +50,26 @@ interface DriverOnboarding {
   };
 }
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 export default function DriverOnboardingPage() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [driver, setDriver] = useState<DriverOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [currentStep, setCurrentStep] = useState<Step>(1);
+  
+  // Police check state
+  const [policeCheckFile, setPoliceCheckFile] = useState<File | null>(null);
+  const [policeCheckUploading, setPoliceCheckUploading] = useState(false);
+  const [policeCheckUploaded, setPoliceCheckUploaded] = useState(false);
+  const [certificateNumber, setCertificateNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
   
   // Contract acceptances
   const [employmentContractAccepted, setEmploymentContractAccepted] = useState(false);
@@ -85,6 +104,18 @@ export default function DriverOnboardingPage() {
       const data = await response.json();
       setDriver(data.driver);
       
+      // If police check already uploaded, mark it
+      if (data.driver.policeCheck?.completed && data.driver.policeCheck?.documentUrl) {
+        setPoliceCheckUploaded(true);
+        setCertificateNumber(data.driver.policeCheck.certificateNumber || "");
+        if (data.driver.policeCheck.issueDate) {
+          setIssueDate(data.driver.policeCheck.issueDate.split("T")[0]);
+        }
+        if (data.driver.policeCheck.expiryDate) {
+          setExpiryDate(data.driver.policeCheck.expiryDate.split("T")[0]);
+        }
+      }
+      
       // If already active, redirect to dashboard
       if (data.driver.onboardingStatus === "active") {
         router.push("/driver/dashboard");
@@ -96,10 +127,71 @@ export default function DriverOnboardingPage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(file.type)) {
+        setError("Invalid file type. Please upload a PDF or image (JPEG, PNG, WebP)");
+        return;
+      }
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File too large. Maximum size is 10MB");
+        return;
+      }
+      setPoliceCheckFile(file);
+      setError("");
+    }
+  };
+
+  const handlePoliceCheckUpload = async () => {
+    if (!policeCheckFile || !certificateNumber || !issueDate || !expiryDate) {
+      setError("Please fill in all police check details and upload your certificate");
+      return;
+    }
+
+    try {
+      setPoliceCheckUploading(true);
+      setError("");
+
+      const formData = new FormData();
+      formData.append("file", policeCheckFile);
+      formData.append("certificateNumber", certificateNumber);
+      formData.append("issueDate", issueDate);
+      formData.append("expiryDate", expiryDate);
+
+      const response = await fetch("/api/upload/police-check", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload police check");
+      }
+
+      setPoliceCheckUploaded(true);
+      // Refresh driver data
+      await fetchOnboardingStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload police check");
+    } finally {
+      setPoliceCheckUploading(false);
+    }
+  };
+
   const handleSubmitContracts = async () => {
     if (!employmentContractAccepted || !driverAgreementAccepted || 
         !workHealthSafetyAccepted || !codeOfConductAccepted) {
       setError("Please accept all contracts to continue");
+      return;
+    }
+
+    if (!policeCheckUploaded) {
+      setError("Please upload your police check before completing onboarding");
       return;
     }
 
@@ -127,7 +219,7 @@ export default function DriverOnboardingPage() {
       }
 
       // Move to success step
-      setCurrentStep(5);
+      setCurrentStep(6);
       
       // Update session to reflect new status
       await update();
@@ -146,9 +238,10 @@ export default function DriverOnboardingPage() {
   const canProceedToNext = (step: Step): boolean => {
     switch (step) {
       case 1: return true; // Welcome - always can proceed
-      case 2: return employmentContractAccepted; // Employment contract
-      case 3: return driverAgreementAccepted && workHealthSafetyAccepted; // Driver agreements
-      case 4: return codeOfConductAccepted; // Code of conduct
+      case 2: return policeCheckUploaded; // Police check uploaded
+      case 3: return employmentContractAccepted; // Employment contract
+      case 4: return driverAgreementAccepted && workHealthSafetyAccepted; // Driver agreements
+      case 5: return codeOfConductAccepted; // Code of conduct
       default: return false;
     }
   };
@@ -166,10 +259,11 @@ export default function DriverOnboardingPage() {
 
   const steps = [
     { num: 1, title: "Welcome", icon: Briefcase },
-    { num: 2, title: "Employment Contract", icon: FileText },
-    { num: 3, title: "Driver Agreements", icon: Shield },
-    { num: 4, title: "Code of Conduct", icon: Heart },
-    { num: 5, title: "Complete", icon: CheckCircle },
+    { num: 2, title: "Police Check", icon: FileCheck },
+    { num: 3, title: "Employment", icon: FileText },
+    { num: 4, title: "Agreements", icon: Shield },
+    { num: 5, title: "Conduct", icon: Heart },
+    { num: 6, title: "Complete", icon: CheckCircle },
   ];
 
   return (
@@ -222,15 +316,15 @@ export default function DriverOnboardingPage() {
           {steps.map((step, index) => (
             <div key={step.num} className="flex items-center">
               <div className={`flex flex-col items-center ${index !== steps.length - 1 ? 'flex-1' : ''}`}>
-                <div className={`flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all ${
+                <div className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all ${
                   currentStep >= step.num 
                     ? 'bg-emerald-500 border-emerald-500 text-white' 
                     : 'bg-white/10 border-white/20 text-white/50'
                 }`}>
                   {currentStep > step.num ? (
-                    <Check className="h-6 w-6" />
+                    <Check className="h-5 w-5 sm:h-6 sm:w-6" />
                   ) : (
-                    <step.icon className="h-5 w-5" />
+                    <step.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   )}
                 </div>
                 <span className={`mt-2 text-xs font-medium hidden sm:block ${
@@ -240,7 +334,7 @@ export default function DriverOnboardingPage() {
                 </span>
               </div>
               {index !== steps.length - 1 && (
-                <div className={`h-0.5 w-full mx-2 sm:mx-4 ${
+                <div className={`h-0.5 w-full mx-1 sm:mx-2 ${
                   currentStep > step.num ? 'bg-emerald-500' : 'bg-white/20'
                 }`} />
               )}
@@ -294,6 +388,7 @@ export default function DriverOnboardingPage() {
                   <div className="space-y-4 mb-8">
                     <h3 className="font-semibold text-slate-800">What you&apos;ll need to complete:</h3>
                     {[
+                      { icon: FileCheck, title: "Police Check", desc: "Upload your national police check certificate" },
                       { icon: FileText, title: "Employment Contract", desc: "Review and sign your employment agreement" },
                       { icon: Car, title: "Driver Agreement", desc: "Acknowledge vehicle operation responsibilities" },
                       { icon: Shield, title: "Work Health & Safety", desc: "Confirm safety protocols understanding" },
@@ -321,8 +416,181 @@ export default function DriverOnboardingPage() {
                 </div>
               )}
 
-              {/* Step 2: Employment Contract */}
+              {/* Step 2: Police Check Upload */}
               {currentStep === 2 && (
+                <div className="p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100">
+                      <FileCheck className="h-6 w-6 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Police Check Certificate</h2>
+                      <p className="text-slate-500 text-sm">Upload your National Police Check</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium">A valid National Police Check is required</p>
+                        <p className="mt-1">You can obtain one from the <a href="https://www.nationalcrimecheck.com.au/" target="_blank" rel="noopener noreferrer" className="underline">Australian National Crime Check</a> or your state police service.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {policeCheckUploaded ? (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="h-8 w-8 text-emerald-600" />
+                        <div>
+                          <h3 className="font-semibold text-emerald-900">Police Check Uploaded</h3>
+                          <p className="text-emerald-700 text-sm">Certificate: {certificateNumber}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Certificate Details */}
+                      <div className="space-y-4 mb-6">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Certificate Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={certificateNumber}
+                            onChange={(e) => setCertificateNumber(e.target.value)}
+                            placeholder="e.g., NPC123456789"
+                            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Issue Date <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={issueDate}
+                              onChange={(e) => setIssueDate(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Expiry Date <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={expiryDate}
+                              onChange={(e) => setExpiryDate(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* File Upload */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Upload Certificate <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                        />
+                        
+                        {policeCheckFile ? (
+                          <div className="flex items-center justify-between p-4 rounded-xl border border-emerald-200 bg-emerald-50">
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-8 w-8 text-emerald-600" />
+                              <div>
+                                <p className="font-medium text-slate-900">{policeCheckFile.name}</p>
+                                <p className="text-sm text-slate-500">
+                                  {(policeCheckFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setPoliceCheckFile(null)}
+                              className="p-2 text-slate-400 hover:text-red-500 transition"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full flex flex-col items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:border-emerald-400 hover:bg-emerald-50/50 transition cursor-pointer"
+                          >
+                            <Upload className="h-10 w-10 text-slate-400" />
+                            <div className="text-center">
+                              <p className="font-medium text-slate-700">Click to upload your certificate</p>
+                              <p className="text-sm text-slate-500">PDF, JPEG, PNG or WebP (max 10MB)</p>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handlePoliceCheckUpload}
+                        disabled={!policeCheckFile || !certificateNumber || !issueDate || !expiryDate || policeCheckUploading}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-purple-500 transition disabled:opacity-50"
+                      >
+                        {policeCheckUploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            Upload Police Check
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {error && (
+                    <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={() => setCurrentStep(1)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (policeCheckUploaded) {
+                          setError("");
+                          setCurrentStep(3);
+                        } else {
+                          setError("Please upload your police check to continue");
+                        }
+                      }}
+                      disabled={!policeCheckUploaded}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                    >
+                      Continue
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Employment Contract */}
+              {currentStep === 3 && (
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
@@ -382,7 +650,7 @@ export default function DriverOnboardingPage() {
 
                   <div className="flex gap-3 mt-6">
                     <button
-                      onClick={() => setCurrentStep(1)}
+                      onClick={() => setCurrentStep(2)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -390,9 +658,9 @@ export default function DriverOnboardingPage() {
                     </button>
                     <button
                       onClick={() => {
-                        if (canProceedToNext(2)) {
+                        if (canProceedToNext(3)) {
                           setError("");
-                          setCurrentStep(3);
+                          setCurrentStep(4);
                         } else {
                           setError("Please accept the employment contract to continue");
                         }
@@ -407,8 +675,8 @@ export default function DriverOnboardingPage() {
                 </div>
               )}
 
-              {/* Step 3: Driver Agreements */}
-              {currentStep === 3 && (
+              {/* Step 4: Driver Agreements */}
+              {currentStep === 4 && (
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
@@ -485,7 +753,7 @@ export default function DriverOnboardingPage() {
 
                   <div className="flex gap-3 mt-6">
                     <button
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => setCurrentStep(3)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -493,9 +761,9 @@ export default function DriverOnboardingPage() {
                     </button>
                     <button
                       onClick={() => {
-                        if (canProceedToNext(3)) {
+                        if (canProceedToNext(4)) {
                           setError("");
-                          setCurrentStep(4);
+                          setCurrentStep(5);
                         } else {
                           setError("Please accept both agreements to continue");
                         }
@@ -510,8 +778,8 @@ export default function DriverOnboardingPage() {
                 </div>
               )}
 
-              {/* Step 4: Code of Conduct + Superannuation */}
-              {currentStep === 4 && (
+              {/* Step 5: Code of Conduct + Superannuation */}
+              {currentStep === 5 && (
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-pink-100">
@@ -592,7 +860,7 @@ export default function DriverOnboardingPage() {
 
                   <div className="flex gap-3 mt-6">
                     <button
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(4)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -619,8 +887,8 @@ export default function DriverOnboardingPage() {
                 </div>
               )}
 
-              {/* Step 5: Success */}
-              {currentStep === 5 && (
+              {/* Step 6: Success */}
+              {currentStep === 6 && (
                 <div className="p-8 text-center">
                   <motion.div
                     initial={{ scale: 0 }}
