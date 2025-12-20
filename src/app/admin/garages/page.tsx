@@ -36,6 +36,10 @@ interface Garage {
     state: string;
     postcode: string;
   };
+  // Linked garage location (the physical garage they represent for booking matching)
+  linkedGarageName?: string;
+  linkedGarageAddress?: string;
+  linkedGaragePlaceId?: string;
   yearsInOperation: number;
   servicesOffered: string[];
   primaryContact: {
@@ -417,9 +421,9 @@ export default function AdminGaragesPage() {
                 <thead className="border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-6 py-4">Business</th>
+                    <th className="px-6 py-4">Linked Garage</th>
                     <th className="px-6 py-4">Location</th>
                     <th className="px-6 py-4">Contact</th>
-                    <th className="px-6 py-4">Services</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Submitted</th>
                     <th className="px-6 py-4">Actions</th>
@@ -440,6 +444,18 @@ export default function AdminGaragesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        {garage.linkedGarageName ? (
+                          <div>
+                            <p className="text-sm font-medium text-emerald-700">{garage.linkedGarageName}</p>
+                            <p className="text-xs text-slate-500 truncate max-w-[200px]" title={garage.linkedGarageAddress}>
+                              {garage.linkedGarageAddress || "No address"}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Not linked</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
                         <p className="text-sm text-slate-900">
                           {garage.businessAddress.suburb}, {garage.businessAddress.state}
                         </p>
@@ -448,23 +464,6 @@ export default function AdminGaragesPage() {
                       <td className="px-6 py-4">
                         <p className="text-sm text-slate-900">{garage.primaryContact.name}</p>
                         <p className="text-xs text-slate-500">{garage.primaryContact.email}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {garage.servicesOffered.slice(0, 2).map((service) => (
-                            <span
-                              key={service}
-                              className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                            >
-                              {SERVICE_LABELS[service] || service}
-                            </span>
-                          ))}
-                          {garage.servicesOffered.length > 2 && (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                              +{garage.servicesOffered.length - 2}
-                            </span>
-                          )}
-                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(garage.status)}`}>
@@ -575,6 +574,33 @@ export default function AdminGaragesPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Linked Garage Location (for booking matching) */}
+                {selectedGarage.linkedGarageName ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800 mb-3">
+                      <Wrench className="h-4 w-4 text-emerald-600" />
+                      Linked Garage (Booking Matching)
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium text-emerald-900">{selectedGarage.linkedGarageName}</p>
+                      <p className="text-emerald-700">{selectedGarage.linkedGarageAddress}</p>
+                      <p className="mt-2 text-xs text-emerald-600">
+                        Bookings for this garage location will appear in this partner&apos;s dashboard
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 mb-3">
+                      <Wrench className="h-4 w-4 text-amber-600" />
+                      No Linked Garage
+                    </div>
+                    <p className="text-sm text-amber-700">
+                      This partner has not been linked to a physical garage location. They won&apos;t receive any bookings until linked.
+                    </p>
+                  </div>
+                )}
 
                 {/* Location */}
                 <div className="rounded-xl border border-slate-200 p-4">

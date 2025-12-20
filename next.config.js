@@ -1,5 +1,3 @@
-import type { NextConfig } from "next";
-
 // Security headers to protect against common attacks
 const securityHeaders = [
   {
@@ -32,8 +30,10 @@ const securityHeaders = [
   },
 ];
 
-const nextConfig: NextConfig = {
-  reactCompiler: true,
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Return null to use the default nanoid-based build ID
+  generateBuildId: async () => null,
   async headers() {
     return [
       {
@@ -44,4 +44,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

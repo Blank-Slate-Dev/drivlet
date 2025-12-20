@@ -544,14 +544,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           />
 
           <motion.div
-            initial={{ y: '-100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '-100%', opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed left-1/2 top-1/2 z-[101] w-[95%] max-w-2xl -translate-x-1/2 -translate-y-1/2"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
             onWheel={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
+            <div className="w-full max-w-2xl">
             <div className="relative rounded-3xl border border-slate-200 bg-white shadow-2xl">
               <button
                 type="button"
@@ -1168,6 +1169,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </>
                 )}
               </div>
+            </div>
             </div>
           </motion.div>
         </>
