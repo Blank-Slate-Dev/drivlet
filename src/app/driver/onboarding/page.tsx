@@ -278,8 +278,8 @@ export default function DriverOnboardingPage() {
         />
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-sm">
+      {/* Header - matches driver login page */}
+      <header className="sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="relative h-12 w-40 sm:h-14 sm:w-48">
@@ -292,14 +292,15 @@ export default function DriverOnboardingPage() {
               />
             </div>
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 border border-emerald-500/30">
-              <Shield className="h-5 w-5 text-emerald-300" />
-              <span className="text-sm font-medium text-emerald-100">Employee Onboarding</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20">
+              <Car className="h-5 w-5 text-emerald-300" />
+              <span className="text-sm font-medium text-white">Driver Portal</span>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/driver/login" })}
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition"
+              title="Sign out"
             >
               <LogOut className="h-5 w-5" />
             </button>
