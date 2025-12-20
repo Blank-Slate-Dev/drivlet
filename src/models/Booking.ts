@@ -338,7 +338,6 @@ const BookingSchema = new Schema<IBooking>(
 
 // Indexes for efficient queries
 BookingSchema.index({ status: 1, createdAt: -1 });
-BookingSchema.index({ userEmail: 1 });
 BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
