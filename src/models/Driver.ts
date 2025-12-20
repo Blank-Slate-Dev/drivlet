@@ -467,7 +467,6 @@ const DriverSchema = new Schema<IDriver>(
 );
 
 // Create indexes
-DriverSchema.index({ userId: 1 });
 DriverSchema.index({ status: 1 });
 DriverSchema.index({ onboardingStatus: 1 });
 DriverSchema.index({ isActive: 1, canAcceptJobs: 1 });
