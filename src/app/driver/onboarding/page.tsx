@@ -248,7 +248,7 @@ export default function DriverOnboardingPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
         <div className="flex items-center gap-2 text-white">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading...
@@ -267,9 +267,9 @@ export default function DriverOnboardingPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 z-0 opacity-20">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 z-0 opacity-10">
         <div
           className="h-full w-full"
           style={{
@@ -277,9 +277,6 @@ export default function DriverOnboardingPage() {
           }}
         />
       </div>
-
-      <div className="absolute top-20 right-20 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
 
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-sm">
@@ -297,7 +294,7 @@ export default function DriverOnboardingPage() {
           </Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 border border-emerald-500/30">
-              <Shield className="h-5 w-5 text-emerald-400" />
+              <Shield className="h-5 w-5 text-emerald-300" />
               <span className="text-sm font-medium text-emerald-100">Employee Onboarding</span>
             </div>
             <button
@@ -328,7 +325,7 @@ export default function DriverOnboardingPage() {
                   )}
                 </div>
                 <span className={`mt-2 text-xs font-medium hidden sm:block ${
-                  currentStep >= step.num ? 'text-emerald-400' : 'text-white/50'
+                  currentStep >= step.num ? 'text-emerald-300' : 'text-white/50'
                 }`}>
                   {step.title}
                 </span>
@@ -408,7 +405,7 @@ export default function DriverOnboardingPage() {
 
                   <button
                     onClick={() => setCurrentStep(2)}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/25 transition"
                   >
                     Begin Onboarding
                     <ArrowRight className="h-4 w-4" />
@@ -539,7 +536,7 @@ export default function DriverOnboardingPage() {
                       <button
                         onClick={handlePoliceCheckUpload}
                         disabled={!policeCheckFile || !certificateNumber || !issueDate || !expiryDate || policeCheckUploading}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-purple-500 transition disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/25 transition disabled:opacity-50"
                       >
                         {policeCheckUploading ? (
                           <>
@@ -580,7 +577,7 @@ export default function DriverOnboardingPage() {
                         }
                       }}
                       disabled={!policeCheckUploaded}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
                     >
                       Continue
                       <ArrowRight className="h-4 w-4" />
@@ -666,7 +663,7 @@ export default function DriverOnboardingPage() {
                         }
                       }}
                       disabled={!employmentContractAccepted}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
                     >
                       Continue
                       <ArrowRight className="h-4 w-4" />
@@ -769,7 +766,7 @@ export default function DriverOnboardingPage() {
                         }
                       }}
                       disabled={!driverAgreementAccepted || !workHealthSafetyAccepted}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
                     >
                       Continue
                       <ArrowRight className="h-4 w-4" />
@@ -869,7 +866,7 @@ export default function DriverOnboardingPage() {
                     <button
                       onClick={handleSubmitContracts}
                       disabled={!codeOfConductAccepted || submitting}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
                     >
                       {submitting ? (
                         <>

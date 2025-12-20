@@ -70,9 +70,9 @@ export default function GarageLoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-800 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 z-0 opacity-20">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 z-0 opacity-10">
         <div
           className="h-full w-full"
           style={{
@@ -80,10 +80,6 @@ export default function GarageLoginPage() {
           }}
         />
       </div>
-
-      {/* Floating decorative shapes */}
-      <div className="absolute top-20 left-10 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
 
       {/* Header */}
       <header className="sticky top-0 z-50">
@@ -243,7 +239,7 @@ export default function GarageLoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
@@ -273,9 +269,9 @@ export default function GarageLoginPage() {
 
             {/* Customer login link */}
             <div className="mt-6 text-center space-y-3">
-              <p className="text-emerald-200/80 text-sm">
+              <p className="text-emerald-100 text-sm">
                 Looking for customer login?{" "}
-                <Link href="/login" className="font-semibold text-white hover:text-emerald-300 transition">
+                <Link href="/login" className="font-semibold text-white hover:text-emerald-200 transition">
                   Sign in here
                 </Link>
               </p>

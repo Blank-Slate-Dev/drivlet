@@ -51,6 +51,15 @@ export async function GET() {
       );
     }
 
+    // AUTO-FIX: If driver is approved but still has "not_started" onboarding status,
+    // automatically advance them to "contracts_pending"
+    // This handles legacy drivers approved before the state machine was added
+    if (driver.status === "approved" && driver.onboardingStatus === "not_started") {
+      driver.onboardingStatus = "contracts_pending";
+      driver.canAcceptJobs = false;
+      await driver.save();
+    }
+
     return NextResponse.json({
       driver: {
         _id: driver._id.toString(),
@@ -59,6 +68,7 @@ export async function GET() {
         email: user.email,
         status: driver.status,
         onboardingStatus: driver.onboardingStatus,
+        policeCheck: driver.policeCheck,
         // Explicitly compute derived field for consistency
         insuranceEligible: driver.employmentType === "employee" && driver.onboardingStatus === "active",
         canAcceptJobs: driver.canAcceptJobs,
@@ -140,14 +150,24 @@ export async function POST(request: Request) {
       );
     }
 
-    if (driver.onboardingStatus !== "contracts_pending") {
-      // Already signed or in wrong state
-      if (driver.onboardingStatus === "active") {
-        return NextResponse.json(
-          { error: "Contracts have already been signed" },
-          { status: 400 }
-        );
-      }
+    // CRITICAL: Verify police check is complete
+    if (!driver.policeCheck?.completed || !driver.policeCheck?.documentUrl) {
+      return NextResponse.json(
+        { error: "Police check must be uploaded before completing onboarding" },
+        { status: 400 }
+      );
+    }
+
+    // Check onboarding status - allow both "contracts_pending" and "not_started" for legacy data
+    if (driver.onboardingStatus === "active") {
+      return NextResponse.json(
+        { error: "Contracts have already been signed" },
+        { status: 400 }
+      );
+    }
+
+    // Allow proceeding if status is "contracts_pending" OR "not_started" (legacy approved drivers)
+    if (driver.onboardingStatus !== "contracts_pending" && driver.onboardingStatus !== "not_started") {
       return NextResponse.json(
         { error: "Invalid onboarding state" },
         { status: 400 }

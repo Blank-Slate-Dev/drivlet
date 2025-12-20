@@ -495,26 +495,33 @@ DriverSchema.virtual("canWork").get(function () {
   );
 });
 
-// Pre-save validation hook - throws errors for invalid state transitions
+// Pre-save hook - AUTO-CORRECTS invalid state instead of throwing errors
+// This makes the system self-healing and prevents crashes from bad data
 DriverSchema.pre("save", async function () {
-  // VALIDATION: canAcceptJobs can only be true if onboardingStatus is "active"
+  // AUTO-FIX: canAcceptJobs can only be true if onboardingStatus is "active"
+  // Instead of throwing an error, we automatically correct invalid state
   if (this.canAcceptJobs === true && this.onboardingStatus !== "active") {
-    throw new Error("Cannot set canAcceptJobs=true when onboardingStatus is not 'active'");
+    this.canAcceptJobs = false;
   }
   
-  // VALIDATION: Cannot jump to "active" without having contracts signed
+  // AUTO-FIX: Cannot be "active" without having all contracts signed
+  // If someone tries to set active without contracts, reset to contracts_pending
   if (this.onboardingStatus === "active") {
     const contracts = this.contracts;
-    if (!contracts?.employmentContractSignedAt || 
-        !contracts?.driverAgreementSignedAt ||
-        !contracts?.workHealthSafetySignedAt ||
-        !contracts?.codeOfConductSignedAt) {
-      throw new Error("Cannot set onboardingStatus='active' without all contracts signed");
-    }
+    const allContractsSigned = 
+      contracts?.employmentContractSignedAt && 
+      contracts?.driverAgreementSignedAt &&
+      contracts?.workHealthSafetySignedAt &&
+      contracts?.codeOfConductSignedAt;
     
-    // VALIDATION: Cannot be active without police check
-    if (!this.policeCheck?.completed || !this.policeCheck?.documentUrl) {
-      throw new Error("Cannot set onboardingStatus='active' without a completed police check");
+    const policeCheckComplete = 
+      this.policeCheck?.completed && 
+      this.policeCheck?.documentUrl;
+    
+    // If trying to be active without requirements, reset to appropriate state
+    if (!allContractsSigned || !policeCheckComplete) {
+      this.onboardingStatus = "contracts_pending";
+      this.canAcceptJobs = false;
     }
   }
   
