@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Driver from "@/models/Driver";
 import Contact from "@/models/Contact";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 // Validate Australian phone number (relaxed for initial registration)
 function validatePhone(phone: string): boolean {

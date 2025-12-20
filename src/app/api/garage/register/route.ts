@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage, { ServiceType, VehicleType } from "@/models/Garage";
 import Contact from "@/models/Contact";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 // Validate email format
 function validateEmail(email: string): boolean {
