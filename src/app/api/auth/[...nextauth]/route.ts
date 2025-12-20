@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Driver from "@/models/Driver";
+import Garage from "@/models/Garage";
 import type { UserRole } from "@/models/User";
 import type { OnboardingStatus } from "@/models/Driver";
 
@@ -52,6 +53,22 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
+        // If user is a garage, fetch their linked garage data
+        let linkedGarageName: string | undefined;
+        let linkedGarageAddress: string | undefined;
+        let linkedGaragePlaceId: string | undefined;
+        let garageStatus: string | undefined;
+
+        if (user.role === "garage" && user.garageProfile) {
+          const garage = await Garage.findById(user.garageProfile);
+          if (garage) {
+            linkedGarageName = garage.linkedGarageName;
+            linkedGarageAddress = garage.linkedGarageAddress;
+            linkedGaragePlaceId = garage.linkedGaragePlaceId;
+            garageStatus = garage.status;
+          }
+        }
+
         return {
           id: user._id.toString(),
           username: user.username,
@@ -60,6 +77,10 @@ export const authOptions: NextAuthOptions = {
           isApproved: user.isApproved ?? true,
           onboardingStatus,
           canAcceptJobs,
+          linkedGarageName,
+          linkedGarageAddress,
+          linkedGaragePlaceId,
+          garageStatus,
         };
       },
     }),
@@ -81,8 +102,13 @@ export const authOptions: NextAuthOptions = {
         token.isApproved = user.isApproved;
         token.onboardingStatus = user.onboardingStatus;
         token.canAcceptJobs = user.canAcceptJobs;
+        // Garage data
+        token.linkedGarageName = user.linkedGarageName;
+        token.linkedGarageAddress = user.linkedGarageAddress;
+        token.linkedGaragePlaceId = user.linkedGaragePlaceId;
+        token.garageStatus = user.garageStatus;
       }
-      
+
       // Refresh driver status on session update
       // This handles the JWT staleness issue after admin approval or contract signing
       if (trigger === "update" && token.role === "driver") {
@@ -97,7 +123,23 @@ export const authOptions: NextAuthOptions = {
           }
         }
       }
-      
+
+      // Refresh garage status on session update
+      if (trigger === "update" && token.role === "garage") {
+        await connectDB();
+        const dbUser = await User.findById(token.id);
+        if (dbUser?.garageProfile) {
+          const garage = await Garage.findById(dbUser.garageProfile);
+          if (garage) {
+            token.isApproved = dbUser.isApproved;
+            token.linkedGarageName = garage.linkedGarageName;
+            token.linkedGarageAddress = garage.linkedGarageAddress;
+            token.linkedGaragePlaceId = garage.linkedGaragePlaceId;
+            token.garageStatus = garage.status;
+          }
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -109,6 +151,11 @@ export const authOptions: NextAuthOptions = {
         session.user.isApproved = token.isApproved as boolean;
         session.user.onboardingStatus = token.onboardingStatus as OnboardingStatus | undefined;
         session.user.canAcceptJobs = token.canAcceptJobs as boolean | undefined;
+        // Garage-specific fields
+        session.user.linkedGarageName = token.linkedGarageName as string | undefined;
+        session.user.linkedGarageAddress = token.linkedGarageAddress as string | undefined;
+        session.user.linkedGaragePlaceId = token.linkedGaragePlaceId as string | undefined;
+        session.user.garageStatus = token.garageStatus as string | undefined;
       }
       return session;
     },

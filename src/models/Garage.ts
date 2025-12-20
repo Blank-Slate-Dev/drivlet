@@ -47,6 +47,16 @@ interface InsuranceDetails {
 export interface IGarage extends Document {
   userId: mongoose.Types.ObjectId;
 
+  // Linked Garage Business (for booking matching)
+  // This is the physical garage location the partner represents
+  linkedGarageName: string;
+  linkedGarageAddress: string;
+  linkedGaragePlaceId: string; // Google Places ID - PRIMARY MATCHING KEY
+  linkedGarageCoordinates?: {
+    lat: number;
+    lng: number;
+  };
+
   // Business Information
   businessName: string;
   tradingName?: string;
@@ -141,6 +151,30 @@ const GarageSchema = new Schema<IGarage>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+
+    // Linked Garage Business (for booking matching)
+    // This is the specific physical garage/mechanic the partner represents
+    linkedGarageName: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true, // Index for name-based fallback matching
+    },
+    linkedGarageAddress: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    linkedGaragePlaceId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true, // Index for exact matching by Google Place ID
+    },
+    linkedGarageCoordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
     },
 
     // Business Information

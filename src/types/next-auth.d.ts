@@ -14,6 +14,11 @@ declare module "next-auth" {
       // Driver-specific onboarding fields
       onboardingStatus?: OnboardingStatus;
       canAcceptJobs?: boolean;
+      // Garage-specific fields
+      linkedGarageName?: string;
+      linkedGarageAddress?: string;
+      linkedGaragePlaceId?: string;
+      garageStatus?: string;
       // NOTE: insuranceEligible is derived server-side, not stored in token
     };
   }
@@ -26,6 +31,11 @@ declare module "next-auth" {
     isApproved: boolean;
     onboardingStatus?: OnboardingStatus;
     canAcceptJobs?: boolean;
+    // Garage-specific fields
+    linkedGarageName?: string;
+    linkedGarageAddress?: string;
+    linkedGaragePlaceId?: string;
+    garageStatus?: string;
   }
 }
 
@@ -38,5 +48,10 @@ declare module "next-auth/jwt" {
     isApproved: boolean;
     onboardingStatus?: OnboardingStatus;
     canAcceptJobs?: boolean;
+    // Garage-specific fields
+    linkedGarageName?: string;
+    linkedGarageAddress?: string;
+    linkedGaragePlaceId?: string;
+    garageStatus?: string;
   }
 }

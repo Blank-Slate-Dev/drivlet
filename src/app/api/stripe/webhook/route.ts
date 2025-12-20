@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
           dropoffTime: metadata.latestDropoff,
           hasExistingBooking: hasExisting,
           garageName: metadata.garageName || null,
+          garageAddress: metadata.garageAddress || null,
+          garagePlaceId: metadata.garagePlaceId || null, // Google Places ID for garage matching
           existingBookingRef: metadata.existingBookingRef || null,
           existingBookingNotes: null,
           transmissionType,
@@ -250,6 +252,8 @@ export async function POST(request: NextRequest) {
           dropoffTime: metadata.latestDropoff,
           hasExistingBooking: hasExistingSession,
           garageName: metadata.garageName || null,
+          garageAddress: metadata.garageAddress || null,
+          garagePlaceId: metadata.garagePlaceId || null, // Google Places ID for garage matching
           existingBookingRef: metadata.existingBookingRef || null,
           existingBookingNotes: null,
           transmissionType: transmissionTypeSession,

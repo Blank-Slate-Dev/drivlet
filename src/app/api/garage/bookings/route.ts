@@ -44,23 +44,80 @@ export async function GET(request: Request) {
     const offset = parseInt(searchParams.get("offset") || "0");
 
     // Build query
-    // For now, fetch bookings that:
+    // Fetch bookings that:
     // 1. Are assigned to this garage, OR
-    // 2. Are new (no garage assigned) and within service area
-    // Since we don't have geolocation for bookings yet, we'll show all new bookings
-    // to approved garages
+    // 2. Are new (no garage assigned) and match this garage's linked business
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: Record<string, any> = {};
 
+    // Get garage's linked business for matching
+    const linkedPlaceId = garage.linkedGaragePlaceId || "";
+    const linkedGarageName = garage.linkedGarageName || "";
+
+    // Build the garage matching condition
+    // Match by placeId (exact) OR garageName (fallback for older bookings)
+    const garageMatchCondition = linkedPlaceId
+      ? {
+          $or: [
+            { garagePlaceId: linkedPlaceId },
+            // Fallback: match by name if placeId not available on booking
+            { garagePlaceId: { $exists: false }, garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
+            { garagePlaceId: null, garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
+            { garagePlaceId: "", garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
+          ],
+        }
+      : linkedGarageName
+      ? { garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } }
+      : null;
+
     if (status && status !== "all") {
-      query.garageStatus = status;
+      // When filtering by status
+      if (status === "new") {
+        // For new bookings, only show those matching this garage's linked business
+        if (!garageMatchCondition) {
+          // No linked garage, return empty
+          return NextResponse.json({ bookings: [], total: 0, limit, offset });
+        }
+        query.$and = [
+          { garageStatus: "new" },
+          {
+            $or: [
+              { assignedGarageId: null },
+              { assignedGarageId: { $exists: false } },
+            ],
+          },
+          garageMatchCondition,
+        ];
+      } else {
+        // For other statuses (accepted, in_progress, completed, declined)
+        // Only show bookings assigned to this garage
+        query.assignedGarageId = garage._id;
+        query.garageStatus = status;
+      }
     } else {
-      // Show bookings assigned to this garage OR new bookings
-      query.$or = [
-        { assignedGarageId: garage._id.toString() },
-        { assignedGarageId: null, garageStatus: "new" },
-        { assignedGarageId: { $exists: false }, garageStatus: { $in: ["new", undefined] } },
-      ];
+      // Show all: bookings assigned to this garage OR new bookings for this garage
+      if (!garageMatchCondition) {
+        // Only show assigned bookings if no linked garage
+        query.assignedGarageId = garage._id;
+      } else {
+        const newBookingsForGarage: Record<string, unknown> = {
+          $and: [
+            { garageStatus: { $in: ["new", undefined] } },
+            {
+              $or: [
+                { assignedGarageId: null },
+                { assignedGarageId: { $exists: false } },
+              ],
+            },
+            garageMatchCondition,
+          ],
+        };
+
+        query.$or = [
+          { assignedGarageId: garage._id },
+          newBookingsForGarage,
+        ];
+      }
     }
 
     const bookings = await Booking.find(query)

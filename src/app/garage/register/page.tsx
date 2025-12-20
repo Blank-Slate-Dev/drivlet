@@ -26,6 +26,7 @@ import {
   Globe,
 } from "lucide-react";
 import AddressAutocomplete, { PlaceDetails } from "@/components/AddressAutocomplete";
+import GarageAutocomplete, { GarageDetails } from "@/components/GarageAutocomplete";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -53,27 +54,51 @@ export default function GarageRegisterPage() {
   // Address autocomplete state
   const [addressInput, setAddressInput] = useState("");
 
+  // Garage autocomplete state (for linking to a physical garage)
+  const [garageSearchInput, setGarageSearchInput] = useState("");
+
   const [formData, setFormData] = useState({
-    businessName: "", 
-    abn: "", 
-    address: "", 
-    suburb: "", 
-    postcode: "", 
+    businessName: "",
+    abn: "",
+    address: "",
+    suburb: "",
+    postcode: "",
     state: "NSW",
-    contactName: "", 
-    email: "", 
-    phone: "", 
-    password: "", 
-    confirmPassword: "", 
+    // Linked garage business (what physical garage they represent)
+    linkedGarageName: "",
+    linkedGarageAddress: "",
+    linkedGaragePlaceId: "",
+    linkedGarageLat: 0,
+    linkedGarageLng: 0,
+    contactName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
     website: "",
-    services: [] as string[], 
-    openingHours: "8am - 5pm", 
+    services: [] as string[],
+    openingHours: "8am - 5pm",
     capacity: "1-5",
   });
 
   const updateField = (field: string, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (error) setError("");
+  };
+
+  // Handle linked garage selection
+  const handleGarageSelect = (details: GarageDetails) => {
+    if (details.name) {
+      setGarageSearchInput(details.name);
+      setFormData((prev) => ({
+        ...prev,
+        linkedGarageName: details.name,
+        linkedGarageAddress: details.formattedAddress || "",
+        linkedGaragePlaceId: details.placeId || "",
+        linkedGarageLat: details.lat || 0,
+        linkedGarageLng: details.lng || 0,
+      }));
+    }
   };
 
   const handleAddressSelect = (details: PlaceDetails) => {
@@ -126,6 +151,7 @@ export default function GarageRegisterPage() {
         if (!formData.businessName.trim()) { setError("Please enter your business name"); return false; }
         if (!formData.abn.trim()) { setError("ABN is required for garage registration"); return false; }
         if (!isValidABN(formData.abn)) { setError("Please enter a valid 11-digit ABN"); return false; }
+        if (!formData.linkedGarageName.trim()) { setError("Please select the garage/mechanic you represent from the search"); return false; }
         if (!formData.address.trim()) { setError("Please select your business address"); return false; }
         if (!formData.suburb.trim()) { setError("Please select a valid address with suburb"); return false; }
         if (!formData.postcode.trim() || formData.postcode.length !== 4) { setError("Please select a valid address with postcode"); return false; }
@@ -173,7 +199,7 @@ export default function GarageRegisterPage() {
 
   const isStepComplete = (step: Step): boolean => {
     switch (step) {
-      case 1: return !!(formData.businessName && formData.abn && isValidABN(formData.abn) && formData.address && formData.suburb && formData.postcode);
+      case 1: return !!(formData.businessName && formData.abn && isValidABN(formData.abn) && formData.linkedGarageName && formData.address && formData.suburb && formData.postcode);
       case 2: return !!(formData.contactName && formData.email && formData.phone && formData.password && formData.confirmPassword);
       case 3: return formData.services.length > 0;
       default: return false;
@@ -312,7 +338,45 @@ export default function GarageRegisterPage() {
                         Don&apos;t have an ABN? <a href="https://www.abr.gov.au/business-super-funds-702s/applying-abn" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">Apply here</a>
                       </p>
                     </div>
-                    
+
+                    {/* Linked Garage Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Which garage do you represent? *</label>
+                      <p className="text-xs text-slate-500 mb-2">
+                        Search and select the garage/mechanic you represent. You will only receive bookings for this garage.
+                      </p>
+                      <GarageAutocomplete
+                        value={garageSearchInput}
+                        onChange={setGarageSearchInput}
+                        onSelect={handleGarageSelect}
+                        placeholder="Search for your garage (e.g. Westlakes Motor Group)..."
+                        disabled={loading}
+                        biasToNewcastle={true}
+                      />
+                    </div>
+
+                    {/* Show selected garage confirmation */}
+                    {formData.linkedGarageName && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl"
+                      >
+                        <div className="flex items-start gap-3">
+                          <Wrench className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-emerald-900">Linked Garage</p>
+                            <p className="text-sm text-emerald-700 mt-1">{formData.linkedGarageName}</p>
+                            <p className="text-xs text-emerald-600">{formData.linkedGarageAddress}</p>
+                            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              You will only receive bookings for this garage location
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
                     {/* Address Autocomplete */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Business address *</label>
@@ -471,6 +535,17 @@ export default function GarageRegisterPage() {
                     </div>
                   </div>
                   <div className="space-y-4">
+                    {/* Linked Garage Highlight */}
+                    <div className="p-4 bg-emerald-50 rounded-xl border-2 border-emerald-300">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wrench className="h-5 w-5 text-emerald-600" />
+                        <h3 className="text-sm font-semibold text-emerald-800">Linked Garage</h3>
+                      </div>
+                      <p className="text-base font-medium text-emerald-900">{formData.linkedGarageName}</p>
+                      <p className="text-sm text-emerald-700">{formData.linkedGarageAddress}</p>
+                      <p className="text-xs text-amber-700 mt-2">You will only receive bookings for this garage location</p>
+                    </div>
+
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                       <h3 className="text-sm font-semibold text-slate-700 mb-3">Business Details</h3>
                       <div className="grid grid-cols-2 gap-2 text-sm">

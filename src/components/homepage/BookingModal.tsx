@@ -99,6 +99,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Garage booking details (mandatory)
   const [garageSearch, setGarageSearch] = useState('');
   const [garageAddress, setGarageAddress] = useState('');
+  const [garagePlaceId, setGaragePlaceId] = useState(''); // Google Places ID for exact matching
   const [garageBookingTime, setGarageBookingTime] = useState('09:00');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
@@ -266,6 +267,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setLatestDropoff('17:00');
         setGarageSearch('');
         setGarageAddress('');
+        setGaragePlaceId('');
         setGarageBookingTime('09:00');
         setAdditionalNotes('');
         setGuestName('');
@@ -290,6 +292,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   const handleGarageSelect = (details: GarageDetails) => {
     setGarageAddress(details.formattedAddress);
+    setGaragePlaceId(details.placeId || '');
   };
 
   const getTimeLabel = (value: string, options: TimeOption[]): string => {
@@ -379,6 +382,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           hasExistingBooking: true,
           garageName: garageSearch.trim(),
           garageAddress: garageAddress.trim(),
+          garagePlaceId: garagePlaceId, // Google Places ID for exact matching
           garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions),
           additionalNotes: additionalNotes.trim(),
           transmissionType,

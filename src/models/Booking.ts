@@ -44,6 +44,8 @@ export interface IBooking extends Document {
   // Existing booking fields (for stage 1)
   hasExistingBooking: boolean;
   garageName?: string;
+  garageAddress?: string;
+  garagePlaceId?: string; // Google Places ID for exact garage matching
   existingBookingRef?: string;
   existingBookingNotes?: string;
 
@@ -202,6 +204,16 @@ const BookingSchema = new Schema<IBooking>(
     garageName: {
       type: String,
       required: false,
+      index: true, // Index for fallback name-based matching
+    },
+    garageAddress: {
+      type: String,
+      required: false,
+    },
+    garagePlaceId: {
+      type: String,
+      required: false,
+      index: true, // Index for exact matching by Google Place ID
     },
     existingBookingRef: {
       type: String,
@@ -331,6 +343,7 @@ BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
+BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 }); // For garage-based booking matching
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =

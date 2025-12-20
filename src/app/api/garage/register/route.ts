@@ -55,6 +55,12 @@ export async function POST(request: Request) {
       suburb,
       postcode,
       state,
+      // Linked garage fields (the physical garage they represent)
+      linkedGarageName,
+      linkedGarageAddress,
+      linkedGaragePlaceId,
+      linkedGarageLat,
+      linkedGarageLng,
       contactName,
       email,
       phone,
@@ -80,6 +86,14 @@ export async function POST(request: Request) {
     if (!abn || !validateABN(abn)) {
       return NextResponse.json(
         { error: "Valid ABN (11 digits) is required" },
+        { status: 400 }
+      );
+    }
+
+    // Linked garage validation - this is the physical garage they represent
+    if (!linkedGarageName || linkedGarageName.trim().length < 2) {
+      return NextResponse.json(
+        { error: "Please select the garage/mechanic you represent" },
         { status: 400 }
       );
     }
@@ -181,6 +195,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if linked garage (placeId) is already registered
+    // This prevents multiple accounts for the same physical garage
+    if (linkedGaragePlaceId) {
+      const existingGarageByPlaceId = await Garage.findOne({
+        linkedGaragePlaceId: linkedGaragePlaceId,
+      });
+      if (existingGarageByPlaceId) {
+        return NextResponse.json(
+          { error: "This garage location is already registered with another account. Please contact support if you believe this is an error." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -229,6 +257,14 @@ export async function POST(request: Request) {
     // Using placeholder values for fields that will be collected during onboarding
     const garage = await Garage.create({
       userId: user._id,
+      // Linked garage (the physical garage they represent for booking matching)
+      linkedGarageName: linkedGarageName?.trim() || "",
+      linkedGarageAddress: linkedGarageAddress?.trim() || "",
+      linkedGaragePlaceId: linkedGaragePlaceId || "",
+      linkedGarageCoordinates: linkedGarageLat && linkedGarageLng ? {
+        lat: linkedGarageLat,
+        lng: linkedGarageLng,
+      } : undefined,
       businessName: businessName.trim(),
       abn: cleanABN,
       businessAddress: {
@@ -291,7 +327,7 @@ export async function POST(request: Request) {
       name: `${businessName.trim()} (${contactName.trim()})`,
       email: email.toLowerCase(),
       phone: formattedPhone,
-      message: `🔧 NEW GARAGE APPLICATION\n\nBusiness: ${businessName.trim()}\nABN: ${cleanABN}\nContact: ${contactName.trim()}\nEmail: ${email.toLowerCase()}\nPhone: ${formattedPhone}\n${website ? `Website: ${website}\n` : ''}\nAddress: ${address.trim()}, ${suburb.trim()} ${state} ${postcode}\n\nServices: ${services.join(", ")}\nCapacity: ${capacity || "Not specified"}\nOpening Hours: ${openingHours || "Not specified"}\n\nThis garage application requires verification of:\n- Public liability insurance\n- Bank details\n- ABN verification\n- Business credentials\n\nGarage ID: ${garage._id}`,
+      message: `🔧 NEW GARAGE APPLICATION\n\nBusiness: ${businessName.trim()}\nABN: ${cleanABN}\n\n🏪 LINKED GARAGE (for booking matching):\n${linkedGarageName || "Not specified"}\n${linkedGarageAddress || ""}\nPlace ID: ${linkedGaragePlaceId || "None"}\n\nContact: ${contactName.trim()}\nEmail: ${email.toLowerCase()}\nPhone: ${formattedPhone}\n${website ? `Website: ${website}\n` : ''}\nAddress: ${address.trim()}, ${suburb.trim()} ${state} ${postcode}\n\nServices: ${services.join(", ")}\nCapacity: ${capacity || "Not specified"}\nOpening Hours: ${openingHours || "Not specified"}\n\nThis garage application requires verification of:\n- Public liability insurance\n- Bank details\n- ABN verification\n- Business credentials\n\nGarage ID: ${garage._id}`,
       status: "new",
     });
 

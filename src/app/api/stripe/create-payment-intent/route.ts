@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       latestDropoff,
       hasExistingBooking,
       garageName,
+      garageAddress,
+      garagePlaceId,
       existingBookingRef,
       transmissionType,
       isManualTransmission,
@@ -62,6 +64,8 @@ export async function POST(request: NextRequest) {
         latestDropoff,
         hasExistingBooking: hasExistingBooking ? 'true' : 'false',
         garageName: garageName || '',
+        garageAddress: garageAddress || '',
+        garagePlaceId: garagePlaceId || '', // Google Places ID for garage matching
         existingBookingRef: existingBookingRef || '',
         transmissionType: transmissionType || 'automatic',
         isManualTransmission: isManualTransmission ? 'true' : 'false',
