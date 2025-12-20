@@ -43,10 +43,12 @@ export default function DriverLayout({
 
   const isActive = (path: string) => pathname === path;
 
-  // Don't apply layout to login, register, or pending pages
+  // Don't apply layout to login, register, pending, or onboarding pages
+  // These pages have their own headers/styling
   const isAuthPage = pathname === "/driver/login" || 
                      pathname === "/driver/register" || 
-                     pathname === "/driver/pending";
+                     pathname === "/driver/pending" ||
+                     pathname === "/driver/onboarding";
 
   if (isAuthPage) {
     return <>{children}</>;
