@@ -442,9 +442,6 @@ GarageSchema.index({ location: "2dsphere" });
 // Create index on status for admin queries
 GarageSchema.index({ status: 1 });
 
-// Create index on userId for lookups
-GarageSchema.index({ userId: 1 });
-
 // Prevent OverwriteModelError by checking if model exists
 const Garage: Model<IGarage> =
   mongoose.models.Garage || mongoose.model<IGarage>("Garage", GarageSchema);
