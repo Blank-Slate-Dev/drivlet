@@ -132,6 +132,14 @@ export interface IGarage extends Document {
   reviewedBy?: mongoose.Types.ObjectId;
   rejectionReason?: string;
 
+  // Notification preferences
+  notificationSettings?: {
+    emailNotifications: boolean;
+    newBookingAlerts: boolean;
+    bookingUpdates: boolean;
+    dailySummary: boolean;
+  };
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -429,6 +437,14 @@ const GarageSchema = new Schema<IGarage>(
     },
     rejectionReason: {
       type: String,
+    },
+
+    // Notification preferences
+    notificationSettings: {
+      emailNotifications: { type: Boolean, default: true },
+      newBookingAlerts: { type: Boolean, default: true },
+      bookingUpdates: { type: Boolean, default: true },
+      dailySummary: { type: Boolean, default: false },
     },
   },
   {

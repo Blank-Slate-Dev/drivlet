@@ -83,6 +83,7 @@ export async function PATCH(request: Request) {
       "serviceRadius",
       "pickupDropoff",
       "certifications",
+      "notificationSettings",
     ];
 
     // Filter out any fields that shouldn't be updated
