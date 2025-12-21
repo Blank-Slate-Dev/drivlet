@@ -134,7 +134,10 @@ export default function GarageSettingsPage() {
           setContactForm(data.garage.primaryContact);
         }
         if (data.garage?.afterHoursContact) {
-          setAfterHoursForm(data.garage.afterHoursContact);
+          setAfterHoursForm({
+            name: data.garage.afterHoursContact.name || "",
+            phone: data.garage.afterHoursContact.phone || "",
+          });
         }
       }
     } catch (err) {
@@ -531,7 +534,10 @@ export default function GarageSettingsPage() {
                             onClick={() => {
                               setEditingAfterHours(false);
                               if (profile?.afterHoursContact) {
-                                setAfterHoursForm(profile.afterHoursContact);
+                                setAfterHoursForm({
+                                  name: profile.afterHoursContact.name || "",
+                                  phone: profile.afterHoursContact.phone || "",
+                                });
                               }
                             }}
                             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
