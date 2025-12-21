@@ -53,6 +53,13 @@ export default function GaragePendingPage() {
     { num: 4, text: "Start accepting bookings through drivlet!", time: "", done: false },
   ];
 
+  // Clock animation timing:
+  // Minute hand: 3 seconds per full rotation
+  // Hour hand: 36 seconds per full rotation (12x slower, like a real clock)
+  // This means hour hand moves from 1pm→2pm, 2pm→3pm, etc. each time minute hand completes one revolution
+  const MINUTE_HAND_DURATION = 3; // seconds per full rotation
+  const HOUR_HAND_DURATION = MINUTE_HAND_DURATION * 12; // 36 seconds per full rotation
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-800 relative overflow-hidden">
       {/* Decorative background elements */}
@@ -106,7 +113,7 @@ export default function GaragePendingPage() {
                 <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full translate-x-1/2 translate-y-1/2" />
               </div>
               
-              {/* Animated Clock with separate hour and minute hands */}
+              {/* Animated Clock with realistic hour and minute hand movement */}
               <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border-4 border-white/40">
                 {/* Clock face background */}
                 <div className="absolute inset-2 rounded-full bg-white/10" />
@@ -122,18 +129,19 @@ export default function GaragePendingPage() {
                   />
                 ))}
                 
-                {/* Hour hand - slow rotation (60 seconds for full rotation) */}
+                {/* Hour hand - completes full rotation in 36 seconds (12x minute hand) */}
+                {/* This means it moves 30° (one hour position) every 3 seconds when minute hand completes one revolution */}
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                  className="absolute w-0.5 h-4 bg-white rounded-full origin-bottom"
+                  transition={{ duration: HOUR_HAND_DURATION, repeat: Infinity, ease: "linear" }}
+                  className="absolute w-1 h-4 bg-white rounded-full origin-bottom"
                   style={{ bottom: '50%' }}
                 />
                 
-                {/* Minute hand - 3x faster (20 seconds for full rotation) */}
+                {/* Minute hand - completes full rotation in 3 seconds */}
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: MINUTE_HAND_DURATION, repeat: Infinity, ease: "linear" }}
                   className="absolute w-0.5 h-6 bg-white/90 rounded-full origin-bottom"
                   style={{ bottom: '50%' }}
                 />
