@@ -27,10 +27,8 @@ import {
   X,
   Loader2,
   Shield,
-  Flag,
   Play,
 } from "lucide-react";
-import { GarageDashboardHeader } from "@/components/garage/GarageDashboardHeader";
 
 // Types
 interface GarageProfile {
@@ -363,65 +361,69 @@ export default function GarageDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header with Notification Bell */}
-        <GarageDashboardHeader
-          garageProfile={garageProfile}
-          onRefresh={fetchDashboardData}
-          loading={loading}
-        />
+        {/* Header - Matching driver/admin style */}
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+            <p className="text-sm text-slate-500">
+              Welcome back, {garageProfile?.businessName || garageProfile?.tradingName}
+            </p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
 
         {/* Stats Cards */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Revenue card - Primary accent */}
+          <div className="rounded-lg bg-emerald-600 p-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                <ClipboardList className="h-5 w-5 text-blue-600" />
-              </div>
+              <DollarSign className="h-5 w-5 text-emerald-100" />
               <div>
-                <p className="text-sm text-slate-500">Pending Bookings</p>
-                <p className="text-2xl font-bold text-slate-900">{stats?.pendingBookings || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Completed (Month)</p>
-                <p className="text-2xl font-bold text-slate-900">{stats?.completedThisMonth || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                <Star className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Rating</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {stats?.averageRating?.toFixed(1) || "N/A"}
-                  <span className="ml-1 text-sm font-normal text-slate-500">
-                    ({stats?.totalReviews || 0} reviews)
-                  </span>
+                <p className="text-xs text-emerald-100">Revenue (Month)</p>
+                <p className="text-xl font-bold text-white">
+                  {formatCurrency(stats?.totalRevenue || 0)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-emerald-600 p-4">
+          {/* Pending Bookings */}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
+              <ClipboardList className="h-5 w-5 text-slate-400" />
               <div>
-                <p className="text-sm text-emerald-100">Revenue (Month)</p>
-                <p className="text-2xl font-bold text-white">
-                  {formatCurrency(stats?.totalRevenue || 0)}
+                <p className="text-xs text-slate-500">Pending Bookings</p>
+                <p className="text-xl font-bold text-slate-900">{stats?.pendingBookings || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Completed */}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">Completed (Month)</p>
+                <p className="text-xl font-bold text-slate-900">{stats?.completedThisMonth || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Rating */}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex items-center gap-3">
+              <Star className="h-5 w-5 text-amber-400" />
+              <div>
+                <p className="text-xs text-slate-500">Rating</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {stats?.averageRating?.toFixed(1) || "N/A"}
                 </p>
               </div>
             </div>
@@ -429,7 +431,7 @@ export default function GarageDashboardPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1">
+        <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1">
           {[
             { id: "bookings" as TabType, label: "Bookings", icon: ClipboardList },
             { id: "services" as TabType, label: "Services", icon: Wrench },
@@ -440,7 +442,7 @@ export default function GarageDashboardPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${
                 activeTab === tab.id
                   ? "bg-emerald-600 text-white"
                   : "text-slate-600 hover:bg-slate-50"
@@ -453,7 +455,7 @@ export default function GarageDashboardPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="rounded-lg border border-slate-200 bg-white">
           {/* Bookings Tab */}
           {activeTab === "bookings" && (
             <div>
