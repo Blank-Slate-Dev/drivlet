@@ -16,7 +16,16 @@
       "Bash(npm cache clean:*)",
       "Bash(grep:*)",
       "Bash(unset:*)",
-      "Bash(timeout 20 npm run dev:*)"
+      "Bash(timeout 20 npm run dev:*)",
+      "Bash(npm ls:*)",
+      "Bash(set __NEXT_PRIVATE_STANDALONE_CONFIG=)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(npx next build)",
+      "Bash(env)",
+      "Bash(echo:*)",
+      "Bash(npm config:*)",
+      "Bash(NODE_ENV=development npm install:*)"
     ],
     "deny": [],
     "ask": []

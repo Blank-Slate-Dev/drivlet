@@ -9,7 +9,6 @@ import {
   Calendar,
   ClipboardList,
   Clock,
-  Settings,
   TrendingUp,
   User,
   RefreshCw,
@@ -23,15 +22,15 @@ import {
   DollarSign,
   Phone,
   Mail,
-  ChevronRight,
   Eye,
   Check,
   X,
   Loader2,
-  CalendarDays,
-  FileText,
   Shield,
+  Flag,
+  Play,
 } from "lucide-react";
+import { GarageDashboardHeader } from "@/components/garage/GarageDashboardHeader";
 
 // Types
 interface GarageProfile {
@@ -182,21 +181,26 @@ export default function GarageDashboardPage() {
     }
   };
 
-  const handleBookingAction = async (bookingId: string, action: "accept" | "decline") => {
+  const handleBookingAction = async (
+    bookingId: string,
+    action: "accept" | "decline" | "start" | "complete",
+    notes?: string
+  ) => {
     setActionLoading(bookingId);
     try {
-      const response = await fetch(`/api/garage/bookings/${bookingId}`, {
-        method: "PATCH",
+      const response = await fetch("/api/garage/booking-action", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ bookingId, action, notes }),
       });
 
       if (response.ok) {
+        const data = await response.json();
         // Update local state
         setBookings(prev =>
           prev.map(b =>
             b._id === bookingId
-              ? { ...b, garageStatus: action === "accept" ? "accepted" : "declined" }
+              ? { ...b, garageStatus: data.booking?.garageStatus || b.garageStatus }
               : b
           )
         );
@@ -359,32 +363,12 @@ export default function GarageDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900">
-                {garageProfile?.businessName || "Garage Dashboard"}
-              </h1>
-              {garageProfile?.status && (
-                <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusBadge(garageProfile.status)}`}>
-                  {garageProfile.status.charAt(0).toUpperCase() + garageProfile.status.slice(1)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage your bookings, services, and business profile
-            </p>
-          </div>
-          <button
-            onClick={fetchDashboardData}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
+        {/* Header with Notification Bell */}
+        <GarageDashboardHeader
+          garageProfile={garageProfile}
+          onRefresh={fetchDashboardData}
+          loading={loading}
+        />
 
         {/* Stats Cards */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -551,7 +535,7 @@ export default function GarageDashboardPage() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             onClick={() => setSelectedBooking(booking)}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
@@ -560,6 +544,7 @@ export default function GarageDashboardPage() {
                             View
                           </button>
 
+                          {/* New booking actions */}
                           {(!booking.garageStatus || booking.garageStatus === "new") && (
                             <>
                               <button
@@ -583,6 +568,38 @@ export default function GarageDashboardPage() {
                                 Decline
                               </button>
                             </>
+                          )}
+
+                          {/* Accepted booking - Start service */}
+                          {booking.garageStatus === "accepted" && (
+                            <button
+                              onClick={() => handleBookingAction(booking._id, "start")}
+                              disabled={actionLoading === booking._id}
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {actionLoading === booking._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Play className="h-4 w-4" />
+                              )}
+                              Start Service
+                            </button>
+                          )}
+
+                          {/* In progress booking - Complete service */}
+                          {booking.garageStatus === "in_progress" && (
+                            <button
+                              onClick={() => handleBookingAction(booking._id, "complete")}
+                              disabled={actionLoading === booking._id}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {actionLoading === booking._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4" />
+                              )}
+                              Complete
+                            </button>
                           )}
                         </div>
                       </div>

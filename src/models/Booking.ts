@@ -23,6 +23,12 @@ export interface ISelectedService {
 
 export type GarageBookingStatus = "new" | "accepted" | "declined" | "in_progress" | "completed";
 
+export interface IGarageResponse {
+  respondedAt: Date;
+  respondedBy: Types.ObjectId;
+  notes?: string;
+}
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -51,10 +57,14 @@ export interface IBooking extends Document {
 
   // Garage assignment
   assignedGarageId?: Types.ObjectId;
+  assignedAt?: Date;
+  garageNotifiedAt?: Date;
+  garageViewedAt?: Date;
   garageStatus: GarageBookingStatus;
   garageNotes?: string;
   garageAcceptedAt?: Date;
   garageCompletedAt?: Date;
+  garageResponse?: IGarageResponse;
 
   // Payment information
   paymentId?: string;
@@ -231,6 +241,18 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
       index: true,
     },
+    assignedAt: {
+      type: Date,
+      required: false,
+    },
+    garageNotifiedAt: {
+      type: Date,
+      required: false,
+    },
+    garageViewedAt: {
+      type: Date,
+      required: false,
+    },
     garageStatus: {
       type: String,
       enum: ["new", "accepted", "declined", "in_progress", "completed"],
@@ -247,6 +269,11 @@ const BookingSchema = new Schema<IBooking>(
     garageCompletedAt: {
       type: Date,
       required: false,
+    },
+    garageResponse: {
+      respondedAt: { type: Date },
+      respondedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      notes: { type: String },
     },
 
     // Payment information

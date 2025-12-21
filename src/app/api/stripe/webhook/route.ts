@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   console.log('🔔 Webhook received!');
@@ -162,6 +162,122 @@ export async function POST(request: NextRequest) {
           amount: paymentIntent.amount / 100 + ' AUD'
         });
 
+        // Auto-assign to matching garage if garagePlaceId exists
+        if (metadata.garagePlaceId) {
+          console.log('🔍 Looking for matching garage with placeId:', metadata.garagePlaceId);
+
+          const matchingGarage = await db.collection('garages').findOne({
+            linkedGaragePlaceId: metadata.garagePlaceId,
+            status: 'approved'
+          });
+
+          if (matchingGarage) {
+            console.log('✅ Found matching garage:', matchingGarage.businessName);
+
+            // Update booking with garage assignment
+            await db.collection('bookings').updateOne(
+              { _id: result.insertedId },
+              {
+                $set: {
+                  assignedGarageId: matchingGarage._id,
+                  assignedAt: new Date(),
+                  garageNotifiedAt: new Date(),
+                },
+                $push: {
+                  updates: {
+                    stage: 'garage_assigned',
+                    timestamp: new Date(),
+                    message: `Booking automatically assigned to ${matchingGarage.businessName}`,
+                    updatedBy: 'system',
+                  } as never
+                }
+              }
+            );
+
+            // Create notification for the garage
+            await db.collection('garagenotifications').insertOne({
+              garageId: matchingGarage._id,
+              bookingId: result.insertedId,
+              type: 'new_booking',
+              title: 'New Booking Assignment',
+              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              isRead: false,
+              metadata: {
+                vehicleRegistration: metadata.vehicleRegistration,
+                serviceType: booking.serviceType,
+                pickupTime: new Date(metadata.earliestPickup),
+                customerName: metadata.customerName,
+                urgency: isManual ? 'urgent' : 'normal',
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            console.log('📧 Notification created for garage:', matchingGarage.businessName);
+          } else {
+            console.log('⚠️ No matching approved garage found for placeId:', metadata.garagePlaceId);
+          }
+        } else if (metadata.garageName) {
+          // Fallback: Try to match by garage name (partial match)
+          console.log('🔍 Looking for matching garage by name:', metadata.garageName);
+
+          // Get all approved garages and check for partial name match
+          const approvedGarages = await db.collection('garages').find({ status: 'approved' }).toArray();
+          const normalizedBookingName = metadata.garageName.toLowerCase();
+          const matchingGarage = approvedGarages.find(g => {
+            const linkedName = (g.linkedGarageName || '').toLowerCase();
+            // Match if booking name contains linked name or vice versa
+            return linkedName && (normalizedBookingName.includes(linkedName) || linkedName.includes(normalizedBookingName));
+          });
+
+          if (matchingGarage) {
+            console.log('✅ Found matching garage by name:', matchingGarage.businessName);
+
+            // Update booking with garage assignment
+            await db.collection('bookings').updateOne(
+              { _id: result.insertedId },
+              {
+                $set: {
+                  assignedGarageId: matchingGarage._id,
+                  assignedAt: new Date(),
+                  garageNotifiedAt: new Date(),
+                },
+                $push: {
+                  updates: {
+                    stage: 'garage_assigned',
+                    timestamp: new Date(),
+                    message: `Booking automatically assigned to ${matchingGarage.businessName}`,
+                    updatedBy: 'system',
+                  } as never
+                }
+              }
+            );
+
+            // Create notification for the garage
+            await db.collection('garagenotifications').insertOne({
+              garageId: matchingGarage._id,
+              bookingId: result.insertedId,
+              type: 'new_booking',
+              title: 'New Booking Assignment',
+              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              isRead: false,
+              metadata: {
+                vehicleRegistration: metadata.vehicleRegistration,
+                serviceType: booking.serviceType,
+                pickupTime: new Date(metadata.earliestPickup),
+                customerName: metadata.customerName,
+                urgency: isManual ? 'urgent' : 'normal',
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            console.log('📧 Notification created for garage:', matchingGarage.businessName);
+          } else {
+            console.log('⚠️ No matching approved garage found for name:', metadata.garageName);
+          }
+        }
+
       } catch (dbError) {
         console.error('❌❌❌ ERROR SAVING BOOKING:', dbError);
         if (dbError instanceof Error) {
@@ -286,6 +402,122 @@ export async function POST(request: NextRequest) {
 
         console.log('✅✅✅ BOOKING SAVED FROM CHECKOUT SESSION!');
         console.log('🆔 Booking ID:', result.insertedId);
+
+        // Auto-assign to matching garage if garagePlaceId exists
+        if (metadata.garagePlaceId) {
+          console.log('🔍 Looking for matching garage with placeId:', metadata.garagePlaceId);
+
+          const matchingGarage = await db.collection('garages').findOne({
+            linkedGaragePlaceId: metadata.garagePlaceId,
+            status: 'approved'
+          });
+
+          if (matchingGarage) {
+            console.log('✅ Found matching garage:', matchingGarage.businessName);
+
+            // Update booking with garage assignment
+            await db.collection('bookings').updateOne(
+              { _id: result.insertedId },
+              {
+                $set: {
+                  assignedGarageId: matchingGarage._id,
+                  assignedAt: new Date(),
+                  garageNotifiedAt: new Date(),
+                },
+                $push: {
+                  updates: {
+                    stage: 'garage_assigned',
+                    timestamp: new Date(),
+                    message: `Booking automatically assigned to ${matchingGarage.businessName}`,
+                    updatedBy: 'system',
+                  } as never
+                }
+              }
+            );
+
+            // Create notification for the garage
+            await db.collection('garagenotifications').insertOne({
+              garageId: matchingGarage._id,
+              bookingId: result.insertedId,
+              type: 'new_booking',
+              title: 'New Booking Assignment',
+              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              isRead: false,
+              metadata: {
+                vehicleRegistration: metadata.vehicleRegistration,
+                serviceType: booking.serviceType,
+                pickupTime: new Date(metadata.earliestPickup),
+                customerName: metadata.customerName,
+                urgency: isManualSession ? 'urgent' : 'normal',
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            console.log('📧 Notification created for garage:', matchingGarage.businessName);
+          } else {
+            console.log('⚠️ No matching approved garage found for placeId:', metadata.garagePlaceId);
+          }
+        } else if (metadata.garageName) {
+          // Fallback: Try to match by garage name (partial match)
+          console.log('🔍 Looking for matching garage by name:', metadata.garageName);
+
+          // Get all approved garages and check for partial name match
+          const approvedGarages = await db.collection('garages').find({ status: 'approved' }).toArray();
+          const normalizedBookingName = metadata.garageName.toLowerCase();
+          const matchingGarage = approvedGarages.find(g => {
+            const linkedName = (g.linkedGarageName || '').toLowerCase();
+            // Match if booking name contains linked name or vice versa
+            return linkedName && (normalizedBookingName.includes(linkedName) || linkedName.includes(normalizedBookingName));
+          });
+
+          if (matchingGarage) {
+            console.log('✅ Found matching garage by name:', matchingGarage.businessName);
+
+            // Update booking with garage assignment
+            await db.collection('bookings').updateOne(
+              { _id: result.insertedId },
+              {
+                $set: {
+                  assignedGarageId: matchingGarage._id,
+                  assignedAt: new Date(),
+                  garageNotifiedAt: new Date(),
+                },
+                $push: {
+                  updates: {
+                    stage: 'garage_assigned',
+                    timestamp: new Date(),
+                    message: `Booking automatically assigned to ${matchingGarage.businessName}`,
+                    updatedBy: 'system',
+                  } as never
+                }
+              }
+            );
+
+            // Create notification for the garage
+            await db.collection('garagenotifications').insertOne({
+              garageId: matchingGarage._id,
+              bookingId: result.insertedId,
+              type: 'new_booking',
+              title: 'New Booking Assignment',
+              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              isRead: false,
+              metadata: {
+                vehicleRegistration: metadata.vehicleRegistration,
+                serviceType: booking.serviceType,
+                pickupTime: new Date(metadata.earliestPickup),
+                customerName: metadata.customerName,
+                urgency: isManualSession ? 'urgent' : 'normal',
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            console.log('📧 Notification created for garage:', matchingGarage.businessName);
+          } else {
+            console.log('⚠️ No matching approved garage found for name:', metadata.garageName);
+          }
+        }
 
       } catch (dbError) {
         console.error('❌❌❌ ERROR SAVING BOOKING:', dbError);

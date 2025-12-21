@@ -55,19 +55,21 @@ export async function GET(request: Request) {
     const linkedGarageName = garage.linkedGarageName || "";
 
     // Build the garage matching condition
-    // Match by placeId (exact) OR garageName (fallback for older bookings)
+    // Match by placeId (exact) OR garageName (partial match - contains the linked name)
+    const escapedName = linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const garageMatchCondition = linkedPlaceId
       ? {
           $or: [
             { garagePlaceId: linkedPlaceId },
-            // Fallback: match by name if placeId not available on booking
-            { garagePlaceId: { $exists: false }, garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
-            { garagePlaceId: null, garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
-            { garagePlaceId: "", garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
+            // Fallback: partial match by name if placeId not available on booking
+            // This allows "Aston Martin Sydney - Alexandria" to match "Aston Martin Sydney"
+            { garagePlaceId: { $exists: false }, garageName: { $regex: new RegExp(escapedName, "i") } },
+            { garagePlaceId: null, garageName: { $regex: new RegExp(escapedName, "i") } },
+            { garagePlaceId: "", garageName: { $regex: new RegExp(escapedName, "i") } },
           ],
         }
       : linkedGarageName
-      ? { garageName: { $regex: new RegExp(`^${linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } }
+      ? { garageName: { $regex: new RegExp(escapedName, "i") } }
       : null;
 
     if (status && status !== "all") {

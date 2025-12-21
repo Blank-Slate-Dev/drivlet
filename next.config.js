@@ -32,8 +32,10 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Return null to use the default nanoid-based build ID
-  generateBuildId: async () => null,
+  generateBuildId: async () => {
+    // Generate a unique build ID
+    return `build-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  },
   async headers() {
     return [
       {
