@@ -126,7 +126,7 @@ export default function GaragePendingPage() {
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                  className="absolute w-1 h-4 bg-white rounded-full origin-bottom"
+                  className="absolute w-0.5 h-4 bg-white rounded-full origin-bottom"
                   style={{ bottom: '50%' }}
                 />
                 
