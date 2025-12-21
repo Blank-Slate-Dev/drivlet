@@ -8,7 +8,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  Clock,
   CheckCircle,
   Mail,
   Phone,
@@ -67,8 +66,8 @@ export default function GaragePendingPage() {
       </div>
 
       {/* Floating decorative shapes */}
-      <div className="absolute top-20 right-20 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl" />
+      <div className="absolute top-20 right-20 w-72 h-72 bg-teal-400/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 left-20 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
 
       {/* Header */}
       <header className="sticky top-0 z-50">
@@ -100,23 +99,53 @@ export default function GaragePendingPage() {
           className="w-full max-w-xl"
         >
           <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl overflow-hidden">
-            {/* Header with animated clock */}
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-8 text-center relative overflow-hidden">
+            {/* Header with animated clock - now emerald themed */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-8 text-center relative overflow-hidden">
               <div className="absolute inset-0 opacity-20">
                 <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full translate-x-1/2 translate-y-1/2" />
               </div>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border-4 border-white/40"
-              >
-                <Clock className="h-10 w-10 text-white" />
-              </motion.div>
+              
+              {/* Animated Clock with separate hour and minute hands */}
+              <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border-4 border-white/40">
+                {/* Clock face background */}
+                <div className="absolute inset-2 rounded-full bg-white/10" />
+                
+                {/* Hour markers */}
+                {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
+                  <div
+                    key={deg}
+                    className="absolute w-0.5 h-1.5 bg-white/40 rounded-full"
+                    style={{
+                      transform: `rotate(${deg}deg) translateY(-24px)`,
+                    }}
+                  />
+                ))}
+                
+                {/* Hour hand - slow rotation (60 seconds for full rotation) */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                  className="absolute w-1 h-4 bg-white rounded-full origin-bottom"
+                  style={{ bottom: '50%' }}
+                />
+                
+                {/* Minute hand - 3x faster (20 seconds for full rotation) */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="absolute w-0.5 h-6 bg-white/90 rounded-full origin-bottom"
+                  style={{ bottom: '50%' }}
+                />
+                
+                {/* Center dot */}
+                <div className="absolute w-2.5 h-2.5 bg-white rounded-full z-10 shadow-sm" />
+              </div>
+              
               <h1 className="mt-4 text-2xl font-bold text-white">
                 Application Under Review
               </h1>
-              <p className="text-amber-100 mt-1">
+              <p className="text-emerald-100 mt-1">
                 We&apos;re reviewing your garage registration
               </p>
             </div>
@@ -164,12 +193,12 @@ export default function GaragePendingPage() {
                 </div>
               </div>
 
-              {/* What we're verifying */}
+              {/* What we're verifying - updated colors to match theme */}
               <div className="grid grid-cols-3 gap-3 mb-8">
                 {[
                   { icon: Briefcase, label: "Business", color: "emerald" },
-                  { icon: Shield, label: "Insurance", color: "blue" },
-                  { icon: FileCheck, label: "Licenses", color: "purple" },
+                  { icon: Shield, label: "Insurance", color: "teal" },
+                  { icon: FileCheck, label: "Licenses", color: "cyan" },
                 ].map((item, index) => (
                   <motion.div
                     key={item.label}
@@ -180,7 +209,7 @@ export default function GaragePendingPage() {
                   >
                     <item.icon className={`h-6 w-6 mx-auto ${
                       item.color === 'emerald' ? 'text-emerald-500' :
-                      item.color === 'blue' ? 'text-blue-500' : 'text-purple-500'
+                      item.color === 'teal' ? 'text-teal-500' : 'text-cyan-500'
                     }`} />
                     <p className="mt-2 text-xs text-slate-600 font-medium">{item.label}</p>
                   </motion.div>
