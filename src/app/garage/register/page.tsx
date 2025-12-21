@@ -3,6 +3,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -185,16 +186,38 @@ export default function GarageRegisterPage() {
     setLoading(true);
     setError("");
     try {
+      // Step 1: Register the garage
       const res = await fetch("/api/garage/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Registration failed"); return; }
-      router.push("/garage/login?registered=true");
-    } catch { setError("Something went wrong. Please try again."); }
-    finally { setLoading(false); }
+      if (!res.ok) { 
+        setError(data.error || "Registration failed"); 
+        setLoading(false);
+        return; 
+      }
+
+      // Step 2: Auto-login the user after successful registration
+      const signInResult = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        // If auto-login fails, redirect to login page with success message
+        router.push("/garage/login?registered=true");
+        return;
+      }
+
+      // Step 3: Redirect to pending page
+      router.push("/garage/pending");
+    } catch { 
+      setError("Something went wrong. Please try again."); 
+      setLoading(false);
+    }
   };
 
   const isStepComplete = (step: Step): boolean => {
