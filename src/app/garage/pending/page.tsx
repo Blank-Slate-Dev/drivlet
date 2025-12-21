@@ -125,7 +125,7 @@ export default function GaragePendingPage() {
                 {/* Hour hand - slow rotation (60 seconds for full rotation) */}
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                   className="absolute w-1 h-4 bg-white rounded-full origin-bottom"
                   style={{ bottom: '50%' }}
                 />
@@ -133,7 +133,7 @@ export default function GaragePendingPage() {
                 {/* Minute hand - 3x faster (20 seconds for full rotation) */}
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                   className="absolute w-0.5 h-6 bg-white/90 rounded-full origin-bottom"
                   style={{ bottom: '50%' }}
                 />
