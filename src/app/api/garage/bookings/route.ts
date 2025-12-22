@@ -7,7 +7,7 @@ import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
 
-// GET - Fetch bookings for the garage
+// GET - Fetch acknowledged bookings for the garage (not new/incoming)
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -34,107 +34,71 @@ export async function GET(request: Request) {
 
     // Only show bookings to approved garages
     if (garage.status !== "approved") {
-      return NextResponse.json({ bookings: [] });
+      return NextResponse.json({
+        success: true,
+        bookings: [],
+        counts: { all: 0, acknowledged: 0, inProgress: 0, completed: 0 },
+        garageName: garage.businessName,
+      });
     }
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const statusFilter = searchParams.get("status"); // 'acknowledged', 'in_progress', 'completed'
 
-    // Build query
-    // Fetch bookings that:
-    // 1. Are assigned to this garage, OR
-    // 2. Are new (no garage assigned) and match this garage's linked business
+    // Base query - only show acknowledged bookings (not new/incoming)
+    // These are bookings assigned to this garage with garageStatus != 'new'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: Record<string, any> = {};
+    const baseQuery: Record<string, any> = {
+      assignedGarageId: garage._id,
+      garageStatus: { $nin: ["new", null] },
+    };
 
-    // Get garage's linked business for matching
-    const linkedPlaceId = garage.linkedGaragePlaceId || "";
-    const linkedGarageName = garage.linkedGarageName || "";
+    // Build specific query based on filter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: Record<string, any> = { ...baseQuery };
 
-    // Build the garage matching condition
-    // Match by placeId (exact) OR garageName (partial match - contains the linked name)
-    const escapedName = linkedGarageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const garageMatchCondition = linkedPlaceId
-      ? {
-          $or: [
-            { garagePlaceId: linkedPlaceId },
-            // Fallback: partial match by name if placeId not available on booking
-            // This allows "Aston Martin Sydney - Alexandria" to match "Aston Martin Sydney"
-            { garagePlaceId: { $exists: false }, garageName: { $regex: new RegExp(escapedName, "i") } },
-            { garagePlaceId: null, garageName: { $regex: new RegExp(escapedName, "i") } },
-            { garagePlaceId: "", garageName: { $regex: new RegExp(escapedName, "i") } },
-          ],
-        }
-      : linkedGarageName
-      ? { garageName: { $regex: new RegExp(escapedName, "i") } }
-      : null;
-
-    if (status && status !== "all") {
-      // When filtering by status
-      if (status === "new") {
-        // For new bookings, only show those matching this garage's linked business
-        if (!garageMatchCondition) {
-          // No linked garage, return empty
-          return NextResponse.json({ bookings: [], total: 0, limit, offset });
-        }
-        query.$and = [
-          { garageStatus: "new" },
-          {
-            $or: [
-              { assignedGarageId: null },
-              { assignedGarageId: { $exists: false } },
-            ],
-          },
-          garageMatchCondition,
-        ];
-      } else {
-        // For other statuses (accepted, in_progress, completed, declined)
-        // Only show bookings assigned to this garage
-        query.assignedGarageId = garage._id;
-        query.garageStatus = status;
-      }
-    } else {
-      // Show all: bookings assigned to this garage OR new bookings for this garage
-      if (!garageMatchCondition) {
-        // Only show assigned bookings if no linked garage
-        query.assignedGarageId = garage._id;
-      } else {
-        const newBookingsForGarage: Record<string, unknown> = {
-          $and: [
-            { garageStatus: { $in: ["new", undefined] } },
-            {
-              $or: [
-                { assignedGarageId: null },
-                { assignedGarageId: { $exists: false } },
-              ],
-            },
-            garageMatchCondition,
-          ],
-        };
-
-        query.$or = [
-          { assignedGarageId: garage._id },
-          newBookingsForGarage,
-        ];
-      }
+    if (statusFilter === "acknowledged") {
+      // Acknowledged but not started yet
+      query.garageStatus = "acknowledged";
+      query.status = "pending";
+    } else if (statusFilter === "in_progress") {
+      query.status = "in_progress";
+    } else if (statusFilter === "completed") {
+      query.status = "completed";
     }
+    // 'all' or no filter - use baseQuery (everything except new)
 
     const bookings = await Booking.find(query)
       .sort({ createdAt: -1 })
-      .skip(offset)
-      .limit(limit)
       .lean();
 
-    const total = await Booking.countDocuments(query);
+    // Get counts for tabs
+    const counts = {
+      all: await Booking.countDocuments({
+        assignedGarageId: garage._id,
+        garageStatus: { $nin: ["new", null] },
+      }),
+      acknowledged: await Booking.countDocuments({
+        assignedGarageId: garage._id,
+        garageStatus: "acknowledged",
+        status: "pending",
+      }),
+      inProgress: await Booking.countDocuments({
+        assignedGarageId: garage._id,
+        status: "in_progress",
+      }),
+      completed: await Booking.countDocuments({
+        assignedGarageId: garage._id,
+        status: "completed",
+      }),
+    };
 
     return NextResponse.json({
+      success: true,
       bookings,
-      total,
-      limit,
-      offset,
+      counts,
+      garageName: garage.businessName,
     });
   } catch (error) {
     console.error("Error fetching garage bookings:", error);

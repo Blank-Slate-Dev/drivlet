@@ -25,7 +25,9 @@
       "Bash(env)",
       "Bash(echo:*)",
       "Bash(npm config:*)",
-      "Bash(NODE_ENV=development npm install:*)"
+      "Bash(NODE_ENV=development npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(cmd /c \"rmdir /s /q .next 2>nul\")"
     ],
     "deny": [],
     "ask": []

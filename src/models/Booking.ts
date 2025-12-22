@@ -21,7 +21,7 @@ export interface ISelectedService {
   services: string[];
 }
 
-export type GarageBookingStatus = "new" | "accepted" | "declined" | "in_progress" | "completed";
+export type GarageBookingStatus = "new" | "acknowledged" | "accepted" | "declined" | "in_progress" | "completed";
 
 export interface IGarageResponse {
   respondedAt: Date;
@@ -255,7 +255,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     garageStatus: {
       type: String,
-      enum: ["new", "accepted", "declined", "in_progress", "completed"],
+      enum: ["new", "acknowledged", "accepted", "declined", "in_progress", "completed"],
       default: "new",
     },
     garageNotes: {
