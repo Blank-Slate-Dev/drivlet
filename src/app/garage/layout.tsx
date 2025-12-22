@@ -9,7 +9,6 @@ import {
   Building2,
   LayoutDashboard,
   ClipboardList,
-  Calendar,
   TrendingUp,
   Settings,
   Globe,
@@ -35,7 +34,6 @@ export default function GarageLayout({
   const navItems = [
     { href: "/garage/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/garage/bookings", label: "Bookings", icon: ClipboardList },
-    { href: "/garage/schedule", label: "Schedule", icon: Calendar },
     { href: "/garage/analytics", label: "Analytics", icon: TrendingUp },
     { href: "/garage/settings", label: "Settings", icon: Settings },
   ];
