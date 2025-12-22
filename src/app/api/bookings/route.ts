@@ -19,7 +19,31 @@ export async function GET() {
   try {
     await connectDB();
 
-    const bookings = await Booking.find({ userId: session.user.id })
+    // Build query to find bookings by BOTH userId AND userEmail
+    // This handles:
+    // 1. Bookings made while logged in (have userId)
+    // 2. Bookings made as guest with same email (userId: null but matching email)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const queryConditions: any[] = [];
+
+    // Always include userId match if we have an ID
+    if (session.user.id) {
+      queryConditions.push({ userId: session.user.id });
+    }
+
+    // Add email matching if user has an email
+    if (session.user.email) {
+      queryConditions.push({ userEmail: session.user.email.toLowerCase() });
+    }
+
+    // If no conditions, return empty (shouldn't happen with valid session)
+    if (queryConditions.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const bookings = await Booking.find({
+      $or: queryConditions,
+    })
       .sort({ createdAt: -1 })
       .lean();
 

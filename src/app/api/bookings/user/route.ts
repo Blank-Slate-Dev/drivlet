@@ -24,9 +24,20 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    // Build query - filter by user's email
+    // Build query - filter by user's email OR userId
+    // This handles both logged-in bookings and guest bookings with same email
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orConditions: any[] = [
+      { userEmail: session.user.email?.toLowerCase() },
+    ];
+
+    // Add userId to query if available
+    if ((session.user as { id?: string }).id) {
+      orConditions.push({ userId: (session.user as { id: string }).id });
+    }
+
     const query: Record<string, unknown> = {
-      userEmail: session.user.email,
+      $or: orConditions,
     };
 
     // Filter by status if provided
@@ -57,9 +68,9 @@ export async function GET(request: NextRequest) {
       .sort(sortOrder)
       .lean();
 
-    // Get stats for the user
+    // Get stats for the user (matching same conditions as main query)
     const stats = await Booking.aggregate([
-      { $match: { userEmail: session.user.email } },
+      { $match: { $or: orConditions } },
       {
         $group: {
           _id: "$status",
