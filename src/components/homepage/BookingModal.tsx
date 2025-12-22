@@ -450,7 +450,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     regoPlate.toUpperCase()
   )}`;
 
-  // Success state
+  // Success state - using same flexbox centering as main modal for consistency
   if (currentStep === 'success') {
     return (
       <AnimatePresence>
@@ -466,59 +466,62 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               onTouchMove={(e) => e.preventDefault()}
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="fixed left-1/2 top-1/2 z-[101] w-[90%] max-w-md -translate-x-1/2 -translate-y-1/2"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[101] flex items-center justify-center p-4"
               onWheel={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-2xl">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-600" />
-                </div>
-                <h3 className="mt-6 text-2xl font-bold text-slate-900">Booking Confirmed!</h3>
-                <p className="mt-2 text-slate-600">We&apos;ve received your booking and payment.</p>
+              <div className="w-full max-w-md">
+                <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-2xl">
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+                  </div>
+                  <h3 className="mt-6 text-2xl font-bold text-slate-900">Booking Confirmed!</h3>
+                  <p className="mt-2 text-slate-600">We&apos;ve received your booking and payment.</p>
 
-                {/* Booking Summary */}
-                <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-left">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Vehicle</span>
-                      <span className="font-medium text-slate-900">
-                        {regoPlate.toUpperCase()} ({regoState})
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Garage</span>
-                      <span className="font-medium text-slate-900">{garageSearch}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Pickup</span>
-                      <span className="font-medium text-slate-900">
-                        {getTimeLabel(earliestPickup, allPickupTimeOptions)}
-                      </span>
+                  {/* Booking Summary */}
+                  <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-left">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Vehicle</span>
+                        <span className="font-medium text-slate-900">
+                          {regoPlate.toUpperCase()} ({regoState})
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Garage</span>
+                        <span className="font-medium text-slate-900">{garageSearch}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Pickup</span>
+                        <span className="font-medium text-slate-900">
+                          {getTimeLabel(earliestPickup, allPickupTimeOptions)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p className="mt-4 text-sm text-slate-500">
-                  A confirmation email has been sent to <span className="font-medium">{customerEmail}</span>
-                </p>
+                  <p className="mt-4 text-sm text-slate-500">
+                    A confirmation email has been sent to <span className="font-medium">{customerEmail}</span>
+                  </p>
 
-                <div className="mt-6 space-y-3">
-                  <Link
-                    href={trackingUrl}
-                    className="block w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-                  >
-                    Track Your Booking
-                  </Link>
-                  <button
-                    onClick={onClose}
-                    className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Done
-                  </button>
+                  <div className="mt-6 space-y-3">
+                    <Link
+                      href={trackingUrl}
+                      className="block w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                    >
+                      Track Your Booking
+                    </Link>
+                    <button
+                      onClick={onClose}
+                      className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
