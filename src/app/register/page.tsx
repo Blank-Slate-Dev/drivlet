@@ -334,6 +334,27 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {/* Partner sign-up buttons */}
+          <div className="mt-6 text-center space-y-3">
+            <p className="text-emerald-100 text-sm">Want to join as a partner?</p>
+
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
+              <Link
+                href="/driver/register"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
+              >
+                Driver Sign Up <ArrowRight className="h-4 w-4" />
+              </Link>
+
+              <Link
+                href="/garage/register"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
+              >
+                Garage Sign Up <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
           {/* Back to home link */}
           <div className="mt-6 text-center">
             <Link
