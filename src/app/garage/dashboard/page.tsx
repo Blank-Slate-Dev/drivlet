@@ -1,9 +1,10 @@
 // src/app/garage/dashboard/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Car,
   MapPin,
@@ -19,7 +20,8 @@ import {
   ArrowRight,
   Loader2,
   AlertCircle,
-  Mail,
+  Sparkles,
+  X,
 } from "lucide-react";
 
 interface Booking {
@@ -50,6 +52,7 @@ interface DashboardStats {
 export default function GarageDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -59,7 +62,21 @@ export default function GarageDashboardPage() {
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  // Redirect if not authenticated or not a garage user
+  // Welcome modal
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  const isGarage = session?.user?.role === "garage";
+  const isApproved = Boolean(session?.user?.isApproved);
+  const userId = session?.user?.id;
+
+  const welcomeParam = searchParams.get("welcome") === "1";
+
+  const welcomeKey = useMemo(() => {
+    if (!userId) return null;
+    return `drivlet:garage_welcome_seen:${userId}`;
+  }, [userId]);
+
+  // Redirect if not authenticated or wrong role
   useEffect(() => {
     if (status === "loading") return;
 
@@ -68,21 +85,54 @@ export default function GarageDashboardPage() {
       return;
     }
 
-    if (session.user.role !== "garage") {
+    if (!isGarage) {
       router.push("/");
       return;
     }
-  }, [session, status, router]);
+
+    // If garage isn't approved, keep them on pending page
+    if (!isApproved) {
+      router.push("/garage/pending");
+      return;
+    }
+  }, [session, status, isGarage, isApproved, router]);
+
+  // Show welcome modal:
+  // - if coming from pending redirect (?welcome=1), OR
+  // - first time an approved garage reaches dashboard (localStorage flag)
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (!isGarage || !isApproved) return;
+    if (!welcomeKey) return;
+
+    try {
+      const seen = localStorage.getItem(welcomeKey) === "1";
+
+      if (welcomeParam && !seen) {
+        setShowWelcome(true);
+        localStorage.setItem(welcomeKey, "1");
+        return;
+      }
+
+      if (!seen) {
+        setShowWelcome(true);
+        localStorage.setItem(welcomeKey, "1");
+      }
+    } catch (e) {
+      // If localStorage is blocked, still show it once this session.
+      setShowWelcome(true);
+    }
+  }, [status, isGarage, isApproved, welcomeKey, welcomeParam]);
 
   // Fetch data
   useEffect(() => {
-    if (session?.user.role === "garage") {
+    if (session?.user.role === "garage" && isApproved) {
       fetchData();
-      // Auto-refresh every 30 seconds
       const interval = setInterval(() => fetchData(false), 30000);
       return () => clearInterval(interval);
     }
-  }, [session]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, isApproved]);
 
   const fetchData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -129,9 +179,7 @@ export default function GarageDashboardPage() {
       });
 
       if (res.ok) {
-        // Remove from incoming list
         setBookings((prev) => prev.filter((b) => b._id !== bookingId));
-        // Refresh stats
         const statsRes = await fetch("/api/garage/stats");
         if (statsRes.ok) {
           setStats(await statsRes.json());
@@ -166,6 +214,71 @@ export default function GarageDashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Welcome Modal */}
+      <AnimatePresence>
+        {showWelcome && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 240, damping: 20 }}
+              className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 relative">
+                <button
+                  onClick={() => setShowWelcome(false)}
+                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 transition"
+                  aria-label="Close welcome"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 border border-white/30">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Welcome to Drivlet!</h2>
+                    <p className="text-sm text-emerald-100">Your garage is approved and ready.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-5">
+                <p className="text-sm text-slate-700">
+                  You can now receive incoming bookings, acknowledge them, and manage your workflow from the dashboard.
+                </p>
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowWelcome(false);
+                    }}
+                    className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                  >
+                    Let’s go
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowWelcome(false);
+                      router.push("/garage/bookings");
+                    }}
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    View bookings
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
@@ -194,7 +307,6 @@ export default function GarageDashboardPage() {
 
         {/* Stats Cards */}
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Revenue card - Primary accent */}
           <div className="rounded-lg bg-emerald-600 p-3">
             <div className="flex items-center gap-3">
               <DollarSign className="h-5 w-5 text-emerald-100" />
@@ -207,7 +319,6 @@ export default function GarageDashboardPage() {
             </div>
           </div>
 
-          {/* Pending Bookings */}
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-3">
               <ClipboardList className="h-5 w-5 text-slate-400" />
@@ -218,7 +329,6 @@ export default function GarageDashboardPage() {
             </div>
           </div>
 
-          {/* Completed */}
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-slate-400" />
@@ -229,7 +339,6 @@ export default function GarageDashboardPage() {
             </div>
           </div>
 
-          {/* Rating */}
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-3">
               <Star className="h-5 w-5 text-amber-400" />
@@ -282,17 +391,12 @@ export default function GarageDashboardPage() {
           ) : (
             <div className="divide-y divide-slate-100">
               {bookings.map((booking) => (
-                <div
-                  key={booking._id}
-                  className="p-4 hover:bg-slate-50 transition"
-                >
+                <div key={booking._id} className="p-4 hover:bg-slate-50 transition">
                   <div className="flex items-start gap-4">
-                    {/* Icon */}
                     <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
                       <Car className="h-6 w-6 text-emerald-600" />
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
@@ -307,7 +411,6 @@ export default function GarageDashboardPage() {
                           <p className="text-sm text-slate-600">{booking.serviceType}</p>
                         </div>
 
-                        {/* Acknowledge Button */}
                         <button
                           onClick={() => handleAcknowledge(booking._id)}
                           disabled={acknowledging === booking._id}
@@ -322,7 +425,6 @@ export default function GarageDashboardPage() {
                         </button>
                       </div>
 
-                      {/* Details Grid */}
                       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                           <User className="h-4 w-4 text-slate-400" />
@@ -332,10 +434,7 @@ export default function GarageDashboardPage() {
                         {booking.guestPhone && (
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Phone className="h-4 w-4 text-slate-400" />
-                            <a
-                              href={`tel:${booking.guestPhone}`}
-                              className="hover:text-emerald-600"
-                            >
+                            <a href={`tel:${booking.guestPhone}`} className="hover:text-emerald-600">
                               {booking.guestPhone}
                             </a>
                           </div>
@@ -359,7 +458,6 @@ export default function GarageDashboardPage() {
                         </div>
                       </div>
 
-                      {/* Tags */}
                       {(booking.hasExistingBooking || booking.isManualTransmission) && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {booking.hasExistingBooking && booking.existingBookingRef && (
