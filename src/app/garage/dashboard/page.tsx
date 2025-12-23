@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Car,
@@ -52,7 +52,6 @@ interface DashboardStats {
 export default function GarageDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -68,8 +67,6 @@ export default function GarageDashboardPage() {
   const isGarage = session?.user?.role === "garage";
   const isApproved = Boolean(session?.user?.isApproved);
   const userId = session?.user?.id;
-
-  const welcomeParam = searchParams.get("welcome") === "1";
 
   const welcomeKey = useMemo(() => {
     if (!userId) return null;
@@ -97,13 +94,23 @@ export default function GarageDashboardPage() {
     }
   }, [session, status, isGarage, isApproved, router]);
 
-  // Show welcome modal:
-  // - if coming from pending redirect (?welcome=1), OR
-  // - first time an approved garage reaches dashboard (localStorage flag)
+  // Show welcome modal only once after approval.
+  // We read ?welcome=1 from the URL using window.location.search (client-only),
+  // so we avoid Next.js build errors related to useSearchParams().
   useEffect(() => {
     if (status !== "authenticated") return;
     if (!isGarage || !isApproved) return;
     if (!welcomeKey) return;
+
+    let welcomeParam = false;
+    try {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        welcomeParam = params.get("welcome") === "1";
+      }
+    } catch {
+      welcomeParam = false;
+    }
 
     try {
       const seen = localStorage.getItem(welcomeKey) === "1";
@@ -118,11 +125,11 @@ export default function GarageDashboardPage() {
         setShowWelcome(true);
         localStorage.setItem(welcomeKey, "1");
       }
-    } catch (e) {
+    } catch {
       // If localStorage is blocked, still show it once this session.
       setShowWelcome(true);
     }
-  }, [status, isGarage, isApproved, welcomeKey, welcomeParam]);
+  }, [status, isGarage, isApproved, welcomeKey]);
 
   // Fetch data
   useEffect(() => {
@@ -256,9 +263,7 @@ export default function GarageDashboardPage() {
 
                 <div className="mt-4 flex gap-3">
                   <button
-                    onClick={() => {
-                      setShowWelcome(false);
-                    }}
+                    onClick={() => setShowWelcome(false)}
                     className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
                   >
                     Let’s go
