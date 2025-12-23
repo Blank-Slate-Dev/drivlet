@@ -58,14 +58,12 @@ function LoginForm() {
         return;
       }
 
-      // Fetch session to check role and determine redirect
       const sessionRes = await fetch("/api/auth/session");
       const session = await sessionRes.json();
 
       if (session?.user) {
         const callbackUrl = searchParams.get("callbackUrl");
 
-        // Role-based routing
         switch (session.user.role) {
           case "admin":
             router.push(callbackUrl || "/admin/dashboard");
@@ -88,6 +86,9 @@ function LoginForm() {
       setLoading(false);
     }
   };
+
+  const secondaryButtonClass =
+    "w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition";
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
@@ -233,38 +234,29 @@ function LoginForm() {
               </button>
             </form>
 
-            {/* Customer register */}
             <div className="mt-8 pt-6 border-t border-slate-200">
               <p className="text-center text-slate-500 text-sm mb-4">
                 Don&apos;t have an account?
               </p>
-              <Link
-                href="/register"
-                className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
-              >
+
+              <Link href="/register" className={secondaryButtonClass}>
                 Create an account
               </Link>
             </div>
 
-            {/* Partner login buttons INSIDE the main container */}
+            {/* Partner login buttons (same styling as "Create an account") */}
             <div className="mt-6 pt-6 border-t border-slate-200">
               <p className="text-center text-slate-600 text-sm mb-4">
                 Are you a partner?
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Link
-                  href="/driver/login"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-                >
+                <Link href="/driver/login" className={secondaryButtonClass}>
                   <Car className="h-4 w-4" />
                   Driver log in
                 </Link>
 
-                <Link
-                  href="/garage/login"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-                >
+                <Link href="/garage/login" className={secondaryButtonClass}>
                   <Wrench className="h-4 w-4" />
                   Garage log in
                 </Link>
