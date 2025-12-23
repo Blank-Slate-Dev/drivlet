@@ -7,7 +7,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowRight, Mail, Lock, CheckCircle2, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Mail,
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+} from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -53,7 +62,7 @@ function LoginForm() {
 
       if (session?.user) {
         const callbackUrl = searchParams.get("callbackUrl");
-        
+
         // Role-based routing
         switch (session.user.role) {
           case "admin":
@@ -123,9 +132,7 @@ function LoginForm() {
               <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
                 Welcome back
               </h2>
-              <p className="text-slate-600 mt-2">
-                Sign in to your account
-              </p>
+              <p className="text-slate-600 mt-2">Sign in to your account</p>
             </div>
 
             {success && (
@@ -240,24 +247,23 @@ function LoginForm() {
             </div>
           </div>
 
-          {/* Partner login links */}
+          {/* Partner login buttons */}
           <div className="mt-6 text-center space-y-3">
-            <p className="text-emerald-100 text-sm">
-              Are you a partner?
-            </p>
-            <div className="flex justify-center gap-4">
+            <p className="text-emerald-100 text-sm">Are you a partner?</p>
+
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Link
                 href="/driver/login"
-                className="text-white font-medium hover:text-emerald-200 transition text-sm"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
               >
-                Driver Login →
+                Driver Log In <ArrowRight className="h-4 w-4" />
               </Link>
-              <span className="text-emerald-300">|</span>
+
               <Link
                 href="/garage/login"
-                className="text-white font-medium hover:text-emerald-200 transition text-sm"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
               >
-                Garage Login →
+                Garage Log In <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
