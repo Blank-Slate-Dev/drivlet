@@ -15,6 +15,8 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Car,
+  Wrench,
   Loader2,
 } from "lucide-react";
 
@@ -69,17 +71,14 @@ function LoginForm() {
             router.push(callbackUrl || "/admin/dashboard");
             break;
           case "driver":
-            // Redirect drivers to driver login - they shouldn't use this form
             setError("Please use the driver login portal.");
             setLoading(false);
             return;
           case "garage":
-            // Redirect garages to garage login - they shouldn't use this form
             setError("Please use the garage partner login portal.");
             setLoading(false);
             return;
           default:
-            // Regular users go to callback or home
             router.push(callbackUrl || "/");
         }
         router.refresh();
@@ -234,6 +233,7 @@ function LoginForm() {
               </button>
             </form>
 
+            {/* Customer register */}
             <div className="mt-8 pt-6 border-t border-slate-200">
               <p className="text-center text-slate-500 text-sm mb-4">
                 Don&apos;t have an account?
@@ -245,26 +245,30 @@ function LoginForm() {
                 Create an account
               </Link>
             </div>
-          </div>
 
-          {/* Partner login buttons */}
-          <div className="mt-6 text-center space-y-3">
-            <p className="text-emerald-100 text-sm">Are you a partner?</p>
+            {/* Partner login buttons INSIDE the main container */}
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <p className="text-center text-slate-600 text-sm mb-4">
+                Are you a partner?
+              </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-3">
-              <Link
-                href="/driver/login"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
-              >
-                Driver Log In <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link
+                  href="/driver/login"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+                >
+                  <Car className="h-4 w-4" />
+                  Driver log in
+                </Link>
 
-              <Link
-                href="/garage/login"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
-              >
-                Garage Log In <ArrowRight className="h-4 w-4" />
-              </Link>
+                <Link
+                  href="/garage/login"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Garage log in
+                </Link>
+              </div>
             </div>
           </div>
         </motion.div>
