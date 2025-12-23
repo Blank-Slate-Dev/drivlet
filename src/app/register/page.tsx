@@ -16,6 +16,8 @@ import {
   EyeOff,
   CheckCircle2,
   ShieldCheck,
+  Car,
+  Wrench,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -29,7 +31,6 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Password strength indicators
   const passwordChecks = {
     length: password.length >= 6,
     match: password === confirmPassword && confirmPassword.length > 0,
@@ -78,6 +79,9 @@ export default function RegisterPage() {
     }
   };
 
+  const secondaryButtonClass =
+    "w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition";
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
       {/* Subtle pattern overlay */}
@@ -90,7 +94,7 @@ export default function RegisterPage() {
         />
       </div>
 
-      {/* Header - matches homepage Header.tsx positioning exactly */}
+      {/* Header */}
       <header className="sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
@@ -251,7 +255,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Password requirements */}
               {(password.length > 0 || confirmPassword.length > 0) && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -332,26 +335,24 @@ export default function RegisterPage() {
                 </Link>
               </p>
             </div>
-          </div>
 
-          {/* Partner sign-up buttons */}
-          <div className="mt-6 text-center space-y-3">
-            <p className="text-emerald-100 text-sm">Want to join as a partner?</p>
+            {/* Partner sign-up buttons (same styling as "Create an account") */}
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <p className="text-center text-slate-600 text-sm mb-4">
+                Want to join as a partner?
+              </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-3">
-              <Link
-                href="/driver/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
-              >
-                Driver Sign Up <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link href="/driver/register" className={secondaryButtonClass}>
+                  <Car className="h-4 w-4" />
+                  Driver sign up
+                </Link>
 
-              <Link
-                href="/garage/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/15 hover:ring-white/35 transition"
-              >
-                Garage Sign Up <ArrowRight className="h-4 w-4" />
-              </Link>
+                <Link href="/garage/register" className={secondaryButtonClass}>
+                  <Wrench className="h-4 w-4" />
+                  Garage sign up
+                </Link>
+              </div>
             </div>
           </div>
 
