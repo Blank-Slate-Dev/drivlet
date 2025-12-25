@@ -215,9 +215,11 @@ export default function GaragePendingPage() {
                 <div className="absolute w-2.5 h-2.5 bg-white rounded-full z-10 shadow-sm" />
               </div>
 
-              <h1 className="mt-4 text-2xl font-bold text-white">Application Under Review</h1>
+              <h1 className="mt-4 text-2xl font-bold text-white">
+                Application Under Review
+              </h1>
               <p className="text-emerald-100 mt-1">
-                We&apos;re reviewing your garage registration
+                Typically takes around 24 hours
               </p>
             </div>
 
