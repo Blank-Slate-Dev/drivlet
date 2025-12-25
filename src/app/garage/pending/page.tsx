@@ -107,9 +107,9 @@ export default function GaragePendingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-800 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 z-0 opacity-20">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 z-0 opacity-10">
         <div
           className="h-full w-full"
           style={{
@@ -117,10 +117,6 @@ export default function GaragePendingPage() {
           }}
         />
       </div>
-
-      {/* Floating decorative shapes */}
-      <div className="absolute top-20 right-20 w-72 h-72 bg-teal-400/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
 
       {/* Header */}
       <header className="sticky top-0 z-50">
