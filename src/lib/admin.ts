@@ -1,6 +1,6 @@
 // src/lib/admin.ts
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { Session } from "next-auth";
 

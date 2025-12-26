@@ -13,7 +13,7 @@
     "@stripe/stripe-js": "^8.5.3",
     "@vercel/blob": "^2.0.0",
     "bcryptjs": "^2.4.3",
-    "framer-motion": "^12.23.25",
+    "framer-motion": "^12.23.26",
     "lucide-react": "^0.556.0",
     "mongodb": "^7.0.0",
     "mongoose": "^9.0.1",
