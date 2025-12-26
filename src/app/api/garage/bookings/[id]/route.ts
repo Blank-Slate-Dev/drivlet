@@ -43,11 +43,22 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     // Check if this booking is accessible to this garage
-    // (either assigned to them or unassigned/new)
     const isAssigned = booking.assignedGarageId?.toString() === garage._id.toString();
-    const isNew = !booking.assignedGarageId || booking.garageStatus === "new";
 
-    if (!isAssigned && !isNew) {
+    // For new/unassigned bookings, only allow access if booking matches this garage
+    // Match by Google Place ID (primary) or garage name (fallback)
+    const matchesByPlaceId = booking.garagePlaceId &&
+      garage.linkedGaragePlaceId &&
+      booking.garagePlaceId === garage.linkedGaragePlaceId;
+
+    const matchesByName = booking.garageName &&
+      garage.linkedGarageName &&
+      booking.garageName.toLowerCase().includes(garage.linkedGarageName.toLowerCase());
+
+    const isNewAndMatches = (!booking.assignedGarageId || booking.garageStatus === "new") &&
+      (matchesByPlaceId || matchesByName);
+
+    if (!isAssigned && !isNewAndMatches) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -112,7 +123,19 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     // Check permissions based on action
     const isAssigned = booking.assignedGarageId?.toString() === garage._id.toString();
-    const isNew = !booking.assignedGarageId || booking.garageStatus === "new";
+
+    // For new/unassigned bookings, only allow actions if booking matches this garage
+    // Match by Google Place ID (primary) or garage name (fallback)
+    const matchesByPlaceId = booking.garagePlaceId &&
+      garage.linkedGaragePlaceId &&
+      booking.garagePlaceId === garage.linkedGaragePlaceId;
+
+    const matchesByName = booking.garageName &&
+      garage.linkedGarageName &&
+      booking.garageName.toLowerCase().includes(garage.linkedGarageName.toLowerCase());
+
+    const isNew = (!booking.assignedGarageId || booking.garageStatus === "new") &&
+      (matchesByPlaceId || matchesByName);
 
     // Define valid state transitions
     interface UpdateData {
