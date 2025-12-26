@@ -1,7 +1,7 @@
 // src/app/garages/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,36 +10,28 @@ import {
   Search,
   MapPin,
   Star,
-  Clock,
   Filter,
   ChevronDown,
-  X,
   Loader2,
-  Crown,
+  Navigation,
+  Clock,
   Shield,
   Zap,
+  Crown,
   CheckCircle,
-  Navigation,
-  Wrench,
+  X,
 } from "lucide-react";
 
 interface GarageResult {
-  _id: string;
+  id: string;
   businessName: string;
-  linkedGarageName: string;
-  address: {
-    suburb: string;
-    state: string;
-    postcode: string;
-  };
-  services: string[];
+  suburb: string;
+  state: string;
+  postcode: string;
   averageRating: number;
   totalReviews: number;
   responseTime: string;
-  priceRange?: {
-    min: number;
-    max: number;
-  };
+  priceRange: string;
   badges: string[];
   isFeatured: boolean;
   isPremium: boolean;
@@ -47,405 +39,369 @@ interface GarageResult {
   score: number;
 }
 
-const SERVICE_OPTIONS = [
-  { id: "logbook_service", label: "Logbook Service" },
-  { id: "major_service", label: "Major Service" },
-  { id: "minor_service", label: "Minor Service" },
-  { id: "brake_service", label: "Brake Service" },
-  { id: "tyre_service", label: "Tyre Service" },
-  { id: "battery", label: "Battery" },
-  { id: "air_conditioning", label: "Air Con" },
-  { id: "diagnostics", label: "Diagnostics" },
-];
+interface SearchFilters {
+  query: string;
+  suburb: string;
+  state: string;
+  service: string;
+  minRating: string;
+  sortBy: string;
+  lat?: number;
+  lng?: number;
+}
 
 const BADGE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   premium: { label: "Premium", icon: Crown, color: "bg-purple-100 text-purple-700" },
   top_rated: { label: "Top Rated", icon: Star, color: "bg-amber-100 text-amber-700" },
-  quick_responder: { label: "Quick Response", icon: Zap, color: "bg-blue-100 text-blue-700" },
+  quick_responder: { label: "Fast Response", icon: Zap, color: "bg-blue-100 text-blue-700" },
   trusted: { label: "Trusted", icon: Shield, color: "bg-emerald-100 text-emerald-700" },
   reliable: { label: "Reliable", icon: CheckCircle, color: "bg-green-100 text-green-700" },
 };
 
-export default function GaragesPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "NT", "ACT"];
 
-  const [loading, setLoading] = useState(true);
-  const [garages, setGarages] = useState<GarageResult[]>([]);
-  const [total, setTotal] = useState(0);
+const SERVICES = [
+  { value: "", label: "All Services" },
+  { value: "logbook", label: "Logbook Service" },
+  { value: "major", label: "Major Service" },
+  { value: "minor", label: "Minor Service" },
+  { value: "brake", label: "Brake Service" },
+  { value: "tyre", label: "Tyre Service" },
+  { value: "battery", label: "Battery" },
+  { value: "aircon", label: "Air Conditioning" },
+  { value: "diagnostics", label: "Diagnostics" },
+  { value: "roadworthy", label: "Roadworthy Certificate" },
+];
+
+function GarageSearchContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<GarageResult[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [suburb, setSuburb] = useState(searchParams.get("suburb") || "");
-  const [state, setState] = useState(searchParams.get("state") || "");
-  const [service, setService] = useState(searchParams.get("service") || "");
-  const [minRating, setMinRating] = useState(parseFloat(searchParams.get("minRating") || "0"));
-  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || "relevance");
   const [showFilters, setShowFilters] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
-  // User location
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>({
+    query: searchParams.get("q") || "",
+    suburb: searchParams.get("suburb") || "",
+    state: searchParams.get("state") || "",
+    service: searchParams.get("service") || "",
+    minRating: searchParams.get("minRating") || "",
+    sortBy: searchParams.get("sortBy") || "relevance",
+  });
 
-  // Fetch garages
   const fetchGarages = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (searchQuery) params.set("q", searchQuery);
-      if (suburb) params.set("suburb", suburb);
-      if (state) params.set("state", state);
-      if (service) params.set("service", service);
-      if (minRating > 0) params.set("minRating", minRating.toString());
-      if (sortBy) params.set("sortBy", sortBy);
+      if (filters.query) params.set("q", filters.query);
+      if (filters.suburb) params.set("suburb", filters.suburb);
+      if (filters.state) params.set("state", filters.state);
+      if (filters.service) params.set("service", filters.service);
+      if (filters.minRating) params.set("minRating", filters.minRating);
+      if (filters.sortBy) params.set("sortBy", filters.sortBy);
+      if (filters.lat) params.set("lat", filters.lat.toString());
+      if (filters.lng) params.set("lng", filters.lng.toString());
       params.set("page", page.toString());
-      params.set("limit", "12");
-
-      if (userLocation) {
-        params.set("lat", userLocation.lat.toString());
-        params.set("lng", userLocation.lng.toString());
-      }
 
       const res = await fetch(`/api/garages/search?${params.toString()}`);
       const data = await res.json();
 
       if (res.ok) {
-        setGarages(data.garages || []);
-        setTotal(data.total || 0);
+        setResults(data.garages || []);
+        setTotalResults(data.total || 0);
         setTotalPages(data.totalPages || 1);
       }
     } catch (error) {
-      console.error("Failed to fetch garages:", error);
+      console.error("Search error:", error);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, suburb, state, service, minRating, sortBy, page, userLocation]);
+  }, [filters, page]);
 
   useEffect(() => {
     fetchGarages();
   }, [fetchGarages]);
 
-  // Get user location
-  const getUserLocation = () => {
-    if (!navigator.geolocation) return;
-    setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-        setLocationLoading(false);
-      },
-      () => {
-        setLocationLoading(false);
-      }
-    );
-  };
-
-  // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     fetchGarages();
   };
 
-  // Clear filters
+  const handleFilterChange = (key: keyof SearchFilters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilters = () => {
+    setPage(1);
+    setShowFilters(false);
+    fetchGarages();
+  };
+
   const clearFilters = () => {
-    setSearchQuery("");
-    setSuburb("");
-    setState("");
-    setService("");
-    setMinRating(0);
-    setSortBy("relevance");
+    setFilters({
+      query: "",
+      suburb: "",
+      state: "",
+      service: "",
+      minRating: "",
+      sortBy: "relevance",
+    });
     setPage(1);
   };
 
-  const hasActiveFilters = searchQuery || suburb || state || service || minRating > 0;
+  const getMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFilters((prev) => ({
+          ...prev,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }));
+        setGettingLocation(false);
+      },
+      () => {
+        alert("Unable to get your location");
+        setGettingLocation(false);
+      }
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+            <Link href="/" className="flex items-center gap-2">
               <div className="relative h-10 w-32">
                 <Image src="/logo.png" alt="drivlet" fill className="object-contain" priority />
               </div>
             </Link>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/track"
-                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition hidden sm:block"
-              >
-                Track my service
-              </Link>
-              <Link
-                href="/garage/login"
-                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition hidden sm:block"
-              >
-                Partner login
-              </Link>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition"
-              >
-                Book a service
-              </Link>
-            </div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition"
+            >
+              Book a service
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-600 text-white">
+      {/* Hero Search */}
+      <div className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 text-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <h1 className="text-3xl sm:text-4xl font-bold mb-3">Find trusted mechanics near you</h1>
-            <p className="text-emerald-100 text-lg">
-              Compare prices, read reviews, and book with confidence. All garages offer transparent,
-              fixed pricing.
-            </p>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2">
+            Find Trusted Mechanics
+          </h1>
+          <p className="text-emerald-100 text-center mb-8">
+            Browse our network of verified partner garages
+          </p>
 
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="mt-8">
+          <form onSubmit={handleSearch} className="max-w-3xl mx-auto">
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
+              <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by garage name or service..."
-                  className="w-full rounded-xl border-0 bg-white py-4 pl-12 pr-4 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-400"
+                  placeholder="Search by garage name..."
+                  value={filters.query}
+                  onChange={(e) => handleFilterChange("query", e.target.value)}
+                  className="w-full rounded-xl border-0 py-4 pl-12 pr-4 text-slate-900 shadow-lg focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
-              <div className="relative">
+              <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
                   type="text"
-                  value={suburb}
-                  onChange={(e) => setSuburb(e.target.value)}
-                  placeholder="Suburb or postcode"
-                  className="w-full sm:w-48 rounded-xl border-0 bg-white py-4 pl-12 pr-4 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-400"
+                  placeholder="Suburb or postcode..."
+                  value={filters.suburb}
+                  onChange={(e) => handleFilterChange("suburb", e.target.value)}
+                  className="w-full rounded-xl border-0 py-4 pl-12 pr-4 text-slate-900 shadow-lg focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <button
                 type="submit"
-                className="rounded-xl bg-slate-900 px-8 py-4 font-semibold text-white hover:bg-slate-800 transition"
+                disabled={loading}
+                className="rounded-xl bg-amber-500 px-8 py-4 font-semibold text-white shadow-lg hover:bg-amber-400 transition disabled:opacity-50"
               >
-                Search
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Search"}
               </button>
-            </div>
-
-            {/* Quick Filters */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-4 py-2 text-sm font-medium hover:bg-white/20 transition"
-              >
-                <Filter className="h-4 w-4" />
-                Filters
-                {hasActiveFilters && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-xs text-emerald-900">
-                    !
-                  </span>
-                )}
-              </button>
-
-              {!userLocation && (
-                <button
-                  type="button"
-                  onClick={getUserLocation}
-                  disabled={locationLoading}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-4 py-2 text-sm font-medium hover:bg-white/20 transition disabled:opacity-50"
-                >
-                  {locationLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Navigation className="h-4 w-4" />
-                  )}
-                  Use my location
-                </button>
-              )}
-
-              {userLocation && (
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/20 px-4 py-2 text-sm">
-                  <Navigation className="h-4 w-4" />
-                  Location enabled
-                  <button
-                    type="button"
-                    onClick={() => setUserLocation(null)}
-                    className="hover:text-white/80"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </span>
-              )}
-
-              {/* Quick service filters */}
-              {SERVICE_OPTIONS.slice(0, 4).map((svc) => (
-                <button
-                  key={svc.id}
-                  type="button"
-                  onClick={() => setService(service === svc.id ? "" : svc.id)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    service === svc.id
-                      ? "bg-white text-emerald-700"
-                      : "bg-white/10 backdrop-blur hover:bg-white/20"
-                  }`}
-                >
-                  {svc.label}
-                </button>
-              ))}
             </div>
           </form>
+
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={getMyLocation}
+              disabled={gettingLocation}
+              className="inline-flex items-center gap-2 text-sm text-emerald-200 hover:text-white transition"
+            >
+              {gettingLocation ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Navigation className="h-4 w-4" />
+              )}
+              Use my location
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filters Panel */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-white border-b border-slate-200 overflow-hidden"
-          >
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {/* State */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">State</label>
-                  <select
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="">All states</option>
-                    <option value="NSW">New South Wales</option>
-                    <option value="VIC">Victoria</option>
-                    <option value="QLD">Queensland</option>
-                    <option value="WA">Western Australia</option>
-                    <option value="SA">South Australia</option>
-                    <option value="TAS">Tasmania</option>
-                    <option value="NT">Northern Territory</option>
-                    <option value="ACT">ACT</option>
-                  </select>
-                </div>
+      {/* Main Content */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Filters Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              <ChevronDown className={`h-4 w-4 transition ${showFilters ? "rotate-180" : ""}`} />
+            </button>
 
-                {/* Service */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Service</label>
-                  <select
-                    value={service}
-                    onChange={(e) => setService(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="">All services</option>
-                    {SERVICE_OPTIONS.map((svc) => (
-                      <option key={svc.id} value={svc.id}>
-                        {svc.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Min Rating */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Minimum Rating
-                  </label>
-                  <select
-                    value={minRating}
-                    onChange={(e) => setMinRating(parseFloat(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value={0}>Any rating</option>
-                    <option value={3}>3+ stars</option>
-                    <option value={4}>4+ stars</option>
-                    <option value={4.5}>4.5+ stars</option>
-                  </select>
-                </div>
-
-                {/* Sort */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Sort by</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="relevance">Relevance</option>
-                    <option value="rating">Highest rated</option>
-                    <option value="distance">Nearest</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-between items-center">
+            {/* Quick service filters */}
+            <div className="hidden sm:flex gap-2">
+              {SERVICES.slice(1, 5).map((service) => (
                 <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="text-sm text-slate-500 hover:text-slate-700"
-                >
-                  Clear all filters
-                </button>
-                <button
-                  type="button"
+                  key={service.value}
                   onClick={() => {
-                    setShowFilters(false);
-                    setPage(1);
+                    handleFilterChange("service", service.value);
                     fetchGarages();
                   }}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                  className={`rounded-full px-3 py-1.5 text-sm transition ${
+                    filters.service === service.value
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
                 >
-                  Apply Filters
+                  {service.label}
                 </button>
-              </div>
+              ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Results */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Results count */}
-        <div className="mb-6 flex items-center justify-between">
+            {filters.lat && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-sm text-blue-700">
+                <Navigation className="h-3.5 w-3.5" />
+                Near me
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, lat: undefined, lng: undefined }))}
+                  className="ml-1 hover:text-blue-900"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
+          </div>
+
           <p className="text-sm text-slate-500">
-            {loading ? "Searching..." : `${total} garage${total !== 1 ? "s" : ""} found`}
+            {totalResults} garage{totalResults !== 1 ? "s" : ""} found
           </p>
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-500"
-            >
-              <X className="h-4 w-4" />
-              Clear filters
-            </button>
-          )}
         </div>
 
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
+        {/* Expandable Filters */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-xl border border-slate-200 bg-white p-6 mb-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
+                    <select
+                      value={filters.state}
+                      onChange={(e) => handleFilterChange("state", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <option value="">All States</option>
+                      {STATES.map((state) => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Service</label>
+                    <select
+                      value={filters.service}
+                      onChange={(e) => handleFilterChange("service", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      {SERVICES.map((service) => (
+                        <option key={service.value} value={service.value}>{service.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Min Rating</label>
+                    <select
+                      value={filters.minRating}
+                      onChange={(e) => handleFilterChange("minRating", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <option value="">Any Rating</option>
+                      <option value="4.5">4.5+ Stars</option>
+                      <option value="4">4+ Stars</option>
+                      <option value="3.5">3.5+ Stars</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Sort By</label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => handleFilterChange("sortBy", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="rating">Highest Rated</option>
+                      <option value="distance">Nearest</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={applyFilters}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Results */}
+        {loading ? (
+          <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
           </div>
-        )}
-
-        {/* No results */}
-        {!loading && garages.length === 0 && (
-          <div className="text-center py-16">
-            <Wrench className="mx-auto h-12 w-12 text-slate-300" />
+        ) : results.length === 0 ? (
+          <div className="text-center py-12">
+            <MapPin className="mx-auto h-12 w-12 text-slate-300" />
             <h3 className="mt-4 text-lg font-medium text-slate-900">No garages found</h3>
-            <p className="mt-2 text-slate-500">
-              Try adjusting your filters or search in a different area.
-            </p>
+            <p className="mt-2 text-slate-500">Try adjusting your search or filters</p>
             <button
               onClick={clearFilters}
               className="mt-4 text-emerald-600 hover:text-emerald-500 font-medium"
@@ -453,34 +409,31 @@ export default function GaragesPage() {
               Clear all filters
             </button>
           </div>
-        )}
-
-        {/* Results grid */}
-        {!loading && garages.length > 0 && (
+        ) : (
           <>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {garages.map((garage, index) => (
-                <GarageCard key={garage._id} garage={garage} index={index} />
+              {results.map((garage) => (
+                <GarageCard key={garage.id} garage={garage} />
               ))}
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
+              <div className="flex justify-center gap-2 mt-8">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   Previous
                 </button>
-                <span className="px-4 py-2 text-sm text-slate-500">
+                <span className="flex items-center px-4 text-sm text-slate-600">
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -493,62 +446,40 @@ export default function GaragesPage() {
   );
 }
 
-// Garage Card Component
-function GarageCard({ garage, index }: { garage: GarageResult; index: number }) {
+function GarageCard({ garage }: { garage: GarageResult }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-    >
-      <Link
-        href={`/garages/${garage._id}`}
-        className="group block rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg hover:border-emerald-200 transition-all"
+    <Link href={`/garages/${garage.id}`}>
+      <motion.div
+        whileHover={{ y: -4 }}
+        className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg transition-shadow"
       >
-        {/* Featured banner */}
         {garage.isFeatured && (
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-1.5 text-center">
-            <span className="text-xs font-semibold text-white flex items-center justify-center gap-1">
-              <Crown className="h-3.5 w-3.5" />
-              Featured Partner
-            </span>
+            <span className="text-xs font-semibold text-white">Featured Partner</span>
           </div>
         )}
-
         <div className="p-5">
-          {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0">
-              <h3 className="font-semibold text-slate-900 group-hover:text-emerald-600 transition truncate">
-                {garage.businessName}
-              </h3>
-              {garage.linkedGarageName && garage.linkedGarageName !== garage.businessName && (
-                <p className="text-sm text-slate-500 truncate">{garage.linkedGarageName}</p>
-              )}
-            </div>
+            <h3 className="font-semibold text-slate-900 line-clamp-1">{garage.businessName}</h3>
             {garage.averageRating > 0 && (
               <div className="flex items-center gap-1 shrink-0">
                 <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                <span className="font-semibold text-slate-900">{garage.averageRating}</span>
-                <span className="text-sm text-slate-400">({garage.totalReviews})</span>
+                <span className="font-medium text-slate-900">{garage.averageRating}</span>
+                <span className="text-slate-400 text-sm">({garage.totalReviews})</span>
               </div>
             )}
           </div>
 
-          {/* Location */}
           <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-3">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span className="truncate">
-              {garage.address.suburb}, {garage.address.state}
+            <MapPin className="h-4 w-4" />
+            <span>
+              {garage.suburb}, {garage.state}
             </span>
             {garage.distanceKm && (
-              <span className="shrink-0 text-emerald-600 font-medium">
-                · {garage.distanceKm}km
-              </span>
+              <span className="text-emerald-600 font-medium">· {garage.distanceKm}km</span>
             )}
           </div>
 
-          {/* Badges */}
           {garage.badges.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {garage.badges.slice(0, 3).map((badge) => {
@@ -568,20 +499,30 @@ function GarageCard({ garage, index }: { garage: GarageResult; index: number }) 
             </div>
           )}
 
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-sm">
+            <div className="flex items-center gap-1 text-slate-500">
               <Clock className="h-4 w-4" />
-              <span>{garage.responseTime}</span>
+              {garage.responseTime}
             </div>
             {garage.priceRange && (
-              <span className="text-sm font-medium text-slate-900">
-                ${garage.priceRange.min} - ${garage.priceRange.max}
-              </span>
+              <span className="font-medium text-emerald-600">{garage.priceRange}</span>
             )}
           </div>
         </div>
-      </Link>
-    </motion.div>
+      </motion.div>
+    </Link>
+  );
+}
+
+// Main export with Suspense boundary
+export default function GaragesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    }>
+      <GarageSearchContent />
+    </Suspense>
   );
 }

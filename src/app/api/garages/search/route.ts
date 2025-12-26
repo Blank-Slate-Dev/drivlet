@@ -13,6 +13,8 @@ import {
 } from "@/lib/garageRanking";
 import { logger } from "@/lib/logger";
 
+export const dynamic = 'force-dynamic';
+
 export interface GarageSearchResult {
   _id: string;
   businessName: string;
