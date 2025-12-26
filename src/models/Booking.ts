@@ -21,7 +21,7 @@ export interface ISelectedService {
   services: string[];
 }
 
-export type GarageBookingStatus = "new" | "accepted" | "declined" | "in_progress" | "completed";
+export type GarageBookingStatus = "new" | "acknowledged" | "accepted" | "declined" | "in_progress" | "completed";
 
 export interface IGarageResponse {
   respondedAt: Date;
@@ -93,6 +93,18 @@ export interface IBooking extends Document {
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
+
+  // Cancellation details
+  cancellation?: {
+    cancelledAt: Date;
+    cancelledBy: Types.ObjectId | string;
+    cancelledByRole: 'customer' | 'admin' | 'system';
+    reason?: string;
+    refundAmount: number;
+    refundPercentage: number;
+    refundId?: string;
+    refundStatus: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
+  };
 }
 
 const UpdateSchema = new Schema<IUpdate>(
@@ -255,7 +267,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     garageStatus: {
       type: String,
-      enum: ["new", "accepted", "declined", "in_progress", "completed"],
+      enum: ["new", "acknowledged", "accepted", "declined", "in_progress", "completed"],
       default: "new",
     },
     garageNotes: {
@@ -356,6 +368,24 @@ const BookingSchema = new Schema<IBooking>(
     updatedAt: {
       type: Date,
       default: Date.now,
+    },
+
+    // Cancellation details
+    cancellation: {
+      cancelledAt: { type: Date },
+      cancelledBy: { type: Schema.Types.Mixed }, // Can be ObjectId or string
+      cancelledByRole: {
+        type: String,
+        enum: ["customer", "admin", "system"],
+      },
+      reason: { type: String },
+      refundAmount: { type: Number, default: 0 },
+      refundPercentage: { type: Number, default: 0 },
+      refundId: { type: String },
+      refundStatus: {
+        type: String,
+        enum: ["pending", "succeeded", "failed", "not_applicable"],
+      },
     },
   },
   {

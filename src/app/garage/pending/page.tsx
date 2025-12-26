@@ -1,12 +1,12 @@
 // src/app/garage/pending/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle,
   Mail,
@@ -19,51 +19,97 @@ import {
   FileCheck,
   Shield,
   Briefcase,
+  Sparkles,
 } from "lucide-react";
 
 export default function GaragePendingPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
-  const [checking, setChecking] = useState(false);
 
+  const [checking, setChecking] = useState(false);
+  const [acceptedAnim, setAcceptedAnim] = useState(false);
+  const [notice, setNotice] = useState<string>("");
+
+  const isGarage = session?.user?.role === "garage";
+  const isApproved = Boolean(session?.user?.isApproved);
+
+  // Minute hand: 3 seconds per full rotation
+  // Hour hand: 36 seconds per full rotation
+  const MINUTE_HAND_DURATION = 3;
+  const HOUR_HAND_DURATION = MINUTE_HAND_DURATION * 12;
+
+  // Steps: automatically mark later steps as done once approved
+  const steps = useMemo(
+    () => [
+      { num: 1, text: "Our team reviews your application", time: "1-2 business days", done: true },
+      { num: 2, text: "We verify your business details and insurance", time: "Part of review", done: isApproved },
+      { num: 3, text: "You'll receive an email once approved", time: "", done: isApproved },
+      { num: 4, text: "Start accepting bookings through drivlet!", time: "", done: isApproved },
+    ],
+    [isApproved]
+  );
+
+  // Guard routes
   useEffect(() => {
-    if (status === "authenticated") {
-      if (session?.user?.isApproved && session?.user?.role === "garage") {
-        router.push("/garage/dashboard");
-      }
-      if (session?.user?.role !== "garage") {
-        router.push("/");
-      }
+    if (status !== "authenticated") return;
+
+    if (!isGarage) {
+      router.push("/");
+      return;
     }
-  }, [session, status, router]);
+
+    // If already approved, go straight to the correct dashboard.
+    // Pass welcome=1 so the dashboard can show a nice first-time welcome modal.
+    if (isApproved) {
+      router.push("/garage/dashboard?welcome=1");
+    }
+  }, [status, isGarage, isApproved, router]);
 
   const handleCheckStatus = async () => {
+    if (checking) return;
     setChecking(true);
-    window.location.reload();
+    setNotice("");
+
+    try {
+      // IMPORTANT: do NOT reload the page. Refresh the session in-place.
+      // Your NextAuth jwt callback supports trigger === "update" for garages.
+      await update();
+
+      // If approval flipped to true, play animation then redirect.
+      // (We also handle it via the effect below.)
+      setNotice("Status refreshed.");
+    } catch (err) {
+      console.error(err);
+      setNotice("Couldn’t refresh status right now. Please try again.");
+    } finally {
+      setChecking(false);
+    }
   };
+
+  // When approval becomes true while on this page:
+  // show quick approved animation -> redirect to dashboard
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (!isGarage) return;
+    if (!isApproved) return;
+
+    setAcceptedAnim(true);
+
+    const t = setTimeout(() => {
+      router.push("/garage/dashboard?welcome=1");
+    }, 1600);
+
+    return () => clearTimeout(t);
+  }, [status, isGarage, isApproved, router]);
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/garage/login" });
   };
 
-  const steps = [
-    { num: 1, text: "Our team reviews your application", time: "1-2 business days", done: true },
-    { num: 2, text: "We verify your business details and insurance", time: "Part of review", done: false },
-    { num: 3, text: "You'll receive an email once approved", time: "", done: false },
-    { num: 4, text: "Start accepting bookings through drivlet!", time: "", done: false },
-  ];
-
-  // Clock animation timing:
-  // Minute hand: 3 seconds per full rotation
-  // Hour hand: 36 seconds per full rotation (12x slower, like a real clock)
-  // This means hour hand moves from 1pm→2pm, 2pm→3pm, etc. each time minute hand completes one revolution
-  const MINUTE_HAND_DURATION = 3; // seconds per full rotation
-  const HOUR_HAND_DURATION = MINUTE_HAND_DURATION * 12; // 36 seconds per full rotation
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-800 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 z-0 opacity-20">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 z-0 opacity-10">
         <div
           className="h-full w-full"
           style={{
@@ -71,10 +117,6 @@ export default function GaragePendingPage() {
           }}
         />
       </div>
-
-      {/* Floating decorative shapes */}
-      <div className="absolute top-20 right-20 w-72 h-72 bg-teal-400/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
 
       {/* Header */}
       <header className="sticky top-0 z-50">
@@ -105,56 +147,79 @@ export default function GaragePendingPage() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-xl"
         >
-          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl overflow-hidden">
-            {/* Header with animated clock - now emerald themed */}
+          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl overflow-hidden relative">
+            {/* Approved overlay */}
+            <AnimatePresence>
+              {acceptedAnim && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-50 flex items-center justify-center bg-emerald-900/70 backdrop-blur-sm"
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, y: 10, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                    className="mx-6 w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"
+                  >
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+                      <Sparkles className="h-7 w-7 text-emerald-600" />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900">You&apos;re approved!</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Taking you to your dashboard…
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-2 text-emerald-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm font-semibold">Loading</span>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Header with animated clock */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-8 text-center relative overflow-hidden">
               <div className="absolute inset-0 opacity-20">
                 <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full translate-x-1/2 translate-y-1/2" />
               </div>
-              
-              {/* Animated Clock with realistic hour and minute hand movement */}
+
+              {/* Animated Clock */}
               <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border-4 border-white/40">
-                {/* Clock face background */}
                 <div className="absolute inset-2 rounded-full bg-white/10" />
-                
-                {/* Hour markers */}
+
                 {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
                   <div
                     key={deg}
                     className="absolute w-0.5 h-1.5 bg-white/40 rounded-full"
-                    style={{
-                      transform: `rotate(${deg}deg) translateY(-24px)`,
-                    }}
+                    style={{ transform: `rotate(${deg}deg) translateY(-24px)` }}
                   />
                 ))}
-                
-                {/* Hour hand - completes full rotation in 36 seconds (12x minute hand) */}
-                {/* This means it moves 30° (one hour position) every 3 seconds when minute hand completes one revolution */}
+
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: HOUR_HAND_DURATION, repeat: Infinity, ease: "linear" }}
                   className="absolute w-0.5 h-4 bg-white rounded-full origin-bottom"
-                  style={{ bottom: '50%' }}
+                  style={{ bottom: "50%" }}
                 />
-                
-                {/* Minute hand - completes full rotation in 3 seconds */}
+
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: MINUTE_HAND_DURATION, repeat: Infinity, ease: "linear" }}
                   className="absolute w-0.5 h-6 bg-white/90 rounded-full origin-bottom"
-                  style={{ bottom: '50%' }}
+                  style={{ bottom: "50%" }}
                 />
-                
-                {/* Center dot */}
+
                 <div className="absolute w-2.5 h-2.5 bg-white rounded-full z-10 shadow-sm" />
               </div>
-              
+
               <h1 className="mt-4 text-2xl font-bold text-white">
                 Application Under Review
               </h1>
               <p className="text-emerald-100 mt-1">
-                We&apos;re reviewing your garage registration
+                Typically takes around 24 hours
               </p>
             </div>
 
@@ -165,6 +230,13 @@ export default function GaragePendingPage() {
                   Thank you for registering your garage with drivlet! Our team is currently reviewing your application.
                 </p>
               </div>
+
+              {/* Notice */}
+              {notice && (
+                <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  {notice}
+                </div>
+              )}
 
               {/* Status Timeline */}
               <div className="mb-8">
@@ -181,27 +253,25 @@ export default function GaragePendingPage() {
                       transition={{ duration: 0.3, delay: index * 0.1 }}
                       className="flex items-start gap-4"
                     >
-                      <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
-                        step.done 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'bg-slate-200 text-slate-500'
-                      }`}>
+                      <div
+                        className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                          step.done ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                        }`}
+                      >
                         {step.done ? <CheckCircle className="h-4 w-4" /> : step.num}
                       </div>
                       <div className="flex-1 pt-1">
-                        <p className={`text-sm ${step.done ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
+                        <p className={`text-sm ${step.done ? "text-slate-900 font-medium" : "text-slate-600"}`}>
                           {step.text}
                         </p>
-                        {step.time && (
-                          <p className="text-xs text-slate-400 mt-0.5">{step.time}</p>
-                        )}
+                        {step.time && <p className="text-xs text-slate-400 mt-0.5">{step.time}</p>}
                       </div>
                     </motion.div>
                   ))}
                 </div>
               </div>
 
-              {/* What we're verifying - updated colors to match theme */}
+              {/* What we're verifying */}
               <div className="grid grid-cols-3 gap-3 mb-8">
                 {[
                   { icon: Briefcase, label: "Business", color: "emerald" },
@@ -215,10 +285,15 @@ export default function GaragePendingPage() {
                     transition={{ duration: 0.3, delay: 0.4 + index * 0.1 }}
                     className="rounded-xl bg-slate-50 p-4 text-center border border-slate-200 hover:border-slate-300 transition"
                   >
-                    <item.icon className={`h-6 w-6 mx-auto ${
-                      item.color === 'emerald' ? 'text-emerald-500' :
-                      item.color === 'teal' ? 'text-teal-500' : 'text-cyan-500'
-                    }`} />
+                    <item.icon
+                      className={`h-6 w-6 mx-auto ${
+                        item.color === "emerald"
+                          ? "text-emerald-500"
+                          : item.color === "teal"
+                          ? "text-teal-500"
+                          : "text-cyan-500"
+                      }`}
+                    />
                     <p className="mt-2 text-xs text-slate-600 font-medium">{item.label}</p>
                   </motion.div>
                 ))}
@@ -226,9 +301,7 @@ export default function GaragePendingPage() {
 
               {/* Contact Info */}
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 mb-6">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                  Questions? Contact us
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-800 mb-3">Questions? Contact us</h3>
                 <div className="space-y-2">
                   <a
                     href="mailto:partners@drivlet.com"
@@ -255,14 +328,10 @@ export default function GaragePendingPage() {
               <div className="space-y-3">
                 <button
                   onClick={handleCheckStatus}
-                  disabled={checking}
+                  disabled={checking || acceptedAnim}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
                 >
-                  {checking ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
+                  {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Check Application Status
                 </button>
 
@@ -279,10 +348,7 @@ export default function GaragePendingPage() {
 
           {/* Back to home link */}
           <div className="mt-6 text-center">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition"
-            >
+            <Link href="/" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition">
               <ArrowRight className="h-4 w-4 rotate-180" />
               Back to drivlet
             </Link>

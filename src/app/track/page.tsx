@@ -17,6 +17,8 @@ import {
   RefreshCw,
   Building,
   CreditCard,
+  XCircle,
+  DollarSign,
 } from "lucide-react";
 
 // Stage definitions
@@ -54,6 +56,13 @@ interface Booking {
   updates: Update[];
   createdAt: string;
   updatedAt: string;
+  cancellation?: {
+    cancelledAt: string;
+    reason?: string;
+    refundAmount: number;
+    refundPercentage: number;
+    refundStatus: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
+  };
 }
 
 function TrackingContent() {
@@ -291,24 +300,88 @@ function TrackingContent() {
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="font-medium text-slate-700">Progress</span>
-                  <span className="font-semibold text-emerald-600">
-                    {booking.overallProgress}%
-                  </span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${booking.overallProgress}%` }}
-                  />
-                </div>
-              </div>
+              {/* Cancelled Booking Notice */}
+              {booking.status === "cancelled" && (
+                <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-red-900">Booking Cancelled</h3>
+                      {booking.cancellation?.cancelledAt && (
+                        <p className="mt-1 text-sm text-red-700">
+                          Cancelled on {new Date(booking.cancellation.cancelledAt).toLocaleDateString("en-AU", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      )}
+                      {booking.cancellation?.reason && (
+                        <p className="mt-2 text-sm text-red-600">
+                          Reason: {booking.cancellation.reason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-              {/* Stage Timeline */}
-              <div className="mb-6">
+                  {/* Refund Information */}
+                  {booking.cancellation && booking.cancellation.refundAmount > 0 && (
+                    <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-900">
+                            Refund: ${(booking.cancellation.refundAmount / 100).toFixed(2)} AUD
+                            <span className="ml-1 text-sm font-normal text-green-700">
+                              ({booking.cancellation.refundPercentage}% refund)
+                            </span>
+                          </p>
+                          <p className="text-sm text-green-700">
+                            {booking.cancellation.refundStatus === "succeeded"
+                              ? "Refund processed - will appear on your card in 5-10 business days"
+                              : booking.cancellation.refundStatus === "pending"
+                                ? "Refund is being processed"
+                                : booking.cancellation.refundStatus === "failed"
+                                  ? "Refund failed - please contact support"
+                                  : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {booking.cancellation && booking.cancellation.refundAmount === 0 && booking.cancellation.refundStatus !== "not_applicable" && (
+                    <p className="mt-3 text-sm text-red-600">
+                      No refund was issued for this cancellation.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Progress Bar - only show for non-cancelled bookings */}
+              {booking.status !== "cancelled" && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="font-medium text-slate-700">Progress</span>
+                    <span className="font-semibold text-emerald-600">
+                      {booking.overallProgress}%
+                    </span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-3 rounded-full bg-emerald-500 transition-all duration-500"
+                      style={{ width: `${booking.overallProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Stage Timeline - only show for non-cancelled bookings */}
+              {booking.status !== "cancelled" && <div className="mb-6">
                 <h3 className="text-sm font-semibold text-slate-900 mb-4">Journey Progress</h3>
                 <div className="relative flex w-full items-start justify-between">
                   {STAGES.map((stage, index) => {
@@ -356,7 +429,7 @@ function TrackingContent() {
                     );
                   })}
                 </div>
-              </div>
+              </div>}
 
               {/* Booking Details */}
               <div className="grid gap-4 sm:grid-cols-2">

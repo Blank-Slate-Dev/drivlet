@@ -17,8 +17,10 @@ import {
   Bell,
   X,
   ClipboardList,
+  XCircle,
 } from "lucide-react";
 import { BookingModal } from "@/components/homepage";
+import { CancelBookingModal } from "@/components/CancelBookingModal";
 
 const POLLING_INTERVAL = 30000; // 30 seconds
 
@@ -339,6 +341,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [updateNotification, setUpdateNotification] = useState<string | null>(null);
+  const [cancelModalBooking, setCancelModalBooking] = useState<{ id: string; rego: string } | null>(null);
 
   // Track previous booking state for comparison
   const previousBookingsRef = useRef<Booking[]>([]);
@@ -496,6 +499,18 @@ export default function DashboardPage() {
       {/* Booking Modal */}
       <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
 
+      {/* Cancel Booking Modal */}
+      <CancelBookingModal
+        bookingId={cancelModalBooking?.id || ""}
+        vehicleRego={cancelModalBooking?.rego || ""}
+        isOpen={!!cancelModalBooking}
+        onClose={() => setCancelModalBooking(null)}
+        onSuccess={() => {
+          setCancelModalBooking(null);
+          fetchBookings(false);
+        }}
+      />
+
       {/* Update Notification Toast */}
       {updateNotification && (
         <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -525,6 +540,35 @@ export default function DashboardPage() {
           <>
             <BookingHeader booking={activeBooking} />
             <StatusSummary booking={activeBooking} />
+
+            {/* Cancel Button - only show for pending bookings */}
+            {activeBooking.status === "pending" && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                      <XCircle className="h-5 w-5 text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Need to cancel?</p>
+                      <p className="text-xs text-slate-500">
+                        Free cancellation available if more than 24 hours before pickup
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCancelModalBooking({
+                      id: activeBooking._id,
+                      rego: activeBooking.vehicleRegistration,
+                    })}
+                    className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  >
+                    Cancel Booking
+                  </button>
+                </div>
+              </div>
+            )}
+
             <ActivityTimeline
               currentStage={activeBooking.currentStage}
               updates={activeBooking.updates}
