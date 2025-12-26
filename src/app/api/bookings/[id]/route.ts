@@ -33,20 +33,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Make sure booking has a userId before comparing
-    const bookingWithUser = booking as { userId?: unknown };
+    // Check authorization - user can access if:
+    // 1. Booking userId matches their session ID, OR
+    // 2. Booking userEmail matches their session email (for guest bookings)
+    const bookingData = booking as { userId?: unknown; userEmail?: string };
 
-    if (!bookingWithUser.userId) {
-      return NextResponse.json(
-        { error: "Booking has no associated user" },
-        { status: 500 }
-      );
-    }
+    const matchesUserId = bookingData.userId &&
+      String(bookingData.userId) === session.user.id;
 
-    const bookingUserId = String(bookingWithUser.userId);
+    const matchesEmail = session.user.email &&
+      bookingData.userEmail?.toLowerCase() === session.user.email.toLowerCase();
 
     // Users can only see their own bookings (admins can see all via admin API)
-    if (bookingUserId !== session.user.id) {
+    if (!matchesUserId && !matchesEmail) {
       return NextResponse.json(
         { error: "Not authorized to view this booking" },
         { status: 403 }
