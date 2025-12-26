@@ -5,8 +5,17 @@ import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
 export async function POST(request: NextRequest) {
   console.log('📤 Creating payment intent...');
 
+  let body;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON in request body' },
+      { status: 400 }
+    );
+  }
+
+  try {
     console.log('📦 Received booking data:', JSON.stringify(body, null, 2));
 
     const {

@@ -9,8 +9,17 @@ import { stripe } from '@/lib/stripe';
 export async function POST(request: NextRequest) {
   console.log('📥 Create booking after payment request received');
 
+  let body;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON in request body' },
+      { status: 400 }
+    );
+  }
+
+  try {
     const { paymentIntentId } = body;
 
     if (!paymentIntentId) {

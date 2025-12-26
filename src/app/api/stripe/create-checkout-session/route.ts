@@ -24,9 +24,17 @@ function getAppUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
+  let body;
   try {
-    const body = await request.json();
-    
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON in request body' },
+      { status: 400 }
+    );
+  }
+
+  try {
     const {
       // Customer info
       customerName,

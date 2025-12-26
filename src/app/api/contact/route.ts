@@ -20,8 +20,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let body;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON in request body" },
+      { status: 400 }
+    );
+  }
+
+  try {
     const { name, email, phone, message } = body;
 
     // Validate required fields
