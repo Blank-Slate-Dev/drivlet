@@ -1,20 +1,48 @@
 // src/components/homepage/RegistrationPlate.tsx
 'use client';
-
 type StateCode = 'NSW' | 'QLD' | 'VIC' | 'SA' | 'WA' | 'TAS' | 'NT' | 'ACT';
-
 interface RegistrationPlateProps {
   plate: string;
   state: StateCode;
 }
-
 export default function RegistrationPlate({ plate, state }: RegistrationPlateProps) {
   // Format plate to uppercase and limit to 6 characters
   const formattedPlate = plate.toUpperCase().slice(0, 6);
   
   // Split state into individual letters for vertical display
   const stateLetters = state.split('');
-
+  // Format plate with dot separator when 6 characters
+  const renderPlateText = () => {
+    if (!formattedPlate) {
+      return '------';
+    }
+    
+    // Only show dot when exactly 6 characters are entered
+    if (formattedPlate.length === 6) {
+      const firstHalf = formattedPlate.slice(0, 3);
+      const secondHalf = formattedPlate.slice(3, 6);
+      return (
+        <>
+          {firstHalf}
+          <span
+            style={{
+              display: 'inline-block',
+              width: '6px',
+              height: '6px',
+              backgroundColor: '#ffffff',
+              borderRadius: '50%',
+              margin: '0 6px',
+              verticalAlign: 'middle',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+          />
+          {secondHalf}
+        </>
+      );
+    }
+    
+    return formattedPlate;
+  };
   return (
     <div 
       className="relative flex h-[70px] w-[280px] overflow-hidden rounded-lg"
@@ -78,14 +106,15 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
               color: '#ffffff',
               letterSpacing: '4px',
               textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
             }}
           >
-            {formattedPlate || '------'}
+            {renderPlateText()}
           </span>
         </div>
       </div>
     </div>
   );
 }
-
 export type { StateCode };
