@@ -152,3 +152,66 @@ export function validateUsername(username: string): { valid: boolean; error?: st
 
   return { valid: true };
 }
+
+/**
+ * Validate CSRF by checking Origin/Referer header
+ * Returns true if the request is from a trusted origin
+ */
+export function validateOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+
+  // Get allowed origins from environment or use defaults
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.APP_URL,
+    "https://drivlet.vercel.app",
+    "https://www.drivlet.com.au",
+    "https://drivlet.com.au",
+  ].filter(Boolean);
+
+  // In development, allow localhost
+  if (process.env.NODE_ENV === "development") {
+    allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
+  }
+
+  // Check Origin header first (preferred)
+  if (origin) {
+    return allowedOrigins.some((allowed) => origin === allowed);
+  }
+
+  // Fallback to Referer header
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer);
+      const refererOrigin = refererUrl.origin;
+      return allowedOrigins.some((allowed) => refererOrigin === allowed);
+    } catch {
+      return false;
+    }
+  }
+
+  // If neither Origin nor Referer is present, this could be:
+  // - A same-origin request (browser doesn't send Origin for same-origin)
+  // - A direct API call (curl, Postman, etc.)
+  // For authenticated routes, we rely on session validation
+  // For extra security on critical routes, return false to require Origin
+  return false;
+}
+
+/**
+ * Check CSRF and return error response if invalid
+ * Use this for critical state-changing operations (payments, cancellations, etc.)
+ */
+export function requireValidOrigin(request: Request): { valid: true } | { valid: false; error: string } {
+  if (!validateOrigin(request)) {
+    // Log for security monitoring
+    console.warn("CSRF validation failed", {
+      origin: request.headers.get("origin"),
+      referer: request.headers.get("referer"),
+      url: request.url,
+    });
+    return { valid: false, error: "Invalid request origin" };
+  }
+  return { valid: true };
+}

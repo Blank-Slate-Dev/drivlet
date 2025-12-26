@@ -8,6 +8,7 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { calculateRefund, formatRefundAmount } from "@/lib/refund-calculator";
 import { processRefund } from "@/lib/stripe-refund";
+import { requireValidOrigin } from "@/lib/validation";
 
 interface CancelRequestBody {
   cancellationReason?: string;
@@ -18,6 +19,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // CSRF protection - validate request origin for state-changing operation
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json(
+      { error: originCheck.error },
+      { status: 403 }
+    );
+  }
+
   try {
     const session = await getServerSession(authOptions);
     const { id: bookingId } = await params;

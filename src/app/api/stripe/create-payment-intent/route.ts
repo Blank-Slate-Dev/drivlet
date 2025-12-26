@@ -1,8 +1,18 @@
 // src/app/api/stripe/create-payment-intent/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
+import { requireValidOrigin } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
+  // CSRF protection - validate request origin for payment operations
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json(
+      { error: originCheck.error },
+      { status: 403 }
+    );
+  }
+
   console.log('📤 Creating payment intent...');
 
   let body;

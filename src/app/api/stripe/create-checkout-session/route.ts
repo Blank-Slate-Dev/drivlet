@@ -1,6 +1,7 @@
 // src/app/api/stripe/create-checkout-session/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
+import { requireValidOrigin } from '@/lib/validation';
 
 // Get the app URL
 function getAppUrl(): string {
@@ -24,6 +25,15 @@ function getAppUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
+  // CSRF protection - validate request origin for payment operations
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json(
+      { error: originCheck.error },
+      { status: 403 }
+    );
+  }
+
   let body;
   try {
     body = await request.json();
