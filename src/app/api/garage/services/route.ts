@@ -77,6 +77,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Garage not found" }, { status: 404 });
     }
 
+    // Only approved garages can modify services
+    if (garage.status !== "approved") {
+      return NextResponse.json(
+        { error: "Garage must be approved to modify services" },
+        { status: 403 }
+      );
+    }
+
     // Update service pricing
     const servicePricing = await GarageServicePricing.findOneAndUpdate(
       { garageId: garage._id },
@@ -143,6 +151,14 @@ export async function POST(request: NextRequest) {
     const garage = await Garage.findOne({ userId: session.user.id });
     if (!garage) {
       return NextResponse.json({ error: "Garage not found" }, { status: 404 });
+    }
+
+    // Only approved garages can add services
+    if (garage.status !== "approved") {
+      return NextResponse.json(
+        { error: "Garage must be approved to add services" },
+        { status: 403 }
+      );
     }
 
     // Add service to catalog
