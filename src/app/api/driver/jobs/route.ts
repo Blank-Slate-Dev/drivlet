@@ -182,7 +182,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not a driver" }, { status: 403 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
+
     const { bookingId, action } = body;
 
     if (!bookingId || !action) {
@@ -218,15 +227,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "accept") {
-      // Check if already assigned
-      if (booking.assignedDriverId) {
-        return NextResponse.json(
-          { error: "This job has already been assigned to another driver" },
-          { status: 400 }
-        );
-      }
-
-      // Check driver's daily job limit
+      // Check driver's daily job limit first (before atomic operation)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -245,17 +246,44 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Assign the job
-      booking.assignedDriverId = user.driverProfile;
-      booking.driverAssignedAt = new Date();
-      booking.updates.push({
-        stage: "driver_assigned",
-        timestamp: new Date(),
-        message: `Driver ${driver.firstName} ${driver.lastName} has accepted this job.`,
-        updatedBy: "driver",
-      });
+      // Use atomic findOneAndUpdate to prevent race condition
+      // Only update if assignedDriverId is not set (null, undefined, or doesn't exist)
+      const now = new Date();
+      const updatedBooking = await Booking.findOneAndUpdate(
+        {
+          _id: bookingId,
+          $or: [
+            { assignedDriverId: { $exists: false } },
+            { assignedDriverId: null },
+          ],
+          status: "pending",
+          "cancellation.cancelledAt": { $exists: false },
+        },
+        {
+          $set: {
+            assignedDriverId: user.driverProfile,
+            driverAssignedAt: now,
+            driverAcceptedAt: now,
+          },
+          $push: {
+            updates: {
+              stage: "driver_assigned",
+              timestamp: now,
+              message: `Driver ${driver.firstName} ${driver.lastName} has accepted this job.`,
+              updatedBy: "driver",
+            },
+          },
+        },
+        { new: true }
+      );
 
-      await booking.save();
+      // If no document was updated, another driver got there first
+      if (!updatedBooking) {
+        return NextResponse.json(
+          { error: "This job has already been assigned to another driver" },
+          { status: 400 }
+        );
+      }
 
       // Update driver metrics
       driver.metrics = driver.metrics || {
@@ -272,8 +300,8 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "Job accepted successfully",
         booking: {
-          _id: booking._id.toString(),
-          status: booking.status,
+          _id: updatedBooking._id.toString(),
+          status: updatedBooking.status,
         },
       });
     } else if (action === "decline") {
