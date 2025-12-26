@@ -1,4 +1,8 @@
+// src/app/api/rego/route.ts
 import { NextResponse } from 'next/server';
+
+// Force dynamic rendering - this route uses request.url
+export const dynamic = 'force-dynamic';
 
 const AUTOGRAB_BASE_URL = 'https://api.autograb.com.au/v2/vehicles/registrations';
 
@@ -61,7 +65,7 @@ export async function GET(request: Request) {
 
     url.searchParams.set('region', region);
     url.searchParams.set('state', state.toUpperCase());
-    // Optional: ask for extra data – you can tweak this later
+    // Optional: ask for extra data — you can tweak this later
     url.searchParams.set(
       'features',
       'extended_data,additional_upstream_data,vehicle_age,writeoff_info,registration_status,build_data'

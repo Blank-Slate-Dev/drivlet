@@ -40,33 +40,33 @@ export interface ISubscriptionEvent {
 export interface IGarageSubscription extends Document {
   garageId: Types.ObjectId;
   userId: Types.ObjectId;
-  
+
   // Current subscription
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   billingInterval: BillingInterval;
-  
+
   // Pricing (in cents)
   monthlyPrice: number;
   yearlyPrice: number;
-  
+
   // Stripe integration
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   stripePriceId?: string;
   stripePaymentMethodId?: string;
-  
+
   // Billing dates
   currentPeriodStart?: Date;
   currentPeriodEnd?: Date;
   trialEndsAt?: Date;
   cancelledAt?: Date;
   cancelAtPeriodEnd: boolean;
-  
+
   // Usage this period
   bookingsThisPeriod: number;
   revenueThisPeriod: number;  // In cents
-  
+
   // Features based on tier
   features: {
     searchListing: boolean;
@@ -80,10 +80,10 @@ export interface IGarageSubscription extends Document {
     prioritySupport: boolean;
     marketingBadge: boolean;
   };
-  
+
   // History
   events: ISubscriptionEvent[];
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -173,7 +173,7 @@ const GarageSubscriptionSchema = new Schema<IGarageSubscription>(
     },
     stripeSubscriptionId: {
       type: String,
-      index: true,
+      // REMOVED: index: true (was duplicated with schema.index() below)
     },
     stripePriceId: {
       type: String,
@@ -234,7 +234,7 @@ GarageSubscriptionSchema.index({ currentPeriodEnd: 1 });
 GarageSubscriptionSchema.pre("save", function () {
   const tierFeatures = TIER_FEATURES[this.tier];
   this.features = { ...tierFeatures };
-  
+
   // Set prices
   this.monthlyPrice = TIER_PRICES[this.tier].monthly;
   this.yearlyPrice = TIER_PRICES[this.tier].yearly;

@@ -5,6 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Contact from "@/models/Contact";
 
+// Force dynamic rendering - this route uses headers via getServerSession
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Check admin authentication

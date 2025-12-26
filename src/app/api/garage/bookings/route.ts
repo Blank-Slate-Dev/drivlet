@@ -7,6 +7,9 @@ import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
 
+// Force dynamic rendering - this route uses headers via getServerSession
+export const dynamic = 'force-dynamic';
+
 // GET - Fetch acknowledged bookings for the garage (not new/incoming)
 export async function GET(request: Request) {
   try {

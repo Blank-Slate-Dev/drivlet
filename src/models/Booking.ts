@@ -188,7 +188,7 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
     },
-    
+
     // Guest-specific fields
     isGuest: {
       type: Boolean,
@@ -198,7 +198,7 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: false,
     },
-    
+
     // Core booking details
     pickupTime: {
       type: String,
@@ -224,7 +224,7 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
     },
-    
+
     // Existing booking fields (for stage 1 - attending existing bookings)
     hasExistingBooking: {
       type: Boolean,
@@ -322,7 +322,7 @@ const BookingSchema = new Schema<IBooking>(
     // Payment information
     paymentId: {
       type: String,
-      index: true,
+      // REMOVED: index: true (using explicit schema.index() below instead)
     },
     paymentAmount: {
       type: Number,
@@ -334,7 +334,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     stripeSessionId: {
       type: String,
-      index: true,
+      // REMOVED: index: true (using explicit schema.index() below instead)
     },
 
     // Vehicle details
@@ -388,7 +388,7 @@ const BookingSchema = new Schema<IBooking>(
       type: [UpdateSchema],
       default: [],
     },
-    
+
     // Timestamps
     createdAt: {
       type: Date,
@@ -430,7 +430,8 @@ BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
 BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 }); // For garage-based booking matching
 BookingSchema.index({ assignedDriverId: 1, status: 1 }); // For driver job queries
-BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // Prevent duplicate bookings for same payment
+BookingSchema.index({ paymentId: 1 }); // For payment lookups
+BookingSchema.index({ stripeSessionId: 1 }); // For Stripe session lookups
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =
