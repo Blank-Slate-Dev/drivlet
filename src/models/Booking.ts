@@ -66,6 +66,13 @@ export interface IBooking extends Document {
   garageCompletedAt?: Date;
   garageResponse?: IGarageResponse;
 
+  // Driver assignment
+  assignedDriverId?: Types.ObjectId;
+  driverAssignedAt?: Date;
+  driverAcceptedAt?: Date;
+  driverStartedAt?: Date;
+  driverCompletedAt?: Date;
+
   // Payment information
   paymentId?: string;
   paymentAmount?: number;
@@ -288,31 +295,53 @@ const BookingSchema = new Schema<IBooking>(
       notes: { type: String },
     },
 
+    // Driver assignment
+    assignedDriverId: {
+      type: Schema.Types.ObjectId,
+      ref: "Driver",
+      required: false,
+      index: true,
+    },
+    driverAssignedAt: {
+      type: Date,
+      required: false,
+    },
+    driverAcceptedAt: {
+      type: Date,
+      required: false,
+    },
+    driverStartedAt: {
+      type: Date,
+      required: false,
+    },
+    driverCompletedAt: {
+      type: Date,
+      required: false,
+    },
+
     // Payment information
     paymentId: {
       type: String,
-      required: false,
       index: true,
     },
     paymentAmount: {
       type: Number,
-      required: false,
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'refunded'],
-      default: 'pending',
+      enum: ["pending", "paid", "failed", "refunded"],
+      default: "pending",
     },
     stripeSessionId: {
       type: String,
-      required: false,
+      index: true,
     },
 
     // Vehicle details
     transmissionType: {
       type: String,
-      enum: ['automatic', 'manual'],
-      default: 'automatic',
+      enum: ["automatic", "manual"],
+      default: "automatic",
     },
     isManualTransmission: {
       type: Boolean,
@@ -330,7 +359,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     serviceNotes: {
       type: String,
-      default: '',
+      default: "",
     },
 
     // Flags for special attention
@@ -346,7 +375,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     overallProgress: {
       type: Number,
-      default: 14,
+      default: 0,
       min: 0,
       max: 100,
     },
@@ -400,6 +429,7 @@ BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
 BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 }); // For garage-based booking matching
+BookingSchema.index({ assignedDriverId: 1, status: 1 }); // For driver job queries
 BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // Prevent duplicate bookings for same payment
 
 // Prevent OverwriteModelError by checking if model exists
