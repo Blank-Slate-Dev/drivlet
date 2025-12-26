@@ -400,6 +400,7 @@ BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
 BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 }); // For garage-based booking matching
+BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // Prevent duplicate bookings for same payment
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =

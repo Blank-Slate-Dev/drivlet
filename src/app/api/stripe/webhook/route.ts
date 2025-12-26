@@ -71,16 +71,6 @@ export async function POST(request: NextRequest) {
         const db = client.db();
         console.log('📊 Database:', db.databaseName);
 
-        // Check for duplicate booking (already created by fallback endpoint)
-        const existingBooking = await db.collection('bookings').findOne({
-          paymentId: paymentIntent.id
-        });
-
-        if (existingBooking) {
-          console.log('ℹ️ Booking already exists (from fallback):', existingBooking._id);
-          break;
-        }
-
         const hasExisting = metadata.hasExistingBooking === 'true';
         const isManual = metadata.isManualTransmission === 'true';
         const transmissionType = metadata.transmissionType || 'automatic';
@@ -105,7 +95,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const booking = {
+        const bookingData = {
           userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
@@ -149,18 +139,37 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date(),
         };
 
-        console.log('📝 Creating booking with data:', JSON.stringify(booking, null, 2));
+        console.log('📝 Creating booking atomically with paymentId:', paymentIntent.id);
 
-        const result = await db.collection('bookings').insertOne(booking);
+        // Use findOneAndUpdate with upsert to atomically create or find existing booking
+        // This prevents race conditions between webhook and fallback endpoint
+        const result = await db.collection('bookings').findOneAndUpdate(
+          { paymentId: paymentIntent.id },
+          { $setOnInsert: bookingData },
+          {
+            upsert: true,
+            returnDocument: 'after',
+          }
+        );
+
+        const booking = result;
+        const wasInserted = booking?.createdAt?.getTime() === bookingData.createdAt.getTime();
+
+        if (!wasInserted) {
+          console.log('ℹ️ Booking already exists (from fallback):', booking?._id);
+          break;
+        }
 
         console.log('✅✅✅ BOOKING SAVED SUCCESSFULLY!');
-        console.log('🆔 Booking ID:', result.insertedId);
+        console.log('🆔 Booking ID:', booking?._id);
         console.log('📋 Summary:', {
           customer: metadata.customerEmail,
           vehicle: metadata.vehicleRegistration,
           paymentId: paymentIntent.id,
           amount: paymentIntent.amount / 100 + ' AUD'
         });
+
+        const bookingId = booking?._id;
 
         // Auto-assign to matching garage if garagePlaceId exists
         if (metadata.garagePlaceId) {
@@ -176,7 +185,7 @@ export async function POST(request: NextRequest) {
 
             // Update booking with garage assignment
             await db.collection('bookings').updateOne(
-              { _id: result.insertedId },
+              { _id: bookingId },
               {
                 $set: {
                   assignedGarageId: matchingGarage._id,
@@ -197,14 +206,14 @@ export async function POST(request: NextRequest) {
             // Create notification for the garage
             await db.collection('garagenotifications').insertOne({
               garageId: matchingGarage._id,
-              bookingId: result.insertedId,
+              bookingId: bookingId,
               type: 'new_booking',
               title: 'New Booking Assignment',
-              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              message: `New booking for ${metadata.vehicleRegistration} - ${bookingData.serviceType}. Customer: ${metadata.customerName}`,
               isRead: false,
               metadata: {
                 vehicleRegistration: metadata.vehicleRegistration,
-                serviceType: booking.serviceType,
+                serviceType: bookingData.serviceType,
                 pickupTime: new Date(metadata.earliestPickup),
                 customerName: metadata.customerName,
                 urgency: isManual ? 'urgent' : 'normal',
@@ -235,7 +244,7 @@ export async function POST(request: NextRequest) {
 
             // Update booking with garage assignment
             await db.collection('bookings').updateOne(
-              { _id: result.insertedId },
+              { _id: bookingId },
               {
                 $set: {
                   assignedGarageId: matchingGarage._id,
@@ -256,14 +265,14 @@ export async function POST(request: NextRequest) {
             // Create notification for the garage
             await db.collection('garagenotifications').insertOne({
               garageId: matchingGarage._id,
-              bookingId: result.insertedId,
+              bookingId: bookingId,
               type: 'new_booking',
               title: 'New Booking Assignment',
-              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              message: `New booking for ${metadata.vehicleRegistration} - ${bookingData.serviceType}. Customer: ${metadata.customerName}`,
               isRead: false,
               metadata: {
                 vehicleRegistration: metadata.vehicleRegistration,
-                serviceType: booking.serviceType,
+                serviceType: bookingData.serviceType,
                 pickupTime: new Date(metadata.earliestPickup),
                 customerName: metadata.customerName,
                 urgency: isManual ? 'urgent' : 'normal',
@@ -317,17 +326,7 @@ export async function POST(request: NextRequest) {
 
         const db = client.db();
 
-        // Check for duplicate booking
         const paymentIntentId = session.payment_intent as string;
-        const existingBooking = await db.collection('bookings').findOne({
-          paymentId: paymentIntentId
-        });
-
-        if (existingBooking) {
-          console.log('ℹ️ Booking already exists (from fallback):', existingBooking._id);
-          break;
-        }
-
         const hasExistingSession = metadata.hasExistingBooking === 'true';
         const isManualSession = metadata.isManualTransmission === 'true';
         const transmissionTypeSession = metadata.transmissionType || 'automatic';
@@ -352,7 +351,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const booking = {
+        const sessionBookingData = {
           userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
@@ -379,7 +378,7 @@ export async function POST(request: NextRequest) {
           serviceNotes: serviceNotesSession,
           flags: flagsSession,
           paymentStatus: 'paid',
-          paymentId: session.payment_intent as string,
+          paymentId: paymentIntentId,
           paymentAmount: session.amount_total,
           stripeSessionId: session.id,
           status: 'pending',
@@ -397,11 +396,31 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date(),
         };
 
-        console.log('📝 Creating booking from checkout session...');
-        const result = await db.collection('bookings').insertOne(booking);
+        console.log('📝 Creating booking atomically from checkout session with paymentId:', paymentIntentId);
+
+        // Use findOneAndUpdate with upsert to atomically create or find existing booking
+        // This prevents race conditions between webhook and fallback endpoint
+        const sessionResult = await db.collection('bookings').findOneAndUpdate(
+          { paymentId: paymentIntentId },
+          { $setOnInsert: sessionBookingData },
+          {
+            upsert: true,
+            returnDocument: 'after',
+          }
+        );
+
+        const sessionBooking = sessionResult;
+        const sessionWasInserted = sessionBooking?.createdAt?.getTime() === sessionBookingData.createdAt.getTime();
+
+        if (!sessionWasInserted) {
+          console.log('ℹ️ Booking already exists (from fallback):', sessionBooking?._id);
+          break;
+        }
+
+        const sessionBookingId = sessionBooking?._id;
 
         console.log('✅✅✅ BOOKING SAVED FROM CHECKOUT SESSION!');
-        console.log('🆔 Booking ID:', result.insertedId);
+        console.log('🆔 Booking ID:', sessionBookingId);
 
         // Auto-assign to matching garage if garagePlaceId exists
         if (metadata.garagePlaceId) {
@@ -417,7 +436,7 @@ export async function POST(request: NextRequest) {
 
             // Update booking with garage assignment
             await db.collection('bookings').updateOne(
-              { _id: result.insertedId },
+              { _id: sessionBookingId },
               {
                 $set: {
                   assignedGarageId: matchingGarage._id,
@@ -438,14 +457,14 @@ export async function POST(request: NextRequest) {
             // Create notification for the garage
             await db.collection('garagenotifications').insertOne({
               garageId: matchingGarage._id,
-              bookingId: result.insertedId,
+              bookingId: sessionBookingId,
               type: 'new_booking',
               title: 'New Booking Assignment',
-              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              message: `New booking for ${metadata.vehicleRegistration} - ${sessionBookingData.serviceType}. Customer: ${metadata.customerName}`,
               isRead: false,
               metadata: {
                 vehicleRegistration: metadata.vehicleRegistration,
-                serviceType: booking.serviceType,
+                serviceType: sessionBookingData.serviceType,
                 pickupTime: new Date(metadata.earliestPickup),
                 customerName: metadata.customerName,
                 urgency: isManualSession ? 'urgent' : 'normal',
@@ -476,7 +495,7 @@ export async function POST(request: NextRequest) {
 
             // Update booking with garage assignment
             await db.collection('bookings').updateOne(
-              { _id: result.insertedId },
+              { _id: sessionBookingId },
               {
                 $set: {
                   assignedGarageId: matchingGarage._id,
@@ -497,14 +516,14 @@ export async function POST(request: NextRequest) {
             // Create notification for the garage
             await db.collection('garagenotifications').insertOne({
               garageId: matchingGarage._id,
-              bookingId: result.insertedId,
+              bookingId: sessionBookingId,
               type: 'new_booking',
               title: 'New Booking Assignment',
-              message: `New booking for ${metadata.vehicleRegistration} - ${booking.serviceType}. Customer: ${metadata.customerName}`,
+              message: `New booking for ${metadata.vehicleRegistration} - ${sessionBookingData.serviceType}. Customer: ${metadata.customerName}`,
               isRead: false,
               metadata: {
                 vehicleRegistration: metadata.vehicleRegistration,
-                serviceType: booking.serviceType,
+                serviceType: sessionBookingData.serviceType,
                 pickupTime: new Date(metadata.earliestPickup),
                 customerName: metadata.customerName,
                 urgency: isManualSession ? 'urgent' : 'normal',

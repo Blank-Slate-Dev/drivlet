@@ -48,28 +48,14 @@ export async function POST(request: NextRequest) {
 
     console.log('📦 Metadata:', metadata);
 
-    // Check if booking already exists (from webhook)
+    // Create booking atomically to prevent race conditions with webhook
     const client = new MongoClient(process.env.MONGODB_URI!);
 
     try {
       await client.connect();
       const db = client.db();
 
-      // Check for existing booking with this payment ID
-      const existingBooking = await db.collection('bookings').findOne({
-        paymentId: paymentIntentId
-      });
-
-      if (existingBooking) {
-        console.log('ℹ️ Booking already exists:', existingBooking._id);
-        return NextResponse.json({
-          success: true,
-          message: 'Booking already exists',
-          bookingId: existingBooking._id,
-        });
-      }
-
-      // Create new booking
+      // Prepare booking data
       const hasExisting = metadata.hasExistingBooking === 'true';
       const isManual = metadata.isManualTransmission === 'true';
       const transmissionType = metadata.transmissionType || 'automatic';
@@ -84,7 +70,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const booking = {
+      const bookingData = {
         userId: null,
         userName: metadata.customerName,
         userEmail: metadata.customerEmail,
@@ -123,16 +109,38 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       };
 
-      console.log('📝 Creating booking...');
-      const result = await db.collection('bookings').insertOne(booking);
+      console.log('📝 Creating booking atomically with paymentId:', paymentIntentId);
+
+      // Use findOneAndUpdate with upsert to atomically create or find existing booking
+      // This prevents race conditions between webhook and this fallback endpoint
+      const result = await db.collection('bookings').findOneAndUpdate(
+        { paymentId: paymentIntentId },
+        { $setOnInsert: bookingData },
+        {
+          upsert: true,
+          returnDocument: 'after',
+        }
+      );
+
+      const booking = result;
+      const wasInserted = booking?.createdAt?.getTime() === bookingData.createdAt.getTime();
+
+      if (!wasInserted) {
+        console.log('ℹ️ Booking already exists (from webhook):', booking?._id);
+        return NextResponse.json({
+          success: true,
+          message: 'Booking already exists',
+          bookingId: booking?._id,
+        });
+      }
 
       console.log('✅✅✅ BOOKING CREATED SUCCESSFULLY!');
-      console.log('🆔 Booking ID:', result.insertedId);
+      console.log('🆔 Booking ID:', booking?._id);
 
       return NextResponse.json({
         success: true,
         message: 'Booking created successfully',
-        bookingId: result.insertedId,
+        bookingId: booking?._id,
       });
 
     } finally {
