@@ -64,8 +64,17 @@ export async function PATCH(request: Request) {
     return adminCheck.response;
   }
 
+  let body;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON in request body" },
+      { status: 400 }
+    );
+  }
+
+  try {
     const { garageId, action, rejectionReason } = body;
 
     if (!garageId || !action) {
@@ -100,7 +109,15 @@ export async function PATCH(request: Request) {
       reactivate: "approved",
     };
 
-    garage.status = statusMap[action];
+    const newStatus = statusMap[action];
+    if (!newStatus) {
+      return NextResponse.json(
+        { error: "Invalid action - no status mapping found" },
+        { status: 400 }
+      );
+    }
+
+    garage.status = newStatus;
     garage.reviewedAt = new Date();
 
     if (action === "reject" && rejectionReason) {
