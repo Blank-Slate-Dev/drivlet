@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Car,
@@ -13,25 +14,23 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
-  ArrowLeft,
-  RefreshCw,
-  Building,
+  ArrowRight,
+  Mail,
   CreditCard,
   XCircle,
-  DollarSign,
+  Package,
+  Wrench,
+  Truck,
+  Home,
 } from "lucide-react";
 
-// Stage definitions
-const STAGES = [
-  { id: "booking_confirmed", label: "Confirmed", icon: CheckCircle2 },
-  { id: "driver_en_route", label: "Driver En Route", icon: Car },
-  { id: "car_picked_up", label: "Car Picked Up", icon: Car },
-  { id: "at_garage", label: "At Garage", icon: Building },
-  { id: "service_in_progress", label: "Service In Progress", icon: Clock },
-  { id: "awaiting_payment", label: "Awaiting Payment", icon: CreditCard },
-  { id: "ready_for_return", label: "Ready for Return", icon: Car },
-  { id: "driver_returning", label: "Driver Returning", icon: Car },
-  { id: "delivered", label: "Delivered", icon: CheckCircle2 },
+// Simplified stages for visual display
+const DISPLAY_STAGES = [
+  { id: "confirmed", label: "Confirmed", icon: CheckCircle2, keys: ["booking_confirmed"] },
+  { id: "pickup", label: "Picked Up", icon: Car, keys: ["driver_en_route", "car_picked_up"] },
+  { id: "service", label: "At Service", icon: Wrench, keys: ["at_garage", "service_in_progress", "awaiting_payment"] },
+  { id: "returning", label: "Returning", icon: Truck, keys: ["ready_for_return", "driver_returning"] },
+  { id: "delivered", label: "Delivered", icon: Home, keys: ["delivered"] },
 ];
 
 interface Update {
@@ -66,8 +65,17 @@ interface Booking {
     reason?: string;
     refundAmount: number;
     refundPercentage: number;
-    refundStatus: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
+    refundStatus: "pending" | "succeeded" | "failed" | "not_applicable";
   };
+}
+
+function getDisplayStageIndex(currentStage: string): number {
+  for (let i = 0; i < DISPLAY_STAGES.length; i++) {
+    if (DISPLAY_STAGES[i].keys.includes(currentStage)) {
+      return i;
+    }
+  }
+  return 0;
 }
 
 function TrackingContent() {
@@ -88,7 +96,7 @@ function TrackingContent() {
       setRegistration(regoParam);
       handleSearch(emailParam, regoParam);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Auto-refresh every 30 seconds if booking is in progress
@@ -132,7 +140,7 @@ function TrackingContent() {
         setError(data.error || "Booking not found");
         setBooking(null);
       }
-    } catch (err) {
+    } catch {
       setError("Failed to search. Please try again.");
       setBooking(null);
     } finally {
@@ -145,348 +153,390 @@ function TrackingContent() {
     handleSearch();
   };
 
-  const getStageIndex = (stage: string) => {
-    return STAGES.findIndex((s) => s.id === stage);
-  };
+  const needsPayment =
+    booking && booking.servicePaymentUrl && booking.servicePaymentStatus === "pending";
 
-  const needsPayment = booking && 
-    booking.servicePaymentUrl && 
-    booking.servicePaymentStatus === "pending";
+  const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+      {/* Subtle pattern */}
+      <div className="absolute inset-0 z-0 opacity-10">
+        <div
+          className="h-full w-full"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+      </div>
+
       {/* Header */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
+      <header className="sticky top-0 z-50">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
               <Image
-                src="/images/drivlet-logo.png"
+                src="/logo.png"
                 alt="drivlet"
-                width={100}
-                height={32}
-                className="h-8 w-auto"
+                fill
+                className="object-contain brightness-0 invert"
+                priority
               />
-            </Link>
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-600"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Link>
-          </div>
+            </div>
+          </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">Track Your Booking</h1>
-          <p className="mt-2 text-slate-600">
-            Enter your details to see real-time updates
-          </p>
-        </div>
+      {/* Main content */}
+      <div className="relative z-10 flex min-h-[calc(100vh-73px)] flex-col items-center justify-center px-4 py-12">
 
-        {/* Search Form */}
-        <form onSubmit={handleSubmit} className="mb-8">
-          <div className="mx-auto max-w-xl rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+                <Package className="h-8 w-8 text-white" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Vehicle Registration
-                </label>
-                <input
-                  type="text"
-                  value={registration}
-                  onChange={(e) => setRegistration(e.target.value.toUpperCase())}
-                  placeholder="ABC123"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 uppercase"
-                />
-              </div>
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                Track Your Booking
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Enter your details to see real-time updates
+              </p>
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-4 w-full flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              {loading ? "Searching..." : "Track Booking"}
-            </button>
-          </div>
-        </form>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-6 mx-auto max-w-xl flex items-center gap-3 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* Booking Result */}
-        {booking && (
-          <div className="mx-auto max-w-2xl">
-            {/* Service Payment Required Banner */}
-            {needsPayment && (
-              <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white shadow-lg">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
-                    <CreditCard className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold mb-1">Your car is ready!</h2>
-                    <p className="text-amber-100 mb-4">
-                      Service is complete. Pay now to have your car delivered back to you.
-                    </p>
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="text-3xl font-bold">
-                        ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
-                      </div>
-                      <span className="text-amber-200">AUD</span>
-                    </div>
-                    <a
-                      href={booking.servicePaymentUrl}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-base font-semibold text-amber-600 shadow-lg transition hover:bg-amber-50"
+            {/* Search Form - only show if no booking found yet */}
+            <AnimatePresence mode="wait">
+              {!booking ? (
+                <motion.div
+                  key="search"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
                     >
-                      <CreditCard className="h-5 w-5" />
-                      Pay Now & Get Your Car
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
+                      <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-red-600 text-sm">{error}</p>
+                    </motion.div>
+                  )}
 
-            {/* Service Payment Completed Banner */}
-            {booking.servicePaymentStatus === "paid" && booking.currentStage !== "delivered" && (
-              <div className="mb-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white shadow-lg">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
-                    <CheckCircle2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold mb-1">Payment Received!</h2>
-                    <p className="text-emerald-100">
-                      Thank you for your payment of ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}. 
-                      Our driver is on the way to deliver your car.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Booking Card */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6 text-white">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
-                      <Car className="h-6 w-6" />
-                    </div>
+                  <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                      <h2 className="text-2xl font-bold">{booking.vehicleRegistration}</h2>
-                      <p className="text-emerald-100">{booking.vehicleState}</p>
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Email address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Mail className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                          placeholder="you@example.com"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => handleSearch()}
-                    className="rounded-full bg-white/20 p-2 hover:bg-white/30 transition"
-                  >
-                    <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-                  </button>
-                </div>
-              </div>
 
-              {/* Cancelled State */}
-              {booking.status === "cancelled" && (
-                <div className="p-6 bg-red-50 border-b border-red-100">
-                  <div className="flex items-center gap-3 text-red-700">
-                    <XCircle className="h-6 w-6" />
                     <div>
-                      <p className="font-semibold">Booking Cancelled</p>
-                      {booking.cancellation?.reason && (
-                        <p className="text-sm text-red-600">{booking.cancellation.reason}</p>
+                      <label
+                        htmlFor="registration"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Vehicle Registration
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Car className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <input
+                          id="registration"
+                          type="text"
+                          value={registration}
+                          onChange={(e) => setRegistration(e.target.value.toUpperCase())}
+                          required
+                          className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition uppercase"
+                          placeholder="ABC123"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="h-5 w-5" />
+                          Track Booking
+                          <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+                        </>
                       )}
+                    </button>
+                  </form>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="result"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
+                  {/* Vehicle Info Header */}
+                  <div className="text-center pb-4 border-b border-slate-200">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-700 font-mono text-lg font-bold">
+                      <Car className="h-5 w-5" />
+                      {booking.vehicleRegistration}
                     </div>
+                    <p className="text-sm text-slate-500 mt-2">{booking.vehicleState}</p>
                   </div>
-                  {booking.cancellation && booking.cancellation.refundAmount > 0 && (
-                    <div className="mt-3 rounded-lg bg-white p-3">
-                      <p className="text-sm text-slate-600">
-                        Refund: ${(booking.cancellation.refundAmount / 100).toFixed(2)} 
-                        ({booking.cancellation.refundPercentage}%)
-                        {booking.cancellation.refundStatus === "succeeded" && (
-                          <span className="ml-2 text-emerald-600">✓ Processed</span>
-                        )}
-                        {booking.cancellation.refundStatus === "pending" && (
-                          <span className="ml-2 text-amber-600">Processing...</span>
-                        )}
-                      </p>
+
+                  {/* Payment Required Banner */}
+                  {needsPayment && (
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-white"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                          <CreditCard className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">Your car is ready!</p>
+                          <p className="text-sm text-amber-100">Pay to get it delivered</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl font-bold">
+                          ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
+                        </span>
+                        <a
+                          href={booking.servicePaymentUrl}
+                          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-amber-600 shadow-lg transition hover:bg-amber-50"
+                        >
+                          Pay Now
+                          <ArrowRight className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Payment Completed Banner */}
+                  {booking.servicePaymentStatus === "paid" && booking.currentStage !== "delivered" && (
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-5 text-white"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">Payment Received!</p>
+                          <p className="text-sm text-emerald-100">
+                            Your car is on its way back to you
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Cancelled State */}
+                  {booking.status === "cancelled" && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+                      <div className="flex items-center gap-3 text-red-700">
+                        <XCircle className="h-5 w-5" />
+                        <div>
+                          <p className="font-semibold">Booking Cancelled</p>
+                          {booking.cancellation?.reason && (
+                            <p className="text-sm text-red-600">{booking.cancellation.reason}</p>
+                          )}
+                        </div>
+                      </div>
+                      {booking.cancellation && booking.cancellation.refundAmount > 0 && (
+                        <p className="mt-2 text-sm text-red-600">
+                          Refund: ${(booking.cancellation.refundAmount / 100).toFixed(2)}
+                          {booking.cancellation.refundStatus === "succeeded" && " ✓ Processed"}
+                        </p>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Content */}
-              <div className="p-6">
-                {/* Service Info */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-2">
-                  <div className="flex items-start gap-3">
-                    <Building className="h-5 w-5 text-slate-400 mt-0.5" />
+                  {/* Progress Section */}
+                  {booking.status !== "cancelled" && (
                     <div>
-                      <p className="text-sm text-slate-500">Service</p>
-                      <p className="font-medium text-slate-900">{booking.serviceType}</p>
-                      {booking.garageName && (
-                        <p className="text-sm text-slate-600">{booking.garageName}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-slate-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-slate-500">Pickup</p>
-                      <p className="font-medium text-slate-900">{booking.pickupAddress}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-slate-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-slate-500">Pickup Window</p>
-                      <p className="font-medium text-slate-900">
-                        {booking.pickupTime} - {booking.dropoffTime}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <DollarSign className="h-5 w-5 text-slate-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-slate-500">Status</p>
-                      <p className={`font-medium ${
-                        booking.status === "completed" ? "text-emerald-600" :
-                        booking.status === "cancelled" ? "text-red-600" :
-                        "text-blue-600"
-                      }`}>
-                        {booking.status === "completed" ? "Completed" :
-                         booking.status === "cancelled" ? "Cancelled" :
-                         booking.status === "in_progress" ? "In Progress" :
-                         "Pending"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                {booking.status !== "cancelled" && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="font-medium text-slate-700">Progress</span>
-                      <span className="font-semibold text-emerald-600">
-                        {booking.overallProgress}%
-                      </span>
-                    </div>
-                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-3 rounded-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${booking.overallProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Stage Timeline */}
-                {booking.status !== "cancelled" && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-4">Journey Progress</h3>
-                    <div className="relative flex flex-wrap justify-between gap-2">
-                      {STAGES.filter(s => !["awaiting_payment", "ready_for_return"].includes(s.id) || 
-                        booking.currentStage === s.id).map((stage, index) => {
-                        const currentStageIndex = getStageIndex(booking.currentStage);
-                        const stageIndex = getStageIndex(stage.id);
-                        const isCompleted = stageIndex <= currentStageIndex;
-                        const isCurrent = stage.id === booking.currentStage;
-                        const Icon = stage.icon;
-
-                        return (
-                          <div key={stage.id} className="flex flex-col items-center">
-                            <div
-                              className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-                                isCompleted
-                                  ? isCurrent
-                                    ? "bg-emerald-500 text-white ring-4 ring-emerald-100"
-                                    : "bg-emerald-500 text-white"
-                                  : "bg-slate-100 text-slate-400"
-                              }`}
-                            >
-                              <Icon className="h-5 w-5" />
-                            </div>
-                            <span className={`mt-2 text-xs text-center max-w-[80px] ${
-                              isCurrent ? "font-semibold text-emerald-600" : "text-slate-500"
-                            }`}>
-                              {stage.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recent Updates */}
-                {booking.updates && booking.updates.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900 mb-3">Recent Updates</h3>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {booking.updates.slice().reverse().slice(0, 5).map((update, index) => (
-                        <div key={index} className="flex gap-3 text-sm">
-                          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-                            <div className="h-2 w-2 rounded-full bg-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-slate-700">{update.message}</p>
-                            <p className="text-xs text-slate-400">
-                              {new Date(update.timestamp).toLocaleString("en-AU", {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}
-                            </p>
-                          </div>
+                      {/* Progress Bar */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="font-medium text-slate-700">Progress</span>
+                          <span className="font-bold text-emerald-600">
+                            {booking.overallProgress}%
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+                        <div className="h-3 rounded-full bg-slate-200 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${booking.overallProgress}%` }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                          />
+                        </div>
+                      </div>
 
-        {/* No Results */}
-        {hasSearched && !booking && !loading && !error && (
-          <div className="mx-auto max-w-xl text-center py-12">
-            <Car className="mx-auto h-16 w-16 text-slate-300" />
-            <h3 className="mt-4 text-lg font-semibold text-slate-900">No booking found</h3>
-            <p className="mt-2 text-slate-500">
-              Please check your email and registration number are correct.
-            </p>
+                      {/* Stage Icons */}
+                      <div className="flex justify-between">
+                        {DISPLAY_STAGES.map((stage, index) => {
+                          const isCompleted = index <= currentDisplayIndex;
+                          const isCurrent = index === currentDisplayIndex;
+                          const Icon = stage.icon;
+
+                          return (
+                            <div key={stage.id} className="flex flex-col items-center">
+                              <motion.div
+                                initial={{ scale: 0.8 }}
+                                animate={{ scale: isCurrent ? 1.1 : 1 }}
+                                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
+                                  isCompleted
+                                    ? isCurrent
+                                      ? "bg-emerald-500 text-white ring-4 ring-emerald-100"
+                                      : "bg-emerald-500 text-white"
+                                    : "bg-slate-200 text-slate-400"
+                                }`}
+                              >
+                                <Icon className="h-5 w-5" />
+                              </motion.div>
+                              <span
+                                className={`mt-2 text-xs text-center max-w-[60px] ${
+                                  isCurrent
+                                    ? "font-semibold text-emerald-600"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                {stage.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Booking Details */}
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <div className="flex items-start gap-3 text-sm">
+                      <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+                      <div>
+                        <p className="text-slate-500">Pickup</p>
+                        <p className="text-slate-900">{booking.pickupAddress}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 text-sm">
+                      <Clock className="h-4 w-4 text-slate-400 mt-0.5" />
+                      <div>
+                        <p className="text-slate-500">Window</p>
+                        <p className="text-slate-900">
+                          {booking.pickupTime} - {booking.dropoffTime}
+                        </p>
+                      </div>
+                    </div>
+                    {booking.garageName && (
+                      <div className="flex items-start gap-3 text-sm">
+                        <Wrench className="h-4 w-4 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-slate-500">Service at</p>
+                          <p className="text-slate-900">{booking.garageName}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Latest Update */}
+                  {booking.updates && booking.updates.length > 0 && (
+                    <div className="pt-4 border-t border-slate-200">
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                        Latest Update
+                      </p>
+                      <div className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-sm text-slate-700">
+                          {booking.updates[booking.updates.length - 1].message}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(
+                            booking.updates[booking.updates.length - 1].timestamp
+                          ).toLocaleString("en-AU", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search Again Button */}
+                  <button
+                    onClick={() => {
+                      setBooking(null);
+                      setHasSearched(false);
+                      setEmail("");
+                      setRegistration("");
+                    }}
+                    className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
+                  >
+                    Track Another Booking
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* No Results */}
+            {hasSearched && !booking && !loading && !error && (
+              <div className="text-center py-8">
+                <Car className="mx-auto h-12 w-12 text-slate-300" />
+                <h3 className="mt-4 font-semibold text-slate-900">No booking found</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Please check your details and try again
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </main>
-    </div>
+
+          {/* Back to home link */}
+          <div className="mt-6 text-center">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              Back to home
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    </main>
   );
 }
 
@@ -494,8 +544,8 @@ export default function TrackPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
       }
     >
