@@ -3,10 +3,13 @@
 
 import Mailjet from 'node-mailjet';
 
-const mailjet = new Mailjet({
-  apiKey: process.env.MAILJET_API_KEY || '',
-  apiSecret: process.env.MAILJET_SECRET_KEY || '',
-});
+// Only initialize Mailjet if credentials are present
+const mailjet = process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY
+  ? new Mailjet({
+      apiKey: process.env.MAILJET_API_KEY,
+      apiSecret: process.env.MAILJET_SECRET_KEY,
+    })
+  : null;
 
 interface SendEmailOptions {
   to: string;
@@ -17,8 +20,8 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
-  if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_SECRET_KEY) {
-    console.error('❌ Mailjet credentials not configured');
+  if (!mailjet) {
+    console.warn('⚠️ Mailjet not configured - skipping email send');
     return false;
   }
 
