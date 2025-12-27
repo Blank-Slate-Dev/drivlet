@@ -5,6 +5,7 @@ import User from "@/models/User";
 import Driver from "@/models/Driver";
 import Contact from "@/models/Contact";
 import bcrypt from "bcryptjs";
+import { validatePassword, validateEmail as validateEmailLib, validateBSB as validateBSBLib, validateABN as validateABNLib } from "@/lib/validation";
 
 // Validate Australian phone number (relaxed for initial registration)
 function validatePhone(phone: string): boolean {
@@ -13,23 +14,10 @@ function validatePhone(phone: string): boolean {
   return cleanPhone.length >= 8 && /^[\d+]+$/.test(cleanPhone);
 }
 
-// Validate email format
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-// Validate BSB format (6 digits)
-function validateBSB(bsb: string): boolean {
-  const cleanBSB = bsb.replace(/[\s-]/g, "");
-  return /^\d{6}$/.test(cleanBSB);
-}
-
-// Validate ABN format (11 digits) - optional
-function validateABN(abn: string): boolean {
-  if (!abn) return true;
-  const cleanABN = abn.replace(/\s/g, "");
-  return /^\d{11}$/.test(cleanABN);
-}
+// Use centralized validation functions
+const validateEmail = validateEmailLib;
+const validateBSB = validateBSBLib;
+const validateABN = validateABNLib;
 
 export async function POST(request: Request) {
   try {
@@ -84,9 +72,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!password || password.length < 6) {
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }

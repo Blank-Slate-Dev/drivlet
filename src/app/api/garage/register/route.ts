@@ -5,23 +5,12 @@ import User from "@/models/User";
 import Garage, { ServiceType, VehicleType } from "@/models/Garage";
 import Contact from "@/models/Contact";
 import bcrypt from "bcryptjs";
+import { validatePassword, validateEmail as validateEmailLib, validatePostcode as validatePostcodeLib, validateABN as validateABNLib } from "@/lib/validation";
 
-// Validate email format
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-// Validate postcode (4 digits)
-function validatePostcode(postcode: string): boolean {
-  return /^\d{4}$/.test(postcode);
-}
-
-// Validate ABN format (11 digits) - optional, only validate if provided
-function validateABN(abn: string): boolean {
-  if (!abn) return true;
-  const cleanABN = abn.replace(/\s/g, "");
-  return /^\d{11}$/.test(cleanABN);
-}
+// Use centralized validation functions
+const validateEmail = validateEmailLib;
+const validatePostcode = validatePostcodeLib;
+const validateABN = validateABNLib;
 
 // Map user-friendly service names to ServiceType enum values
 function mapServicesToServiceTypes(services: string[]): ServiceType[] {
@@ -149,10 +138,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Password validation
-    if (!password || password.length < 6) {
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }

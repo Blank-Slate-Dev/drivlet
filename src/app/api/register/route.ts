@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import { validatePassword, validateEmail, validateUsername } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,33 +18,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate username
-    if (username.length < 3) {
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.valid) {
       return NextResponse.json(
-        { error: "Username must be at least 3 characters" },
-        { status: 400 }
-      );
-    }
-
-    if (username.length > 30) {
-      return NextResponse.json(
-        { error: "Username cannot exceed 30 characters" },
+        { error: usernameValidation.error },
         { status: 400 }
       );
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!validateEmail(email)) {
       return NextResponse.json(
         { error: "Invalid email format" },
         { status: 400 }
       );
     }
 
-    // Validate password length
-    if (password.length < 6) {
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }
