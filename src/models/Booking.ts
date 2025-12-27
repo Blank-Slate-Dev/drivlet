@@ -83,6 +83,7 @@ export interface IBooking extends Document {
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
   servicePaymentId?: string;
+  servicePaymentIntentId?: string;
   servicePaymentStatus?: 'pending' | 'paid' | 'failed';
 
   // Vehicle details
@@ -339,6 +340,11 @@ const BookingSchema = new Schema<IBooking>(
     servicePaymentId: {
       type: String,
       required: false,
+    },
+    servicePaymentIntentId: {
+      type: String,
+      required: false,
+      index: true,
     },
     servicePaymentStatus: {
       type: String,
