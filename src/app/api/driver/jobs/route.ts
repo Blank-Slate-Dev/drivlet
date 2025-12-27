@@ -6,9 +6,25 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import User from "@/models/User";
-import mongoose from "mongoose";
+import { stripe } from "@/lib/stripe";
+import { sendServicePaymentEmail } from "@/lib/email";
+import { sendServicePaymentSMS } from "@/lib/sms";
 
-// GET /api/driver/jobs - Get available jobs for driver
+// Get the app URL for Stripe redirects
+function getAppUrl(): string {
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  if (process.env.VERCEL_ENV === 'production') {
+    return 'https://drivlet.vercel.app';
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3000';
+}
+
+// GET /api/driver/jobs - Get jobs for driver
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -22,13 +38,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || "available"; // available, accepted, in_progress
+    const status = searchParams.get("status") || "available";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
 
     await connectDB();
 
-    // Get the driver profile
     const user = await User.findById(session.user.id);
     if (!user?.driverProfile) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
@@ -39,7 +54,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Driver not found" }, { status: 404 });
     }
 
-    // Check if driver can accept jobs
     if (!driver.canAcceptJobs) {
       return NextResponse.json({
         error: "You are not authorized to accept jobs. Please complete your onboarding.",
@@ -56,38 +70,35 @@ export async function GET(request: NextRequest) {
         assignedDriverId: { $exists: false },
         "cancellation.cancelledAt": { $exists: false },
       };
-
-      // Filter by driver's preferred areas if they have any
-      if (driver.preferredAreas && driver.preferredAreas.length > 0) {
-        // Create regex patterns for suburb matching
-        const areaPatterns = driver.preferredAreas.map(
-          (area: string) => new RegExp(area, "i")
-        );
-        query.$or = [
-          { pickupAddress: { $in: areaPatterns } },
-          // Also include jobs even if not in preferred areas (they can still see them)
-        ];
-        // Actually, let's show all jobs but we'll sort preferred ones first
-        delete query.$or;
-      }
-
-      // Check for manual transmission capability
-      if (!driver.license?.class || driver.license.class === "C") {
-        // Standard license, might need to filter manual transmission
-        // For now, show all but flag manual jobs
-      }
     } else if (status === "accepted") {
-      // Jobs assigned to this driver that are pending
+      // Jobs assigned to this driver that are pending (not started)
       query = {
         assignedDriverId: user.driverProfile,
         status: "pending",
         "cancellation.cancelledAt": { $exists: false },
       };
     } else if (status === "in_progress") {
-      // Jobs assigned to this driver that are in progress
+      // Jobs assigned to this driver that are in progress (includes awaiting payment)
       query = {
         assignedDriverId: user.driverProfile,
         status: "in_progress",
+        servicePaymentStatus: { $ne: "paid" }, // Not yet paid
+        "cancellation.cancelledAt": { $exists: false },
+      };
+    } else if (status === "awaiting_payment") {
+      // Jobs where payment link exists but customer hasn't paid
+      query = {
+        assignedDriverId: user.driverProfile,
+        servicePaymentStatus: "pending",
+        servicePaymentUrl: { $exists: true, $ne: null },
+        "cancellation.cancelledAt": { $exists: false },
+      };
+    } else if (status === "ready_for_return") {
+      // Jobs where customer has paid and car is ready to return
+      query = {
+        assignedDriverId: user.driverProfile,
+        servicePaymentStatus: "paid",
+        status: { $ne: "completed" },
         "cancellation.cancelledAt": { $exists: false },
       };
     }
@@ -103,26 +114,19 @@ export async function GET(request: NextRequest) {
       Booking.countDocuments(query),
     ]);
 
-    // Calculate payout for each job (e.g., $25-40 per pickup/delivery)
-    const jobsWithPayout = jobs.map((job) => {
-      // Base payout calculation
-      let payout = 25; // Base rate
-      
-      // Add for manual transmission
-      if (job.isManualTransmission) {
-        payout += 5;
-      }
-      
-      // Add for longer distances (would need actual distance calculation)
-      // For now, estimate based on time window
+    // Format jobs for response
+    const formattedJobs = jobs.map((job) => {
+      // Calculate payout
+      let payout = 25;
+      if (job.isManualTransmission) payout += 5;
       const pickupHour = parseInt(job.pickupTime?.split(":")[0] || "9");
-      if (pickupHour < 7 || pickupHour > 18) {
-        payout += 10; // Early morning or evening premium
-      }
+      if (pickupHour < 7 || pickupHour > 18) payout += 10;
 
       return {
         _id: job._id.toString(),
         customerName: job.userName,
+        customerEmail: job.userEmail,
+        customerPhone: job.guestPhone,
         vehicleRegistration: job.vehicleRegistration,
         vehicleState: job.vehicleState,
         serviceType: job.serviceType,
@@ -137,16 +141,20 @@ export async function GET(request: NextRequest) {
         currentStage: job.currentStage,
         createdAt: job.createdAt,
         payout,
-        // Check if this is in driver's preferred area
+        // Service payment info
+        servicePaymentStatus: job.servicePaymentStatus || null,
+        servicePaymentAmount: job.servicePaymentAmount || null,
+        servicePaymentUrl: job.servicePaymentUrl || null,
+        // Preferred area check
         isPreferredArea: driver.preferredAreas?.some((area: string) =>
           job.pickupAddress?.toLowerCase().includes(area.toLowerCase())
         ) || false,
       };
     });
 
-    // Sort to show preferred area jobs first for available jobs
+    // Sort preferred area jobs first for available jobs
     if (status === "available") {
-      jobsWithPayout.sort((a, b) => {
+      formattedJobs.sort((a, b) => {
         if (a.isPreferredArea && !b.isPreferredArea) return -1;
         if (!a.isPreferredArea && b.isPreferredArea) return 1;
         return 0;
@@ -154,7 +162,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      jobs: jobsWithPayout,
+      jobs: formattedJobs,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -169,7 +177,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/driver/jobs - Accept or decline a job
+// POST /api/driver/jobs - Job actions (accept, decline, start, generate-payment, complete)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -192,7 +200,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { bookingId, action } = body;
+    const { bookingId, action, serviceAmount } = body;
 
     if (!bookingId || !action) {
       return NextResponse.json(
@@ -201,13 +209,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!["accept", "decline", "start", "complete"].includes(action)) {
+    const validActions = ["accept", "decline", "start", "picked_up", "at_garage", "generate_payment", "complete"];
+    if (!validActions.includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
     await connectDB();
 
-    // Get driver profile
     const user = await User.findById(session.user.id);
     if (!user?.driverProfile) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
@@ -226,8 +234,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
+    const now = new Date();
+
+    // ========== ACCEPT JOB ==========
     if (action === "accept") {
-      // Check driver's daily job limit first (before atomic operation)
+      // Check daily limit
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -239,25 +250,19 @@ export async function POST(request: NextRequest) {
         status: { $ne: "cancelled" },
       });
 
-      if (todaysJobs >= driver.maxJobsPerDay) {
+      if (todaysJobs >= (driver.maxJobsPerDay || 10)) {
         return NextResponse.json(
-          { error: `You have reached your daily limit of ${driver.maxJobsPerDay} jobs` },
+          { error: "You have reached your daily job limit" },
           { status: 400 }
         );
       }
 
-      // Use atomic findOneAndUpdate to prevent race condition
-      // Only update if assignedDriverId is not set (null, undefined, or doesn't exist)
-      const now = new Date();
-      const updatedBooking = await Booking.findOneAndUpdate(
+      // Atomic update to prevent race conditions
+      const result = await Booking.findOneAndUpdate(
         {
           _id: bookingId,
-          $or: [
-            { assignedDriverId: { $exists: false } },
-            { assignedDriverId: null },
-          ],
+          assignedDriverId: { $exists: false },
           status: "pending",
-          "cancellation.cancelledAt": { $exists: false },
         },
         {
           $set: {
@@ -269,7 +274,7 @@ export async function POST(request: NextRequest) {
             updates: {
               stage: "driver_assigned",
               timestamp: now,
-              message: `Driver ${driver.firstName} ${driver.lastName} has accepted this job.`,
+              message: `Driver ${driver.firstName} ${driver.lastName} accepted the job.`,
               updatedBy: "driver",
             },
           },
@@ -277,120 +282,258 @@ export async function POST(request: NextRequest) {
         { new: true }
       );
 
-      // If no document was updated, another driver got there first
-      if (!updatedBooking) {
+      if (!result) {
         return NextResponse.json(
-          { error: "This job has already been assigned to another driver" },
+          { error: "This job is no longer available" },
           { status: 400 }
         );
       }
 
       // Update driver metrics
-      driver.metrics = driver.metrics || {
-        totalJobs: 0,
-        completedJobs: 0,
-        cancelledJobs: 0,
-        averageRating: 0,
-        totalRatings: 0,
-      };
+      driver.metrics = driver.metrics || { totalJobs: 0, completedJobs: 0, cancelledJobs: 0, averageRating: 0, totalRatings: 0 };
       driver.metrics.totalJobs += 1;
       await driver.save();
 
       return NextResponse.json({
         success: true,
         message: "Job accepted successfully",
-        booking: {
-          _id: updatedBooking._id.toString(),
-          status: updatedBooking.status,
-        },
       });
-    } else if (action === "decline") {
-      // If this driver was assigned, remove them
+    }
+
+    // ========== DECLINE JOB ==========
+    if (action === "decline") {
       if (booking.assignedDriverId?.toString() === user.driverProfile.toString()) {
         booking.assignedDriverId = undefined;
         booking.driverAssignedAt = undefined;
+        booking.driverAcceptedAt = undefined;
         booking.updates.push({
-          stage: "driver_unassigned",
-          timestamp: new Date(),
-          message: "Driver declined this job.",
+          stage: "driver_declined",
+          timestamp: now,
+          message: "Driver declined the job.",
           updatedBy: "driver",
         });
         await booking.save();
       }
 
-      return NextResponse.json({
-        success: true,
-        message: "Job declined",
-      });
-    } else if (action === "start") {
-      // Start the job (pickup)
-      if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
-        return NextResponse.json(
-          { error: "You are not assigned to this job" },
-          { status: 403 }
-        );
-      }
+      return NextResponse.json({ success: true, message: "Job declined" });
+    }
 
+    // For remaining actions, verify driver is assigned
+    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+      return NextResponse.json(
+        { error: "You are not assigned to this job" },
+        { status: 403 }
+      );
+    }
+
+    // ========== START (En route to pickup) ==========
+    if (action === "start") {
       booking.status = "in_progress";
       booking.currentStage = "driver_en_route";
-      booking.overallProgress = 28;
+      booking.overallProgress = 20;
+      booking.driverStartedAt = now;
       booking.updates.push({
         stage: "driver_en_route",
-        timestamp: new Date(),
+        timestamp: now,
         message: "Driver is on the way to pick up the vehicle.",
         updatedBy: "driver",
       });
-
       await booking.save();
 
-      return NextResponse.json({
-        success: true,
-        message: "Job started",
-        booking: {
-          _id: booking._id.toString(),
-          status: booking.status,
-          currentStage: booking.currentStage,
-        },
+      return NextResponse.json({ success: true, message: "Job started" });
+    }
+
+    // ========== PICKED UP ==========
+    if (action === "picked_up") {
+      booking.currentStage = "car_picked_up";
+      booking.overallProgress = 35;
+      booking.updates.push({
+        stage: "car_picked_up",
+        timestamp: now,
+        message: "Vehicle has been picked up. Heading to garage.",
+        updatedBy: "driver",
       });
-    } else if (action === "complete") {
-      // Complete the job (delivery done)
-      if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+      await booking.save();
+
+      return NextResponse.json({ success: true, message: "Pickup confirmed" });
+    }
+
+    // ========== AT GARAGE ==========
+    if (action === "at_garage") {
+      booking.currentStage = "at_garage";
+      booking.overallProgress = 50;
+      booking.updates.push({
+        stage: "at_garage",
+        timestamp: now,
+        message: "Vehicle has arrived at the garage.",
+        updatedBy: "driver",
+      });
+      await booking.save();
+
+      return NextResponse.json({ success: true, message: "Arrived at garage" });
+    }
+
+    // ========== GENERATE PAYMENT LINK ==========
+    if (action === "generate_payment") {
+      // Validate service amount
+      if (!serviceAmount || typeof serviceAmount !== "number" || serviceAmount <= 0) {
         return NextResponse.json(
-          { error: "You are not assigned to this job" },
-          { status: 403 }
+          { error: "Service amount is required (in cents)" },
+          { status: 400 }
+        );
+      }
+
+      // Validate amount is within reasonable range ($150 - $800)
+      const MIN_SERVICE_AMOUNT = 15000; // $150 in cents
+      const MAX_SERVICE_AMOUNT = 80000; // $800 in cents
+
+      if (serviceAmount < MIN_SERVICE_AMOUNT) {
+        return NextResponse.json(
+          { error: "Please double check the price - it seems too low. Minimum is $150." },
+          { status: 400 }
+        );
+      }
+
+      if (serviceAmount > MAX_SERVICE_AMOUNT) {
+        return NextResponse.json(
+          { error: "Please double check the price - it seems too high. Maximum is $800." },
+          { status: 400 }
+        );
+      }
+
+      // Check if payment link already exists
+      if (booking.servicePaymentUrl && booking.servicePaymentStatus === "pending") {
+        return NextResponse.json({
+          success: true,
+          message: "Payment link already exists",
+          paymentLink: booking.servicePaymentUrl,
+          paymentAmount: booking.servicePaymentAmount,
+        });
+      }
+
+      // Create Stripe Checkout Session
+      const appUrl = getAppUrl();
+
+      try {
+        const checkoutSession = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'payment',
+          customer_email: booking.userEmail,
+          line_items: [
+            {
+              price_data: {
+                currency: 'aud',
+                product_data: {
+                  name: `Service Payment - ${booking.vehicleRegistration}`,
+                  description: `${booking.serviceType}${booking.garageName ? ` at ${booking.garageName}` : ''}`,
+                },
+                unit_amount: serviceAmount,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            bookingId: bookingId,
+            type: 'service_payment',
+            vehicleRegistration: booking.vehicleRegistration,
+            garageName: booking.garageName || '',
+          },
+          success_url: `${appUrl}/payment/success?booking=${bookingId}&type=service`,
+          cancel_url: `${appUrl}/payment/cancelled?booking=${bookingId}`,
+        });
+
+        // Update booking with payment link
+        booking.servicePaymentAmount = serviceAmount;
+        booking.servicePaymentUrl = checkoutSession.url || undefined;
+        booking.servicePaymentStatus = "pending";
+        booking.currentStage = "awaiting_payment";
+        booking.overallProgress = 70;
+        booking.updates.push({
+          stage: "payment_link_generated",
+          timestamp: now,
+          message: `Payment link generated for $${(serviceAmount / 100).toFixed(2)}. Waiting for customer payment.`,
+          updatedBy: "driver",
+        });
+        await booking.save();
+
+        console.log('💳 Service payment link created:', checkoutSession.url);
+        console.log('📦 Booking:', bookingId);
+        console.log('💰 Amount:', serviceAmount / 100, 'AUD');
+
+        // Send email notification (async, don't block)
+        sendServicePaymentEmail(
+          booking.userEmail,
+          booking.userName,
+          booking.vehicleRegistration,
+          serviceAmount,
+          checkoutSession.url!,
+          booking.garageName
+        ).then(sent => {
+          if (sent) console.log('📧 Payment email sent to:', booking.userEmail);
+          else console.log('⚠️ Failed to send payment email');
+        });
+
+        // Send SMS notification if phone number exists (async, don't block)
+        const phoneNumber = booking.guestPhone;
+        if (phoneNumber) {
+          sendServicePaymentSMS(
+            phoneNumber,
+            booking.userName,
+            booking.vehicleRegistration,
+            serviceAmount,
+            checkoutSession.url!
+          ).then(sent => {
+            if (sent) console.log('📱 Payment SMS sent to:', phoneNumber);
+            else console.log('⚠️ Failed to send payment SMS');
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: "Payment link generated",
+          paymentLink: checkoutSession.url,
+          paymentAmount: serviceAmount,
+        });
+
+      } catch (stripeError) {
+        console.error('❌ Failed to create payment link:', stripeError);
+        return NextResponse.json(
+          { error: "Failed to create payment link" },
+          { status: 500 }
+        );
+      }
+    }
+
+    // ========== COMPLETE DELIVERY ==========
+    if (action === "complete") {
+      // Check if payment received
+      if (booking.servicePaymentStatus !== "paid") {
+        return NextResponse.json(
+          { error: "Cannot complete - customer has not paid for service yet" },
+          { status: 400 }
         );
       }
 
       booking.status = "completed";
       booking.currentStage = "delivered";
       booking.overallProgress = 100;
+      booking.driverCompletedAt = now;
       booking.updates.push({
         stage: "delivered",
-        timestamp: new Date(),
+        timestamp: now,
         message: "Vehicle has been delivered back to the customer.",
         updatedBy: "driver",
       });
-
       await booking.save();
 
       // Update driver metrics
-      driver.metrics = driver.metrics || {
-        totalJobs: 0,
-        completedJobs: 0,
-        cancelledJobs: 0,
-        averageRating: 0,
-        totalRatings: 0,
-      };
+      driver.metrics = driver.metrics || { totalJobs: 0, completedJobs: 0, cancelledJobs: 0, averageRating: 0, totalRatings: 0 };
       driver.metrics.completedJobs += 1;
       await driver.save();
 
       return NextResponse.json({
         success: true,
         message: "Job completed successfully",
-        booking: {
-          _id: booking._id.toString(),
-          status: booking.status,
-        },
       });
     }
 

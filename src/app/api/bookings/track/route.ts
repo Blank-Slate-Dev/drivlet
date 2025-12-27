@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
     await connectDB();
 
     // SECURITY FIX: Use exact string matching instead of regex
-    // This prevents NoSQL injection and ReDoS attacks
     const booking = await Booking.findOne({
       userEmail: email.toLowerCase().trim(),
       vehicleRegistration: regClean,
@@ -92,9 +91,15 @@ export async function POST(request: NextRequest) {
         hasExistingBooking: booking.hasExistingBooking,
         garageName: booking.garageName,
         paymentStatus: booking.paymentStatus,
+        // Service payment fields for pay-on-return flow
+        servicePaymentAmount: booking.servicePaymentAmount,
+        servicePaymentUrl: booking.servicePaymentUrl,
+        servicePaymentStatus: booking.servicePaymentStatus,
         updates: booking.updates,
         createdAt: booking.createdAt,
         updatedAt: booking.updatedAt,
+        // Cancellation info if applicable
+        cancellation: booking.cancellation,
       },
     });
   } catch (error) {

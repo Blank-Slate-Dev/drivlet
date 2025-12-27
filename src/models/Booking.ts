@@ -51,11 +51,11 @@ export interface IBooking extends Document {
   hasExistingBooking: boolean;
   garageName?: string;
   garageAddress?: string;
-  garagePlaceId?: string; // Google Places ID for exact garage matching
+  garagePlaceId?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
 
-  // Garage assignment
+  // Garage assignment (for future stages)
   assignedGarageId?: Types.ObjectId;
   assignedAt?: Date;
   garageNotifiedAt?: Date;
@@ -73,11 +73,17 @@ export interface IBooking extends Document {
   driverStartedAt?: Date;
   driverCompletedAt?: Date;
 
-  // Payment information
+  // Drivlet fee payment information (paid at booking)
   paymentId?: string;
   paymentAmount?: number;
   paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
   stripeSessionId?: string;
+
+  // Service payment (paid before car return)
+  servicePaymentAmount?: number;
+  servicePaymentUrl?: string;
+  servicePaymentId?: string;
+  servicePaymentStatus?: 'pending' | 'paid' | 'failed';
 
   // Vehicle details
   transmissionType: 'automatic' | 'manual';
@@ -110,28 +116,16 @@ export interface IBooking extends Document {
     refundAmount: number;
     refundPercentage: number;
     refundId?: string;
-    refundStatus: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
+    refundStatus?: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
   };
 }
 
 const UpdateSchema = new Schema<IUpdate>(
   {
-    stage: {
-      type: String,
-      required: true,
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now,
-    },
-    message: {
-      type: String,
-      default: "",
-    },
-    updatedBy: {
-      type: String,
-      default: "",
-    },
+    stage: { type: String, required: true },
+    timestamp: { type: Date, required: true },
+    message: { type: String, required: true },
+    updatedBy: { type: String, required: true },
   },
   { _id: false }
 );
@@ -143,50 +137,48 @@ const FlagSchema = new Schema<IFlag>(
       enum: ['manual_transmission', 'high_value_vehicle', 'other'],
       required: true,
     },
-    reason: {
-      type: String,
-      required: true,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
+    reason: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
   },
   { _id: false }
 );
 
 const SelectedServiceSchema = new Schema<ISelectedService>(
   {
-    category: {
-      type: String,
-      required: true,
-    },
-    services: {
-      type: [String],
-      default: [],
-    },
+    category: { type: String, required: true },
+    services: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const GarageResponseSchema = new Schema<IGarageResponse>(
+  {
+    respondedAt: { type: Date, required: true },
+    respondedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    notes: { type: String },
   },
   { _id: false }
 );
 
 const BookingSchema = new Schema<IBooking>(
   {
-    // User info - userId is optional for guest bookings
+    // User info
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: false,
-      index: true,
       default: null,
     },
     userEmail: {
       type: String,
       required: true,
-      index: true,
+      lowercase: true,
+      trim: true,
     },
     userName: {
       type: String,
       required: true,
+      trim: true,
     },
 
     // Guest-specific fields
@@ -215,17 +207,20 @@ const BookingSchema = new Schema<IBooking>(
     vehicleRegistration: {
       type: String,
       required: true,
+      uppercase: true,
+      trim: true,
     },
     vehicleState: {
       type: String,
       required: true,
+      uppercase: true,
     },
     serviceType: {
       type: String,
       required: true,
     },
 
-    // Existing booking fields (for stage 1 - attending existing bookings)
+    // Existing booking fields
     hasExistingBooking: {
       type: Boolean,
       default: false,
@@ -233,7 +228,6 @@ const BookingSchema = new Schema<IBooking>(
     garageName: {
       type: String,
       required: false,
-      index: true, // Index for fallback name-based matching
     },
     garageAddress: {
       type: String,
@@ -242,7 +236,6 @@ const BookingSchema = new Schema<IBooking>(
     garagePlaceId: {
       type: String,
       required: false,
-      index: true, // Index for exact matching by Google Place ID
     },
     existingBookingRef: {
       type: String,
@@ -253,7 +246,7 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
 
-    // Garage assignment
+    // Garage assignment (for future stages)
     assignedGarageId: {
       type: Schema.Types.ObjectId,
       ref: "Garage",
@@ -290,9 +283,8 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
     garageResponse: {
-      respondedAt: { type: Date },
-      respondedBy: { type: Schema.Types.ObjectId, ref: "User" },
-      notes: { type: String },
+      type: GarageResponseSchema,
+      required: false,
     },
 
     // Driver assignment
@@ -319,10 +311,9 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
 
-    // Payment information
+    // Drivlet fee payment information
     paymentId: {
       type: String,
-      // REMOVED: index: true (using explicit schema.index() below instead)
     },
     paymentAmount: {
       type: Number,
@@ -334,7 +325,24 @@ const BookingSchema = new Schema<IBooking>(
     },
     stripeSessionId: {
       type: String,
-      // REMOVED: index: true (using explicit schema.index() below instead)
+    },
+
+    // Service payment (paid before car return)
+    servicePaymentAmount: {
+      type: Number,
+      required: false,
+    },
+    servicePaymentUrl: {
+      type: String,
+      required: false,
+    },
+    servicePaymentId: {
+      type: String,
+      required: false,
+    },
+    servicePaymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
     },
 
     // Vehicle details
@@ -402,7 +410,7 @@ const BookingSchema = new Schema<IBooking>(
     // Cancellation details
     cancellation: {
       cancelledAt: { type: Date },
-      cancelledBy: { type: Schema.Types.Mixed }, // Can be ObjectId or string
+      cancelledBy: { type: Schema.Types.Mixed },
       cancelledByRole: {
         type: String,
         enum: ["customer", "admin", "system"],
@@ -428,10 +436,12 @@ BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
-BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 }); // For garage-based booking matching
-BookingSchema.index({ assignedDriverId: 1, status: 1 }); // For driver job queries
-BookingSchema.index({ paymentId: 1 }); // For payment lookups
-BookingSchema.index({ stripeSessionId: 1 }); // For Stripe session lookups
+BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 });
+BookingSchema.index({ assignedDriverId: 1, status: 1 });
+BookingSchema.index({ paymentId: 1 });
+BookingSchema.index({ stripeSessionId: 1 });
+BookingSchema.index({ servicePaymentId: 1 });
+BookingSchema.index({ userEmail: 1, createdAt: -1 });
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =

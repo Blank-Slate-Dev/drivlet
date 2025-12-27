@@ -1,4 +1,4 @@
-// src/app/api/bookings/track/route.ts
+// src/app/api/admin/bookings/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
