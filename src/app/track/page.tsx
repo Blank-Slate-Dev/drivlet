@@ -163,8 +163,8 @@ function ServicePaymentForm({
 
 function TrackingContent() {
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState(searchParams.get("email") || "");
-  const [registration, setRegistration] = useState(searchParams.get("rego") || "");
+  const [email, setEmail] = useState("");
+  const [registration, setRegistration] = useState("");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -177,14 +177,29 @@ function TrackingContent() {
   const [paymentError, setPaymentError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  // Auto-search if URL params present
+  // Load saved credentials on mount and auto-search
   useEffect(() => {
+    // Priority: URL params > localStorage
     const emailParam = searchParams.get("email");
     const regoParam = searchParams.get("rego");
+    
     if (emailParam && regoParam) {
+      // From URL params
       setEmail(emailParam);
       setRegistration(regoParam);
+      // Save to localStorage for future refreshes
+      localStorage.setItem("drivlet_track_email", emailParam);
+      localStorage.setItem("drivlet_track_rego", regoParam);
       handleSearch(emailParam, regoParam);
+    } else {
+      // Try localStorage
+      const savedEmail = localStorage.getItem("drivlet_track_email");
+      const savedRego = localStorage.getItem("drivlet_track_rego");
+      if (savedEmail && savedRego) {
+        setEmail(savedEmail);
+        setRegistration(savedRego);
+        handleSearch(savedEmail, savedRego);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -226,10 +241,19 @@ function TrackingContent() {
 
       if (response.ok) {
         setBooking(data.booking);
-        // Reset payment states when fetching new booking
-        setShowPayment(false);
-        setClientSecret(null);
-        setPaymentSuccess(false);
+        // Save credentials for refresh persistence
+        localStorage.setItem("drivlet_track_email", emailToSearch);
+        localStorage.setItem("drivlet_track_rego", regoToSearch);
+        // Only reset payment UI if this is a fresh search (not a refresh after payment)
+        // If we just paid successfully, keep that state until DB confirms
+        if (!paymentSuccess) {
+          setShowPayment(false);
+          setClientSecret(null);
+        }
+        // If DB now shows paid, we can clear our local success state
+        if (data.booking.servicePaymentStatus === "paid") {
+          setPaymentSuccess(false); // DB confirmed, no need for local flag
+        }
       } else {
         setError(data.error || "Booking not found");
         setBooking(null);
@@ -278,10 +302,39 @@ function TrackingContent() {
   const handlePaymentSuccess = () => {
     setPaymentSuccess(true);
     setShowPayment(false);
-    // Refresh booking to get updated status
-    setTimeout(() => {
-      handleSearch(email, registration);
-    }, 2000);
+    setPaymentError("");
+    
+    // Poll for updated booking status - webhook may take a moment
+    // Try multiple times with increasing delays
+    const pollForUpdate = async (attempts: number) => {
+      if (attempts <= 0) return;
+      
+      try {
+        const response = await fetch("/api/bookings/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, registration }),
+        });
+        const data = await response.json();
+        
+        if (response.ok) {
+          setBooking(data.booking);
+          // If DB shows paid, we're done
+          if (data.booking.servicePaymentStatus === "paid") {
+            setPaymentSuccess(false); // DB confirmed, show the DB banner instead
+            return;
+          }
+        }
+      } catch {
+        // Ignore errors during polling
+      }
+      
+      // Try again after delay
+      setTimeout(() => pollForUpdate(attempts - 1), 2000);
+    };
+    
+    // Start polling after initial delay
+    setTimeout(() => pollForUpdate(5), 2000);
   };
 
   const handlePaymentError = (error: string) => {
@@ -722,6 +775,9 @@ function TrackingContent() {
                         setEmail("");
                         setRegistration("");
                         setPaymentSuccess(false);
+                        // Clear saved credentials
+                        localStorage.removeItem("drivlet_track_email");
+                        localStorage.removeItem("drivlet_track_rego");
                       }}
                       className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
                     >
