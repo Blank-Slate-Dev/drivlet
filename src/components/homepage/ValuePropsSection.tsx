@@ -37,24 +37,7 @@ export default function ValuePropsSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-            Simply{' '}
-            <span className="relative inline-block">
-              book online
-              <svg
-                className="absolute -bottom-1 left-0 w-full"
-                height="8"
-                viewBox="0 0 100 8"
-                preserveAspectRatio="none"
-              >
-                <path
-                  d="M0 7 Q 50 0 100 7"
-                  stroke="#fbbf24"
-                  strokeWidth="3"
-                  fill="none"
-                />
-              </svg>
-            </span>{' '}
-            and we&apos;ll handle the rest
+            Simply book online and we&apos;ll handle the rest
           </h2>
         </div>
 

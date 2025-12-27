@@ -6,6 +6,37 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { getRandomServices, type ServiceItem } from '@/constants/allServices';
 
+// Rainbow spectrum color palette for service card tops
+// Sequential assignment ensures no duplicate colors visible at the same time
+const RAINBOW_COLORS = [
+  'bg-red-500',
+  'bg-orange-500',
+  'bg-amber-500',
+  'bg-yellow-500',
+  'bg-lime-500',
+  'bg-green-500',
+  'bg-emerald-500',
+  'bg-teal-500',
+  'bg-cyan-500',
+  'bg-sky-500',
+  'bg-blue-500',
+  'bg-indigo-500',
+  'bg-violet-500',
+  'bg-purple-500',
+  'bg-fuchsia-500',
+  'bg-pink-500',
+  'bg-rose-500',
+];
+
+/**
+ * Get a unique color based on card position
+ * Each card gets a unique color from the rainbow spectrum
+ * No duplicates visible at the same time (17 unique colors available)
+ */
+function getServiceColor(index: number): string {
+  return RAINBOW_COLORS[index % RAINBOW_COLORS.length];
+}
+
 interface ServicesSectionProps {
   onBookingClick: () => void;
 }
@@ -65,7 +96,7 @@ export default function ServicesSection({ onBookingClick }: ServicesSectionProps
               transition={{ duration: 0.4, delay: index * 0.1 }}
               className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
             >
-              <div className={`h-1.5 ${service.color}`} />
+              <div className={`h-1.5 ${getServiceColor(index)}`} />
               <div className="p-6 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
                   <service.icon className="h-7 w-7 text-slate-600" />
