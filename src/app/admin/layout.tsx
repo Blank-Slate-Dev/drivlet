@@ -17,6 +17,7 @@ import {
   Building2,
   MessageSquare,
   Car,
+  MapPin,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -162,6 +163,17 @@ export default function AdminLayout({
             >
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">Garages</span>
+            </Link>
+            <Link
+              href="/admin/location-requests"
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                isActive("/admin/location-requests")
+                  ? "bg-white/20 text-white"
+                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <MapPin className="h-4 w-4" />
+              <span className="hidden sm:inline">Locations</span>
             </Link>
             <Link
               href="/admin/inquiries"

@@ -22,6 +22,7 @@ import {
   BarChart3,
   Star,
   Crown,
+  MapPin,
 } from "lucide-react";
 
 export default function GarageLayout({ children }: { children: React.ReactNode }) {
@@ -120,6 +121,11 @@ export default function GarageLayout({ children }: { children: React.ReactNode }
       icon: Crown,
     },
     {
+      href: "/garage/location",
+      label: "Location",
+      icon: MapPin,
+    },
+    {
       href: "/garage/settings",
       label: "Settings",
       icon: Settings,
@@ -159,19 +165,19 @@ export default function GarageLayout({ children }: { children: React.ReactNode }
                   />
                 </div>
               </Link>
-              <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-400/20 border border-emerald-400/30 px-3 py-1 text-xs font-medium text-emerald-300">
-                <Building2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:flex items-center gap-1 rounded-full bg-emerald-400/20 border border-emerald-400/30 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
+                <Building2 className="h-3 w-3" />
                 Garage Portal
               </span>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1.5">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  className={`flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition ${
                     isActive(item.href)
                       ? "bg-white/20 text-white"
                       : "text-emerald-100 hover:bg-white/10 hover:text-white"

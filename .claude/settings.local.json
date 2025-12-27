@@ -28,7 +28,8 @@
       "Bash(NODE_ENV=development npm install:*)",
       "Bash(mkdir:*)",
       "Bash(cmd /c \"rmdir /s /q .next 2>nul\")",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

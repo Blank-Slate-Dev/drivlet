@@ -11,6 +11,17 @@ export interface IUser extends Document {
   garageProfile?: mongoose.Types.ObjectId;
   driverProfile?: mongoose.Types.ObjectId;
   isApproved: boolean;
+
+  // Garage location fields (for garage users without full profile yet)
+  garageLocationId?: string; // Google Place ID
+  garageLocationName?: string;
+  garageLocationAddress?: string;
+  garageLocationCoordinates?: {
+    lat: number;
+    lng: number;
+  };
+  locationUpdatedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +63,28 @@ const UserSchema = new Schema<IUser>(
     isApproved: {
       type: Boolean,
       default: true, // Auto-approve customers, garages and drivers need manual approval
+    },
+
+    // Garage location fields (for garage users without full profile yet)
+    garageLocationId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    garageLocationName: {
+      type: String,
+      trim: true,
+    },
+    garageLocationAddress: {
+      type: String,
+      trim: true,
+    },
+    garageLocationCoordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    locationUpdatedAt: {
+      type: Date,
     },
   },
   {
