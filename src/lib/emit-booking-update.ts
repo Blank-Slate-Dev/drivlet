@@ -9,6 +9,8 @@ interface BookingDocument {
   overallProgress: number;
   status: string;
   servicePaymentStatus?: string;
+  servicePaymentAmount?: number;
+  servicePaymentUrl?: string;
   updatedAt: Date;
   updates?: Array<{
     stage: string;
@@ -27,6 +29,8 @@ export function notifyBookingUpdate(booking: BookingDocument): void {
     overallProgress: booking.overallProgress,
     status: booking.status,
     servicePaymentStatus: booking.servicePaymentStatus,
+    servicePaymentAmount: booking.servicePaymentAmount,
+    servicePaymentUrl: booking.servicePaymentUrl,
     updatedAt: booking.updatedAt,
     latestUpdate: booking.updates && booking.updates.length > 0
       ? booking.updates[booking.updates.length - 1]

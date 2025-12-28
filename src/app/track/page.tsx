@@ -35,37 +35,57 @@ import RegistrationPlate, { StateCode } from "@/components/homepage/Registration
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-// Hook for animated counting
+// Hook for animated counting - counts up smoothly when target changes
 function useAnimatedCounter(targetValue: number, duration: number = 800) {
   const [displayValue, setDisplayValue] = useState(targetValue);
-  const previousValue = useRef(targetValue);
+  const animationRef = useRef<number | null>(null);
+  const currentValueRef = useRef(targetValue);
 
   useEffect(() => {
-    const startValue = previousValue.current;
+    // Cancel any existing animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    const startValue = currentValueRef.current;
     const difference = targetValue - startValue;
-    
-    if (difference === 0) return;
+
+    // If no change, just ensure we're at the right value
+    if (difference === 0) {
+      setDisplayValue(targetValue);
+      return;
+    }
 
     const startTime = performance.now();
-    
+
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
-      // Ease out curve to match the progress bar
+
+      // Ease out cubic curve for smooth deceleration
       const easeOut = 1 - Math.pow(1 - progress, 3);
-      const currentValue = Math.round(startValue + difference * easeOut);
-      
-      setDisplayValue(currentValue);
-      
+      const newValue = Math.round(startValue + difference * easeOut);
+
+      currentValueRef.current = newValue;
+      setDisplayValue(newValue);
+
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       } else {
-        previousValue.current = targetValue;
+        // Ensure we end exactly at target
+        currentValueRef.current = targetValue;
+        setDisplayValue(targetValue);
       }
     };
-    
-    requestAnimationFrame(animate);
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    // Cleanup on unmount or when target changes
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [targetValue, duration]);
 
   return displayValue;
@@ -245,14 +265,14 @@ function TrackingContent() {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         if (data.type === 'connected') {
           console.log('SSE connection confirmed for booking:', data.bookingId);
         } else if (data.type === 'heartbeat') {
           console.log('SSE heartbeat received');
         } else if (data.type === 'update') {
           console.log('SSE update received:', data);
-          // Update booking state with new data
+          // Update booking state with new data (including payment info)
           setBooking(prev => {
             if (!prev) return prev;
             return {
@@ -261,13 +281,15 @@ function TrackingContent() {
               overallProgress: data.overallProgress,
               status: data.status,
               servicePaymentStatus: data.servicePaymentStatus,
+              servicePaymentAmount: data.servicePaymentAmount,
+              servicePaymentUrl: data.servicePaymentUrl,
               updatedAt: data.updatedAt,
-              updates: data.latestUpdate 
+              updates: data.latestUpdate
                 ? [...prev.updates.filter(u => u.timestamp !== data.latestUpdate.timestamp), data.latestUpdate]
                 : prev.updates,
             };
           });
-          
+
           // If payment status changed to paid, clear payment success flag
           if (data.servicePaymentStatus === 'paid') {
             setPaymentSuccess(false);
@@ -305,7 +327,7 @@ function TrackingContent() {
       // Priority: URL params > localStorage
       const emailParam = searchParams.get("email");
       const regoParam = searchParams.get("rego");
-      
+
       if (emailParam && regoParam) {
         setEmail(emailParam);
         setRegistration(regoParam);
@@ -367,7 +389,7 @@ function TrackingContent() {
         if (data.booking.servicePaymentStatus === "paid") {
           setPaymentSuccess(false);
         }
-        
+
         // Connect to SSE for real-time updates
         connectSSE(data.booking._id, emailToSearch, regoToSearch);
       } else {
@@ -419,7 +441,7 @@ function TrackingContent() {
     setPaymentSuccess(true);
     setShowPayment(false);
     setPaymentError("");
-    
+
     // Immediately confirm payment with our server (verifies with Stripe directly)
     if (booking?._id) {
       try {
@@ -427,9 +449,9 @@ function TrackingContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        
+
         const confirmData = await confirmResponse.json();
-        
+
         if (confirmData.success) {
           // Update local booking state immediately
           setBooking(prev => prev ? {
@@ -445,11 +467,11 @@ function TrackingContent() {
         console.error('Failed to confirm payment:', err);
       }
     }
-    
+
     // SSE will handle the update automatically, but fall back to polling if needed
     const pollForUpdate = async (attempts: number) => {
       if (attempts <= 0) return;
-      
+
       try {
         const response = await fetch("/api/bookings/track", {
           method: "POST",
@@ -457,7 +479,7 @@ function TrackingContent() {
           body: JSON.stringify({ email, registration }),
         });
         const data = await response.json();
-        
+
         if (response.ok) {
           setBooking(data.booking);
           if (data.booking.servicePaymentStatus === "paid") {
@@ -468,10 +490,10 @@ function TrackingContent() {
       } catch {
         // Ignore errors during polling
       }
-      
+
       setTimeout(() => pollForUpdate(attempts - 1), 2000);
     };
-    
+
     setTimeout(() => pollForUpdate(5), 2000);
   };
 
@@ -540,12 +562,12 @@ function TrackingContent() {
               />
             </div>
           </Link>
-          
+
           {/* Connection status indicator */}
           {booking && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-              isConnected 
-                ? 'bg-emerald-500/20 text-emerald-100' 
+              isConnected
+                ? 'bg-emerald-500/20 text-emerald-100'
                 : 'bg-amber-500/20 text-amber-100'
             }`}>
               {isConnected ? (
@@ -683,9 +705,9 @@ function TrackingContent() {
                   {/* Vehicle Info Header */}
                   <div className="flex justify-center pb-4 border-b border-slate-200">
                     <div className="transform scale-[0.85] origin-center">
-                      <RegistrationPlate 
-                        plate={booking.vehicleRegistration} 
-                        state={booking.vehicleState as StateCode} 
+                      <RegistrationPlate
+                        plate={booking.vehicleRegistration}
+                        state={booking.vehicleState as StateCode}
                       />
                     </div>
                   </div>

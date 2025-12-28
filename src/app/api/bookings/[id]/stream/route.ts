@@ -47,13 +47,15 @@ export async function GET(
         const connectMsg = `data: ${JSON.stringify({ type: 'connected', bookingId })}\n\n`;
         controller.enqueue(encoder.encode(connectMsg));
 
-        // Send current state immediately
+        // Send current state immediately (including payment info)
         const initialData: BookingEventData = {
           bookingId: booking._id.toString(),
           currentStage: booking.currentStage,
           overallProgress: booking.overallProgress,
           status: booking.status,
           servicePaymentStatus: booking.servicePaymentStatus,
+          servicePaymentAmount: booking.servicePaymentAmount,
+          servicePaymentUrl: booking.servicePaymentUrl,
           updatedAt: booking.updatedAt,
           latestUpdate: booking.updates?.length > 0 
             ? booking.updates[booking.updates.length - 1] 
