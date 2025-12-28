@@ -23,7 +23,7 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
       const secondHalf = formattedPlate.slice(3, 6);
       return (
         <>
-          {firstHalf}
+          <span style={{ letterSpacing: '4px' }}>{firstHalf}</span>
           <span
             style={{
               display: 'inline-block',
@@ -31,17 +31,17 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
               height: '6px',
               backgroundColor: '#ffffff',
               borderRadius: '50%',
-              margin: '0 6px',
+              margin: '0 8px',
               verticalAlign: 'middle',
               boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
             }}
           />
-          {secondHalf}
+          <span style={{ letterSpacing: '4px' }}>{secondHalf}</span>
         </>
       );
     }
     
-    return formattedPlate;
+    return <span style={{ letterSpacing: '4px' }}>{formattedPlate}</span>;
   };
   return (
     <div 
@@ -104,7 +104,6 @@ export default function RegistrationPlate({ plate, state }: RegistrationPlatePro
               fontSize: '32px',
               fontWeight: 700,
               color: '#ffffff',
-              letterSpacing: '4px',
               textShadow: '0 1px 2px rgba(0,0,0,0.4)',
               display: 'flex',
               alignItems: 'center',
