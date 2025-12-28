@@ -167,6 +167,7 @@ function TrackingContent() {
   const [registration, setRegistration] = useState("");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -179,28 +180,30 @@ function TrackingContent() {
 
   // Load saved credentials on mount and auto-search
   useEffect(() => {
-    // Priority: URL params > localStorage
-    const emailParam = searchParams.get("email");
-    const regoParam = searchParams.get("rego");
-    
-    if (emailParam && regoParam) {
-      // From URL params
-      setEmail(emailParam);
-      setRegistration(regoParam);
-      // Save to localStorage for future refreshes
-      localStorage.setItem("drivlet_track_email", emailParam);
-      localStorage.setItem("drivlet_track_rego", regoParam);
-      handleSearch(emailParam, regoParam);
-    } else {
-      // Try localStorage
-      const savedEmail = localStorage.getItem("drivlet_track_email");
-      const savedRego = localStorage.getItem("drivlet_track_rego");
-      if (savedEmail && savedRego) {
-        setEmail(savedEmail);
-        setRegistration(savedRego);
-        handleSearch(savedEmail, savedRego);
+    const loadBooking = async () => {
+      // Priority: URL params > localStorage
+      const emailParam = searchParams.get("email");
+      const regoParam = searchParams.get("rego");
+      
+      if (emailParam && regoParam) {
+        setEmail(emailParam);
+        setRegistration(regoParam);
+        localStorage.setItem("drivlet_track_email", emailParam);
+        localStorage.setItem("drivlet_track_rego", regoParam);
+        await handleSearch(emailParam, regoParam);
+      } else {
+        const savedEmail = localStorage.getItem("drivlet_track_email");
+        const savedRego = localStorage.getItem("drivlet_track_rego");
+        if (savedEmail && savedRego) {
+          setEmail(savedEmail);
+          setRegistration(savedRego);
+          await handleSearch(savedEmail, savedRego);
+        }
       }
-    }
+      setInitialLoading(false);
+    };
+
+    loadBooking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -245,14 +248,13 @@ function TrackingContent() {
         localStorage.setItem("drivlet_track_email", emailToSearch);
         localStorage.setItem("drivlet_track_rego", regoToSearch);
         // Only reset payment UI if this is a fresh search (not a refresh after payment)
-        // If we just paid successfully, keep that state until DB confirms
         if (!paymentSuccess) {
           setShowPayment(false);
           setClientSecret(null);
         }
         // If DB now shows paid, we can clear our local success state
         if (data.booking.servicePaymentStatus === "paid") {
-          setPaymentSuccess(false); // DB confirmed, no need for local flag
+          setPaymentSuccess(false);
         }
       } else {
         setError(data.error || "Booking not found");
@@ -299,13 +301,38 @@ function TrackingContent() {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setPaymentSuccess(true);
     setShowPayment(false);
     setPaymentError("");
     
-    // Poll for updated booking status - webhook may take a moment
-    // Try multiple times with increasing delays
+    // Immediately confirm payment with our server (verifies with Stripe directly)
+    if (booking?._id) {
+      try {
+        const confirmResponse = await fetch(`/api/bookings/${booking._id}/confirm-service-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        const confirmData = await confirmResponse.json();
+        
+        if (confirmData.success) {
+          // Update local booking state immediately
+          setBooking(prev => prev ? {
+            ...prev,
+            servicePaymentStatus: 'paid',
+            currentStage: 'ready_for_return',
+            overallProgress: 85,
+          } : null);
+          setPaymentSuccess(false); // DB confirmed, show the DB banner instead
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to confirm payment:', err);
+      }
+    }
+    
+    // Fallback: poll for webhook update if direct confirmation failed
     const pollForUpdate = async (attempts: number) => {
       if (attempts <= 0) return;
       
@@ -319,9 +346,8 @@ function TrackingContent() {
         
         if (response.ok) {
           setBooking(data.booking);
-          // If DB shows paid, we're done
           if (data.booking.servicePaymentStatus === "paid") {
-            setPaymentSuccess(false); // DB confirmed, show the DB banner instead
+            setPaymentSuccess(false);
             return;
           }
         }
@@ -329,11 +355,9 @@ function TrackingContent() {
         // Ignore errors during polling
       }
       
-      // Try again after delay
       setTimeout(() => pollForUpdate(attempts - 1), 2000);
     };
     
-    // Start polling after initial delay
     setTimeout(() => pollForUpdate(5), 2000);
   };
 
@@ -348,6 +372,18 @@ function TrackingContent() {
     !paymentSuccess;
 
   const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
+
+  // Show loading during initial auto-search
+  if (initialLoading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
+          <p className="text-white/80 mt-3">Loading your booking...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
