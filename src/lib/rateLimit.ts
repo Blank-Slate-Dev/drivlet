@@ -28,7 +28,7 @@ export const RATE_LIMITS = {
   // Strict: Auth endpoints
   auth: { maxRequests: 5, windowMs: 60 * 1000 }, // 5 per minute
   // Moderate: Registration/forms
-  form: { maxRequests: 3, windowMs: 60 * 1000 }, // 3 per minute
+  form: { maxRequests: 16, windowMs: 60 * 1000 }, // 16 per minute
   // Standard: General API
   api: { maxRequests: 30, windowMs: 60 * 1000 }, // 30 per minute
   // Loose: Read operations
