@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { requireAdmin } from "@/lib/admin";
+import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -149,6 +150,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     booking.updatedAt = new Date();
     await booking.save();
+    
+    // Notify connected clients of the update
+    notifyBookingUpdate(booking);
 
     return NextResponse.json(booking);
   } catch (error) {
@@ -273,6 +277,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     booking.updatedAt = new Date();
     await booking.save();
+    
+    // Notify connected clients of the update
+    notifyBookingUpdate(booking);
 
     return NextResponse.json(booking);
   } catch (error) {
