@@ -1,7 +1,7 @@
 // src/app/track/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,6 +26,8 @@ import {
   Home,
   Lock,
   Sparkles,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
@@ -173,12 +175,89 @@ function TrackingContent() {
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
 
+  // SSE connection state
+  const [isConnected, setIsConnected] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   // Payment state
   const [showPayment, setShowPayment] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // Connect to SSE for real-time updates
+  const connectSSE = (bookingId: string, userEmail: string, rego: string) => {
+    // Close existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    const url = `/api/bookings/${bookingId}/stream?email=${encodeURIComponent(userEmail)}&rego=${encodeURIComponent(rego)}`;
+    const eventSource = new EventSource(url);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log('SSE connected');
+      setIsConnected(true);
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'connected') {
+          console.log('SSE connection confirmed for booking:', data.bookingId);
+        } else if (data.type === 'heartbeat') {
+          console.log('SSE heartbeat received');
+        } else if (data.type === 'update') {
+          console.log('SSE update received:', data);
+          // Update booking state with new data
+          setBooking(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              currentStage: data.currentStage,
+              overallProgress: data.overallProgress,
+              status: data.status,
+              servicePaymentStatus: data.servicePaymentStatus,
+              updatedAt: data.updatedAt,
+              updates: data.latestUpdate 
+                ? [...prev.updates.filter(u => u.timestamp !== data.latestUpdate.timestamp), data.latestUpdate]
+                : prev.updates,
+            };
+          });
+          
+          // If payment status changed to paid, clear payment success flag
+          if (data.servicePaymentStatus === 'paid') {
+            setPaymentSuccess(false);
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing SSE data:', err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE error:', err);
+      setIsConnected(false);
+      // Attempt to reconnect after 5 seconds
+      setTimeout(() => {
+        if (booking && email && registration) {
+          connectSSE(booking._id, email, registration);
+        }
+      }, 5000);
+    };
+  };
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   // Load saved credentials on mount and auto-search
   useEffect(() => {
@@ -208,16 +287,6 @@ function TrackingContent() {
     loadBooking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  // Auto-refresh every 30 seconds if booking is in progress
-  useEffect(() => {
-    if (booking && booking.status === "in_progress" && !showPayment) {
-      const interval = setInterval(() => {
-        handleSearch(email, registration);
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [booking, email, registration, showPayment]);
 
   const handleSearch = async (searchEmail?: string, searchRego?: string) => {
     const emailToSearch = searchEmail || email;
@@ -258,6 +327,9 @@ function TrackingContent() {
         if (data.booking.servicePaymentStatus === "paid") {
           setPaymentSuccess(false);
         }
+        
+        // Connect to SSE for real-time updates
+        connectSSE(data.booking._id, emailToSearch, regoToSearch);
       } else {
         setError(data.error || "Booking not found");
         setBooking(null);
@@ -334,7 +406,7 @@ function TrackingContent() {
       }
     }
     
-    // Fallback: poll for webhook update if direct confirmation failed
+    // SSE will handle the update automatically, but fall back to polling if needed
     const pollForUpdate = async (attempts: number) => {
       if (attempts <= 0) return;
       
@@ -365,6 +437,23 @@ function TrackingContent() {
 
   const handlePaymentError = (error: string) => {
     setPaymentError(error);
+  };
+
+  const handleTrackAnother = () => {
+    // Close SSE connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setIsConnected(false);
+    setBooking(null);
+    setHasSearched(false);
+    setEmail("");
+    setRegistration("");
+    setPaymentSuccess(false);
+    // Clear saved credentials
+    localStorage.removeItem("drivlet_track_email");
+    localStorage.removeItem("drivlet_track_rego");
   };
 
   const needsPayment =
@@ -413,6 +502,27 @@ function TrackingContent() {
               />
             </div>
           </Link>
+          
+          {/* Connection status indicator */}
+          {booking && (
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+              isConnected 
+                ? 'bg-emerald-500/20 text-emerald-100' 
+                : 'bg-amber-500/20 text-amber-100'
+            }`}>
+              {isConnected ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5" />
+                  Live
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3.5 w-3.5" />
+                  Reconnecting...
+                </>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -808,16 +918,7 @@ function TrackingContent() {
                   {/* Search Again Button */}
                   {!showPayment && (
                     <button
-                      onClick={() => {
-                        setBooking(null);
-                        setHasSearched(false);
-                        setEmail("");
-                        setRegistration("");
-                        setPaymentSuccess(false);
-                        // Clear saved credentials
-                        localStorage.removeItem("drivlet_track_email");
-                        localStorage.removeItem("drivlet_track_rego");
-                      }}
+                      onClick={handleTrackAnother}
                       className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
                     >
                       Track Another Booking

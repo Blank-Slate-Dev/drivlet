@@ -9,6 +9,7 @@ import User from "@/models/User";
 import { stripe } from "@/lib/stripe";
 import { sendServicePaymentEmail } from "@/lib/email";
 import { sendServicePaymentSMS } from "@/lib/sms";
+import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 
 // Get the app URL for Stripe redirects
 function getAppUrl(): string {
@@ -294,6 +295,9 @@ export async function POST(request: NextRequest) {
       driver.metrics.totalJobs += 1;
       await driver.save();
 
+      // Notify connected clients of the update
+      notifyBookingUpdate(result);
+
       return NextResponse.json({
         success: true,
         message: "Job accepted successfully",
@@ -313,6 +317,9 @@ export async function POST(request: NextRequest) {
           updatedBy: "driver",
         });
         await booking.save();
+        
+        // Notify connected clients of the update
+        notifyBookingUpdate(booking);
       }
 
       return NextResponse.json({ success: true, message: "Job declined" });
@@ -339,6 +346,9 @@ export async function POST(request: NextRequest) {
         updatedBy: "driver",
       });
       await booking.save();
+      
+      // Notify connected clients of the update
+      notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Job started" });
     }
@@ -354,6 +364,9 @@ export async function POST(request: NextRequest) {
         updatedBy: "driver",
       });
       await booking.save();
+      
+      // Notify connected clients of the update
+      notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Pickup confirmed" });
     }
@@ -369,6 +382,9 @@ export async function POST(request: NextRequest) {
         updatedBy: "driver",
       });
       await booking.save();
+      
+      // Notify connected clients of the update
+      notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Arrived at garage" });
     }
@@ -455,6 +471,9 @@ export async function POST(request: NextRequest) {
           updatedBy: "driver",
         });
         await booking.save();
+        
+        // Notify connected clients of the update
+        notifyBookingUpdate(booking);
 
         console.log('💳 Service payment link created:', checkoutSession.url);
         console.log('📦 Booking:', bookingId);
@@ -525,6 +544,9 @@ export async function POST(request: NextRequest) {
         updatedBy: "driver",
       });
       await booking.save();
+      
+      // Notify connected clients of the update
+      notifyBookingUpdate(booking);
 
       // Update driver metrics
       driver.metrics = driver.metrics || { totalJobs: 0, completedJobs: 0, cancelledJobs: 0, averageRating: 0, totalRatings: 0 };
