@@ -28,6 +28,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
+
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -531,12 +533,13 @@ function TrackingContent() {
                   className="space-y-6"
                 >
                   {/* Vehicle Info Header */}
-                  <div className="text-center pb-4 border-b border-slate-200">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-700 font-mono text-lg font-bold">
-                      <Car className="h-5 w-5" />
-                      {booking.vehicleRegistration}
+                  <div className="flex justify-center pb-4 border-b border-slate-200">
+                    <div className="transform scale-[0.85] origin-center">
+                      <RegistrationPlate 
+                        plate={booking.vehicleRegistration} 
+                        state={booking.vehicleState as StateCode} 
+                      />
                     </div>
-                    <p className="text-sm text-slate-500 mt-2">{booking.vehicleState}</p>
                   </div>
 
                   {/* Payment Success Banner */}
