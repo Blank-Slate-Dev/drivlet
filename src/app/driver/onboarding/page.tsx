@@ -308,36 +308,131 @@ export default function DriverOnboardingPage() {
         </div>
       </header>
 
-      {/* Progress Steps */}
-      <div className="relative z-10 mx-auto max-w-4xl px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((step, index) => (
-            <div key={step.num} className="flex items-center">
-              <div className={`flex flex-col items-center ${index !== steps.length - 1 ? 'flex-1' : ''}`}>
-                <div className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all ${
-                  currentStep >= step.num 
-                    ? 'bg-emerald-500 border-emerald-500 text-white' 
-                    : 'bg-white/10 border-white/20 text-white/50'
-                }`}>
-                  {currentStep > step.num ? (
-                    <Check className="h-5 w-5 sm:h-6 sm:w-6" />
-                  ) : (
-                    <step.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+      {/* Progress Steps - Modern Timeline */}
+      <div className="relative z-10 mx-auto max-w-5xl px-4 py-8 sm:py-12">
+        {/* Timeline Container */}
+        <div className="relative">
+          {/* Background Track */}
+          <div className="absolute top-6 sm:top-7 left-0 right-0 h-0.5 bg-white/10 hidden sm:block"
+               style={{ left: '8.33%', right: '8.33%' }} />
+
+          {/* Progress Track */}
+          <div
+            className="absolute top-6 sm:top-7 h-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 hidden sm:block transition-all duration-500 ease-out"
+            style={{
+              left: '8.33%',
+              width: `${Math.max(0, ((currentStep - 1) / (steps.length - 1)) * 83.33)}%`
+            }}
+          />
+
+          {/* Steps */}
+          <div className="relative flex items-start justify-between">
+            {steps.map((step, index) => {
+              const isCompleted = currentStep > step.num;
+              const isCurrent = currentStep === step.num;
+
+              return (
+                <div
+                  key={step.num}
+                  className="flex flex-col items-center relative group"
+                  style={{ width: `${100 / steps.length}%` }}
+                >
+                  {/* Step Circle */}
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      scale: isCurrent ? 1.1 : 1,
+                      boxShadow: isCurrent
+                        ? '0 0 0 4px rgba(16, 185, 129, 0.2), 0 10px 25px -5px rgba(0, 0, 0, 0.2)'
+                        : isCompleted
+                          ? '0 4px 12px -2px rgba(0, 0, 0, 0.15)'
+                          : '0 2px 8px -2px rgba(0, 0, 0, 0.1)',
+                    }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className={`
+                      relative flex items-center justify-center
+                      w-12 h-12 sm:w-14 sm:h-14
+                      rounded-full border-2
+                      transition-all duration-300 ease-out
+                      ${isCompleted
+                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 border-emerald-400 text-white'
+                        : isCurrent
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-500 border-emerald-400 text-white ring-4 ring-emerald-400/20'
+                          : 'bg-white/5 border-white/20 text-white/40 backdrop-blur-sm'
+                      }
+                    `}
+                  >
+                    {isCompleted ? (
+                      <motion.div
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ duration: 0.4, ease: 'backOut' }}
+                      >
+                        <Check className="h-5 w-5 sm:h-6 sm:w-6 stroke-[3]" />
+                      </motion.div>
+                    ) : (
+                      <step.icon className={`h-5 w-5 sm:h-6 sm:w-6 transition-transform duration-300 ${isCurrent ? 'scale-110' : ''}`} />
+                    )}
+
+                    {/* Pulse animation for current step */}
+                    {isCurrent && (
+                      <motion.div
+                        className="absolute inset-0 rounded-full bg-emerald-400"
+                        initial={{ scale: 1, opacity: 0.4 }}
+                        animate={{ scale: 1.5, opacity: 0 }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+                      />
+                    )}
+                  </motion.div>
+
+                  {/* Step Label */}
+                  <div className="mt-3 sm:mt-4 text-center">
+                    <span className={`
+                      text-[10px] sm:text-xs font-semibold uppercase tracking-wider
+                      transition-all duration-300
+                      ${isCompleted || isCurrent
+                        ? 'text-emerald-300'
+                        : 'text-white/40'
+                      }
+                    `}>
+                      {step.title}
+                    </span>
+
+                    {/* Step number badge - mobile only */}
+                    <div className={`
+                      sm:hidden mt-1 text-[9px] font-medium
+                      ${isCompleted || isCurrent ? 'text-emerald-400/80' : 'text-white/30'}
+                    `}>
+                      {step.num}/{steps.length}
+                    </div>
+                  </div>
+
+                  {/* Connector Line (between steps) - Hidden on mobile, shown on larger screens */}
+                  {index !== steps.length - 1 && (
+                    <div className="absolute top-6 sm:top-7 left-1/2 w-full h-0.5 -z-10 hidden sm:block">
+                      {/* This is handled by the absolute positioned tracks above */}
+                    </div>
                   )}
                 </div>
-                <span className={`mt-2 text-xs font-medium hidden sm:block ${
-                  currentStep >= step.num ? 'text-emerald-300' : 'text-white/50'
-                }`}>
-                  {step.title}
-                </span>
-              </div>
-              {index !== steps.length - 1 && (
-                <div className={`h-0.5 w-full mx-1 sm:mx-2 ${
-                  currentStep > step.num ? 'bg-emerald-500' : 'bg-white/20'
-                }`} />
-              )}
+              );
+            })}
+          </div>
+
+          {/* Mobile Progress Bar */}
+          <div className="sm:hidden mt-6">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-2">
+              <span>Step {currentStep} of {steps.length}</span>
+              <span>{Math.round((currentStep / steps.length) * 100)}% Complete</span>
             </div>
-          ))}
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full"
+                initial={false}
+                animate={{ width: `${(currentStep / steps.length) * 100}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
