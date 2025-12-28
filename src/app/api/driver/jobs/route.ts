@@ -547,7 +547,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: "delivered",
         timestamp: now,
-        message: "Vehicle has been delivered back to the customer.",
+        message: "Vehicle has been delivered. Thanks for choosing drivlet!",
         updatedBy: "driver",
       });
       await booking.save();
