@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   Wrench,
   Building2,
+  Camera,
 } from "lucide-react";
+import VehiclePhotosViewer from "@/components/customer/VehiclePhotosViewer";
 
 interface IUpdate {
   stage: string;
@@ -104,6 +106,7 @@ const stageLabels: Record<string, string> = {
 
 export default function BookingCard({ booking }: BookingCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showPhotos, setShowPhotos] = useState(false);
   const config = statusConfig[booking.status];
   const StatusIcon = config.icon;
 
@@ -206,6 +209,17 @@ export default function BookingCard({ booking }: BookingCardProps) {
                   </span>
                 )}
               </div>
+            )}
+
+            {/* View Photos Button - show for active or completed bookings */}
+            {(booking.status === "in_progress" || booking.status === "completed") && (
+              <button
+                onClick={() => setShowPhotos(true)}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition"
+              >
+                <Camera className="h-4 w-4" />
+                View Vehicle Photos
+              </button>
             )}
           </div>
 
@@ -339,6 +353,14 @@ export default function BookingCard({ booking }: BookingCardProps) {
           </div>
         </div>
       )}
+
+      {/* Vehicle Photos Viewer Modal */}
+      <VehiclePhotosViewer
+        bookingId={booking._id}
+        vehicleRegistration={`${booking.vehicleRegistration} (${booking.vehicleState})`}
+        isOpen={showPhotos}
+        onClose={() => setShowPhotos(false)}
+      />
     </div>
   );
 }

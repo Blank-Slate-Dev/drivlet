@@ -146,6 +146,13 @@ export async function GET(request: NextRequest) {
         servicePaymentStatus: job.servicePaymentStatus || null,
         servicePaymentAmount: job.servicePaymentAmount || null,
         servicePaymentUrl: job.servicePaymentUrl || null,
+        // Photo checkpoint status
+        checkpointStatus: job.checkpointStatus || {
+          pre_pickup: 0,
+          service_dropoff: 0,
+          service_pickup: 0,
+          final_delivery: 0,
+        },
         // Preferred area check
         isPreferredArea: driver.preferredAreas?.some((area: string) =>
           job.pickupAddress?.toLowerCase().includes(area.toLowerCase())

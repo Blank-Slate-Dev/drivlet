@@ -24,7 +24,16 @@ import {
   Navigation,
   CreditCard,
   X,
+  Camera,
 } from "lucide-react";
+import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
+
+interface CheckpointStatus {
+  pre_pickup: number;
+  service_dropoff: number;
+  service_pickup: number;
+  final_delivery: number;
+}
 
 interface Job {
   _id: string;
@@ -49,6 +58,7 @@ interface Job {
   servicePaymentStatus?: string;
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
+  checkpointStatus?: CheckpointStatus;
 }
 
 type TabType = "available" | "accepted" | "in_progress" | "awaiting_payment" | "ready_for_return";
@@ -71,6 +81,21 @@ export default function DriverJobsPage() {
   const [generatedLink, setGeneratedLink] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+
+  // Photo upload modal state
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoJob, setPhotoJob] = useState<Job | null>(null);
+
+  const openPhotoModal = (job: Job) => {
+    setPhotoJob(job);
+    setShowPhotoModal(true);
+  };
+
+  const closePhotoModal = () => {
+    setShowPhotoModal(false);
+    setPhotoJob(null);
+    fetchJobs(); // Refresh to get updated checkpoint status
+  };
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -277,6 +302,7 @@ export default function DriverJobsPage() {
                   actionLoading={actionLoading}
                   onAction={handleJobAction}
                   onOpenPayment={openPaymentModal}
+                  onOpenPhotos={openPhotoModal}
                 />
               ))}
             </AnimatePresence>
@@ -431,6 +457,19 @@ export default function DriverJobsPage() {
           </div>
         </div>
       )}
+
+      {/* Photo Upload Modal */}
+      {showPhotoModal && photoJob && (
+        <PhotoUploadModal
+          isOpen={showPhotoModal}
+          onClose={closePhotoModal}
+          bookingId={photoJob._id}
+          customerName={photoJob.customerName}
+          vehicleRegistration={photoJob.vehicleRegistration}
+          vehicleState={photoJob.vehicleState}
+          currentStage={photoJob.currentStage}
+        />
+      )}
     </div>
   );
 }
@@ -441,14 +480,33 @@ function JobCard({
   actionLoading,
   onAction,
   onOpenPayment,
+  onOpenPhotos,
 }: {
   job: Job;
   activeTab: TabType;
   actionLoading: string | null;
   onAction: (jobId: string, action: "accept" | "decline" | "start" | "picked_up" | "at_garage" | "complete") => void;
   onOpenPayment: (job: Job) => void;
+  onOpenPhotos: (job: Job) => void;
 }) {
   const isLoading = actionLoading === job._id;
+
+  // Calculate photo progress
+  const photoCount = job.checkpointStatus
+    ? job.checkpointStatus.pre_pickup +
+      job.checkpointStatus.service_dropoff +
+      job.checkpointStatus.service_pickup +
+      job.checkpointStatus.final_delivery
+    : 0;
+  const photoProgress = Math.round((photoCount / 20) * 100);
+  const completedCheckpoints = job.checkpointStatus
+    ? [
+        job.checkpointStatus.pre_pickup >= 5,
+        job.checkpointStatus.service_dropoff >= 5,
+        job.checkpointStatus.service_pickup >= 5,
+        job.checkpointStatus.final_delivery >= 5,
+      ].filter(Boolean).length
+    : 0;
 
   return (
     <motion.div
@@ -507,6 +565,44 @@ function JobCard({
               <AlertTriangle className="h-3 w-3" />
               Manual transmission
             </span>
+          </div>
+        )}
+
+        {/* Photo Progress Indicator - show for active jobs */}
+        {activeTab !== "available" && (
+          <div className="mt-3">
+            <button
+              onClick={() => onOpenPhotos(job)}
+              className="w-full rounded-lg bg-slate-100 hover:bg-slate-200 p-3 transition"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-700">Vehicle Photos</span>
+                </div>
+                <span className="text-sm font-bold text-emerald-600">
+                  {photoCount}/20
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all"
+                    style={{ width: `${photoProgress}%` }}
+                  />
+                </div>
+                <div className="flex gap-0.5">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        i < completedCheckpoints ? "bg-emerald-500" : "bg-slate-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </button>
           </div>
         )}
 
