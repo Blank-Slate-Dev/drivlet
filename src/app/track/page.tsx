@@ -28,15 +28,48 @@ import {
   Sparkles,
   Wifi,
   WifiOff,
-  Camera,
 } from "lucide-react";
-
-import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+// Hook for animated counting
+function useAnimatedCounter(targetValue: number, duration: number = 800) {
+  const [displayValue, setDisplayValue] = useState(targetValue);
+  const previousValue = useRef(targetValue);
+
+  useEffect(() => {
+    const startValue = previousValue.current;
+    const difference = targetValue - startValue;
+    
+    if (difference === 0) return;
+
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out curve to match the progress bar
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentValue = Math.round(startValue + difference * easeOut);
+      
+      setDisplayValue(currentValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        previousValue.current = targetValue;
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [targetValue, duration]);
+
+  return displayValue;
+}
 
 // Simplified stages for visual display
 const DISPLAY_STAGES = [
@@ -189,8 +222,9 @@ function TrackingContent() {
   const [paymentError, setPaymentError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  // Photos viewer state
-  const [showPhotos, setShowPhotos] = useState(false);
+  // Animated progress counter
+  const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
+  const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
   // Connect to SSE for real-time updates
   const connectSSE = (bookingId: string, userEmail: string, rego: string) => {
@@ -467,8 +501,6 @@ function TrackingContent() {
     booking.servicePaymentAmount &&
     booking.servicePaymentStatus === "pending" &&
     !paymentSuccess;
-
-  const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
 
   // Show loading during initial auto-search
   if (initialLoading) {
@@ -817,7 +849,7 @@ function TrackingContent() {
                         <div className="flex items-center justify-between text-sm mb-2">
                           <span className="font-medium text-slate-700">Progress</span>
                           <span className="font-bold text-emerald-600">
-                            {booking.overallProgress}%
+                            {animatedProgress}%
                           </span>
                         </div>
                         <div className="h-3 rounded-full bg-slate-200 overflow-hidden">
@@ -921,17 +953,6 @@ function TrackingContent() {
                     </div>
                   )}
 
-                  {/* View Photos Button */}
-                  {!showPayment && booking.status !== "cancelled" && (
-                    <button
-                      onClick={() => setShowPhotos(true)}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold text-slate-700 transition"
-                    >
-                      <Camera className="h-4 w-4" />
-                      View Vehicle Photos
-                    </button>
-                  )}
-
                   {/* Search Again Button */}
                   {!showPayment && (
                     <button
@@ -969,18 +990,6 @@ function TrackingContent() {
           </div>
         </motion.div>
       </div>
-
-      {/* Guest Photos Viewer Modal */}
-      {booking && (
-        <GuestPhotosViewer
-          email={email}
-          registration={registration}
-          vehicleRegistration={booking.vehicleRegistration}
-          vehicleState={booking.vehicleState}
-          isOpen={showPhotos}
-          onClose={() => setShowPhotos(false)}
-        />
-      )}
     </main>
   );
 }
