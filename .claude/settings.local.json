@@ -29,7 +29,8 @@
       "Bash(mkdir:*)",
       "Bash(cmd /c \"rmdir /s /q .next 2>nul\")",
       "Bash(head:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(npx tsc --noEmit)"
     ],
     "deny": [],
     "ask": []

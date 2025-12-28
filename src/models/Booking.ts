@@ -3,6 +3,14 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export type BookingStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
+// Vehicle photo checkpoint tracking
+export interface ICheckpointStatus {
+  pre_pickup: number;      // 0-5 photos completed
+  service_dropoff: number; // 0-5 photos completed
+  service_pickup: number;  // 0-5 photos completed
+  final_delivery: number;  // 0-5 photos completed
+}
+
 export interface IUpdate {
   stage: string;
   timestamp: Date;
@@ -119,6 +127,9 @@ export interface IBooking extends Document {
     refundId?: string;
     refundStatus?: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
   };
+
+  // Vehicle photo checkpoint tracking
+  checkpointStatus: ICheckpointStatus;
 }
 
 const UpdateSchema = new Schema<IUpdate>(
@@ -429,6 +440,14 @@ const BookingSchema = new Schema<IBooking>(
         type: String,
         enum: ["pending", "succeeded", "failed", "not_applicable"],
       },
+    },
+
+    // Vehicle photo checkpoint tracking
+    checkpointStatus: {
+      pre_pickup: { type: Number, default: 0, min: 0, max: 5 },
+      service_dropoff: { type: Number, default: 0, min: 0, max: 5 },
+      service_pickup: { type: Number, default: 0, min: 0, max: 5 },
+      final_delivery: { type: Number, default: 0, min: 0, max: 5 },
     },
   },
   {
