@@ -172,7 +172,7 @@ export default function GarageLayout({ children }: { children: React.ReactNode }
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-1.5">
+            <nav className="hidden lg:flex items-center gap-3 ml-8 mr-8">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
