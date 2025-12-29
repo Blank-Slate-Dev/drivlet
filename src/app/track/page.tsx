@@ -28,9 +28,11 @@ import {
   Sparkles,
   Wifi,
   WifiOff,
+  Camera,
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
+import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -241,6 +243,9 @@ function TrackingContent() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // Photo viewer state
+  const [showPhotos, setShowPhotos] = useState(false);
 
   // Animated progress counter
   const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
@@ -975,6 +980,17 @@ function TrackingContent() {
                     </div>
                   )}
 
+                  {/* View Vehicle Photos Button */}
+                  {!showPayment && booking.status !== "cancelled" && (
+                    <button
+                      onClick={() => setShowPhotos(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold text-slate-700 transition"
+                    >
+                      <Camera className="h-4 w-4" />
+                      View Vehicle Photos
+                    </button>
+                  )}
+
                   {/* Search Again Button */}
                   {!showPayment && (
                     <button
@@ -1012,6 +1028,18 @@ function TrackingContent() {
           </div>
         </motion.div>
       </div>
+
+      {/* Guest Photos Viewer Modal */}
+      {booking && (
+        <GuestPhotosViewer
+          email={email}
+          registration={registration}
+          vehicleRegistration={booking.vehicleRegistration}
+          vehicleState={booking.vehicleState}
+          isOpen={showPhotos}
+          onClose={() => setShowPhotos(false)}
+        />
+      )}
     </main>
   );
 }
