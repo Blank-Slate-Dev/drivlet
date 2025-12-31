@@ -8,7 +8,7 @@ import {
   HeroSection,
   ValuePropsSection,
   HowItWorksSection,
-  ServicesSection,
+  InteractiveServicesSection,
   ContactCTASection,
   FAQSection,
   Footer,
@@ -36,7 +36,7 @@ export default function Home() {
         <HowItWorksSection />
 
       {/* Services Section */}
-      <ServicesSection onBookingClick={openBookingModal} />
+      <InteractiveServicesSection onBookingClick={openBookingModal} />
 
       {/* Contact CTA Section */}
       <ContactCTASection />
