@@ -589,7 +589,7 @@ function TrackingContent() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
-      {/* Subtle pattern */}
+      {/* Subtle pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
           className="h-full w-full"
@@ -599,34 +599,43 @@ function TrackingContent() {
         />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      {/* Header */}
+      <header className="sticky top-0 z-50">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+              <Image
+                src="/logo.png"
+                alt="drivlet"
+                fill
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+          </Link>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="relative z-10 flex min-h-[calc(100vh-80px)] items-center justify-center px-4 pb-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-block">
-              <div className="relative h-12 w-40 sm:h-14 sm:w-48 mx-auto">
-                <Image
-                  src="/logo.png"
-                  alt="drivlet"
-                  fill
-                  className="object-contain brightness-0 invert"
-                  priority
-                />
-              </div>
-            </Link>
-            <h1 className="mt-4 text-2xl font-bold text-white">Track Your Booking</h1>
-            <p className="mt-2 text-emerald-100/80">
-              Enter your tracking code to see your vehicle's status
-            </p>
-          </div>
-
           {/* Main Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl">
+            {/* Title */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                Track Your Booking
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Enter your details to see your vehicle's status
+              </p>
+            </div>
+
             {/* Connection Status */}
             {booking && (
               <div className={`flex items-center gap-2 text-xs mb-4 ${isConnected ? 'text-emerald-600' : 'text-slate-400'}`}>
