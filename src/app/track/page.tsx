@@ -530,14 +530,15 @@ function TrackingContent() {
           {/* Logo */}
           <div className="text-center mb-8">
             <Link href="/" className="inline-block">
-              <Image
-                src="/images/drivlet-logo.svg"
-                alt="Drivlet"
-                width={160}
-                height={40}
-                className="mx-auto brightness-0 invert"
-                priority
-              />
+              <div className="relative h-12 w-40 sm:h-14 sm:w-48 mx-auto">
+                <Image
+                  src="/logo.png"
+                  alt="drivlet"
+                  fill
+                  className="object-contain brightness-0 invert"
+                  priority
+                />
+              </div>
             </Link>
             <h1 className="mt-4 text-2xl font-bold text-white">Track Your Booking</h1>
             <p className="mt-2 text-emerald-100/80">
