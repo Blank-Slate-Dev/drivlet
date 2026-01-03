@@ -37,78 +37,7 @@ import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-// Hook for animated counting - counts up smoothly when target changes
-function useAnimatedCounter(targetValue: number, duration: number = 800) {
-  const [displayValue, setDisplayValue] = useState(targetValue);
-  const animationRef = useRef<number | null>(null);
-  const currentValueRef = useRef(targetValue);
-
-  useEffect(() => {
-    // Cancel any existing animation
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-
-    const startValue = currentValueRef.current;
-    const difference = targetValue - startValue;
-
-    // If no change, just ensure we're at the right value
-    if (difference === 0) {
-      setDisplayValue(targetValue);
-      return;
-    }
-
-    const startTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Ease out cubic curve for smooth deceleration
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const newValue = Math.round(startValue + difference * easeOut);
-
-      currentValueRef.current = newValue;
-      setDisplayValue(newValue);
-
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        // Ensure we end exactly at target
-        currentValueRef.current = targetValue;
-        setDisplayValue(targetValue);
-      }
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    // Cleanup on unmount or when target changes
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [targetValue, duration]);
-
-  return displayValue;
-}
-
-// Simplified stages for visual display
-const DISPLAY_STAGES = [
-  { id: "confirmed", label: "Confirmed", icon: CheckCircle2, keys: ["booking_confirmed"] },
-  { id: "pickup", label: "Picked Up", icon: Car, keys: ["driver_en_route", "car_picked_up"] },
-  { id: "service", label: "At Service", icon: Wrench, keys: ["at_garage", "service_in_progress", "awaiting_payment"] },
-  { id: "returning", label: "Returning", icon: Truck, keys: ["ready_for_return", "driver_returning"] },
-  { id: "delivered", label: "Delivered", icon: Home, keys: ["delivered"] },
-];
-
-interface Update {
-  stage: string;
-  timestamp: string;
-  message: string;
-  updatedBy: string;
-}
-
+// Booking type
 interface Booking {
   _id: string;
   vehicleRegistration: string;
@@ -120,42 +49,86 @@ interface Booking {
   currentStage: string;
   overallProgress: number;
   status: string;
-  hasExistingBooking: boolean;
   garageName?: string;
-  paymentStatus?: string;
-  servicePaymentAmount?: number;
-  servicePaymentUrl?: string;
-  servicePaymentStatus?: string;
-  updates: Update[];
+  updates: Array<{
+    stage: string;
+    timestamp: string;
+    message: string;
+  }>;
   createdAt: string;
   updatedAt: string;
-  cancellation?: {
-    cancelledAt: string;
-    reason?: string;
-    refundAmount: number;
-    refundPercentage: number;
-    refundStatus: "pending" | "succeeded" | "failed" | "not_applicable";
-  };
+  // Payment fields
+  servicePaymentStatus?: 'pending' | 'paid';
+  servicePaymentAmount?: number;
+  servicePaymentUrl?: string;
 }
 
-function getDisplayStageIndex(currentStage: string): number {
-  for (let i = 0; i < DISPLAY_STAGES.length; i++) {
-    if (DISPLAY_STAGES[i].keys.includes(currentStage)) {
-      return i;
+// Stage definitions for visual display
+const STAGES = [
+  { id: "booking_confirmed", label: "Booking Confirmed", icon: CheckCircle2 },
+  { id: "driver_en_route", label: "Driver En Route", icon: Truck },
+  { id: "car_picked_up", label: "Car Picked Up", icon: Package },
+  { id: "at_service_location", label: "At Service Location", icon: MapPin },
+  { id: "service_in_progress", label: "Service In Progress", icon: Wrench },
+  { id: "ready_for_return", label: "Ready For Return", icon: CheckCircle2 },
+  { id: "returning", label: "Returning", icon: Truck },
+  { id: "delivered", label: "Delivered", icon: Home },
+];
+
+// Helper to get stage index for progress display
+const getDisplayStageIndex = (stageId: string): number => {
+  const index = STAGES.findIndex((s) => s.id === stageId);
+  return index >= 0 ? index : 0;
+};
+
+// Animated counter hook
+function useAnimatedCounter(target: number, duration: number = 500) {
+  const [count, setCount] = useState(0);
+  const previousTarget = useRef(target);
+
+  useEffect(() => {
+    if (previousTarget.current === target) {
+      setCount(target);
+      return;
     }
-  }
-  return 0;
+
+    const startValue = previousTarget.current;
+    const startTime = Date.now();
+    const difference = target - startValue;
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Easing function (ease-out)
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentValue = startValue + difference * easeOut;
+
+      setCount(Math.round(currentValue));
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+    previousTarget.current = target;
+  }, [target, duration]);
+
+  return count;
 }
 
-// Embedded Payment Form Component
+// Stripe Payment Form Component
 function ServicePaymentForm({
+  clientSecret,
+  amount,
   onSuccess,
   onError,
-  amount,
 }: {
+  clientSecret: string;
+  amount: number;
   onSuccess: () => void;
   onError: (error: string) => void;
-  amount: number;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -165,23 +138,30 @@ function ServicePaymentForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) return;
+    if (!stripe || !elements) {
+      return;
+    }
 
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/payment/success?type=service`,
-      },
-      redirect: "if_required",
-    });
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: "if_required",
+      });
 
-    if (error) {
-      onError(error.message || "Payment failed");
+      if (error) {
+        onError(error.message || "Payment failed");
+      } else if (paymentIntent?.status === "succeeded") {
+        onSuccess();
+      }
+    } catch {
+      onError("Payment failed. Please try again.");
+    } finally {
       setIsProcessing(false);
-    } else {
-      onSuccess();
     }
   };
 
@@ -196,7 +176,7 @@ function ServicePaymentForm({
       <button
         type="submit"
         disabled={!stripe || isProcessing || !isReady}
-        className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isProcessing ? (
           <>
@@ -250,7 +230,8 @@ function TrackingContent() {
   const [showPhotos, setShowPhotos] = useState(false);
 
   // Animated progress counter
-  const currentDisplayIndex = booking ? getDisplayStageIndex(booking.currentStage) : 0;
+  const currentDisplayIndex = booking ?
+    getDisplayStageIndex(booking.currentStage) : 0;
   const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
   // Connect to SSE for real-time updates
@@ -312,8 +293,8 @@ function TrackingContent() {
       setIsConnected(false);
       // Attempt to reconnect after 5 seconds
       setTimeout(() => {
-        if (booking && email && registration) {
-          connectSSE(booking._id, email, registration);
+        if (booking && trackingCode) {
+          connectSSE(booking._id, trackingCode);
         }
       }, 5000);
     };
@@ -470,16 +451,12 @@ function TrackingContent() {
       if (attempts <= 0) return;
 
       try {
-        const response = await fetch("/api/bookings/track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, registration }),
-        });
+        const response = await fetch(`/api/bookings/track?code=${encodeURIComponent(trackingCode)}`);
         const data = await response.json();
 
         if (response.ok) {
-          setBooking(data.booking);
-          if (data.booking.servicePaymentStatus === "paid") {
+          setBooking(data);
+          if (data.servicePaymentStatus === "paid") {
             setPaymentSuccess(false);
             return;
           }
@@ -507,12 +484,10 @@ function TrackingContent() {
     setIsConnected(false);
     setBooking(null);
     setHasSearched(false);
-    setEmail("");
-    setRegistration("");
+    setTrackingCode("");
     setPaymentSuccess(false);
     // Clear saved credentials
-    localStorage.removeItem("drivlet_track_email");
-    localStorage.removeItem("drivlet_track_rego");
+    localStorage.removeItem("drivlet_track_code");
   };
 
   const needsPayment =
@@ -545,117 +520,94 @@ function TrackingContent() {
         />
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-              <Image
-                src="/logo.png"
-                alt="drivlet"
-                fill
-                className="object-contain brightness-0 invert"
-                priority
-              />
-            </div>
-          </Link>
-
-          {/* Connection status indicator */}
-          {booking && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-              isConnected
-                ? 'bg-emerald-500/20 text-emerald-100'
-                : 'bg-amber-500/20 text-amber-100'
-            }`}>
-              {isConnected ? (
-                <>
-                  <Wifi className="h-3.5 w-3.5" />
-                  Live
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3.5 w-3.5" />
-                  Reconnecting...
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Main content */}
-      <div className="relative z-10 flex min-h-[calc(100vh-73px)] flex-col items-center justify-center px-4 py-12">
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-                <Package className="h-8 w-8 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                Track Your Booking
-              </h1>
-              <p className="text-slate-600 mt-2">
-                Enter your 6-character tracking code
-              </p>
-            </div>
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <Link href="/" className="inline-block">
+              <Image
+                src="/images/drivlet-logo.svg"
+                alt="Drivlet"
+                width={160}
+                height={40}
+                className="mx-auto brightness-0 invert"
+                priority
+              />
+            </Link>
+            <h1 className="mt-4 text-2xl font-bold text-white">Track Your Booking</h1>
+            <p className="mt-2 text-emerald-100/80">
+              Enter your tracking code to see your vehicle's status
+            </p>
+          </div>
 
-            {/* Search Form - only show if no booking found yet */}
+          {/* Main Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+            {/* Connection Status */}
+            {booking && (
+              <div className={`flex items-center gap-2 text-xs mb-4 ${isConnected ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {isConnected ? (
+                  <>
+                    <Wifi className="h-3 w-3" />
+                    <span>Live updates active</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3 w-3" />
+                    <span>Reconnecting...</span>
+                  </>
+                )}
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
+              {/* Search Form */}
               {!booking ? (
                 <motion.div
                   key="search"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
                 >
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
-                        isExpired
-                          ? 'bg-amber-50 border-amber-200'
-                          : 'bg-red-50 border-red-200'
-                      }`}
-                    >
-                      {isExpired ? (
-                        <CheckCircle2 className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                      )}
-                      <p className={`text-sm ${isExpired ? 'text-amber-700' : 'text-red-600'}`}>{error}</p>
-                    </motion.div>
-                  )}
-
                   <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Error Display */}
+                    {error && (
+                      <div className={`flex items-start gap-3 p-4 rounded-xl ${isExpired ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'}`}>
+                        {isExpired ? (
+                          <Clock className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                        )}
+                        <div>
+                          <p className={`text-sm font-medium ${isExpired ? 'text-amber-800' : 'text-red-800'}`}>
+                            {error}
+                          </p>
+                          {isExpired && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Need help? <Link href="/#contact" className="underline">Contact support</Link>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tracking Code Input */}
                     <div>
-                      <label
-                        htmlFor="trackingCode"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
+                      <label htmlFor="trackingCode" className="block text-sm font-medium text-slate-700 mb-2">
                         Tracking Code
                       </label>
                       <div className="relative">
                         <input
-                          id="trackingCode"
                           type="text"
+                          id="trackingCode"
                           value={trackingCode}
-                          onChange={(e) => {
-                            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                            setTrackingCode(value);
-                            setError('');
-                            setIsExpired(false);
-                          }}
-                          required
-                          maxLength={6}
-                          className="w-full px-4 py-3.5 text-center text-2xl font-mono tracking-[0.5em] uppercase rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 placeholder:tracking-normal placeholder:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                          placeholder="e.g. ABC123"
+                          onChange={(e) => setTrackingCode(e.target.value.toUpperCase().slice(0, 6))}
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-slate-900 placeholder:text-slate-300 placeholder:tracking-normal focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+                          placeholder="ABC123"
                           autoComplete="off"
                           autoFocus
                         />
@@ -720,280 +672,214 @@ function TrackingContent() {
                     <motion.div
                       initial={{ scale: 0.95, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-5 text-white"
+                      className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                          <CheckCircle2 className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold">Payment Successful!</p>
-                          <p className="text-sm text-emerald-100">
-                            Your car is on its way back to you
-                          </p>
-                        </div>
+                      <div className="shrink-0 h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <Sparkles className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-emerald-800">Payment Successful!</p>
+                        <p className="text-sm text-emerald-600">Your car will be returned soon</p>
                       </div>
                     </motion.div>
                   )}
 
-                  {/* Payment Required Section */}
-                  {needsPayment && !showPayment && (
-                    <motion.div
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-600 p-5 text-white"
-                    >
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                          <Sparkles className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold">Your car is ready!</p>
-                          <p className="text-sm text-teal-100">Pay to get it delivered back</p>
-                        </div>
+                  {/* Service Payment Paid Banner (from DB) */}
+                  {booking.servicePaymentStatus === 'paid' && !paymentSuccess && (
+                    <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <div className="shrink-0 h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold">
-                          ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
-                        </span>
-                        <button
-                          onClick={initiatePayment}
-                          disabled={paymentLoading}
-                          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-emerald-600 shadow-lg transition hover:bg-emerald-50 disabled:opacity-50"
-                        >
-                          {paymentLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CreditCard className="h-4 w-4" />
-                          )}
-                          {paymentLoading ? "Loading..." : "Pay Now"}
-                        </button>
-                      </div>
-                      {paymentError && (
-                        <p className="mt-3 text-sm text-red-200 bg-red-500/20 rounded-lg px-3 py-2">
-                          {paymentError}
+                      <div>
+                        <p className="font-semibold text-emerald-800">Service Payment Complete</p>
+                        <p className="text-sm text-emerald-600">
+                          ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)} paid
                         </p>
-                      )}
-                    </motion.div>
-                  )}
-
-                  {/* Embedded Payment Form */}
-                  {showPayment && clientSecret && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-5"
-                    >
-                      <div className="flex items-center gap-2 mb-4">
-                        <CreditCard className="h-5 w-5 text-emerald-600" />
-                        <span className="font-semibold text-slate-900">
-                          Pay ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
-                        </span>
                       </div>
-                      <Elements
-                        stripe={stripePromise}
-                        options={{
-                          clientSecret,
-                          appearance: {
-                            theme: "stripe",
-                            variables: {
-                              colorPrimary: "#059669",
-                              colorBackground: "#ffffff",
-                              colorText: "#1e293b",
-                              colorDanger: "#ef4444",
-                              fontFamily: "system-ui, sans-serif",
-                              borderRadius: "12px",
-                            },
-                          },
-                        }}
-                      >
-                        <ServicePaymentForm
-                          onSuccess={handlePaymentSuccess}
-                          onError={handlePaymentError}
-                          amount={booking.servicePaymentAmount || 0}
-                        />
-                      </Elements>
-                      <button
-                        onClick={() => setShowPayment(false)}
-                        className="mt-4 w-full text-sm text-slate-500 hover:text-slate-700"
-                      >
-                        Cancel
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* Payment Completed Banner (from previous session) */}
-                  {booking.servicePaymentStatus === "paid" &&
-                    booking.currentStage !== "delivered" &&
-                    !paymentSuccess && (
-                      <motion.div
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-5 text-white"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                            <CheckCircle2 className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="font-bold">Payment Received!</p>
-                            <p className="text-sm text-emerald-100">
-                              Your car is on its way back to you
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                  {/* Cancelled State */}
-                  {booking.status === "cancelled" && (
-                    <div className="rounded-xl bg-red-50 border border-red-200 p-4">
-                      <div className="flex items-center gap-3 text-red-700">
-                        <XCircle className="h-5 w-5" />
-                        <div>
-                          <p className="font-semibold">Booking Cancelled</p>
-                          {booking.cancellation?.reason && (
-                            <p className="text-sm text-red-600">{booking.cancellation.reason}</p>
-                          )}
-                        </div>
-                      </div>
-                      {booking.cancellation && booking.cancellation.refundAmount > 0 && (
-                        <p className="mt-2 text-sm text-red-600">
-                          Refund: ${(booking.cancellation.refundAmount / 100).toFixed(2)}
-                          {booking.cancellation.refundStatus === "succeeded" && " ✓ Processed"}
-                        </p>
-                      )}
                     </div>
                   )}
 
                   {/* Progress Section */}
-                  {booking.status !== "cancelled" && !showPayment && (
-                    <div>
-                      {/* Progress Bar */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="font-medium text-slate-700">Progress</span>
-                          <span className="font-bold text-emerald-600">
-                            {animatedProgress}%
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-slate-600">Overall Progress</span>
+                      <span className="text-lg font-bold text-emerald-600">{animatedProgress}%</span>
+                    </div>
+                    <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${booking.overallProgress}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Current Stage */}
+                  <div className="text-center">
+                    {(() => {
+                      const currentStage = STAGES[currentDisplayIndex];
+                      const Icon = currentStage?.icon || CheckCircle2;
+                      return (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full">
+                          <Icon className="h-5 w-5" />
+                          <span className="font-semibold">{currentStage?.label || booking.currentStage}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Stage Timeline */}
+                  <div className="space-y-3">
+                    {STAGES.map((stage, index) => {
+                      const isCompleted = index < currentDisplayIndex;
+                      const isCurrent = index === currentDisplayIndex;
+                      const Icon = stage.icon;
+
+                      return (
+                        <div
+                          key={stage.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition ${
+                            isCurrent
+                              ? "bg-emerald-50 border border-emerald-200"
+                              : isCompleted
+                              ? "bg-slate-50"
+                              : "opacity-50"
+                          }`}
+                        >
+                          <div
+                            className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                              isCurrent
+                                ? "bg-emerald-600 text-white"
+                                : isCompleted
+                                ? "bg-emerald-100 text-emerald-600"
+                                : "bg-slate-200 text-slate-400"
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <Icon className="h-4 w-4" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-sm font-medium ${
+                              isCurrent
+                                ? "text-emerald-700"
+                                : isCompleted
+                                ? "text-slate-600"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {stage.label}
                           </span>
                         </div>
-                        <div className="h-3 rounded-full bg-slate-200 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${booking.overallProgress}%` }}
-                            transition={{ duration: 0.8, ease: "easeOut" }}
-                            className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
-                          />
-                        </div>
-                      </div>
+                      );
+                    })}
+                  </div>
 
-                      {/* Stage Icons */}
-                      <div className="flex justify-between">
-                        {DISPLAY_STAGES.map((stage, index) => {
-                          const isCompleted = index <= currentDisplayIndex;
-                          const isCurrent = index === currentDisplayIndex;
-                          const Icon = stage.icon;
-
-                          return (
-                            <div key={stage.id} className="flex flex-col items-center">
-                              <motion.div
-                                initial={{ scale: 0.8 }}
-                                animate={{ scale: isCurrent ? 1.1 : 1 }}
-                                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
-                                  isCompleted
-                                    ? isCurrent
-                                      ? "bg-emerald-500 text-white ring-4 ring-emerald-100"
-                                      : "bg-emerald-500 text-white"
-                                    : "bg-slate-200 text-slate-400"
-                                }`}
-                              >
-                                <Icon className="h-5 w-5" />
-                              </motion.div>
-                              <span
-                                className={`mt-2 text-xs text-center max-w-[60px] ${
-                                  isCurrent
-                                    ? "font-semibold text-emerald-600"
-                                    : "text-slate-500"
-                                }`}
-                              >
-                                {stage.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  {/* Service Details */}
+                  <div className="border-t border-slate-200 pt-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Wrench className="h-4 w-4 text-slate-400" />
+                      <span>Service: {booking.serviceType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                     </div>
-                  )}
+                    {booking.garageName && (
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span>Location: {booking.garageName}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Clock className="h-4 w-4 text-slate-400" />
+                      <span>Pickup: {booking.pickupTime}</span>
+                    </div>
+                  </div>
 
-                  {/* Booking Details */}
-                  {!showPayment && (
-                    <div className="pt-4 border-t border-slate-200 space-y-3">
-                      <div className="flex items-start gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                        <div>
-                          <p className="text-slate-500">Pickup</p>
-                          <p className="text-slate-900">{booking.pickupAddress}</p>
-                        </div>
+                  {/* View Photos Button */}
+                  <button
+                    onClick={() => setShowPhotos(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
+                  >
+                    <Camera className="h-4 w-4" />
+                    View Vehicle Photos
+                  </button>
+
+                  {/* Payment Section */}
+                  {needsPayment && (
+                    <div className="border-t border-slate-200 pt-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <CreditCard className="h-5 w-5 text-emerald-600" />
+                        <span className="font-semibold text-slate-900">Service Payment Required</span>
                       </div>
-                      <div className="flex items-start gap-3 text-sm">
-                        <Clock className="h-4 w-4 text-slate-400 mt-0.5" />
-                        <div>
-                          <p className="text-slate-500">Window</p>
-                          <p className="text-slate-900">
-                            {booking.pickupTime} - {booking.dropoffTime}
-                          </p>
+
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-amber-800 font-medium">Service Cost</span>
+                          <span className="text-2xl font-bold text-amber-900">
+                            ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
+                          </span>
                         </div>
+                        <p className="text-sm text-amber-700 mt-1">
+                          Please pay to have your vehicle returned
+                        </p>
                       </div>
-                      {booking.garageName && (
-                        <div className="flex items-start gap-3 text-sm">
-                          <Wrench className="h-4 w-4 text-slate-400 mt-0.5" />
-                          <div>
-                            <p className="text-slate-500">Service at</p>
-                            <p className="text-slate-900">{booking.garageName}</p>
-                          </div>
+
+                      {paymentError && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+                          <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                          <span className="text-sm text-red-700">{paymentError}</span>
                         </div>
                       )}
+
+                      {!showPayment ? (
+                        <button
+                          onClick={initiatePayment}
+                          disabled={paymentLoading}
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
+                        >
+                          {paymentLoading ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="h-5 w-5" />
+                              Pay Now
+                            </>
+                          )}
+                        </button>
+                      ) : clientSecret ? (
+                        <Elements
+                          stripe={stripePromise}
+                          options={{
+                            clientSecret,
+                            appearance: {
+                              theme: 'stripe',
+                              variables: {
+                                colorPrimary: '#059669',
+                                borderRadius: '12px',
+                              },
+                            },
+                          }}
+                        >
+                          <ServicePaymentForm
+                            clientSecret={clientSecret}
+                            amount={booking.servicePaymentAmount || 0}
+                            onSuccess={handlePaymentSuccess}
+                            onError={handlePaymentError}
+                          />
+                        </Elements>
+                      ) : null}
                     </div>
                   )}
 
-                  {/* Latest Update */}
-                  {booking.updates && booking.updates.length > 0 && !showPayment && (
-                    <div className="pt-4 border-t border-slate-200">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                        Latest Update
-                      </p>
-                      <div className="bg-slate-50 rounded-xl p-3">
-                        <p className="text-sm text-slate-700">
-                          {booking.updates[booking.updates.length - 1].message}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {new Date(
-                            booking.updates[booking.updates.length - 1].timestamp
-                          ).toLocaleString("en-AU", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* View Vehicle Photos Button */}
-                  {!showPayment && booking.status !== "cancelled" && (
-                    <button
-                      onClick={() => setShowPhotos(true)}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold text-slate-700 transition"
-                    >
-                      <Camera className="h-4 w-4" />
-                      View Vehicle Photos
-                    </button>
-                  )}
-
-                  {/* Search Again Button */}
-                  {!showPayment && (
+                  {/* Track Another Button */}
+                  {booking && (
                     <button
                       onClick={handleTrackAnother}
-                      className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
                     >
                       Track Another Booking
                     </button>
@@ -1031,7 +917,7 @@ function TrackingContent() {
       {booking && (
         <GuestPhotosViewer
           email={email}
-          registration={registration}
+          registration={rego}
           vehicleRegistration={booking.vehicleRegistration}
           vehicleState={booking.vehicleState}
           isOpen={showPhotos}
