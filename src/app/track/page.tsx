@@ -225,12 +225,12 @@ function ServicePaymentForm({
 
 function TrackingContent() {
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("");
-  const [registration, setRegistration] = useState("");
+  const [trackingCode, setTrackingCode] = useState(searchParams.get('code') || '');
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isExpired, setIsExpired] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   // SSE connection state
@@ -252,13 +252,13 @@ function TrackingContent() {
   const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
   // Connect to SSE for real-time updates
-  const connectSSE = (bookingId: string, userEmail: string, rego: string) => {
+  const connectSSE = (bookingId: string, code: string) => {
     // Close existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
 
-    const url = `/api/bookings/${bookingId}/stream?email=${encodeURIComponent(userEmail)}&rego=${encodeURIComponent(rego)}`;
+    const url = `/api/bookings/${bookingId}/stream?code=${encodeURIComponent(code)}`;
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
@@ -330,22 +330,17 @@ function TrackingContent() {
   useEffect(() => {
     const loadBooking = async () => {
       // Priority: URL params > localStorage
-      const emailParam = searchParams.get("email");
-      const regoParam = searchParams.get("rego");
+      const codeParam = searchParams.get("code");
 
-      if (emailParam && regoParam) {
-        setEmail(emailParam);
-        setRegistration(regoParam);
-        localStorage.setItem("drivlet_track_email", emailParam);
-        localStorage.setItem("drivlet_track_rego", regoParam);
-        await handleSearch(emailParam, regoParam);
+      if (codeParam && codeParam.length === 6) {
+        setTrackingCode(codeParam);
+        localStorage.setItem("drivlet_track_code", codeParam);
+        await handleSearch(codeParam);
       } else {
-        const savedEmail = localStorage.getItem("drivlet_track_email");
-        const savedRego = localStorage.getItem("drivlet_track_rego");
-        if (savedEmail && savedRego) {
-          setEmail(savedEmail);
-          setRegistration(savedRego);
-          await handleSearch(savedEmail, savedRego);
+        const savedCode = localStorage.getItem("drivlet_track_code");
+        if (savedCode && savedCode.length === 6) {
+          setTrackingCode(savedCode);
+          await handleSearch(savedCode);
         }
       }
       setInitialLoading(false);
@@ -355,49 +350,44 @@ function TrackingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleSearch = async (searchEmail?: string, searchRego?: string) => {
-    const emailToSearch = searchEmail || email;
-    const regoToSearch = searchRego || registration;
+  const handleSearch = async (code?: string) => {
+    const codeToSearch = code || trackingCode;
 
-    if (!emailToSearch || !regoToSearch) {
-      setError("Please enter both email and registration");
+    if (!codeToSearch || codeToSearch.length !== 6) {
+      setError("Please enter a valid 6-character tracking code");
       return;
     }
 
     setLoading(true);
     setError("");
+    setIsExpired(false);
     setHasSearched(true);
 
     try {
-      const response = await fetch("/api/bookings/track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: emailToSearch,
-          registration: regoToSearch,
-        }),
-      });
-
+      const response = await fetch(`/api/bookings/track?code=${encodeURIComponent(codeToSearch)}`);
       const data = await response.json();
 
       if (response.ok) {
-        setBooking(data.booking);
-        // Save credentials for refresh persistence
-        localStorage.setItem("drivlet_track_email", emailToSearch);
-        localStorage.setItem("drivlet_track_rego", regoToSearch);
+        setBooking(data);
+        // Save tracking code for refresh persistence
+        localStorage.setItem("drivlet_track_code", codeToSearch);
         // Only reset payment UI if this is a fresh search (not a refresh after payment)
         if (!paymentSuccess) {
           setShowPayment(false);
           setClientSecret(null);
         }
         // If DB now shows paid, we can clear our local success state
-        if (data.booking.servicePaymentStatus === "paid") {
+        if (data.servicePaymentStatus === "paid") {
           setPaymentSuccess(false);
         }
 
         // Connect to SSE for real-time updates
-        connectSSE(data.booking._id, emailToSearch, regoToSearch);
+        connectSSE(data._id, codeToSearch);
       } else {
+        if (response.status === 410) {
+          // Booking expired (completed or cancelled)
+          setIsExpired(true);
+        }
         setError(data.error || "Booking not found");
         setBooking(null);
       }
@@ -609,7 +599,7 @@ function TrackingContent() {
                 Track Your Booking
               </h1>
               <p className="text-slate-600 mt-2">
-                Enter your details to see real-time updates
+                Enter your 6-character tracking code
               </p>
             </div>
 
@@ -626,63 +616,59 @@ function TrackingContent() {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
+                      className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
+                        isExpired
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
                     >
-                      <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-red-600 text-sm">{error}</p>
+                      {isExpired ? (
+                        <CheckCircle2 className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      )}
+                      <p className={`text-sm ${isExpired ? 'text-amber-700' : 'text-red-600'}`}>{error}</p>
                     </motion.div>
                   )}
 
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
                       <label
-                        htmlFor="email"
+                        htmlFor="trackingCode"
                         className="block text-sm font-medium text-slate-700 mb-2"
                       >
-                        Email address
+                        Tracking Code
                       </label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Mail className="h-5 w-5 text-slate-400" />
-                        </div>
                         <input
-                          id="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                          placeholder="you@example.com"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="registration"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        Vehicle Registration
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Car className="h-5 w-5 text-slate-400" />
-                        </div>
-                        <input
-                          id="registration"
+                          id="trackingCode"
                           type="text"
-                          value={registration}
-                          onChange={(e) => setRegistration(e.target.value.toUpperCase())}
+                          value={trackingCode}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                            setTrackingCode(value);
+                            setError('');
+                            setIsExpired(false);
+                          }}
                           required
-                          className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition uppercase"
-                          placeholder="ABC123"
+                          maxLength={6}
+                          className="w-full px-4 py-3.5 text-center text-2xl font-mono tracking-[0.5em] uppercase rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 placeholder:tracking-normal placeholder:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                          placeholder="e.g. ABC123"
+                          autoComplete="off"
+                          autoFocus
                         />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                          {trackingCode.length}/6
+                        </div>
                       </div>
+                      <p className="mt-2 text-xs text-slate-500 text-center">
+                        Your tracking code was sent to your email after booking
+                      </p>
                     </div>
 
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || trackingCode.length !== 6}
                       className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
@@ -698,6 +684,16 @@ function TrackingContent() {
                         </>
                       )}
                     </button>
+
+                    {/* Help Text */}
+                    <div className="pt-4 border-t border-slate-100">
+                      <p className="text-xs text-slate-500 text-center">
+                        Can't find your tracking code?{' '}
+                        <Link href="/#contact" className="text-emerald-600 hover:underline">
+                          Contact support
+                        </Link>
+                      </p>
+                    </div>
                   </form>
                 </motion.div>
               ) : (

@@ -20,6 +20,7 @@ import {
   User,
   Mail,
   Phone,
+  Copy,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
@@ -123,6 +124,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Tracking code state
+  const [trackingCode, setTrackingCode] = useState<string | null>(null);
 
   // Determine if user is authenticated
   const isAuthenticated = authStatus === 'authenticated' && session?.user;
@@ -463,6 +467,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
         if (response.ok) {
           console.log('✅ Booking saved:', data.bookingId);
+          // Save the tracking code if provided
+          if (data.trackingCode) {
+            setTrackingCode(data.trackingCode);
+            console.log('🔑 Tracking code:', data.trackingCode);
+          }
         } else {
           console.error('❌ Failed to save booking:', data.error);
         }
@@ -484,9 +493,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   }
 
   // Build tracking URL for success page
-  const trackingUrl = `/track?email=${encodeURIComponent(customerEmail)}&rego=${encodeURIComponent(
-    regoPlate.toUpperCase()
-  )}`;
+  const trackingUrl = trackingCode
+    ? `/track?code=${encodeURIComponent(trackingCode)}`
+    : `/track`;
 
   // Success state - using same flexbox centering as main modal for consistency
   if (currentStep === 'success') {
@@ -542,6 +551,31 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     </div>
                   </div>
 
+                  {/* Tracking Code Display */}
+                  {trackingCode && (
+                    <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <p className="text-sm text-emerald-700 mb-2 font-medium">Your Tracking Code:</p>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-3xl font-mono font-bold tracking-[0.3em] text-emerald-700">
+                          {trackingCode}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(trackingCode);
+                          }}
+                          className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"
+                          title="Copy to clipboard"
+                          type="button"
+                        >
+                          <Copy className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-emerald-600 mt-2">
+                        Save this code to track your booking
+                      </p>
+                    </div>
+                  )}
+
                   <p className="mt-4 text-sm text-slate-500">
                     A confirmation email has been sent to <span className="font-medium">{customerEmail}</span>
                   </p>
@@ -549,8 +583,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   <div className="mt-6 space-y-3">
                     <Link
                       href={trackingUrl}
-                      className="block w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
+                      className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
                     >
+                      <MapPin className="h-4 w-4" />
                       Track Your Booking
                     </Link>
                     <button

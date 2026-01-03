@@ -1,111 +1,93 @@
 // src/app/api/bookings/track/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
-import Booking from "@/models/Booking";
-import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { NextRequest, NextResponse } from 'next/server';
+import { connectDB } from '@/lib/mongodb';
+import Booking from '@/models/Booking';
+import { isValidTrackingCodeFormat } from '@/lib/trackingCode';
 
-// POST /api/bookings/track - Track booking by email and vehicle registration
-export async function POST(request: NextRequest) {
-  // Apply rate limiting - prevent enumeration attacks
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "track");
-  if (!rateLimit.success) {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const code = searchParams.get('code');
+
+  // Validate input
+  if (!code) {
     return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)),
-        },
-      }
+      { error: 'Tracking code is required' },
+      { status: 400 }
     );
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  const upperCode = code.toUpperCase().trim();
+
+  // Validate format
+  if (!isValidTrackingCodeFormat(upperCode)) {
     return NextResponse.json(
-      { error: "Invalid JSON in request body" },
+      { error: 'Invalid tracking code format' },
       { status: 400 }
     );
   }
 
   try {
-    const { email, registration } = body;
-
-    if (!email || !registration) {
-      return NextResponse.json(
-        { error: "Email and vehicle registration are required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
-    }
-
-    // Validate registration format (basic alphanumeric, 2-10 chars)
-    const regClean = registration.trim().toUpperCase();
-    if (!/^[A-Z0-9]{2,10}$/.test(regClean)) {
-      return NextResponse.json(
-        { error: "Invalid vehicle registration format" },
-        { status: 400 }
-      );
-    }
-
     await connectDB();
 
-    // SECURITY FIX: Use exact string matching instead of regex
-    const booking = await Booking.findOne({
-      userEmail: email.toLowerCase().trim(),
-      vehicleRegistration: regClean,
-    })
-      .sort({ createdAt: -1 })
-      .select("-__v")
-      .lean();
+    // Find booking by tracking code
+    const booking = await Booking.findOne({ trackingCode: upperCode });
 
     if (!booking) {
       return NextResponse.json(
-        { error: "No booking found with this email and registration" },
+        { error: 'No booking found with this tracking code' },
         { status: 404 }
       );
     }
 
+    // Check if booking is completed or cancelled
+    if (booking.status === 'completed') {
+      return NextResponse.json(
+        {
+          error: 'This booking has been completed. Your tracking code is no longer active.',
+          isExpired: true,
+          completedAt: booking.updatedAt
+        },
+        { status: 410 } // 410 Gone - resource no longer available
+      );
+    }
+
+    if (booking.status === 'cancelled') {
+      return NextResponse.json(
+        {
+          error: 'This booking was cancelled. Your tracking code is no longer active.',
+          isExpired: true,
+          isCancelled: true
+        },
+        { status: 410 }
+      );
+    }
+
+    // Return booking data (sanitized - don't expose sensitive fields)
     return NextResponse.json({
-      booking: {
-        _id: booking._id,
-        vehicleRegistration: booking.vehicleRegistration,
-        vehicleState: booking.vehicleState,
-        serviceType: booking.serviceType,
-        pickupAddress: booking.pickupAddress,
-        pickupTime: booking.pickupTime,
-        dropoffTime: booking.dropoffTime,
-        currentStage: booking.currentStage,
-        overallProgress: booking.overallProgress,
-        status: booking.status,
-        hasExistingBooking: booking.hasExistingBooking,
-        garageName: booking.garageName,
-        paymentStatus: booking.paymentStatus,
-        // Service payment fields for pay-on-return flow
-        servicePaymentAmount: booking.servicePaymentAmount,
-        servicePaymentUrl: booking.servicePaymentUrl,
-        servicePaymentStatus: booking.servicePaymentStatus,
-        updates: booking.updates,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        // Cancellation info if applicable
-        cancellation: booking.cancellation,
-      },
+      _id: booking._id,
+      vehicleRegistration: booking.vehicleRegistration,
+      vehicleState: booking.vehicleState,
+      pickupAddress: booking.pickupAddress,
+      pickupTime: booking.pickupTime,
+      dropoffTime: booking.dropoffTime,
+      garageName: booking.garageName,
+      garageAddress: booking.garageAddress,
+      serviceType: booking.serviceType,
+      status: booking.status,
+      currentStage: booking.currentStage,
+      overallProgress: booking.overallProgress,
+      updates: booking.updates,
+      createdAt: booking.createdAt,
+      // Service payment fields (if applicable)
+      servicePaymentStatus: booking.servicePaymentStatus,
+      servicePaymentAmount: booking.servicePaymentAmount,
+      servicePaymentUrl: booking.servicePaymentUrl,
     });
+
   } catch (error) {
-    console.error("Error fetching booking:", error);
+    console.error('Error fetching booking by tracking code:', error);
     return NextResponse.json(
-      { error: "Failed to fetch booking" },
+      { error: 'Failed to fetch booking' },
       { status: 500 }
     );
   }

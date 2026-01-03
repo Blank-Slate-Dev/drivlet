@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
+import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 
 export async function POST(request: NextRequest) {
   console.log('🔔 Webhook received!');
@@ -95,6 +96,11 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // Generate unique tracking code
+        console.log('🔑 Generating tracking code...');
+        const trackingCode = await generateUniqueTrackingCode();
+        console.log('✅ Tracking code generated:', trackingCode);
+
         const bookingData = {
           userId: null, // Guest booking
           userName: metadata.customerName,
@@ -109,6 +115,7 @@ export async function POST(request: NextRequest) {
           pickupAddress: metadata.pickupAddress,
           pickupTime: metadata.earliestPickup,
           dropoffTime: metadata.latestDropoff,
+          trackingCode,
           hasExistingBooking: hasExisting,
           garageName: metadata.garageName || null,
           garageAddress: metadata.garageAddress || null,

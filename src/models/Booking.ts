@@ -55,6 +55,9 @@ export interface IBooking extends Document {
   vehicleState: string;
   serviceType: string;
 
+  // Tracking code for secure booking lookup
+  trackingCode: string;
+
   // Existing booking fields (for stage 1)
   hasExistingBooking: boolean;
   garageName?: string;
@@ -230,6 +233,16 @@ const BookingSchema = new Schema<IBooking>(
     serviceType: {
       type: String,
       required: true,
+    },
+
+    // Tracking code for secure booking lookup
+    trackingCode: {
+      type: String,
+      required: true,
+      unique: true,
+      uppercase: true,
+      trim: true,
+      index: true,
     },
 
     // Existing booking fields
@@ -457,6 +470,7 @@ const BookingSchema = new Schema<IBooking>(
 
 // Indexes for efficient queries
 BookingSchema.index({ status: 1, createdAt: -1 });
+BookingSchema.index({ trackingCode: 1, status: 1 });
 BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });
 BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });

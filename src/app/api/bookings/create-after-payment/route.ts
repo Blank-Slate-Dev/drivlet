@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { stripe } from '@/lib/stripe';
+import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 
 export async function POST(request: NextRequest) {
   console.log('📥 Create booking after payment request received');
@@ -79,6 +80,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Generate unique tracking code
+      console.log('🔑 Generating tracking code...');
+      const trackingCode = await generateUniqueTrackingCode();
+      console.log('✅ Tracking code generated:', trackingCode);
+
       const bookingData = {
         userId: null,
         userName: metadata.customerName,
@@ -93,6 +99,7 @@ export async function POST(request: NextRequest) {
         pickupAddress: metadata.pickupAddress,
         pickupTime: metadata.earliestPickup,
         dropoffTime: metadata.latestDropoff,
+        trackingCode,
         hasExistingBooking: hasExisting,
         garageName: metadata.garageName || null,
         existingBookingRef: metadata.existingBookingRef || null,
@@ -150,6 +157,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Booking created successfully',
         bookingId: booking?._id,
+        trackingCode,
       });
 
     } finally {
