@@ -7,18 +7,22 @@ import { isValidTrackingCodeFormat } from '@/lib/trackingCode';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
+  const email = searchParams.get('email');
+  const rego = searchParams.get('rego');
 
-  // Validate input
-  if (!code) {
+  // Validate all inputs are present
+  if (!code || !email || !rego) {
     return NextResponse.json(
-      { error: 'Tracking code is required' },
+      { error: 'Tracking code, email, and registration number are all required' },
       { status: 400 }
     );
   }
 
   const upperCode = code.toUpperCase().trim();
+  const upperRego = rego.toUpperCase().trim();
+  const lowerEmail = email.toLowerCase().trim();
 
-  // Validate format
+  // Validate tracking code format
   if (!isValidTrackingCodeFormat(upperCode)) {
     return NextResponse.json(
       { error: 'Invalid tracking code format' },
@@ -26,15 +30,39 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(lowerEmail)) {
+    return NextResponse.json(
+      { error: 'Invalid email format' },
+      { status: 400 }
+    );
+  }
+
+  // Basic rego validation (alphanumeric, 1-10 chars)
+  const regoRegex = /^[A-Z0-9]{1,10}$/;
+  if (!regoRegex.test(upperRego)) {
+    return NextResponse.json(
+      { error: 'Invalid registration number format' },
+      { status: 400 }
+    );
+  }
+
   try {
     await connectDB();
 
-    // Find booking by tracking code
-    const booking = await Booking.findOne({ trackingCode: upperCode });
+    // Find booking matching ALL THREE criteria
+    const booking = await Booking.findOne({
+      trackingCode: upperCode,
+      userEmail: lowerEmail,
+      vehicleRegistration: upperRego
+    });
 
     if (!booking) {
+      // Generic error to prevent information leakage
+      // Don't reveal which field was wrong
       return NextResponse.json(
-        { error: 'No booking found with this tracking code' },
+        { error: 'No booking found. Please check your tracking code, email, and registration number.' },
         { status: 404 }
       );
     }

@@ -226,6 +226,8 @@ function ServicePaymentForm({
 function TrackingContent() {
   const searchParams = useSearchParams();
   const [trackingCode, setTrackingCode] = useState(searchParams.get('code') || '');
+  const [email, setEmail] = useState(searchParams.get('email') || '');
+  const [rego, setRego] = useState(searchParams.get('rego') || '');
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
