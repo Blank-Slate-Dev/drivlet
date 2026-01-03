@@ -207,13 +207,22 @@ function TrackingContent() {
   const searchParams = useSearchParams();
   const [trackingCode, setTrackingCode] = useState(searchParams.get('code') || '');
   const [email, setEmail] = useState(searchParams.get('email') || '');
-  const [rego, setRego] = useState(searchParams.get('rego') || '');
+  const [registration, setRegistration] = useState(
+    (searchParams.get('rego') || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  );
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
   const [isExpired, setIsExpired] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Field-specific validation errors
+  const [fieldErrors, setFieldErrors] = useState<{
+    trackingCode?: string;
+    email?: string;
+    registration?: string;
+  }>({});
 
   // SSE connection state
   const [isConnected, setIsConnected] = useState(false);
@@ -314,16 +323,35 @@ function TrackingContent() {
     const loadBooking = async () => {
       // Priority: URL params > localStorage
       const codeParam = searchParams.get("code");
+      const emailParam = searchParams.get("email");
+      const regoParam = searchParams.get("rego");
 
-      if (codeParam && codeParam.length === 6) {
-        setTrackingCode(codeParam);
-        localStorage.setItem("drivlet_track_code", codeParam);
-        await handleSearch(codeParam);
+      // If all three URL params are present, auto-search
+      if (codeParam && codeParam.length === 6 && emailParam && regoParam) {
+        setTrackingCode(codeParam.toUpperCase());
+        setEmail(emailParam);
+        setRegistration(regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+        // Save to localStorage for persistence
+        localStorage.setItem("drivlet_track_code", codeParam.toUpperCase());
+        localStorage.setItem("drivlet_track_email", emailParam);
+        localStorage.setItem("drivlet_track_rego", regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+        await handleSearch(codeParam, emailParam, regoParam);
       } else {
+        // Try to load from localStorage
         const savedCode = localStorage.getItem("drivlet_track_code");
-        if (savedCode && savedCode.length === 6) {
+        const savedEmail = localStorage.getItem("drivlet_track_email");
+        const savedRego = localStorage.getItem("drivlet_track_rego");
+
+        if (savedCode && savedCode.length === 6 && savedEmail && savedRego) {
           setTrackingCode(savedCode);
-          await handleSearch(savedCode);
+          setEmail(savedEmail);
+          setRegistration(savedRego);
+          await handleSearch(savedCode, savedEmail, savedRego);
+        } else {
+          // Pre-fill any available params
+          if (codeParam) setTrackingCode(codeParam.toUpperCase());
+          if (emailParam) setEmail(emailParam);
+          if (regoParam) setRegistration(regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
         }
       }
       setInitialLoading(false);
@@ -333,27 +361,73 @@ function TrackingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleSearch = async (code?: string) => {
-    const codeToSearch = code || trackingCode;
+  // Client-side validation
+  const validateForm = (): boolean => {
+    const errors: typeof fieldErrors = {};
+    let isValid = true;
 
-    if (!codeToSearch || codeToSearch.length !== 6) {
-      setError("Please enter a valid 6-character tracking code");
+    // Validate tracking code
+    if (!trackingCode || trackingCode.length !== 6) {
+      errors.trackingCode = "Please enter a valid 6-character tracking code";
+      isValid = false;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      errors.email = "Email address is required";
+      isValid = false;
+    } else if (!emailRegex.test(email)) {
+      errors.email = "Please enter a valid email address";
+      isValid = false;
+    }
+
+    // Validate registration
+    if (!registration) {
+      errors.registration = "Vehicle registration is required";
+      isValid = false;
+    } else if (registration.length < 2) {
+      errors.registration = "Registration must be at least 2 characters";
+      isValid = false;
+    }
+
+    setFieldErrors(errors);
+    return isValid;
+  };
+
+  const handleSearch = async (code?: string, emailParam?: string, regoParam?: string) => {
+    const codeToSearch = code || trackingCode;
+    const emailToSearch = emailParam || email;
+    const regoToSearch = regoParam || registration;
+
+    // Clear previous errors
+    setFieldErrors({});
+    setError("");
+
+    // If called without params (from form submit), validate
+    if (!code && !validateForm()) {
       return;
     }
 
     setLoading(true);
-    setError("");
     setIsExpired(false);
     setHasSearched(true);
 
     try {
-      const response = await fetch(`/api/bookings/track?code=${encodeURIComponent(codeToSearch)}`);
+      const params = new URLSearchParams({
+        code: codeToSearch,
+        email: emailToSearch.toLowerCase().trim(),
+        rego: regoToSearch.toUpperCase().trim(),
+      });
+      const response = await fetch(`/api/bookings/track?${params.toString()}`);
       const data = await response.json();
 
       if (response.ok) {
         setBooking(data);
-        // Save tracking code for refresh persistence
-        localStorage.setItem("drivlet_track_code", codeToSearch);
+        // Save credentials for refresh persistence
+        localStorage.setItem("drivlet_track_code", codeToSearch.toUpperCase());
+        localStorage.setItem("drivlet_track_email", emailToSearch.toLowerCase().trim());
+        localStorage.setItem("drivlet_track_rego", regoToSearch.toUpperCase().trim());
         // Only reset payment UI if this is a fresh search (not a refresh after payment)
         if (!paymentSuccess) {
           setShowPayment(false);
@@ -485,9 +559,14 @@ function TrackingContent() {
     setBooking(null);
     setHasSearched(false);
     setTrackingCode("");
+    setEmail("");
+    setRegistration("");
+    setFieldErrors({});
     setPaymentSuccess(false);
     // Clear saved credentials
     localStorage.removeItem("drivlet_track_code");
+    localStorage.removeItem("drivlet_track_email");
+    localStorage.removeItem("drivlet_track_rego");
   };
 
   const needsPayment =
@@ -606,24 +685,125 @@ function TrackingContent() {
                           type="text"
                           id="trackingCode"
                           value={trackingCode}
-                          onChange={(e) => setTrackingCode(e.target.value.toUpperCase().slice(0, 6))}
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-slate-900 placeholder:text-slate-300 placeholder:tracking-normal focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+                          onChange={(e) => {
+                            setTrackingCode(e.target.value.toUpperCase().slice(0, 6));
+                            if (fieldErrors.trackingCode) {
+                              setFieldErrors(prev => ({ ...prev, trackingCode: undefined }));
+                            }
+                          }}
+                          className={`w-full rounded-xl border px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-slate-900 placeholder:text-slate-300 placeholder:tracking-normal focus:ring-2 transition ${
+                            fieldErrors.trackingCode
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                              : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          }`}
                           placeholder="ABC123"
                           autoComplete="off"
                           autoFocus
+                          aria-invalid={!!fieldErrors.trackingCode}
+                          aria-describedby={fieldErrors.trackingCode ? "trackingCode-error" : "trackingCode-help"}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
                           {trackingCode.length}/6
                         </div>
                       </div>
-                      <p className="mt-2 text-xs text-slate-500 text-center">
-                        Your tracking code was sent to your email after booking
-                      </p>
+                      {fieldErrors.trackingCode ? (
+                        <p id="trackingCode-error" className="mt-2 text-xs text-red-600 text-center">
+                          {fieldErrors.trackingCode}
+                        </p>
+                      ) : (
+                        <p id="trackingCode-help" className="mt-2 text-xs text-slate-500 text-center">
+                          Your tracking code was sent to your email after booking
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Email Input */}
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                          <Mail className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <input
+                          type="email"
+                          id="email"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (fieldErrors.email) {
+                              setFieldErrors(prev => ({ ...prev, email: undefined }));
+                            }
+                          }}
+                          className={`w-full rounded-xl border pl-10 pr-4 py-3 text-slate-900 placeholder:text-slate-400 focus:ring-2 transition ${
+                            fieldErrors.email
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                              : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          }`}
+                          placeholder="Enter your email address"
+                          autoComplete="email"
+                          aria-invalid={!!fieldErrors.email}
+                          aria-describedby={fieldErrors.email ? "email-error" : "email-help"}
+                        />
+                      </div>
+                      {fieldErrors.email ? (
+                        <p id="email-error" className="mt-2 text-xs text-red-600">
+                          {fieldErrors.email}
+                        </p>
+                      ) : (
+                        <p id="email-help" className="mt-2 text-xs text-slate-500">
+                          The email address used when making the booking
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Registration Number Input */}
+                    <div>
+                      <label htmlFor="registration" className="block text-sm font-medium text-slate-700 mb-2">
+                        Vehicle Registration Number
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                          <Car className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <input
+                          type="text"
+                          id="registration"
+                          value={registration}
+                          onChange={(e) => {
+                            // Transform: uppercase, remove spaces and special chars
+                            const cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                            setRegistration(cleaned);
+                            if (fieldErrors.registration) {
+                              setFieldErrors(prev => ({ ...prev, registration: undefined }));
+                            }
+                          }}
+                          className={`w-full rounded-xl border pl-10 pr-4 py-3 text-slate-900 font-mono uppercase placeholder:text-slate-400 placeholder:font-sans focus:ring-2 transition ${
+                            fieldErrors.registration
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                              : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          }`}
+                          placeholder="e.g., ABC123"
+                          autoComplete="off"
+                          aria-invalid={!!fieldErrors.registration}
+                          aria-describedby={fieldErrors.registration ? "registration-error" : "registration-help"}
+                        />
+                      </div>
+                      {fieldErrors.registration ? (
+                        <p id="registration-error" className="mt-2 text-xs text-red-600">
+                          {fieldErrors.registration}
+                        </p>
+                      ) : (
+                        <p id="registration-help" className="mt-2 text-xs text-slate-500">
+                          Your vehicle's registration plate number
+                        </p>
+                      )}
                     </div>
 
                     <button
                       type="submit"
-                      disabled={loading || trackingCode.length !== 6}
+                      disabled={loading}
                       className="group w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
@@ -918,7 +1098,7 @@ function TrackingContent() {
       {booking && (
         <GuestPhotosViewer
           email={email}
-          registration={rego}
+          registration={registration}
           vehicleRegistration={booking.vehicleRegistration}
           vehicleState={booking.vehicleState}
           isOpen={showPhotos}
