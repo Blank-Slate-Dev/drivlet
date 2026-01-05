@@ -9,6 +9,9 @@ import Garage from "@/models/Garage";
 import User from "@/models/User";
 import mongoose from "mongoose";
 
+// Force dynamic rendering - this route uses headers via getServerSession
+export const dynamic = "force-dynamic";
+
 // GET /api/garage/quote-requests - Fetch available quote requests for garages
 export async function GET(request: NextRequest) {
   try {
