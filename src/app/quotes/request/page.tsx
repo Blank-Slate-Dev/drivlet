@@ -24,7 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { SERVICE_CATEGORIES, URGENCY_LEVELS } from "@/models/QuoteRequest";
+import { SERVICE_CATEGORIES, URGENCY_LEVELS } from "@/constants/quoteRequest";
 
 interface FormData {
   vehicleRegistration: string;

@@ -1,24 +1,11 @@
 // src/models/QuoteRequest.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 
+// Re-export constants from shared file for backward compatibility
+export { SERVICE_CATEGORIES, URGENCY_LEVELS } from "@/constants/quoteRequest";
+export type { ServiceCategory, UrgencyLevel } from "@/constants/quoteRequest";
+
 export type QuoteRequestStatus = "open" | "quoted" | "accepted" | "expired" | "cancelled";
-export type ServiceCategory = "mechanical" | "electrical" | "bodywork" | "tyres" | "servicing" | "other";
-export type UrgencyLevel = "immediate" | "this_week" | "flexible";
-
-export const SERVICE_CATEGORIES: { value: ServiceCategory; label: string }[] = [
-  { value: "mechanical", label: "Mechanical Repairs" },
-  { value: "electrical", label: "Electrical Systems" },
-  { value: "bodywork", label: "Bodywork & Paint" },
-  { value: "tyres", label: "Tyres & Wheels" },
-  { value: "servicing", label: "Regular Servicing" },
-  { value: "other", label: "Other" },
-];
-
-export const URGENCY_LEVELS: { value: UrgencyLevel; label: string; description: string }[] = [
-  { value: "immediate", label: "Immediate", description: "I need this done ASAP" },
-  { value: "this_week", label: "This Week", description: "Within the next 7 days" },
-  { value: "flexible", label: "Flexible", description: "No rush, whenever convenient" },
-];
 
 export interface IQuoteRequest extends Document {
   customerId?: mongoose.Types.ObjectId;
@@ -30,9 +17,9 @@ export interface IQuoteRequest extends Document {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleYear?: number;
-  serviceCategory: ServiceCategory;
+  serviceCategory: string;
   serviceDescription: string;
-  urgency: UrgencyLevel;
+  urgency: string;
   preferredDate?: Date;
   locationAddress: string;
   locationPlaceId?: string;
