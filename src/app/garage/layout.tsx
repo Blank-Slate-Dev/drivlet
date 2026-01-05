@@ -23,6 +23,7 @@ import {
   Star,
   Crown,
   MapPin,
+  MessageSquareQuote,
 } from "lucide-react";
 
 export default function GarageLayout({ children }: { children: React.ReactNode }) {
@@ -94,6 +95,11 @@ export default function GarageLayout({ children }: { children: React.ReactNode }
       href: "/garage/dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
+    },
+    {
+      href: "/garage/quotes",
+      label: "Quote Requests",
+      icon: MessageSquareQuote,
     },
     {
       href: "/garage/bookings",

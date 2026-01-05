@@ -18,6 +18,7 @@ import {
   MapPin,
   Car,
   Building2,
+  FileText,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -88,6 +89,10 @@ export default function Header({ onBookingClick }: HeaderProps) {
           <a href="#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
+          <Link href="/quotes/request" className="flex items-center gap-1.5 transition hover:text-emerald-600">
+            <FileText className="h-4 w-4" />
+            Get Quotes
+          </Link>
           <Link href="/track" className="flex items-center gap-1.5 transition hover:text-emerald-600">
             <MapPin className="h-4 w-4" />
             Track my service
@@ -167,16 +172,26 @@ export default function Header({ onBookingClick }: HeaderProps) {
                       {getDashboardLabel()}
                     </Link>
 
-                    {/* Account settings - only for regular users */}
-                    {!isDriver && !isGarage && (
-                      <Link
-                        href="/account"
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                        onClick={() => setShowUserMenu(false)}
-                      >
-                        <Settings className="h-4 w-4" />
-                        Account Settings
-                      </Link>
+                    {/* Customer-specific links */}
+                    {!isDriver && !isGarage && !isAdmin && (
+                      <>
+                        <Link
+                          href="/quotes"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <FileText className="h-4 w-4" />
+                          My Quote Requests
+                        </Link>
+                        <Link
+                          href="/account"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <Settings className="h-4 w-4" />
+                          Account Settings
+                        </Link>
+                      </>
                     )}
 
                     {/* Driver-specific links */}
@@ -324,16 +339,26 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 {getDashboardLabel()}
               </Link>
 
-              {/* Account/settings link based on role */}
-              {!isDriver && !isGarage && (
-                <Link
-                  href="/account"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  onClick={() => setShowUserMenu(false)}
-                >
-                  <Settings className="h-4 w-4" />
-                  Account Settings
-                </Link>
+              {/* Customer-specific links */}
+              {!isDriver && !isGarage && !isAdmin && (
+                <>
+                  <Link
+                    href="/quotes"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    <FileText className="h-4 w-4" />
+                    My Quote Requests
+                  </Link>
+                  <Link
+                    href="/account"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    <Settings className="h-4 w-4" />
+                    Account Settings
+                  </Link>
+                </>
               )}
 
               {isDriver && (
@@ -404,6 +429,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   FAQ
                 </a>
+                <Link
+                  href="/quotes/request"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <FileText className="h-4 w-4" />
+                  Get Quotes
+                </Link>
                 <Link
                   href="/track"
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
