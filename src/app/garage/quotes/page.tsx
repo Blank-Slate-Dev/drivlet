@@ -35,12 +35,8 @@ interface QuoteRequest {
   serviceCategory: ServiceCategory;
   serviceDescription: string;
   selectedServices: string[];
-  urgency: 'flexible' | 'within_week' | 'urgent';
-  preferredLocation: {
-    suburb: string;
-    postcode: string;
-    state: string;
-  };
+  urgency: 'immediate' | 'this_week' | 'flexible';
+  locationAddress: string;
   status: string;
   quotesReceived: number;
   expiresAt: string;
@@ -58,9 +54,9 @@ const CATEGORY_CONFIG: Record<ServiceCategory, { label: string; color: string; b
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  immediate: { label: 'Urgent', color: 'text-red-600', bgColor: 'bg-red-100' },
+  this_week: { label: 'Within a week', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   flexible: { label: 'Flexible', color: 'text-slate-600', bgColor: 'bg-slate-100' },
-  within_week: { label: 'Within a week', color: 'text-amber-600', bgColor: 'bg-amber-100' },
-  urgent: { label: 'Urgent', color: 'text-red-600', bgColor: 'bg-red-100' },
 };
 
 export default function GarageQuoteRequestsPage() {
@@ -122,7 +118,7 @@ export default function GarageQuoteRequestsPage() {
       request.serviceDescription.toLowerCase().includes(search) ||
       request.vehicleMake?.toLowerCase().includes(search) ||
       request.vehicleModel?.toLowerCase().includes(search) ||
-      request.preferredLocation.suburb.toLowerCase().includes(search)
+      request.locationAddress.toLowerCase().includes(search)
     );
   });
 
@@ -229,8 +225,8 @@ export default function GarageQuoteRequestsPage() {
               className="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">All Urgency</option>
-              <option value="urgent">Urgent</option>
-              <option value="within_week">Within a week</option>
+              <option value="immediate">Urgent</option>
+              <option value="this_week">Within a week</option>
               <option value="flexible">Flexible</option>
             </select>
           </div>
@@ -310,7 +306,7 @@ export default function GarageQuoteRequestsPage() {
                                 <span
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${urgencyConfig?.bgColor} ${urgencyConfig?.color}`}
                                 >
-                                  {request.urgency === 'urgent' && (
+                                  {request.urgency === 'immediate' && (
                                     <Zap className="h-3 w-3" />
                                   )}
                                   {urgencyConfig?.label}
@@ -358,8 +354,7 @@ export default function GarageQuoteRequestsPage() {
                           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-500">
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="h-4 w-4" />
-                              {request.preferredLocation.suburb},{' '}
-                              {request.preferredLocation.state}
+                              {request.locationAddress}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Clock className="h-4 w-4" />

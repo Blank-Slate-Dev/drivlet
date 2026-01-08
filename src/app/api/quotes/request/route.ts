@@ -146,9 +146,44 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
+
+    // If ID is provided, fetch single quote request
+    if (id) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return NextResponse.json(
+          { error: "Invalid quote request ID" },
+          { status: 400 }
+        );
+      }
+
+      const quoteRequest = await QuoteRequest.findById(id).lean();
+
+      if (!quoteRequest) {
+        return NextResponse.json(
+          { error: "Quote request not found" },
+          { status: 404 }
+        );
+      }
+
+      // Verify authorization
+      const isOwner =
+        quoteRequest.customerId?.toString() === session.user.id ||
+        quoteRequest.customerEmail === session.user.email?.toLowerCase();
+      const isAdmin = session.user.role === "admin";
+
+      if (!isOwner && !isAdmin) {
+        return NextResponse.json(
+          { error: "Access denied" },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json({ quoteRequest });
+    }
 
     // Build query - match by customerId OR email (to catch guest-to-user conversions)
     const query: Record<string, unknown> = {

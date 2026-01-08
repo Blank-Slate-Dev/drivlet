@@ -33,12 +33,8 @@ interface QuoteRequest {
   vehicleYear?: number;
   serviceCategory: string;
   serviceDescription: string;
-  urgency: 'flexible' | 'within_week' | 'urgent';
-  preferredLocation: {
-    suburb: string;
-    postcode: string;
-    state: string;
-  };
+  urgency: 'immediate' | 'this_week' | 'flexible';
+  locationAddress: string;
   status: QuoteRequestStatus;
   quotesReceived: number;
   expiresAt: string;
@@ -82,9 +78,9 @@ const STATUS_CONFIG: Record<
 };
 
 const URGENCY_LABELS: Record<string, string> = {
+  immediate: 'Urgent - ASAP',
+  this_week: 'Within a week',
   flexible: 'Flexible timing',
-  within_week: 'Within a week',
-  urgent: 'Urgent',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -364,8 +360,7 @@ export default function QuotesDashboardPage() {
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <MapPin className="h-4 w-4" />
-                                {request.preferredLocation.suburb},{' '}
-                                {request.preferredLocation.state}
+                                {request.locationAddress}
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-4 w-4" />

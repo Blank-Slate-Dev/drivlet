@@ -57,12 +57,8 @@ interface QuoteRequest {
   serviceCategory: string;
   serviceDescription: string;
   selectedServices: string[];
-  urgency: 'flexible' | 'within_week' | 'urgent';
-  preferredLocation: {
-    suburb: string;
-    postcode: string;
-    state: string;
-  };
+  urgency: 'immediate' | 'this_week' | 'flexible';
+  locationAddress: string;
   additionalNotes?: string;
   status: QuoteRequestStatus;
   quotesReceived: number;
@@ -107,9 +103,9 @@ const STATUS_CONFIG: Record<
 };
 
 const URGENCY_LABELS: Record<string, string> = {
+  immediate: 'Urgent - ASAP',
+  this_week: 'Within a week',
   flexible: 'Flexible timing',
-  within_week: 'Within a week',
-  urgent: 'Urgent',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -402,9 +398,7 @@ export default function QuoteRequestDetailPage() {
                   <div>
                     <dt className="text-slate-500">Location</dt>
                     <dd className="font-medium text-slate-900">
-                      {quoteRequest.preferredLocation.suburb},{' '}
-                      {quoteRequest.preferredLocation.state}{' '}
-                      {quoteRequest.preferredLocation.postcode}
+                      {quoteRequest.locationAddress}
                     </dd>
                   </div>
                 </div>

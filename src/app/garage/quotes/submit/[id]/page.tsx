@@ -36,12 +36,8 @@ interface QuoteRequest {
   serviceCategory: string;
   serviceDescription: string;
   selectedServices: string[];
-  urgency: 'flexible' | 'within_week' | 'urgent';
-  preferredLocation: {
-    suburb: string;
-    postcode: string;
-    state: string;
-  };
+  urgency: 'immediate' | 'this_week' | 'flexible';
+  locationAddress: string;
   additionalNotes?: string;
   status: string;
   quotesReceived: number;
@@ -72,9 +68,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  immediate: { label: 'Urgent', color: 'text-red-600', bgColor: 'bg-red-100' },
+  this_week: { label: 'Within a week', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   flexible: { label: 'Flexible timing', color: 'text-slate-600', bgColor: 'bg-slate-100' },
-  within_week: { label: 'Within a week', color: 'text-amber-600', bgColor: 'bg-amber-100' },
-  urgent: { label: 'Urgent', color: 'text-red-600', bgColor: 'bg-red-100' },
 };
 
 export default function GarageSubmitQuotePage() {
@@ -388,7 +384,7 @@ export default function GarageSubmitQuotePage() {
                   <span
                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${urgencyConfig?.bgColor} ${urgencyConfig?.color}`}
                   >
-                    {quoteRequest.urgency === 'urgent' && <Zap className="h-3 w-3 inline mr-1" />}
+                    {quoteRequest.urgency === 'immediate' && <Zap className="h-3 w-3 inline mr-1" />}
                     {urgencyConfig?.label}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
@@ -432,9 +428,7 @@ export default function GarageSubmitQuotePage() {
                   <div>
                     <dt className="text-slate-500">Location</dt>
                     <dd className="font-medium text-slate-900">
-                      {quoteRequest.preferredLocation.suburb},{' '}
-                      {quoteRequest.preferredLocation.state}{' '}
-                      {quoteRequest.preferredLocation.postcode}
+                      {quoteRequest.locationAddress}
                     </dd>
                   </div>
                 </div>
