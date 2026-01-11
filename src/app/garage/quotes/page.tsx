@@ -11,7 +11,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  ChevronDown,
   ChevronUp,
   Filter,
   Loader2,
@@ -146,8 +145,8 @@ function QuoteRequestCard({
       newErrors.quotedAmount = 'Please enter a valid amount greater than $0';
     }
 
-    if (!formData.estimatedDuration || formData.estimatedDuration.trim().length < 2) {
-      newErrors.estimatedDuration = 'Please enter an estimated duration (e.g., "2-3 hours")';
+    if (!formData.estimatedDuration || formData.estimatedDuration.trim().length === 0) {
+      newErrors.estimatedDuration = 'Please enter an estimated duration';
     }
 
     if (!formData.availableFrom) {
@@ -343,7 +342,7 @@ function QuoteRequestCard({
               {/* Action button */}
               {request.hasSubmittedQuote ? (
                 <Link
-                  href={`/garage/quotes/submit/${request._id}`}
+                  href={`/garage/quotes/view/${request._id}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition"
                 >
                   <CheckCircle className="h-4 w-4" />
@@ -437,7 +436,7 @@ function QuoteRequestCard({
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g., 2-3 hours"
+                        placeholder="e.g., 2 hours, 1 day, 2-3 hours"
                         value={formData.estimatedDuration}
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, estimatedDuration: e.target.value }))
