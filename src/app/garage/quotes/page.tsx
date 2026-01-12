@@ -26,6 +26,10 @@ import {
   X,
   Shield,
   DollarSign,
+  Eye,
+  MessageSquare,
+  ArrowRight,
+  Wrench,
 } from 'lucide-react';
 
 type ServiceCategory = 'mechanical' | 'electrical' | 'bodywork' | 'tyres' | 'servicing' | 'other';
@@ -65,19 +69,22 @@ interface FormErrors {
   general?: string;
 }
 
-const CATEGORY_CONFIG: Record<ServiceCategory, { label: string; color: string; bgColor: string }> = {
-  mechanical: { label: 'Mechanical', color: 'text-blue-700', bgColor: 'bg-blue-100' },
-  electrical: { label: 'Electrical', color: 'text-amber-700', bgColor: 'bg-amber-100' },
-  bodywork: { label: 'Bodywork', color: 'text-pink-700', bgColor: 'bg-pink-100' },
-  tyres: { label: 'Tyres & Wheels', color: 'text-slate-700', bgColor: 'bg-slate-100' },
-  servicing: { label: 'Servicing', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
-  other: { label: 'Other', color: 'text-purple-700', bgColor: 'bg-purple-100' },
+const CATEGORY_CONFIG: Record<
+  ServiceCategory,
+  { label: string; color: string; bgColor: string; icon: React.ElementType }
+> = {
+  mechanical: { label: 'Mechanical', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: Wrench },
+  electrical: { label: 'Electrical', color: 'text-amber-700', bgColor: 'bg-amber-100', icon: Zap },
+  bodywork: { label: 'Bodywork', color: 'text-pink-700', bgColor: 'bg-pink-100', icon: Car },
+  tyres: { label: 'Tyres & Wheels', color: 'text-slate-700', bgColor: 'bg-slate-200', icon: Car },
+  servicing: { label: 'Servicing', color: 'text-emerald-700', bgColor: 'bg-emerald-100', icon: Wrench },
+  other: { label: 'Other', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: Tag },
 };
 
-const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  immediate: { label: 'Urgent', color: 'text-red-600', bgColor: 'bg-red-100' },
-  this_week: { label: 'Within a week', color: 'text-amber-600', bgColor: 'bg-amber-100' },
-  flexible: { label: 'Flexible', color: 'text-slate-600', bgColor: 'bg-slate-100' },
+const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: string; borderColor: string }> = {
+  immediate: { label: 'Urgent', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
+  this_week: { label: 'This Week', color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
+  flexible: { label: 'Flexible', color: 'text-sky-700', bgColor: 'bg-sky-50', borderColor: 'border-sky-200' },
 };
 
 // Get today's date in YYYY-MM-DD format
@@ -115,6 +122,7 @@ function QuoteRequestCard({
 
   const categoryConfig = CATEGORY_CONFIG[request.serviceCategory];
   const urgencyConfig = URGENCY_CONFIG[request.urgency];
+  const CategoryIcon = categoryConfig?.icon || Wrench;
 
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -136,6 +144,7 @@ function QuoteRequestCard({
   };
 
   const daysUntilExpiry = getDaysUntilExpiry(request.expiresAt);
+  const isNew = getDaysUntilExpiry(request.createdAt) >= -1; // Posted within last day
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -169,7 +178,6 @@ function QuoteRequestCard({
         includedServices: [...prev.includedServices, trimmedService],
       }));
       setNewService('');
-      // Clear service error if exists
       if (errors.includedServices) {
         setErrors((prev) => ({ ...prev, includedServices: undefined }));
       }
@@ -202,7 +210,7 @@ function QuoteRequestCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quoteRequestId: request._id,
-          quotedAmount: parseFloat(formData.quotedAmount) * 100, // Convert to cents
+          quotedAmount: parseFloat(formData.quotedAmount) * 100,
           estimatedDuration: formData.estimatedDuration.trim(),
           includedServices: formData.includedServices,
           warrantyOffered: formData.warrantyOffered.trim() || undefined,
@@ -222,7 +230,6 @@ function QuoteRequestCard({
         return;
       }
 
-      // Success - close form and refresh list
       onQuoteSubmitted();
     } catch {
       setErrors({ general: 'Network error. Please try again.' });
@@ -236,136 +243,202 @@ function QuoteRequestCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: index * 0.03 }}
+      transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="group"
     >
       <div
-        className={`bg-white rounded-xl border overflow-hidden transition ${
+        className={`relative bg-white rounded-2xl overflow-hidden transition-all duration-300 ease-out ${
           request.hasSubmittedQuote
-            ? 'border-emerald-200 bg-emerald-50/50'
+            ? 'border-2 border-emerald-200 shadow-sm shadow-emerald-100'
             : isExpanded
-            ? 'border-emerald-400 shadow-lg'
-            : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+            ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-100/50 scale-[1.01]'
+            : 'border border-slate-200 shadow-sm hover:shadow-lg hover:border-slate-300 hover:scale-[1.005]'
         }`}
       >
-        {/* Card Content */}
-        <div className="p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-            {/* Left: Main info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <Car className="h-6 w-6 text-slate-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-slate-900">
-                      {request.vehicleRegistration}
-                    </h3>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig?.bgColor} ${categoryConfig?.color}`}
-                    >
-                      {categoryConfig?.label || request.serviceCategory}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${urgencyConfig?.bgColor} ${urgencyConfig?.color}`}
-                    >
-                      {request.urgency === 'immediate' && <Zap className="h-3 w-3" />}
-                      {urgencyConfig?.label}
-                    </span>
-                    {request.hasSubmittedQuote && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                        <CheckCircle className="h-3 w-3" />
-                        Quote submitted
-                      </span>
-                    )}
-                  </div>
-                  {request.vehicleMake && (
-                    <p className="text-sm text-slate-600 mt-0.5">
-                      {request.vehicleYear} {request.vehicleMake} {request.vehicleModel}
-                    </p>
-                  )}
-                  <p className="text-sm text-slate-700 mt-2 line-clamp-2">
-                    {request.serviceDescription}
-                  </p>
+        {/* Gradient accent bar */}
+        <div
+          className={`absolute top-0 left-0 right-0 h-1 ${
+            request.hasSubmittedQuote
+              ? 'bg-gradient-to-r from-emerald-400 to-teal-500'
+              : request.urgency === 'immediate'
+              ? 'bg-gradient-to-r from-red-400 to-orange-500'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-500'
+          }`}
+        />
 
-                  {/* Selected services tags */}
-                  {request.selectedServices && request.selectedServices.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {request.selectedServices.slice(0, 3).map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs"
-                        >
-                          <Tag className="h-3 w-3" />
-                          {service}
-                        </span>
-                      ))}
-                      {request.selectedServices.length > 3 && (
-                        <span className="text-xs text-slate-500">
-                          +{request.selectedServices.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+        {/* Card Content */}
+        <div className="p-5 sm:p-6">
+          {/* Header Row */}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              {/* Vehicle Icon */}
+              <div
+                className={`relative flex-shrink-0 h-14 w-14 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 ${
+                  request.hasSubmittedQuote
+                    ? 'bg-gradient-to-br from-emerald-100 to-teal-100'
+                    : 'bg-gradient-to-br from-slate-100 to-slate-50'
+                }`}
+              >
+                <Car
+                  className={`h-7 w-7 ${
+                    request.hasSubmittedQuote ? 'text-emerald-600' : 'text-slate-600'
+                  }`}
+                />
+                {isNew && !request.hasSubmittedQuote && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
+                )}
               </div>
 
-              {/* Meta info */}
-              <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {request.locationAddress}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Posted {getTimeAgo(request.createdAt)}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {daysUntilExpiry > 0
-                    ? `Expires in ${daysUntilExpiry} days`
-                    : 'Expires today'}
-                </span>
+              {/* Vehicle Info */}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                    {request.vehicleRegistration}
+                  </h3>
+                  {isNew && !request.hasSubmittedQuote && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500 text-white">
+                      New
+                    </span>
+                  )}
+                </div>
+                {request.vehicleMake && (
+                  <p className="text-sm text-slate-600 font-medium">
+                    {request.vehicleYear} {request.vehicleMake} {request.vehicleModel}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Right: Action section */}
-            <div className="flex items-center gap-4 lg:flex-col lg:items-end">
-              {/* Quotes count */}
-              <div className="text-center px-4 py-2 rounded-lg bg-slate-50">
-                <p className="text-xl font-bold text-slate-700">{request.quotesReceived}</p>
-                <p className="text-xs text-slate-500">
-                  quote{request.quotesReceived !== 1 ? 's' : ''}
-                </p>
+            {/* Quote Count Badge */}
+            <div
+              className={`flex-shrink-0 text-center px-4 py-2.5 rounded-xl transition-all duration-300 ${
+                request.quotesReceived > 0
+                  ? 'bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200'
+                  : 'bg-slate-50'
+              }`}
+              title={`${request.quotesReceived} quote${request.quotesReceived !== 1 ? 's' : ''} received`}
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-slate-500" />
+                <span className="text-xl font-bold text-slate-700">{request.quotesReceived}</span>
               </div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mt-0.5">
+                Quote{request.quotesReceived !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
 
-              {/* Action button */}
+          {/* Badges Row */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            {/* Category Badge */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-transform hover:scale-105 ${categoryConfig?.bgColor} ${categoryConfig?.color}`}
+            >
+              <CategoryIcon className="h-3.5 w-3.5" />
+              {categoryConfig?.label || request.serviceCategory}
+            </span>
+
+            {/* Urgency Badge */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-transform hover:scale-105 ${urgencyConfig?.bgColor} ${urgencyConfig?.color} ${urgencyConfig?.borderColor}`}
+            >
+              {request.urgency === 'immediate' && <Zap className="h-3.5 w-3.5" />}
+              {request.urgency === 'this_week' && <Clock className="h-3.5 w-3.5" />}
+              {request.urgency === 'flexible' && <Calendar className="h-3.5 w-3.5" />}
+              {urgencyConfig?.label}
+            </span>
+
+            {/* Status Badge */}
+            {request.hasSubmittedQuote && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 transition-transform hover:scale-105">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Quote Submitted
+              </span>
+            )}
+          </div>
+
+          {/* Service Description */}
+          <div className="mb-4">
+            <p className="text-sm text-slate-700 leading-relaxed line-clamp-2">
+              {request.serviceDescription}
+            </p>
+          </div>
+
+          {/* Selected Services Tags */}
+          {request.selectedServices && request.selectedServices.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {request.selectedServices.slice(0, 4).map((service, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors"
+                >
+                  <Tag className="h-3 w-3" />
+                  {service}
+                </span>
+              ))}
+              {request.selectedServices.length > 4 && (
+                <span className="px-2.5 py-1 rounded-md bg-slate-50 text-slate-500 text-xs font-medium">
+                  +{request.selectedServices.length - 4} more
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="border-t border-slate-100 my-4" />
+
+          {/* Footer: Meta Info & Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Meta Info */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-slate-400" />
+                <span className="truncate max-w-[200px]">{request.locationAddress}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-slate-400" />
+                {getTimeAgo(request.createdAt)}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1.5 ${
+                  daysUntilExpiry <= 2 ? 'text-amber-600 font-medium' : ''
+                }`}
+              >
+                <Calendar className="h-4 w-4" />
+                {daysUntilExpiry > 0 ? `${daysUntilExpiry}d left` : 'Expires today'}
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
               {request.hasSubmittedQuote ? (
                 <Link
                   href={`/garage/quotes/view/${request._id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition"
+                  className="group/btn inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 active:scale-[0.98]"
                 >
-                  <CheckCircle className="h-4 w-4" />
+                  <Eye className="h-4 w-4 transition-transform group-hover/btn:scale-110" />
                   View Quote
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                 </Link>
               ) : (
                 <button
                   onClick={onToggleExpand}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  className={`group/btn inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out ${
                     isExpanded
-                      ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      ? 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 active:scale-[0.98]'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-200 hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
                   }`}
                 >
                   {isExpanded ? (
                     <>
-                      <ChevronUp className="h-4 w-4" />
+                      <ChevronUp className="h-4 w-4 transition-transform group-hover/btn:-translate-y-0.5" />
                       Close Form
                     </>
                   ) : (
                     <>
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
                       Submit Quote
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                     </>
                   )}
                 </button>
@@ -384,29 +457,41 @@ function QuoteRequestCard({
               transition={{ duration: 0.3, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-6">
-                <h4 className="text-lg font-semibold text-slate-900 mb-4">
-                  Submit Your Quote
-                </h4>
+              <div className="border-t-2 border-emerald-100 bg-gradient-to-b from-slate-50 to-white p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <Send className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-slate-900">Submit Your Quote</h4>
+                    <p className="text-sm text-slate-500">
+                      Fill in the details below to submit your quote
+                    </p>
+                  </div>
+                </div>
 
                 {/* General error */}
                 {errors.general && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3"
+                  >
                     <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-red-700">{errors.general}</p>
-                  </div>
+                    <p className="text-sm text-red-700 font-medium">{errors.general}</p>
+                  </motion.div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {/* Row 1: Amount and Duration */}
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-5 sm:grid-cols-2">
                     {/* Quoted Amount */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Quoted Amount <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                         <input
                           type="number"
                           min="0"
@@ -416,22 +501,27 @@ function QuoteRequestCard({
                           onChange={(e) =>
                             setFormData((prev) => ({ ...prev, quotedAmount: e.target.value }))
                           }
-                          className={`w-full pl-10 pr-16 py-2.5 rounded-lg border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                            errors.quotedAmount ? 'border-red-300' : 'border-slate-300'
+                          className={`w-full pl-12 pr-16 py-3 rounded-xl border-2 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 ${
+                            errors.quotedAmount
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-slate-200 hover:border-slate-300'
                           }`}
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">
                           AUD
                         </span>
                       </div>
                       {errors.quotedAmount && (
-                        <p className="mt-1 text-sm text-red-600">{errors.quotedAmount}</p>
+                        <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.quotedAmount}
+                        </p>
                       )}
                     </div>
 
                     {/* Estimated Duration */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Estimated Duration <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -441,25 +531,30 @@ function QuoteRequestCard({
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, estimatedDuration: e.target.value }))
                         }
-                        className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                          errors.estimatedDuration ? 'border-red-300' : 'border-slate-300'
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 ${
+                          errors.estimatedDuration
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-slate-200 hover:border-slate-300'
                         }`}
                       />
                       {errors.estimatedDuration && (
-                        <p className="mt-1 text-sm text-red-600">{errors.estimatedDuration}</p>
+                        <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.estimatedDuration}
+                        </p>
                       )}
                     </div>
                   </div>
 
                   {/* Row 2: Available From and Warranty */}
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-5 sm:grid-cols-2">
                     {/* Available From */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Available From <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                         <input
                           type="date"
                           min={getTodayDate()}
@@ -467,24 +562,29 @@ function QuoteRequestCard({
                           onChange={(e) =>
                             setFormData((prev) => ({ ...prev, availableFrom: e.target.value }))
                           }
-                          className={`w-full pl-10 pr-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                            errors.availableFrom ? 'border-red-300' : 'border-slate-300'
+                          className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 ${
+                            errors.availableFrom
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-slate-200 hover:border-slate-300'
                           }`}
                         />
                       </div>
                       {errors.availableFrom && (
-                        <p className="mt-1 text-sm text-red-600">{errors.availableFrom}</p>
+                        <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.availableFrom}
+                        </p>
                       )}
                     </div>
 
                     {/* Warranty */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Warranty Offered{' '}
                         <span className="text-slate-400 font-normal">(optional)</span>
                       </label>
                       <div className="relative">
-                        <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <Shield className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                         <input
                           type="text"
                           placeholder="e.g., 12 months / 20,000km"
@@ -492,7 +592,7 @@ function QuoteRequestCard({
                           onChange={(e) =>
                             setFormData((prev) => ({ ...prev, warrantyOffered: e.target.value }))
                           }
-                          className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500"
                         />
                       </div>
                     </div>
@@ -500,49 +600,55 @@ function QuoteRequestCard({
 
                   {/* Included Services */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Included Services <span className="text-red-500">*</span>
                     </label>
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2 mb-3">
                       <input
                         type="text"
                         placeholder="Add a service..."
                         value={newService}
                         onChange={(e) => setNewService(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className={`flex-1 px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                        className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 ${
                           errors.includedServices && formData.includedServices.length === 0
-                            ? 'border-red-300'
-                            : 'border-slate-300'
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-slate-200 hover:border-slate-300'
                         }`}
                       />
                       <button
                         type="button"
                         onClick={handleAddService}
-                        className="px-4 py-2.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition"
+                        className="px-4 py-3 rounded-xl bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-200 hover:scale-105 active:scale-95"
                       >
                         <Plus className="h-5 w-5" />
                       </button>
                     </div>
                     {errors.includedServices && (
-                      <p className="mb-2 text-sm text-red-600">{errors.includedServices}</p>
+                      <p className="mb-3 text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.includedServices}
+                      </p>
                     )}
                     {formData.includedServices.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {formData.includedServices.map((service, idx) => (
-                          <span
+                          <motion.span
                             key={idx}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-medium"
                           >
+                            <CheckCircle className="h-3.5 w-3.5" />
                             {service}
                             <button
                               type="button"
                               onClick={() => handleRemoveService(service)}
-                              className="hover:text-emerald-900 transition"
+                              className="hover:text-emerald-900 hover:bg-emerald-200 rounded-full p-0.5 transition-colors"
                             >
                               <X className="h-4 w-4" />
                             </button>
-                          </span>
+                          </motion.span>
                         ))}
                       </div>
                     )}
@@ -550,7 +656,7 @@ function QuoteRequestCard({
 
                   {/* Additional Notes */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Additional Notes{' '}
                       <span className="text-slate-400 font-normal">(optional)</span>
                     </label>
@@ -561,21 +667,24 @@ function QuoteRequestCard({
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, additionalNotes: e.target.value }))
                       }
-                      className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 resize-none"
                     />
                   </div>
 
                   {/* Validity notice */}
-                  <p className="text-sm text-slate-500">
-                    Your quote will be valid for 14 days from submission.
-                  </p>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <Clock className="h-4 w-4 text-blue-500" />
+                    <p className="text-sm text-blue-700">
+                      Your quote will be valid for 14 days from submission.
+                    </p>
+                  </div>
 
                   {/* Action buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleSubmit}
                       disabled={submitting}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold shadow-md shadow-emerald-200 transition-all duration-200 hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       {submitting ? (
                         <>
@@ -593,7 +702,7 @@ function QuoteRequestCard({
                       type="button"
                       onClick={onToggleExpand}
                       disabled={submitting}
-                      className="px-6 py-3 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition disabled:opacity-50"
+                      className="px-6 py-3.5 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -683,10 +792,14 @@ export default function GarageQuoteRequestsPage() {
 
   if (sessionStatus === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-          <p className="mt-2 text-slate-600">Loading quote requests...</p>
+          <div className="relative">
+            <div className="h-16 w-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+            </div>
+          </div>
+          <p className="text-slate-600 font-medium">Loading quote requests...</p>
         </div>
       </div>
     );
@@ -697,14 +810,14 @@ export default function GarageQuoteRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 backdrop-blur-xl bg-white/90">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                Available Quote Requests
+                Quote Requests
               </h1>
               <p className="mt-1 text-slate-600">
                 Browse and submit quotes for customer service requests
@@ -713,9 +826,13 @@ export default function GarageQuoteRequestsPage() {
             <button
               onClick={() => fetchQuoteRequests(true)}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+              className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-700 font-medium transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 transition-transform ${
+                  refreshing ? 'animate-spin' : 'group-hover:rotate-180'
+                }`}
+              />
               Refresh
             </button>
           </div>
@@ -724,42 +841,44 @@ export default function GarageQuoteRequestsPage() {
           <div className="mt-6 flex flex-col sm:flex-row gap-4">
             {/* Search */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by registration, vehicle, location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 hover:border-slate-300"
               />
             </div>
 
             {/* Category filter */}
             <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-slate-400" />
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value as ServiceCategory | 'all')}
-                className="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="all">All Categories</option>
-                {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
-                  <option key={key} value={key}>
-                    {config.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value as ServiceCategory | 'all')}
+                  className="pl-12 pr-8 py-3 rounded-xl border-2 border-slate-200 bg-white appearance-none cursor-pointer transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 hover:border-slate-300"
+                >
+                  <option value="all">All Categories</option>
+                  {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                    <option key={key} value={key}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Urgency filter */}
             <select
               value={urgencyFilter}
               onChange={(e) => setUrgencyFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="px-4 py-3 rounded-xl border-2 border-slate-200 bg-white appearance-none cursor-pointer transition-all duration-200 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 hover:border-slate-300"
             >
               <option value="all">All Urgency</option>
               <option value="immediate">Urgent</option>
-              <option value="this_week">Within a week</option>
+              <option value="this_week">This Week</option>
               <option value="flexible">Flexible</option>
             </select>
           </div>
@@ -767,35 +886,39 @@ export default function GarageQuoteRequestsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {error && (
-          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3"
+          >
+            <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-red-800">Error loading requests</p>
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="font-semibold text-red-800">Error loading requests</p>
+              <p className="text-sm text-red-600 mt-0.5">{error}</p>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {filteredRequests.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-12"
+            className="text-center py-16"
           >
-            <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-4">
-              <FileText className="h-8 w-8 text-slate-400" />
+            <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-slate-100 mb-5">
+              <FileText className="h-10 w-10 text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">No quote requests found</h3>
-            <p className="mt-1 text-slate-600 max-w-md mx-auto">
+            <h3 className="text-xl font-bold text-slate-900">No quote requests found</h3>
+            <p className="mt-2 text-slate-600 max-w-md mx-auto">
               {searchTerm || categoryFilter !== 'all' || urgencyFilter !== 'all'
                 ? 'Try adjusting your filters to see more requests.'
                 : 'New quote requests will appear here as customers submit them.'}
             </p>
           </motion.div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-5">
             <AnimatePresence mode="popLayout">
               {filteredRequests.map((request, index) => (
                 <QuoteRequestCard
