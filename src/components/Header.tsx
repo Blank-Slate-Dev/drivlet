@@ -174,24 +174,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
 
                     {/* Customer-specific links */}
                     {!isDriver && !isGarage && !isAdmin && (
-                      <>
-                        <Link
-                          href="/quotes"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                          onClick={() => setShowUserMenu(false)}
-                        >
-                          <FileText className="h-4 w-4" />
-                          My Quote Requests
-                        </Link>
-                        <Link
-                          href="/account"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                          onClick={() => setShowUserMenu(false)}
-                        >
-                          <Settings className="h-4 w-4" />
-                          Account Settings
-                        </Link>
-                      </>
+                      <Link
+                        href="/account"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        Account Settings
+                      </Link>
                     )}
 
                     {/* Driver-specific links */}
@@ -341,24 +331,14 @@ export default function Header({ onBookingClick }: HeaderProps) {
 
               {/* Customer-specific links */}
               {!isDriver && !isGarage && !isAdmin && (
-                <>
-                  <Link
-                    href="/quotes"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setShowUserMenu(false)}
-                  >
-                    <FileText className="h-4 w-4" />
-                    My Quote Requests
-                  </Link>
-                  <Link
-                    href="/account"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setShowUserMenu(false)}
-                  >
-                    <Settings className="h-4 w-4" />
-                    Account Settings
-                  </Link>
-                </>
+                <Link
+                  href="/account"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Account Settings
+                </Link>
               )}
 
               {isDriver && (
