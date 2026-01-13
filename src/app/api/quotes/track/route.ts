@@ -5,6 +5,9 @@ import QuoteRequest from "@/models/QuoteRequest";
 import Quote from "@/models/Quote";
 import { isValidQuoteTrackingCodeFormat } from "@/lib/trackingCode";
 
+// Force dynamic rendering - this route uses request.url for query params
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/quotes/track - Track a quote request (no auth required)
  * 
