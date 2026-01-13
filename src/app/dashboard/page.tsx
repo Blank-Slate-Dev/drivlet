@@ -1,14 +1,14 @@
 // src/app/dashboard/page.tsx
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import type { ElementType } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
-  CheckCircle2,
   MapPin,
   Car,
   ChevronRight,
@@ -21,7 +21,6 @@ import {
   Home,
   FileText,
   Calendar,
-  User,
   MessageSquare,
   CheckCircle,
   Filter,
@@ -88,12 +87,18 @@ interface QuoteRequest {
 
 type DashboardSection = 'overview' | 'quotes' | 'bookings';
 
+// ✅ FIX: Proper Record<...> generic syntax + avoid React.ElementType (no React import needed)
 const QUOTE_STATUS_CONFIG: Record<
   QuoteRequestStatus,
-  { label: string; icon: React.ElementType; color: string; bgColor: string }
+  { label: string; icon: ElementType; color: string; bgColor: string }
 > = {
   open: { label: 'Open', icon: Clock, color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  quoted: { label: 'Quotes Received', icon: MessageSquare, color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
+  quoted: {
+    label: 'Quotes Received',
+    icon: MessageSquare,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100',
+  },
   accepted: { label: 'Accepted', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
   expired: { label: 'Expired', icon: XCircle, color: 'text-slate-500', bgColor: 'bg-slate-100' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' },
@@ -268,7 +273,9 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
                       </p>
                     </div>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
+                  >
                     <StatusIcon className="h-3 w-3" />
                     {statusConfig.label}
                   </span>
@@ -286,22 +293,26 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
                     <Car className="h-4 w-4 text-slate-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      Booking: {booking.vehicleRegistration}
-                    </p>
+                    <p className="text-sm font-medium text-slate-900">Booking: {booking.vehicleRegistration}</p>
                     <p className="text-xs text-slate-500">
                       {booking.serviceType} • {booking.overallProgress}% complete
                     </p>
                   </div>
                 </div>
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  booking.status === 'completed'
-                    ? 'bg-green-100 text-green-700'
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                    booking.status === 'completed'
+                      ? 'bg-green-100 text-green-700'
+                      : booking.status === 'in_progress'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {booking.status === 'completed'
+                    ? 'Completed'
                     : booking.status === 'in_progress'
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-slate-100 text-slate-700'
-                }`}>
-                  {booking.status === 'completed' ? 'Completed' : booking.status === 'in_progress' ? 'In Progress' : 'Pending'}
+                    ? 'In Progress'
+                    : 'Pending'}
                 </span>
               </Link>
             ))}
@@ -409,9 +420,7 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">My Quote Requests</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            View and manage all your service quote requests
-          </p>
+          <p className="mt-1 text-sm text-slate-600">View and manage all your service quote requests</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -437,14 +446,13 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
         <button
           onClick={() => setActiveFilter('all')}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-            activeFilter === 'all'
-              ? 'bg-slate-900 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            activeFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
           }`}
         >
           <Filter className="h-4 w-4" />
           All ({statusCounts.all || 0})
         </button>
+
         {(['open', 'quoted', 'accepted', 'expired'] as QuoteRequestStatus[]).map((status) => {
           const config = QUOTE_STATUS_CONFIG[status];
           const Icon = config.icon;
@@ -472,7 +480,9 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
             <FileText className="h-8 w-8 text-slate-400" />
           </div>
           <h3 className="text-lg font-semibold text-slate-900">
-            {activeFilter === 'all' ? 'No quote requests yet' : `No ${QUOTE_STATUS_CONFIG[activeFilter]?.label.toLowerCase()} requests`}
+            {activeFilter === 'all'
+              ? 'No quote requests yet'
+              : `No ${QUOTE_STATUS_CONFIG[activeFilter]?.label.toLowerCase()} requests`}
           </h3>
           <p className="mt-1 text-slate-600 max-w-md mx-auto">
             {activeFilter === 'all'
@@ -514,10 +524,10 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-slate-900">
-                                  {request.vehicleRegistration}
-                                </h3>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
+                                <h3 className="font-semibold text-slate-900">{request.vehicleRegistration}</h3>
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
+                                >
                                   <StatusIcon className="h-3 w-3" />
                                   {statusConfig.label}
                                 </span>
@@ -534,7 +544,8 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
                                 </p>
                               )}
                               <p className="text-sm text-slate-500 mt-1 line-clamp-1">
-                                {CATEGORY_LABELS[request.serviceCategory] || request.serviceCategory} - {request.serviceDescription}
+                                {CATEGORY_LABELS[request.serviceCategory] || request.serviceCategory} -{' '}
+                                {request.serviceDescription}
                               </p>
                             </div>
                           </div>
@@ -559,7 +570,9 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
                           {request.quotesReceived > 0 && (
                             <div className="text-center px-4 py-2 rounded-lg bg-emerald-50">
                               <p className="text-2xl font-bold text-emerald-600">{request.quotesReceived}</p>
-                              <p className="text-xs text-emerald-600">quote{request.quotesReceived !== 1 ? 's' : ''}</p>
+                              <p className="text-xs text-emerald-600">
+                                quote{request.quotesReceived !== 1 ? 's' : ''}
+                              </p>
                             </div>
                           )}
                           <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-emerald-600 transition" />
@@ -634,11 +647,7 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
     <div className="space-y-6">
       {/* Active Booking */}
       {activeBooking && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <h2 className="text-xl font-semibold text-slate-900">Active Booking</h2>
 
           {/* Booking Header */}
@@ -795,8 +804,8 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
   );
 }
 
-// Main Dashboard Component
-export default function DashboardPage() {
+// Dashboard Content Component (uses useSearchParams)
+function DashboardContent() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1012,10 +1021,7 @@ export default function DashboardPage() {
                 <h1 className="text-2xl font-bold text-slate-900">My Dashboard</h1>
                 <p className="mt-1 text-sm text-slate-600">Manage your quote requests and bookings</p>
               </div>
-              <Link
-                href="/"
-                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition"
-              >
+              <Link href="/" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition">
                 ← Back to Home
               </Link>
             </div>
@@ -1090,5 +1096,27 @@ export default function DashboardPage() {
         </AnimatePresence>
       </div>
     </main>
+  );
+}
+
+// Main Dashboard Page with Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="h-16 w-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+              </div>
+              <p className="text-slate-600 font-medium">Loading your dashboard...</p>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }
