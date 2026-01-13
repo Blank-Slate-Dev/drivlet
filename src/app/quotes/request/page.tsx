@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -23,6 +22,8 @@ import {
   ArrowRight,
   ArrowLeft,
   Search,
+  Copy,
+  Check,
 } from "lucide-react";
 
 import { SERVICE_CATEGORIES, URGENCY_LEVELS } from "@/constants/quoteRequest";
@@ -49,7 +50,6 @@ interface FormErrors {
 
 export default function RequestQuotePage() {
   const { data: session } = useSession();
-  const router = useRouter();
 
   const [formData, setFormData] = useState<FormData>({
     vehicleRegistration: "",
@@ -71,6 +71,8 @@ export default function RequestQuotePage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
+  const [trackingCode, setTrackingCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Update form data when session loads
   useState(() => {
@@ -177,6 +179,7 @@ export default function RequestQuotePage() {
       if (response.ok) {
         setSuccess(true);
         setQuoteRequestId(data.quoteRequestId);
+        setTrackingCode(data.trackingCode);
       } else {
         if (data.errors) {
           setErrors(data.errors);
@@ -191,8 +194,28 @@ export default function RequestQuotePage() {
     }
   };
 
+  const copyTrackingCode = async () => {
+    if (!trackingCode) return;
+    
+    try {
+      await navigator.clipboard.writeText(trackingCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for browsers that don't support clipboard API
+      const textArea = document.createElement("textarea");
+      textArea.value = trackingCode;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   // Success state
-  if (success) {
+  if (success && trackingCode) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
         {/* Subtle pattern overlay */}
@@ -243,25 +266,70 @@ export default function RequestQuotePage() {
               <p className="text-slate-600 mb-6">
                 Your request has been sent to local garages. You&apos;ll receive quotes soon.
               </p>
-              <div className="bg-slate-100 rounded-xl p-4 mb-6">
-                <p className="text-sm text-slate-500">Request ID</p>
-                <p className="font-mono text-lg font-semibold text-slate-900">
+              
+              {/* Tracking Code Display */}
+              <div className="bg-slate-100 rounded-xl p-4 mb-4">
+                <p className="text-sm text-slate-500 mb-2">Your Tracking Code</p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="font-mono text-2xl font-bold text-slate-900 tracking-wider">
+                    {trackingCode}
+                  </p>
+                  <button
+                    onClick={copyTrackingCode}
+                    className="p-2 rounded-lg hover:bg-slate-200 transition"
+                    title="Copy tracking code"
+                  >
+                    {copied ? (
+                      <Check className="h-5 w-5 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-slate-500" />
+                    )}
+                  </button>
+                </div>
+                {copied && (
+                  <p className="text-xs text-emerald-600 mt-1">Copied to clipboard!</p>
+                )}
+              </div>
+
+              {/* Important Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+                <p className="text-sm text-amber-800">
+                  <strong className="text-amber-900">Important:</strong> Save this tracking code! 
+                  You&apos;ll need it to check back on your quotes.
+                </p>
+                {/* TODO: When email is configured, update this message to mention checking email */}
+              </div>
+
+              {/* Request ID */}
+              <div className="bg-slate-50 rounded-xl p-3 mb-6">
+                <p className="text-xs text-slate-500">Request ID</p>
+                <p className="font-mono text-sm text-slate-700">
                   {quoteRequestId}
                 </p>
               </div>
+
               <div className="space-y-3">
                 <Link
-                  href="/quotes"
+                  href={`/quotes/track?code=${trackingCode}&email=${encodeURIComponent(formData.customerEmail)}`}
                   className="block w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow-lg shadow-emerald-500/25"
                 >
-                  View My Quotes
+                  Track My Quote Request
                 </Link>
-                <Link
-                  href="/"
-                  className="block w-full py-3 px-4 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition"
-                >
-                  Back to Home
-                </Link>
+                {session?.user ? (
+                  <Link
+                    href="/quotes"
+                    className="block w-full py-3 px-4 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition"
+                  >
+                    View All My Quotes
+                  </Link>
+                ) : (
+                  <Link
+                    href="/"
+                    className="block w-full py-3 px-4 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition"
+                  >
+                    Back to Home
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -333,6 +401,23 @@ export default function RequestQuotePage() {
             <p className="mt-3 text-lg text-emerald-100">
               Get competitive quotes from local garages for your vehicle service
             </p>
+          </motion.div>
+
+          {/* Already have a tracking code? */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-6 text-center"
+          >
+            <Link
+              href="/quotes/track"
+              className="inline-flex items-center gap-2 text-sm text-emerald-200 hover:text-white transition"
+            >
+              <Search className="h-4 w-4" />
+              Already submitted a request? Track your quotes
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </motion.div>
 
           {/* Form Card */}

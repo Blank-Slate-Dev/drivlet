@@ -13,6 +13,7 @@ export interface IQuoteRequest extends Document {
   customerName: string;
   customerPhone: string;
   isGuest: boolean;
+  trackingCode: string;
   vehicleRegistration: string;
   vehicleMake?: string;
   vehicleModel?: string;
@@ -63,6 +64,14 @@ const QuoteRequestSchema = new Schema<IQuoteRequest>(
     isGuest: {
       type: Boolean,
       default: false,
+    },
+    trackingCode: {
+      type: String,
+      required: [true, "Tracking code is required"],
+      unique: true,
+      uppercase: true,
+      trim: true,
+      index: true,
     },
     vehicleRegistration: {
       type: String,
@@ -149,6 +158,7 @@ QuoteRequestSchema.index({ customerId: 1, status: 1 });
 QuoteRequestSchema.index({ customerEmail: 1, status: 1 });
 QuoteRequestSchema.index({ status: 1, expiresAt: 1 });
 QuoteRequestSchema.index({ "locationCoordinates": "2dsphere" });
+QuoteRequestSchema.index({ trackingCode: 1, customerEmail: 1 });
 
 // Virtual for checking if request is expired
 QuoteRequestSchema.virtual("isExpired").get(function () {

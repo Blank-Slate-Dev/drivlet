@@ -4,9 +4,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import QuoteRequest, { ServiceCategory, UrgencyLevel } from "@/models/QuoteRequest";
+import { generateUniqueQuoteTrackingCode } from "@/lib/trackingCode";
 import mongoose from "mongoose";
 
-// POST /api/quotes/request - Create new quote request
+/**
+ * POST /api/quotes/request - Create new quote request
+ * 
+ * TODO: Future enhancement - Send confirmation email with tracking code
+ * When email is configured, send the customer an email containing:
+ * - Their tracking code
+ * - A direct link to /quotes/track?code=XXXXXXXX&email=their@email.com
+ * - Summary of their quote request
+ * This will allow customers to easily check back on their quotes.
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -83,6 +93,9 @@ export async function POST(request: NextRequest) {
       customerId = new mongoose.Types.ObjectId(session.user.id);
     }
 
+    // Generate unique tracking code (8 characters for quote requests)
+    const trackingCode = await generateUniqueQuoteTrackingCode();
+
     // Set expiration date (7 days from now)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -94,6 +107,7 @@ export async function POST(request: NextRequest) {
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       isGuest,
+      trackingCode,
       vehicleRegistration: vehicleRegistration.toUpperCase().trim(),
       vehicleMake: vehicleMake?.trim(),
       vehicleModel: vehicleModel?.trim(),
@@ -109,9 +123,15 @@ export async function POST(request: NextRequest) {
       expiresAt,
     });
 
+    // TODO: Send confirmation email with tracking code and link
+    // Example email content:
+    // Subject: "Your Drivlet Quote Request - Track Code: {trackingCode}"
+    // Body: Include trackingCode and link to /quotes/track?code={trackingCode}&email={customerEmail}
+
     return NextResponse.json({
       success: true,
       quoteRequestId: quoteRequest._id.toString(),
+      trackingCode: quoteRequest.trackingCode,
       message: "Quote request submitted successfully",
     });
   } catch (error) {
