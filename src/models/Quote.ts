@@ -1,7 +1,7 @@
 // src/models/Quote.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type QuoteStatus = "pending" | "accepted" | "declined" | "expired";
+export type QuoteStatus = "pending" | "viewed" | "expired" | "cancelled";
 
 export interface IQuote extends Document {
   quoteRequestId: mongoose.Types.ObjectId;
@@ -15,9 +15,8 @@ export interface IQuote extends Document {
   warrantyOffered?: string;
   availableFrom: Date;
   status: QuoteStatus;
-  acceptedAt?: Date;
-  declinedAt?: Date;
-  declineReason?: string;
+  firstViewedAt?: Date;
+  expiresAt?: Date;
   validUntil: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -82,18 +81,15 @@ const QuoteSchema = new Schema<IQuote>(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "declined", "expired"],
+      enum: ["pending", "viewed", "expired", "cancelled"],
       default: "pending",
     },
-    acceptedAt: {
+    firstViewedAt: {
       type: Date,
     },
-    declinedAt: {
+    expiresAt: {
       type: Date,
-    },
-    declineReason: {
-      type: String,
-      trim: true,
+      index: true,
     },
     validUntil: {
       type: Date,
@@ -114,12 +110,22 @@ QuoteSchema.index({ quoteRequestId: 1, garageId: 1 }, { unique: true });
 
 // Virtual for checking if quote is expired
 QuoteSchema.virtual("isExpired").get(function () {
+  // Quote expires 48 hours after first view, or when validUntil passes
+  if (this.expiresAt && this.expiresAt < new Date()) {
+    return true;
+  }
   return this.validUntil < new Date();
 });
 
 // Pre-save middleware to auto-expire
 QuoteSchema.pre("save", function () {
-  if (this.validUntil < new Date() && this.status === "pending") {
+  const now = new Date();
+  // Expire if validUntil has passed
+  if (this.validUntil < now && this.status === "pending") {
+    this.status = "expired";
+  }
+  // Expire if 48-hour window has passed after first view
+  if (this.expiresAt && this.expiresAt < now && this.status === "viewed") {
     this.status = "expired";
   }
 });

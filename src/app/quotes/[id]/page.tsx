@@ -1,7 +1,7 @@
 // src/app/quotes/[id]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -18,18 +18,22 @@ import {
   Loader2,
   AlertCircle,
   Building2,
-  DollarSign,
   Shield,
-  Star,
-  Phone,
   ChevronDown,
   ChevronUp,
-  Check,
   Wrench,
+  Eye,
+  Timer,
 } from 'lucide-react';
+import {
+  isQuoteExpired,
+  isExpiringSoon,
+  type QuoteWithExpiry,
+} from '@/lib/quoteExpiry';
+import { QuoteTimerBadge, QuoteTimer, ExpiringSoonBadge } from '@/components/quotes/QuoteTimer';
 
 type QuoteRequestStatus = 'open' | 'quoted' | 'accepted' | 'expired' | 'cancelled';
-type QuoteStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+type QuoteStatus = 'pending' | 'viewed' | 'expired' | 'cancelled';
 
 interface Quote {
   _id: string;
@@ -44,6 +48,8 @@ interface Quote {
   availableFrom: string;
   validUntil: string;
   status: QuoteStatus;
+  firstViewedAt?: string;
+  expiresAt?: string;
   createdAt: string;
 }
 
@@ -128,9 +134,7 @@ export default function QuoteRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedQuote, setExpandedQuote] = useState<string | null>(null);
-  const [acceptingQuote, setAcceptingQuote] = useState<string | null>(null);
-  const [showAcceptModal, setShowAcceptModal] = useState(false);
-  const [selectedQuoteForAccept, setSelectedQuoteForAccept] = useState<Quote | null>(null);
+  const [trackingViews, setTrackingViews] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -138,7 +142,7 @@ export default function QuoteRequestDetailPage() {
     }
   }, [sessionStatus, router, requestId]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch quote request details
@@ -165,49 +169,46 @@ export default function QuoteRequestDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [requestId]);
 
   useEffect(() => {
     if (session?.user && requestId) {
       fetchData();
     }
-  }, [session, requestId]);
+  }, [session, requestId, fetchData]);
 
-  const handleAcceptQuote = async () => {
-    if (!selectedQuoteForAccept) return;
+  // Track view when a quote is expanded (first time viewing details)
+  const trackQuoteView = useCallback(async (quoteId: string) => {
+    if (trackingViews.has(quoteId)) return;
 
-    setAcceptingQuote(selectedQuoteForAccept._id);
+    setTrackingViews((prev) => new Set(prev).add(quoteId));
+
     try {
-      const response = await fetch('/api/quotes/accept', {
+      const response = await fetch(`/api/quotes/${quoteId}/track-view`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteId: selectedQuoteForAccept._id,
-          quoteRequestId: requestId,
-        }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to accept quote');
+      if (response.ok) {
+        const data = await response.json();
+        // Update the quote in state with new expiry info
+        setQuotes((prevQuotes) =>
+          prevQuotes.map((q) =>
+            q._id === quoteId
+              ? {
+                  ...q,
+                  status: data.quote.status,
+                  firstViewedAt: data.quote.firstViewedAt,
+                  expiresAt: data.quote.expiresAt,
+                }
+              : q
+          )
+        );
       }
-
-      // Refresh data
-      await fetchData();
-      setShowAcceptModal(false);
-      setSelectedQuoteForAccept(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to accept quote');
-    } finally {
-      setAcceptingQuote(null);
+      console.error('Failed to track quote view:', err);
     }
-  };
+  }, [trackingViews]);
 
-  const openAcceptModal = (quote: Quote) => {
-    setSelectedQuoteForAccept(quote);
-    setShowAcceptModal(true);
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-AU', {
@@ -260,8 +261,10 @@ export default function QuoteRequestDetailPage() {
 
   const statusConfig = STATUS_CONFIG[quoteRequest.status];
   const StatusIcon = statusConfig.icon;
-  const acceptedQuote = quotes.find((q) => q.status === 'accepted');
-  const pendingQuotes = quotes.filter((q) => q.status === 'pending');
+  const activeQuotes = quotes.filter(
+    (q) => q.status === 'pending' || q.status === 'viewed'
+  );
+  const expiredQuotes = quotes.filter((q) => q.status === 'expired' || q.status === 'cancelled');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -436,10 +439,26 @@ export default function QuoteRequestDetailPage() {
           {/* Right column: Quotes */}
           <div className="lg:col-span-2">
             <h2 className="text-xl font-bold text-slate-900 mb-4">
-              {acceptedQuote
-                ? 'Accepted Quote'
-                : `Quotes Received (${quotes.length})`}
+              Quotes Received ({quotes.length})
             </h2>
+
+            {/* Info banner about 48-hour expiry */}
+            {quotes.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Timer className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">
+                      48-hour validity window
+                    </p>
+                    <p className="text-sm text-blue-600 mt-0.5">
+                      Once you view a quote&apos;s details, it remains valid for 48 hours. Quotes
+                      not yet viewed remain indefinitely valid.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {quotes.length === 0 ? (
               <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -454,68 +473,11 @@ export default function QuoteRequestDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Show accepted quote first if exists */}
-                {acceptedQuote && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-green-50 rounded-xl border-2 border-green-200 p-5"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
-                          <CheckCircle className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-slate-900">
-                            {acceptedQuote.garageName}
-                          </h3>
-                          <p className="text-sm text-slate-600">
-                            {acceptedQuote.garageAddress}
-                          </p>
-                          <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            <Check className="h-3 w-3" />
-                            Accepted
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-green-600">
-                          {formatCurrency(acceptedQuote.quotedAmount)}
-                        </p>
-                        <p className="text-sm text-slate-600">
-                          {acceptedQuote.estimatedDuration}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-green-200">
-                      <p className="text-sm text-slate-600 mb-2">
-                        <strong>Included services:</strong>
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {acceptedQuote.includedServices.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-block px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs"
-                          >
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                      {acceptedQuote.warrantyOffered && (
-                        <p className="mt-3 text-sm text-slate-600">
-                          <Shield className="h-4 w-4 inline mr-1 text-green-600" />
-                          <strong>Warranty:</strong> {acceptedQuote.warrantyOffered}
-                        </p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Show pending quotes */}
-                {pendingQuotes.map((quote, index) => {
+                {/* Show active quotes */}
+                {activeQuotes.map((quote, index) => {
                   const isExpanded = expandedQuote === quote._id;
+                  const expired = isQuoteExpired(quote as QuoteWithExpiry);
+                  const expiringSoon = isExpiringSoon(quote as QuoteWithExpiry);
 
                   return (
                     <motion.div
@@ -523,7 +485,13 @@ export default function QuoteRequestDetailPage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+                      className={`bg-white rounded-xl border overflow-hidden ${
+                        expired
+                          ? 'border-slate-200 opacity-60'
+                          : expiringSoon
+                          ? 'border-amber-300'
+                          : 'border-slate-200'
+                      }`}
                     >
                       <div className="p-5">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -538,16 +506,22 @@ export default function QuoteRequestDetailPage() {
                               <p className="text-sm text-slate-600">
                                 {quote.garageAddress}
                               </p>
-                              <div className="flex items-center gap-3 mt-2 text-sm text-slate-500">
-                                <span className="flex items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <span className="flex items-center gap-1 text-sm text-slate-500">
                                   <Calendar className="h-4 w-4" />
                                   Available from {formatDate(quote.availableFrom)}
                                 </span>
+                                {/* Live expiry countdown badge */}
+                                <QuoteTimerBadge
+                                  expiresAt={quote.expiresAt}
+                                  firstViewedAt={quote.firstViewedAt}
+                                  status={quote.status}
+                                />
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-emerald-600">
+                            <p className={`text-2xl font-bold ${expired ? 'text-slate-400' : 'text-emerald-600'}`}>
                               {formatCurrency(quote.quotedAmount)}
                             </p>
                             <p className="text-sm text-slate-600">
@@ -556,18 +530,28 @@ export default function QuoteRequestDetailPage() {
                           </div>
                         </div>
 
-                        {/* Expand/collapse for more details */}
+                        {/* Expand/collapse for more details - tracks view on expand */}
                         <button
-                          onClick={() =>
-                            setExpandedQuote(isExpanded ? null : quote._id)
-                          }
+                          onClick={() => {
+                            const newExpanded = isExpanded ? null : quote._id;
+                            setExpandedQuote(newExpanded);
+                            // Track view when expanding for the first time
+                            if (newExpanded && !quote.firstViewedAt) {
+                              trackQuoteView(quote._id);
+                            }
+                          }}
                           className="mt-4 flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700"
                         >
-                          {isExpanded ? 'Show less' : 'Show details'}
+                          {isExpanded ? 'Show less' : 'View details'}
                           {isExpanded ? (
                             <ChevronUp className="h-4 w-4" />
                           ) : (
                             <ChevronDown className="h-4 w-4" />
+                          )}
+                          {!quote.firstViewedAt && !isExpanded && (
+                            <span className="ml-2 text-xs text-slate-400">
+                              (starts 48h timer)
+                            </span>
                           )}
                         </button>
 
@@ -615,70 +599,70 @@ export default function QuoteRequestDetailPage() {
                                   </div>
                                 )}
 
-                                <p className="text-xs text-slate-500">
-                                  Quote valid until {formatDate(quote.validUntil)}
-                                </p>
+                                {/* Live countdown if viewed */}
+                                {quote.firstViewedAt && !expired && (
+                                  <div className={`p-3 rounded-lg ${expiringSoon ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+                                    <QuoteTimer
+                                      expiresAt={quote.expiresAt}
+                                      firstViewedAt={quote.firstViewedAt}
+                                      status={quote.status}
+                                      compact={false}
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">
+                                      Contact the garage directly to proceed with this quote.
+                                    </p>
+                                  </div>
+                                )}
+
+                                {expired && (
+                                  <div className="p-3 rounded-lg bg-red-50">
+                                    <div className="flex items-center gap-2">
+                                      <XCircle className="h-4 w-4 text-red-600" />
+                                      <span className="text-sm font-medium text-red-700">
+                                        This quote has expired
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      Request a new quote from this garage if you&apos;re still interested.
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
                       </div>
-
-                      {/* Accept button */}
-                      {quoteRequest.status !== 'accepted' &&
-                        quoteRequest.status !== 'expired' && (
-                          <div className="px-5 py-3 bg-slate-50 border-t border-slate-100">
-                            <button
-                              onClick={() => openAcceptModal(quote)}
-                              disabled={acceptingQuote === quote._id}
-                              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50"
-                            >
-                              {acceptingQuote === quote._id ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Accepting...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4" />
-                                  Accept Quote
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        )}
                     </motion.div>
                   );
                 })}
 
-                {/* Declined quotes */}
-                {quotes.filter((q) => q.status === 'declined').length > 0 && (
+                {/* Expired quotes */}
+                {expiredQuotes.length > 0 && (
                   <div className="mt-6">
                     <h3 className="text-sm font-medium text-slate-500 mb-3">
-                      Other Quotes
+                      Expired Quotes ({expiredQuotes.length})
                     </h3>
-                    {quotes
-                      .filter((q) => q.status === 'declined')
-                      .map((quote) => (
-                        <div
-                          key={quote._id}
-                          className="bg-slate-50 rounded-lg border border-slate-200 p-4 opacity-60"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-slate-700">
-                                {quote.garageName}
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                {formatCurrency(quote.quotedAmount)}
-                              </p>
-                            </div>
-                            <span className="text-xs text-slate-500">
-                              Not selected
-                            </span>
+                    {expiredQuotes.map((quote) => (
+                      <div
+                        key={quote._id}
+                        className="bg-slate-50 rounded-lg border border-slate-200 p-4 opacity-60 mb-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-slate-700">
+                              {quote.garageName}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              {formatCurrency(quote.quotedAmount)}
+                            </p>
                           </div>
+                          <span className="inline-flex items-center gap-1 text-xs text-red-500">
+                            <XCircle className="h-3 w-3" />
+                            Expired
+                          </span>
                         </div>
-                      ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -687,62 +671,6 @@ export default function QuoteRequestDetailPage() {
         </div>
       </div>
 
-      {/* Accept confirmation modal */}
-      <AnimatePresence>
-        {showAcceptModal && selectedQuoteForAccept && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-            onClick={() => setShowAcceptModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-xl font-bold text-slate-900">Accept this quote?</h3>
-              <p className="mt-2 text-slate-600">
-                You&apos;re about to accept the quote from{' '}
-                <strong>{selectedQuoteForAccept.garageName}</strong> for{' '}
-                <strong>{formatCurrency(selectedQuoteForAccept.quotedAmount)}</strong>.
-              </p>
-              <p className="mt-2 text-sm text-slate-500">
-                Other quotes will be automatically declined.
-              </p>
-
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={() => setShowAcceptModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAcceptQuote}
-                  disabled={!!acceptingQuote}
-                  className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                >
-                  {acceptingQuote ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Accepting...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4" />
-                      Accept Quote
-                    </>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

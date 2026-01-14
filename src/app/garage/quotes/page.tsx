@@ -672,11 +672,16 @@ function QuoteRequestCard({
                   </div>
 
                   {/* Validity notice */}
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100">
-                    <Clock className="h-4 w-4 text-blue-500" />
-                    <p className="text-sm text-blue-700">
-                      Your quote will be valid for 14 days from submission.
-                    </p>
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                    <Clock className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-blue-800">
+                        48-hour validity window
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Your quote remains valid until the customer views it. Once viewed, they have 48 hours to contact you.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Action buttons */}

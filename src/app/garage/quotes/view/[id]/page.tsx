@@ -22,7 +22,15 @@ import {
   FileText,
   Timer,
   Info,
+  Eye,
+  XCircle,
 } from 'lucide-react';
+import {
+  isQuoteExpired,
+  isExpiringSoon,
+  type QuoteWithExpiry,
+} from '@/lib/quoteExpiry';
+import { QuoteTimer } from '@/components/quotes/QuoteTimer';
 
 type ServiceCategory = 'mechanical' | 'electrical' | 'bodywork' | 'tyres' | 'servicing' | 'other';
 
@@ -51,7 +59,9 @@ interface Quote {
   warrantyOffered?: string;
   availableFrom: string;
   validUntil: string;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  status: 'pending' | 'viewed' | 'expired' | 'cancelled';
+  firstViewedAt?: string;
+  expiresAt?: string;
   createdAt: string;
 }
 
@@ -71,10 +81,10 @@ const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: st
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  pending: { label: 'Pending Review', color: 'text-amber-700', bgColor: 'bg-amber-100' },
-  accepted: { label: 'Accepted', color: 'text-green-700', bgColor: 'bg-green-100' },
-  declined: { label: 'Declined', color: 'text-red-700', bgColor: 'bg-red-100' },
+  pending: { label: 'Awaiting View', color: 'text-amber-700', bgColor: 'bg-amber-100' },
+  viewed: { label: 'Viewed by Customer', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
   expired: { label: 'Expired', color: 'text-slate-700', bgColor: 'bg-slate-100' },
+  cancelled: { label: 'Cancelled', color: 'text-red-700', bgColor: 'bg-red-100' },
 };
 
 export default function ViewQuotePage() {
@@ -438,6 +448,58 @@ export default function ViewQuotePage() {
               </div>
             </div>
 
+            {/* Customer View Status */}
+            {quote.firstViewedAt && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className={`rounded-xl p-5 ${
+                  isQuoteExpired(quote as QuoteWithExpiry)
+                    ? 'bg-red-50 border border-red-200'
+                    : isExpiringSoon(quote as QuoteWithExpiry)
+                    ? 'bg-amber-50 border border-amber-200'
+                    : 'bg-emerald-50 border border-emerald-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {isQuoteExpired(quote as QuoteWithExpiry) ? (
+                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <h4 className={`text-sm font-semibold ${
+                      isQuoteExpired(quote as QuoteWithExpiry) ? 'text-red-800' : 'text-emerald-800'
+                    }`}>
+                      {isQuoteExpired(quote as QuoteWithExpiry)
+                        ? 'Quote Expired'
+                        : 'Customer Viewed Your Quote'}
+                    </h4>
+                    <p className={`text-sm mt-1 ${
+                      isQuoteExpired(quote as QuoteWithExpiry) ? 'text-red-700' : 'text-emerald-700'
+                    }`}>
+                      Viewed on {formatDate(quote.firstViewedAt)}
+                    </p>
+                    {quote.expiresAt && !isQuoteExpired(quote as QuoteWithExpiry) && (
+                      <div className={`mt-3 pt-3 border-t ${
+                        isExpiringSoon(quote as QuoteWithExpiry)
+                          ? 'border-amber-200'
+                          : 'border-emerald-200'
+                      }`}>
+                        <QuoteTimer
+                          expiresAt={quote.expiresAt}
+                          firstViewedAt={quote.firstViewedAt}
+                          status={quote.status}
+                          compact={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Info Box */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -448,12 +510,12 @@ export default function ViewQuotePage() {
               <div className="flex items-start gap-3">
                 <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-blue-800">What happens next?</h4>
+                  <h4 className="text-sm font-semibold text-blue-800">How quote expiry works</h4>
                   <ul className="mt-2 space-y-1.5 text-sm text-blue-700">
-                    <li>• The customer will review all submitted quotes</li>
-                    <li>• If they choose your quote, you&apos;ll receive a notification</li>
-                    <li>• Your quote is valid for 14 days from submission</li>
-                    <li>• You can submit quotes on other requests in the meantime</li>
+                    <li>• Your quote remains valid until the customer views it</li>
+                    <li>• Once viewed, the customer has 48 hours to contact you</li>
+                    <li>• If they&apos;re interested, they&apos;ll reach out directly</li>
+                    <li>• You can continue submitting quotes to other requests</li>
                   </ul>
                 </div>
               </div>
