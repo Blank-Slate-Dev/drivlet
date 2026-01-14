@@ -103,7 +103,7 @@ export default function HeroSection({ onBookingClick }: HeroSectionProps) {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
-                className="absolute -bottom-4 right-4 flex items-center gap-2 rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg sm:right-8"
+                className="absolute -bottom-4 right-4 flex items-center gap-2 rounded-full bg-[#348feb] px-4 py-2 text-sm font-semibold text-white shadow-lg sm:right-8"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Collection & Delivery available
