@@ -3,8 +3,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import { isValidTrackingCodeFormat } from '@/lib/trackingCode';
+import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
+  // Rate limiting to prevent brute force attacks on tracking code guessing
+  // This endpoint requires 3 matching fields, making it a target for enumeration
+  const rateLimitResult = withRateLimit(request, RATE_LIMITS.auth, 'booking-track');
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      {
+        error: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil(rateLimitResult.resetIn / 1000),
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)),
+        },
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const email = searchParams.get('email');

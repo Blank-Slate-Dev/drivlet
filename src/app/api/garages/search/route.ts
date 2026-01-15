@@ -54,11 +54,13 @@ export async function GET(request: NextRequest) {
     const vehicleType = searchParams.get("vehicleType") || "";
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
-    const maxDistance = parseInt(searchParams.get("maxDistance") || "30");
-    const minRating = parseFloat(searchParams.get("minRating") || "0");
+    const maxDistance = Math.max(1, parseInt(searchParams.get("maxDistance") || "30") || 30);
+    const minRating = Math.max(0, Math.min(5, parseFloat(searchParams.get("minRating") || "0") || 0));
     const sortBy = searchParams.get("sortBy") || "relevance"; // relevance, rating, distance, price
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
+    // Ensure page is at least 1 and handle NaN from invalid input
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+    // Ensure limit is between 1 and 50
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get("limit") || "20") || 20, 50));
 
     await connectDB();
 
@@ -89,11 +91,30 @@ export async function GET(request: NextRequest) {
 
     // Geo query if coordinates provided
     if (lat && lng) {
+      const parsedLat = parseFloat(lat);
+      const parsedLng = parseFloat(lng);
+
+      // Validate coordinates are within valid geographic ranges
+      // Latitude: -90 to 90, Longitude: -180 to 180
+      if (
+        isNaN(parsedLat) ||
+        isNaN(parsedLng) ||
+        parsedLat < -90 ||
+        parsedLat > 90 ||
+        parsedLng < -180 ||
+        parsedLng > 180
+      ) {
+        return NextResponse.json(
+          { error: "Invalid coordinates. Latitude must be -90 to 90, longitude must be -180 to 180." },
+          { status: 400 }
+        );
+      }
+
       garageQuery.location = {
         $near: {
           $geometry: {
             type: "Point",
-            coordinates: [parseFloat(lng), parseFloat(lat)],
+            coordinates: [parsedLng, parsedLat],
           },
           $maxDistance: maxDistance * 1000, // Convert km to meters
         },
