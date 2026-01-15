@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET /api/bookings - Get user's own bookings
 export async function GET() {
@@ -59,6 +60,15 @@ export async function GET() {
 
 // POST /api/bookings - Create a new booking (authenticated or guest)
 export async function POST(request: NextRequest) {
+  // CSRF protection - validate request origin for state-changing operation
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json(
+      { error: originCheck.error },
+      { status: 403 }
+    );
+  }
+
   try {
     const session = await getServerSession(authOptions);
     const data = await request.json();

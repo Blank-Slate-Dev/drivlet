@@ -13,6 +13,9 @@ import { requireValidOrigin } from "@/lib/validation";
 interface CancelRequestBody {
   cancellationReason?: string;
   forceFullRefund?: boolean; // Admin only
+  // Guest cancellation verification
+  guestEmail?: string;
+  guestPhone?: string;
 }
 
 export async function POST(
@@ -59,8 +62,32 @@ export async function POST(
       (session?.user?.email &&
         booking.userEmail.toLowerCase() === session.user.email.toLowerCase());
 
-    // Guest cancellation - allow if email matches
-    const isGuestOwner = !session?.user && booking.isGuest;
+    // Guest cancellation - MUST verify both email AND phone match the booking
+    // This prevents unauthorized users from cancelling other guests' bookings
+    let isGuestOwner = false;
+    if (!session?.user && booking.isGuest) {
+      const providedEmail = body.guestEmail?.toLowerCase().trim();
+      const providedPhone = body.guestPhone?.replace(/[\s\-()]/g, "");
+      const bookingEmail = booking.userEmail?.toLowerCase();
+      const bookingPhone = booking.guestPhone?.replace(/[\s\-()]/g, "");
+
+      // Both email AND phone must be provided and match
+      if (providedEmail && providedPhone && bookingEmail && bookingPhone) {
+        isGuestOwner =
+          providedEmail === bookingEmail && providedPhone === bookingPhone;
+      }
+
+      // If guest credentials don't match, return specific error
+      if (!isGuestOwner) {
+        return NextResponse.json(
+          {
+            error:
+              "Guest verification failed. Please provide the email and phone number used when booking.",
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     if (!isAdmin && !isOwner && !isGuestOwner) {
       return NextResponse.json(

@@ -9,9 +9,9 @@ const ALLOWED_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 /**
  * Generate a random 6-character tracking code
  */
-function generateRandomCode(): string {
+function generateRandomCode(length = 6): string {
   let code = '';
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * ALLOWED_CHARS.length);
     code += ALLOWED_CHARS[randomIndex];
   }
@@ -20,7 +20,13 @@ function generateRandomCode(): string {
 
 /**
  * Generate a unique tracking code that doesn't exist in the database
- * Retries up to maxAttempts times to ensure uniqueness
+ *
+ * IMPORTANT: This function only generates a candidate code. The actual uniqueness
+ * is guaranteed by the unique index on the trackingCode field in the Booking model.
+ * Callers should handle duplicate key errors by retrying with generateUniqueTrackingCode.
+ *
+ * To prevent race conditions, use generateTrackingCodeWithRetry() which handles
+ * the full save-and-retry flow atomically.
  */
 export async function generateUniqueTrackingCode(maxAttempts = 10): Promise<string> {
   await connectDB();
@@ -43,6 +49,47 @@ export async function generateUniqueTrackingCode(maxAttempts = 10): Promise<stri
 }
 
 /**
+ * Create a booking with a unique tracking code, handling race conditions.
+ * This is the recommended way to create bookings as it handles the case where
+ * two concurrent requests generate the same code.
+ *
+ * @param bookingData - The booking data (without trackingCode)
+ * @param maxAttempts - Maximum retry attempts if duplicate key error occurs
+ * @returns The saved booking document
+ */
+export async function createBookingWithTrackingCode(
+  bookingData: Record<string, unknown>,
+  maxAttempts = 5
+): Promise<typeof Booking.prototype> {
+  await connectDB();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const code = generateRandomCode();
+
+    try {
+      const booking = new Booking({
+        ...bookingData,
+        trackingCode: code,
+      });
+      await booking.save();
+      return booking;
+    } catch (error: unknown) {
+      // Check if this is a duplicate key error on trackingCode
+      const mongoError = error as { code?: number; keyPattern?: { trackingCode?: number } };
+      if (mongoError.code === 11000 && mongoError.keyPattern?.trackingCode) {
+        // Duplicate tracking code - retry with a new code
+        console.warn(`Tracking code collision on attempt ${attempt + 1}, retrying...`);
+        continue;
+      }
+      // Some other error - rethrow
+      throw error;
+    }
+  }
+
+  throw new Error('Unable to create booking with unique tracking code after maximum attempts');
+}
+
+/**
  * Generate a unique tracking code for quote requests
  * Uses 8 characters to differentiate from booking codes and reduce collision chance
  */
@@ -51,11 +98,7 @@ export async function generateUniqueQuoteTrackingCode(maxAttempts = 10): Promise
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // Generate 8-character code for quote requests (vs 6 for bookings)
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      const randomIndex = Math.floor(Math.random() * ALLOWED_CHARS.length);
-      code += ALLOWED_CHARS[randomIndex];
-    }
+    const code = generateRandomCode(8);
 
     // Check if code already exists in active quote requests
     const existing = await QuoteRequest.findOne({
@@ -69,6 +112,45 @@ export async function generateUniqueQuoteTrackingCode(maxAttempts = 10): Promise
   }
 
   throw new Error('Unable to generate unique quote tracking code after maximum attempts');
+}
+
+/**
+ * Create a quote request with a unique tracking code, handling race conditions.
+ *
+ * @param quoteRequestData - The quote request data (without trackingCode)
+ * @param maxAttempts - Maximum retry attempts if duplicate key error occurs
+ * @returns The saved quote request document
+ */
+export async function createQuoteRequestWithTrackingCode(
+  quoteRequestData: Record<string, unknown>,
+  maxAttempts = 5
+): Promise<typeof QuoteRequest.prototype> {
+  await connectDB();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const code = generateRandomCode(8);
+
+    try {
+      const quoteRequest = new QuoteRequest({
+        ...quoteRequestData,
+        trackingCode: code,
+      });
+      await quoteRequest.save();
+      return quoteRequest;
+    } catch (error: unknown) {
+      // Check if this is a duplicate key error on trackingCode
+      const mongoError = error as { code?: number; keyPattern?: { trackingCode?: number } };
+      if (mongoError.code === 11000 && mongoError.keyPattern?.trackingCode) {
+        // Duplicate tracking code - retry with a new code
+        console.warn(`Quote tracking code collision on attempt ${attempt + 1}, retrying...`);
+        continue;
+      }
+      // Some other error - rethrow
+      throw error;
+    }
+  }
+
+  throw new Error('Unable to create quote request with unique tracking code after maximum attempts');
 }
 
 /**

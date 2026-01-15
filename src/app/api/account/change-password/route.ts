@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { authOptions } from "@/lib/auth";
+import { validatePassword } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,9 +27,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (newPassword.length < 6) {
+    // Validate new password meets security requirements
+    // Must be 8+ chars with uppercase, lowercase, number, and special character
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: "New password must be at least 6 characters" },
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }
