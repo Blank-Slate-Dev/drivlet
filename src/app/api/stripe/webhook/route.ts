@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
           serviceType: hasExisting
             ? `Existing Booking - ${metadata.garageName}`
             : (metadata.serviceType || 'Standard Service'),
+          serviceDate: metadata.serviceDate ? new Date(metadata.serviceDate) : new Date(),
           pickupAddress: metadata.pickupAddress,
           pickupTime: metadata.earliestPickup,
           dropoffTime: metadata.latestDropoff,

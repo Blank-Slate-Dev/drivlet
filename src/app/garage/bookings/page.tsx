@@ -29,6 +29,7 @@ interface Booking {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  serviceDate?: string;
   pickupAddress: string;
   pickupTime: string;
   guestPhone?: string;
@@ -314,6 +315,19 @@ export default function GarageBookingsPage() {
                           </div>
                         )}
 
+                        {booking.serviceDate && (
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <span>
+                              {new Date(booking.serviceDate).toLocaleDateString("en-AU", {
+                                weekday: "short",
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                           <MapPin className="h-4 w-4 text-slate-400" />
                           <span className="truncate">{booking.pickupAddress}</span>
@@ -321,14 +335,7 @@ export default function GarageBookingsPage() {
 
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                           <Clock className="h-4 w-4 text-slate-400" />
-                          <span>
-                            {new Date(booking.pickupTime).toLocaleString("en-AU", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </span>
+                          <span>Pickup: {booking.pickupTime}</span>
                         </div>
                       </div>
 

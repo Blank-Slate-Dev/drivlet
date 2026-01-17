@@ -21,6 +21,7 @@ import {
   Mail,
   Phone,
   Copy,
+  Calendar,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
@@ -96,6 +97,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [earliestPickup, setEarliestPickup] = useState('09:00');
   const [latestDropoff, setLatestDropoff] = useState('17:00');
   const [pickupAddress, setPickupAddress] = useState('');
+  const [serviceDate, setServiceDate] = useState('');
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
 
   // Guest checkout fields
@@ -153,6 +155,32 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const availableDropoffOptions = useMemo(() => {
     return allDropoffTimeOptions.filter((time) => time.minutes >= selectedPickupMinutes + MIN_GAP_MINUTES);
   }, [selectedPickupMinutes]);
+
+  // Get minimum date (tomorrow)
+  const getMinDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+
+  // Get maximum date (90 days from now)
+  const getMaxDate = () => {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 90);
+    return maxDate.toISOString().split('T')[0];
+  };
+
+  // Format date for display
+  const formatDateDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
   useEffect(() => {
     const isCurrentPickupValid = availablePickupOptions.some((t) => t.value === earliestPickup);
@@ -303,6 +331,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setRegoPlate('');
         setRegoState('NSW');
         setPickupAddress('');
+        setServiceDate('');
         setSelectedPlaceDetails(null);
         setSubmitError(null);
         setEarliestPickup('09:00');
@@ -370,6 +399,16 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (!pickupAddress.trim()) {
       return 'Please enter your pick-up address.';
     }
+    if (!serviceDate) {
+      return 'Please select a service date.';
+    }
+    // Validate date is not in the past
+    const selectedDate = new Date(serviceDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      return 'Service date cannot be in the past.';
+    }
     if (!earliestPickup) {
       return 'Please select a pick-up time.';
     }
@@ -417,6 +456,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           customerPhone,
           pickupAddress: pickupAddress.trim(),
           serviceType: 'Existing Garage Booking',
+          serviceDate: new Date(serviceDate).toISOString(),
           vehicleRegistration: regoPlate.trim().toUpperCase(),
           vehicleState: regoState,
           earliestPickup: getTimeLabel(earliestPickup, allPickupTimeOptions),
@@ -804,6 +844,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </div>
                         </div>
 
+                        {/* Service Date */}
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <Calendar className="h-4 w-4 text-emerald-600" />
+                            Service Date
+                          </h3>
+                          <p className="text-sm font-medium text-slate-900">
+                            {formatDateDisplay(serviceDate)}
+                          </p>
+                        </div>
+
                         {/* Times */}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -1089,6 +1140,30 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               </select>
                               <p className="text-xs text-slate-400">Available 9:00am – 7:00pm (min. 2hr gap)</p>
                             </div>
+                          </div>
+
+                          {/* Service Date */}
+                          <div className="space-y-1.5">
+                            <label htmlFor="serviceDate" className="text-sm font-medium text-slate-700">
+                              <span className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-emerald-600" />
+                                Preferred Service Date *
+                              </span>
+                            </label>
+                            <input
+                              type="date"
+                              id="serviceDate"
+                              value={serviceDate}
+                              onChange={(e) => setServiceDate(e.target.value)}
+                              min={getMinDate()}
+                              max={getMaxDate()}
+                              disabled={isProcessing}
+                              required
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                            />
+                            <p className="text-xs text-slate-400">
+                              Select a date between tomorrow and {formatDateDisplay(getMaxDate())}
+                            </p>
                           </div>
 
                           {/* Address with Autocomplete */}

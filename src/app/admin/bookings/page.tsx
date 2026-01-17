@@ -26,6 +26,7 @@ import {
   Building,
   CreditCard,
   ExternalLink,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
@@ -62,6 +63,7 @@ interface Booking {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  serviceDate?: string;
   pickupAddress: string;
   pickupTime: string;
   dropoffTime: string;
@@ -761,6 +763,19 @@ function ViewDetailsModal({
               <p className="text-xs text-slate-500">Service Type</p>
               <p className="font-medium text-slate-900">{booking.serviceType}</p>
             </div>
+            {booking.serviceDate && (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500">Service Date</p>
+                <p className="font-medium text-slate-900">
+                  {new Date(booking.serviceDate).toLocaleDateString('en-AU', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
+            )}
             {booking.primaryServiceCategory && (
               <div className="mt-3">
                 <p className="text-xs text-slate-500">Primary Category</p>

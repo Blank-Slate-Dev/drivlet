@@ -54,6 +54,7 @@ export interface IBooking extends Document {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  serviceDate: Date;
 
   // Tracking code for secure booking lookup
   trackingCode: string;
@@ -233,6 +234,18 @@ const BookingSchema = new Schema<IBooking>(
     serviceType: {
       type: String,
       required: true,
+    },
+    serviceDate: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function(date: Date) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return date >= today;
+        },
+        message: "Service date cannot be in the past"
+      }
     },
 
     // Tracking code for secure booking lookup
@@ -470,6 +483,7 @@ const BookingSchema = new Schema<IBooking>(
 
 // Indexes for efficient queries
 BookingSchema.index({ status: 1, createdAt: -1 });
+BookingSchema.index({ serviceDate: 1, status: 1 });
 BookingSchema.index({ trackingCode: 1, status: 1 });
 BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });

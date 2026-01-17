@@ -29,6 +29,7 @@ import {
   Wifi,
   WifiOff,
   Camera,
+  Calendar,
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
@@ -43,6 +44,7 @@ interface Booking {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  serviceDate?: string;
   pickupAddress: string;
   pickupTime: string;
   dropoffTime: string;
@@ -974,6 +976,17 @@ function TrackingContent() {
                       <Wrench className="h-4 w-4 text-slate-400" />
                       <span>Service: {booking.serviceType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                     </div>
+                    {booking.serviceDate && (
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span>Date: {new Date(booking.serviceDate).toLocaleDateString('en-AU', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}</span>
+                      </div>
+                    )}
                     {booking.garageName && (
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <MapPin className="h-4 w-4 text-slate-400" />
