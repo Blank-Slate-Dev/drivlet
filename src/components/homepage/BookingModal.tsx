@@ -976,10 +976,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             <p className="mt-1 text-sm text-slate-500">We&apos;ll collect, service, and return your car</p>
                           </div>
                         </div>
-                        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-emerald-700">
-                          <CreditCard className="h-4 w-4" />
-                          <span className="font-semibold">{PRICE_DISPLAY} AUD</span>
-                        </div>
                       </div>
 
                       {submitError && !isHighValueVehicle && (

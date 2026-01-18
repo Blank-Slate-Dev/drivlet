@@ -2,8 +2,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Users, Gauge, ShieldCheck, Car, Clock, MapPin } from 'lucide-react';
-import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
+import { Users, Gauge, ShieldCheck, Car, Clock } from 'lucide-react';
+import { FEATURES } from '@/lib/featureFlags';
 
 // Marketplace value props (when full service features are enabled)
 const marketplaceValueProps = [
@@ -43,7 +43,7 @@ const transportValueProps = [
   },
   {
     icon: Gauge,
-    title: `Flat ${TRANSPORT_PRICE_DISPLAY} rate`,
+    title: 'Transparent pricing',
     description:
       'One simple price covers pickup, delivery to your garage, and return. No hidden fees, no surprises.',
   },
