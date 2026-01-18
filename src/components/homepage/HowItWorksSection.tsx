@@ -38,7 +38,7 @@ const transportSteps = [
     step: '1',
     title: 'Book your transport',
     description:
-      'Enter your rego, pickup address, and your garage booking details. Quick and simple.',
+      'Enter your rego, pickup address, and your service centre booking details. Quick and simple.',
   },
   {
     step: '2',
@@ -48,15 +48,15 @@ const transportSteps = [
   },
   {
     step: '3',
-    title: 'Delivered to your garage',
+    title: 'Delivered to your service centre',
     description:
-      'We deliver your car to your booked garage and keep you updated every step of the way.',
+      'We deliver your car to your booked service centre and keep you updated every step of the way.',
   },
   {
     step: '4',
     title: 'Returned to you',
     description:
-      'Once your garage is done, we collect and return your car — hassle-free.',
+      'Once your service centre is done, we collect and return your car — hassle-free.',
   },
 ];
 

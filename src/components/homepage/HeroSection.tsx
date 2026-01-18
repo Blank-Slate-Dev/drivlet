@@ -44,12 +44,12 @@ export default function HeroSection({ onBookingClick }: HeroSectionProps) {
             className="text-center lg:text-left"
           >
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Servicing,
+              Car service
               <br />
               <span className="text-emerald-300">without the hassle</span>
             </h1>
             <p className="mt-5 text-lg text-emerald-100 sm:text-xl">
-              We pick up your car, deliver it to your garage, and return it — so you can get on with your day
+              We pick up your car, deliver it to your service centre, and return it — so you can get on with your day
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center lg:justify-start">

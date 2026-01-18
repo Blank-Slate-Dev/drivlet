@@ -39,13 +39,13 @@ const transportValueProps = [
     icon: Car,
     title: 'Door-to-door service',
     description:
-      'We collect your car from home or work, deliver it to your garage, and return it when done. No effort required.',
+      'We collect your car from home or work, deliver it to your service centre, and return it when done. No effort required.',
   },
   {
     icon: Gauge,
     title: 'Transparent pricing',
     description:
-      'One simple price covers pickup, delivery to your garage, and return. No hidden fees, no surprises.',
+      'One simple price covers pickup, delivery to your service centre, and return. No hidden fees, no surprises.',
   },
   {
     icon: ShieldCheck,

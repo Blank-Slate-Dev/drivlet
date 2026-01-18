@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { MapPin } from 'lucide-react';
+import { MapPin, Phone, Mail } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { FEATURES } from '@/lib/featureFlags';
 
@@ -30,9 +30,23 @@ export default function Footer() {
             <p className="text-sm text-emerald-200">
               Service done, without the run.
             </p>
-            <div className="mt-4 flex items-center gap-1 text-xs text-emerald-300">
-              <MapPin className="h-3.5 w-3.5" />
-              Based in Newcastle, NSW
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-emerald-200">
+                <Phone className="h-4 w-4 text-emerald-300" />
+                <a href="tel:1300470886" className="transition hover:text-white">
+                  1300 470 886
+                </a>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-emerald-200">
+                <Mail className="h-4 w-4 text-emerald-300" />
+                <a href="mailto:support@drivlet.com.au" className="transition hover:text-white">
+                  support@drivlet.com.au
+                </a>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-emerald-300">
+                <MapPin className="h-3.5 w-3.5" />
+                Based in Newcastle, NSW
+              </div>
             </div>
           </div>
 
@@ -102,14 +116,21 @@ export default function Footer() {
                     Vehicle Transport
                   </a>
                 </li>
+                {/* HIDDEN FOR PHASE 1 - Only one service now
                 <li>
                   <a href="#pricing" className="transition hover:text-white">
                     Flat Rate Pricing
                   </a>
                 </li>
+                */}
                 <li>
                   <a href="/track" className="transition hover:text-white">
                     Track Your Vehicle
+                  </a>
+                </li>
+                <li>
+                  <a href="#faq" className="transition hover:text-white">
+                    FAQs
                   </a>
                 </li>
               </ul>
