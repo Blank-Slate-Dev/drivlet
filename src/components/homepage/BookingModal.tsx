@@ -34,6 +34,7 @@ import {
   formatSelectedServices,
   getCategoryById,
 } from '@/constants/serviceCategories';
+import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '@/components/StripePaymentForm';
@@ -41,8 +42,8 @@ import StripePaymentForm from '@/components/StripePaymentForm';
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-// Price display
-const PRICE_DISPLAY = '$119.00';
+// Price display - $65 flat rate for transport only (Phase 1)
+const PRICE_DISPLAY = TRANSPORT_PRICE_DISPLAY;
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -424,8 +425,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return 'Please select your garage booking time.';
     }
 
-    // Service selection validation
-    if (getTotalSelectedCount(selectedServices) === 0) {
+    // Service selection validation (only required when marketplace features enabled)
+    if (FEATURES.SERVICE_SELECTION && getTotalSelectedCount(selectedServices) === 0) {
       return 'Please select at least one service type for your booking.';
     }
 
@@ -886,8 +887,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <p className="text-sm text-slate-900">{pickupAddress}</p>
                         </div>
 
-                        {/* Selected Services */}
-                        {getTotalSelectedCount(selectedServices) > 0 && (
+                        {/* Selected Services - HIDDEN IN PHASE 1 (Transport Only) */}
+                        {FEATURES.SERVICE_SELECTION && getTotalSelectedCount(selectedServices) > 0 && (
                           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-700">
                               <CheckCircle2 className="h-4 w-4" />
@@ -1253,22 +1254,27 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             </div>
                           </div>
 
-                          {/* Service Selection Section */}
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                            <ServiceSelector
-                              selectedServices={selectedServices}
-                              onServicesChange={setSelectedServices}
-                              primaryCategory={primaryServiceCategory}
-                              onPrimaryCategoryChange={setPrimaryServiceCategory}
-                              serviceNotes={serviceNotes}
-                              onServiceNotesChange={setServiceNotes}
-                              disabled={isProcessing}
-                            />
-                          </div>
+                          {/* Service Selection Section - HIDDEN IN PHASE 1 (Transport Only) */}
+                          {FEATURES.SERVICE_SELECTION && (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                              <ServiceSelector
+                                selectedServices={selectedServices}
+                                onServicesChange={setSelectedServices}
+                                primaryCategory={primaryServiceCategory}
+                                onPrimaryCategoryChange={setPrimaryServiceCategory}
+                                serviceNotes={serviceNotes}
+                                onServiceNotesChange={setServiceNotes}
+                                disabled={isProcessing}
+                              />
+                            </div>
+                          )}
 
                           {/* Garage Booking Section */}
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                            <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Garage Booking</h3>
+                            <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Existing Garage Booking</h3>
+                            <p className="mb-4 text-xs text-slate-600">
+                              Provide details of the booking you've already made with your garage. We'll coordinate the pickup and drop-off.
+                            </p>
 
                             <div className="space-y-4">
                               <div className="space-y-1.5">

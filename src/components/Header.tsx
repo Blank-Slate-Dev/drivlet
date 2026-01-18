@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   ArrowRight,
   User,
@@ -89,10 +90,12 @@ export default function Header({ onBookingClick }: HeaderProps) {
           <a href="#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
-          <Link href="/quotes/request" className="flex items-center gap-1.5 transition hover:text-emerald-600">
-            <FileText className="h-4 w-4" />
-            Get Quotes
-          </Link>
+          {FEATURES.QUOTE_SYSTEM && (
+            <Link href="/quotes/request" className="flex items-center gap-1.5 transition hover:text-emerald-600">
+              <FileText className="h-4 w-4" />
+              Get Quotes
+            </Link>
+          )}
           <Link href="/track" className="flex items-center gap-1.5 transition hover:text-emerald-600">
             <MapPin className="h-4 w-4" />
             Track my service
@@ -409,14 +412,16 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   FAQ
                 </a>
-                <Link
-                  href="/quotes/request"
-                  className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
-                  onClick={() => setShowMobileMenu(false)}
-                >
-                  <FileText className="h-4 w-4" />
-                  Get Quotes
-                </Link>
+                {FEATURES.QUOTE_SYSTEM && (
+                  <Link
+                    href="/quotes/request"
+                    className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Get Quotes
+                  </Link>
+                )}
                 <Link
                   href="/track"
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"

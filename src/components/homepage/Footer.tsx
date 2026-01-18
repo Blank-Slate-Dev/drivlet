@@ -4,6 +4,7 @@
 import Image from 'next/image';
 import { MapPin } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { FEATURES } from '@/lib/featureFlags';
 
 export default function Footer() {
   const { data: session, status } = useSession();
@@ -65,32 +66,55 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Popular Services */}
-          <div>
-            <h4 className="mb-4 font-semibold">Popular Services</h4>
-            <ul className="space-y-2 text-sm text-emerald-200">
-              <li>
-                <a href="#services" className="transition hover:text-white">
-                  Standard service
-                </a>
-              </li>
-              <li>
-                <a href="#services" className="transition hover:text-white">
-                  Major service
-                </a>
-              </li>
-              <li>
-                <a href="#services" className="transition hover:text-white">
-                  Logbook service
-                </a>
-              </li>
-              <li>
-                <a href="#services" className="transition hover:text-white">
-                  Car diagnostic
-                </a>
-              </li>
-            </ul>
-          </div>
+          {/* Popular Services - Hidden in Phase 1 (Transport Only) */}
+          {FEATURES.SERVICE_SELECTION ? (
+            <div>
+              <h4 className="mb-4 font-semibold">Popular Services</h4>
+              <ul className="space-y-2 text-sm text-emerald-200">
+                <li>
+                  <a href="#services" className="transition hover:text-white">
+                    Standard service
+                  </a>
+                </li>
+                <li>
+                  <a href="#services" className="transition hover:text-white">
+                    Major service
+                  </a>
+                </li>
+                <li>
+                  <a href="#services" className="transition hover:text-white">
+                    Logbook service
+                  </a>
+                </li>
+                <li>
+                  <a href="#services" className="transition hover:text-white">
+                    Car diagnostic
+                  </a>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <h4 className="mb-4 font-semibold">Our Service</h4>
+              <ul className="space-y-2 text-sm text-emerald-200">
+                <li>
+                  <a href="#how-it-works" className="transition hover:text-white">
+                    Vehicle Transport
+                  </a>
+                </li>
+                <li>
+                  <a href="#pricing" className="transition hover:text-white">
+                    Flat Rate Pricing
+                  </a>
+                </li>
+                <li>
+                  <a href="/track" className="transition hover:text-white">
+                    Track Your Vehicle
+                  </a>
+                </li>
+              </ul>
+            </div>
+          )}
 
           {/* Terms & Partner Links */}
           <div>

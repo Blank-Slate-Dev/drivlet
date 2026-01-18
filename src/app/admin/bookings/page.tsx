@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
+import { FEATURES } from "@/lib/featureFlags";
 
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
@@ -412,7 +413,7 @@ export default function AdminBookingsPage() {
                   <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-4">Customer</th>
                     <th className="px-4 py-4">Vehicle</th>
-                    <th className="px-4 py-4">Service</th>
+                    <th className="px-4 py-4">{FEATURES.SERVICE_SELECTION ? 'Service' : 'Details'}</th>
                     <th className="px-4 py-4">Pickup</th>
                     <th className="px-4 py-4">Stage</th>
                     <th className="px-4 py-4">Payment</th>
@@ -460,7 +461,7 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-700">
-                          {booking.serviceType}
+                          {FEATURES.SERVICE_SELECTION ? booking.serviceType : 'Transport'}
                         </p>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {booking.hasExistingBooking && (
@@ -469,7 +470,7 @@ export default function AdminBookingsPage() {
                               {booking.garageName}
                             </span>
                           )}
-                          {booking.selectedServices && booking.selectedServices.length > 0 && (
+                          {FEATURES.SERVICE_SELECTION && booking.selectedServices && booking.selectedServices.length > 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                               <Wrench className="h-3 w-3" />
                               {booking.selectedServices.reduce((acc, s) => acc + s.services.length, 0)} services
@@ -757,11 +758,11 @@ function ViewDetailsModal({
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Wrench className="h-4 w-4 text-emerald-600" />
-              Service Details
+              {FEATURES.SERVICE_SELECTION ? 'Service Details' : 'Transport Details'}
             </div>
             <div className="mt-3">
-              <p className="text-xs text-slate-500">Service Type</p>
-              <p className="font-medium text-slate-900">{booking.serviceType}</p>
+              <p className="text-xs text-slate-500">{FEATURES.SERVICE_SELECTION ? 'Service Type' : 'Booking Type'}</p>
+              <p className="font-medium text-slate-900">{FEATURES.SERVICE_SELECTION ? booking.serviceType : 'Vehicle Transport'}</p>
             </div>
             {booking.serviceDate && (
               <div className="mt-3">
@@ -776,7 +777,7 @@ function ViewDetailsModal({
                 </p>
               </div>
             )}
-            {booking.primaryServiceCategory && (
+            {FEATURES.SERVICE_SELECTION && booking.primaryServiceCategory && (
               <div className="mt-3">
                 <p className="text-xs text-slate-500">Primary Category</p>
                 <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
@@ -786,8 +787,8 @@ function ViewDetailsModal({
             )}
           </div>
 
-          {/* Selected Services */}
-          {booking.selectedServices && booking.selectedServices.length > 0 && (
+          {/* Selected Services - Hidden in Phase 1 (Transport Only) */}
+          {FEATURES.SERVICE_SELECTION && booking.selectedServices && booking.selectedServices.length > 0 && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
                 <Wrench className="h-4 w-4" />

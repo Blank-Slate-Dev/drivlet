@@ -22,6 +22,7 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { SERVICE_CATEGORIES, COMMON_SERVICES } from '@/constants/serviceCategories';
+import { FEATURES } from '@/lib/featureFlags';
 
 // Icon mapping
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -114,6 +115,11 @@ export default function InteractiveServicesSection({
 }: InteractiveServicesSectionProps) {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+
+  // Hide interactive services section in Phase 1 (transport-only mode)
+  if (!FEATURES.SERVICE_SELECTION) {
+    return null;
+  }
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategory(expandedCategory === categoryId ? null : categoryId);

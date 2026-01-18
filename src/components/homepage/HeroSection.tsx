@@ -4,6 +4,7 @@
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ShieldCheck, ArrowRight, CheckCircle2, Star } from 'lucide-react';
+import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
 
 interface HeroSectionProps {
   onBookingClick: () => void;
@@ -44,12 +45,25 @@ export default function HeroSection({ onBookingClick }: HeroSectionProps) {
             className="text-center lg:text-left"
           >
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Car servicing,
-              <br />
-              <span className="text-emerald-300">made easy</span>
+              {FEATURES.SERVICE_SELECTION ? (
+                <>
+                  Car servicing,
+                  <br />
+                  <span className="text-emerald-300">made easy</span>
+                </>
+              ) : (
+                <>
+                  Vehicle transport
+                  <br />
+                  <span className="text-emerald-300">to your garage</span>
+                </>
+              )}
             </h1>
             <p className="mt-5 text-lg text-emerald-100 sm:text-xl">
-              Hassle-free pick-up, service and drop-off while you work
+              {FEATURES.SERVICE_SELECTION
+                ? 'Hassle-free pick-up, service and drop-off while you work'
+                : `We pick up your car, deliver it to your garage, and return it — just ${TRANSPORT_PRICE_DISPLAY}`
+              }
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
@@ -58,7 +72,7 @@ export default function HeroSection({ onBookingClick }: HeroSectionProps) {
                 onClick={onBookingClick}
                 className="group inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
               >
-                Book a service
+                {FEATURES.SERVICE_SELECTION ? 'Book a service' : 'Book Transport'}
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </button>
             </div>

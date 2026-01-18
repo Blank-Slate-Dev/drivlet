@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { getRandomServices, type ServiceItem } from '@/constants/allServices';
+import { FEATURES } from '@/lib/featureFlags';
 
 // Rainbow spectrum color palette for service card tops
 // Sequential assignment ensures no duplicate colors visible at the same time
@@ -46,8 +47,15 @@ export default function ServicesSection({ onBookingClick }: ServicesSectionProps
 
   // Generate random services on mount (client-side only to prevent hydration mismatch)
   useEffect(() => {
-    setDisplayedServices(getRandomServices(4));
+    if (FEATURES.SERVICE_SELECTION) {
+      setDisplayedServices(getRandomServices(4));
+    }
   }, []);
+
+  // Hide services section in Phase 1 (transport-only mode)
+  if (!FEATURES.SERVICE_SELECTION) {
+    return null;
+  }
 
   // Show skeleton/placeholder while loading to prevent layout shift
   if (displayedServices.length === 0) {

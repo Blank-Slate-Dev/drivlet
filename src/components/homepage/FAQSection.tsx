@@ -4,8 +4,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
 
-const faqs = [
+// Marketplace FAQs (when full service features are enabled)
+const marketplaceFaqs = [
   {
     question: 'Who is going to drive my car?',
     answer:
@@ -38,8 +40,43 @@ const faqs = [
   },
 ];
 
+// Transport-only FAQs (Phase 1)
+const transportFaqs = [
+  {
+    question: 'Who is going to drive my car?',
+    answer:
+      'All drivlet drivers are fully insured, background-checked professionals. We treat every car as if it were our own.',
+  },
+  {
+    question: `What does the ${TRANSPORT_PRICE_DISPLAY} cover?`,
+    answer:
+      `The ${TRANSPORT_PRICE_DISPLAY} flat rate covers picking up your car from your location, delivering it to your chosen garage, then collecting and returning it to you once the service is complete. No hidden fees.`,
+  },
+  {
+    question: 'Do I need an existing garage booking?',
+    answer:
+      'Yes, for now you need to have an existing booking with your garage. We handle the transport — picking up, delivering, and returning your car.',
+  },
+  {
+    question: 'How and when do I pay?',
+    answer:
+      `You pay ${TRANSPORT_PRICE_DISPLAY} upfront when you book. Your garage service is paid separately to your garage as usual.`,
+  },
+  {
+    question: 'Can I cancel my booking?',
+    answer:
+      'Yes, you can cancel or reschedule free of charge up to 24 hours before your scheduled pick-up time.',
+  },
+  {
+    question: 'What areas do you service?',
+    answer:
+      'We currently operate in the Newcastle, NSW region and surrounding suburbs. We are expanding to more areas soon.',
+  },
+];
+
 export default function FAQSection() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const faqs = FEATURES.SERVICE_SELECTION ? marketplaceFaqs : transportFaqs;
 
   return (
     <section
@@ -51,7 +88,10 @@ export default function FAQSection() {
           {/* Left: Title */}
           <div>
             <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              Common questions about booking at drivlet
+              {FEATURES.SERVICE_SELECTION
+                ? 'Common questions about booking at drivlet'
+                : 'Common questions about our transport service'
+              }
             </h2>
           </div>
 

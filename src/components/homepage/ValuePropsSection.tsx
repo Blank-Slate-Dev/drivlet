@@ -2,9 +2,11 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Users, Gauge, ShieldCheck, Car } from 'lucide-react';
+import { Users, Gauge, ShieldCheck, Car, Clock, MapPin } from 'lucide-react';
+import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
 
-const valueProps = [
+// Marketplace value props (when full service features are enabled)
+const marketplaceValueProps = [
   {
     icon: Users,
     title: 'Advisors on your side',
@@ -31,13 +33,46 @@ const valueProps = [
   },
 ];
 
+// Transport-only value props (Phase 1)
+const transportValueProps = [
+  {
+    icon: Car,
+    title: 'Door-to-door service',
+    description:
+      'We collect your car from home or work, deliver it to your garage, and return it when done. No effort required.',
+  },
+  {
+    icon: Gauge,
+    title: `Flat ${TRANSPORT_PRICE_DISPLAY} rate`,
+    description:
+      'One simple price covers pickup, delivery to your garage, and return. No hidden fees, no surprises.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Fully insured drivers',
+    description:
+      'All our drivers are background-checked professionals with full insurance. Your car is in safe hands.',
+  },
+  {
+    icon: Clock,
+    title: 'Real-time tracking',
+    description:
+      'Track your vehicle at every step. Know exactly where your car is and when it will be returned.',
+  },
+];
+
 export default function ValuePropsSection() {
+  const valueProps = FEATURES.SERVICE_SELECTION ? marketplaceValueProps : transportValueProps;
+
   return (
     <section className="relative border-b border-slate-200 bg-white py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-            Simply book online and we&apos;ll handle the rest
+            {FEATURES.SERVICE_SELECTION
+              ? "Simply book online and we'll handle the rest"
+              : "Vehicle transport, simplified"
+            }
           </h2>
         </div>
 

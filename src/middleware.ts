@@ -2,10 +2,20 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
+// Check if quote system is enabled (Phase 1: disabled)
+const QUOTE_SYSTEM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_QUOTE_SYSTEM === 'true';
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
+
+    // ========== PHASE 1: BLOCK QUOTE ROUTES ==========
+    // Quote routes are disabled until marketplace features are enabled
+    if (!QUOTE_SYSTEM_ENABLED && pathname.startsWith("/quotes")) {
+      // Redirect to homepage with a message
+      return NextResponse.redirect(new URL("/?feature=coming-soon", req.url));
+    }
 
     // ========== GARAGE ROUTES ==========
     // Garage dashboard routes require garage role and approval
@@ -123,6 +133,11 @@ export default withAuth(
           return true;
         }
 
+        // Quote routes - public when enabled (will be blocked by middleware if disabled)
+        if (pathname.startsWith("/quotes")) {
+          return true;
+        }
+
         // All other protected routes require authentication
         return !!token;
       },
@@ -141,7 +156,8 @@ export const config = {
     "/driver/earnings/:path*",
     "/driver/settings/:path*",
     "/driver/pending",
-    "/driver/onboarding/:path*", // NEW: Onboarding routes
+    "/driver/onboarding/:path*",
     "/admin/:path*",
+    "/quotes/:path*", // Phase 1: blocked when QUOTE_SYSTEM disabled
   ],
 };

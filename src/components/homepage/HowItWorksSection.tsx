@@ -2,8 +2,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { FEATURES } from '@/lib/featureFlags';
 
-const steps = [
+// Full service steps (when marketplace features are enabled)
+const marketplaceSteps = [
   {
     step: '1',
     title: 'Book online in 2 clicks',
@@ -30,7 +32,37 @@ const steps = [
   },
 ];
 
+// Transport-only steps (Phase 1)
+const transportSteps = [
+  {
+    step: '1',
+    title: 'Book your transport',
+    description:
+      'Enter your rego, pickup address, and your garage booking details. Quick and simple.',
+  },
+  {
+    step: '2',
+    title: 'We collect your car',
+    description:
+      'Our fully insured drivers pick up your car from home, work, or wherever suits you.',
+  },
+  {
+    step: '3',
+    title: 'Delivered to your garage',
+    description:
+      'We deliver your car to your booked garage and keep you updated every step of the way.',
+  },
+  {
+    step: '4',
+    title: 'Returned to you',
+    description:
+      'Once your garage is done, we collect and return your car — hassle-free.',
+  },
+];
+
 export default function HowItWorksSection() {
+  const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
+
   return (
     <section
       id="how-it-works"
@@ -42,7 +74,7 @@ export default function HowItWorksSection() {
             How it works
           </h2>
           <p className="mt-3 text-lg text-slate-600">
-            Car servicing, made easy in{' '}
+            {FEATURES.SERVICE_SELECTION ? 'Car servicing, made easy in' : 'Vehicle transport, made easy in'}{' '}
             <span className="relative inline-block font-semibold">
               4 steps
               <svg
