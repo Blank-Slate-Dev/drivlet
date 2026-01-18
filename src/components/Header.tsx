@@ -81,9 +81,11 @@ export default function Header({ onBookingClick }: HeaderProps) {
           <a href="#how-it-works" className="transition hover:text-emerald-600">
             How it works
           </a>
+          {/* HIDDEN FOR PHASE 1 - Services section hidden
           <a href="#services" className="transition hover:text-emerald-600">
             Our services
           </a>
+          */}
           {/* HIDDEN FOR PHASE 1 - Pricing link leads nowhere
           <a href="#pricing" className="transition hover:text-emerald-600">
             Pricing
@@ -393,6 +395,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   How it works
                 </a>
+                {/* HIDDEN FOR PHASE 1 - Services section hidden
                 <a
                   href="#services"
                   className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
@@ -400,6 +403,7 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   Our services
                 </a>
+                */}
                 {/* HIDDEN FOR PHASE 1 - Pricing link leads nowhere
                 <a
                   href="#pricing"
