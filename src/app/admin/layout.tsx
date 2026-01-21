@@ -91,24 +91,22 @@ export default function AdminLayout({
           />
         </div>
         <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-                <Image
-                  src="/logo.png"
-                  alt="drivlet"
-                  fill
-                  className="object-contain brightness-0 invert"
-                  priority
-                />
-              </div>
-            </Link>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+              <Image
+                src="/logo.png"
+                alt="drivlet"
+                fill
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+          </Link>
+          <nav className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-300">
               <Shield className="h-3.5 w-3.5" />
               Admin Panel
             </span>
-          </div>
-          <nav className="flex items-center gap-1">
             <Link
               href="/admin/dashboard"
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
