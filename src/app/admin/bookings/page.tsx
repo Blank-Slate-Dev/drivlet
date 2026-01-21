@@ -27,6 +27,8 @@ import {
   CreditCard,
   ExternalLink,
   Calendar,
+  Copy,
+  QrCode,
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
@@ -68,8 +70,10 @@ interface Booking {
   pickupAddress: string;
   pickupTime: string;
   dropoffTime: string;
+  trackingCode?: string;
   hasExistingBooking: boolean;
   garageName?: string;
+  garageAddress?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
   paymentStatus?: string;
@@ -288,7 +292,22 @@ export default function AdminBookingsPage() {
 
   // Generate tracking link for a booking
   const getTrackingLink = (booking: Booking) => {
+    if (booking.trackingCode) {
+      return `/track?code=${encodeURIComponent(booking.trackingCode)}`;
+    }
+    // Fallback to email + rego if no tracking code
     return `/track?email=${encodeURIComponent(booking.userEmail)}&rego=${encodeURIComponent(booking.vehicleRegistration)}`;
+  };
+
+  // Copy text to clipboard
+  const copyToClipboard = async (text: string, label: string = "Text") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setSuccessMessage(`${label} copied to clipboard`);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      setSuccessMessage("Failed to copy to clipboard");
+    }
   };
 
   return (
@@ -596,6 +615,7 @@ export default function AdminBookingsPage() {
             formatDate={formatDate}
             formatCurrency={formatCurrency}
             getTrackingLink={getTrackingLink}
+            copyToClipboard={copyToClipboard}
           />
         )}
 
@@ -621,6 +641,7 @@ function ViewDetailsModal({
   formatDate,
   formatCurrency,
   getTrackingLink,
+  copyToClipboard,
 }: {
   booking: Booking;
   onClose: () => void;
@@ -630,6 +651,7 @@ function ViewDetailsModal({
   formatDate: (date: string) => string;
   formatCurrency: (cents: number) => string;
   getTrackingLink: (booking: Booking) => string;
+  copyToClipboard: (text: string, label: string) => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -662,6 +684,65 @@ function ViewDetailsModal({
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-medium text-slate-500">Booking ID</p>
             <p className="font-mono text-sm text-slate-900">{booking._id}</p>
+          </div>
+
+          {/* Tracking Information */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 mb-3">
+              <QrCode className="h-4 w-4" />
+              Tracking Information
+            </div>
+            <div className="space-y-3">
+              {/* Tracking Code */}
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Tracking Code</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-mono text-slate-900 border border-emerald-200">
+                    {booking.trackingCode || 'Not available'}
+                  </code>
+                  {booking.trackingCode && (
+                    <button
+                      onClick={() => copyToClipboard(booking.trackingCode!, 'Tracking code')}
+                      className="rounded-lg p-2 bg-emerald-500 text-white hover:bg-emerald-600 transition"
+                      title="Copy tracking code"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tracking URL */}
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Tracking URL</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}${getTrackingLink(booking)}`}
+                    className="flex-1 rounded-lg bg-white px-3 py-2 text-xs text-slate-700 border border-emerald-200"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(`${window.location.origin}${getTrackingLink(booking)}`, 'Tracking URL')}
+                    className="rounded-lg p-2 bg-slate-500 text-white hover:bg-slate-600 transition"
+                    title="Copy tracking URL"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* View Tracking Page Button */}
+              <Link
+                href={getTrackingLink(booking)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View Customer Tracking Page
+              </Link>
+            </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
