@@ -41,6 +41,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid password");
         }
 
+        // Check account status - prevent suspended or deleted users from logging in
+        if (user.accountStatus === "suspended") {
+          throw new Error("Your account has been suspended. Please contact support.");
+        }
+        if (user.accountStatus === "deleted") {
+          throw new Error("This account no longer exists.");
+        }
+
         // If user is a driver, fetch their onboarding status
         let onboardingStatus: OnboardingStatus | undefined;
         let canAcceptJobs: boolean | undefined;

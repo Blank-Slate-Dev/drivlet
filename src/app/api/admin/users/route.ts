@@ -12,6 +12,14 @@ interface CombinedUser {
   email?: string;
   name?: string;
   role: UserRole | "guest";
+  accountStatus: "active" | "suspended" | "deleted";
+  suspensionInfo?: {
+    suspendedAt: string;
+    suspendedBy: string;
+    reason: string;
+    suspendedUntil?: string;
+    notes?: string;
+  };
   bookingCount: number;
   isGuest: boolean;
   phone?: string;
@@ -31,8 +39,10 @@ export async function GET() {
   try {
     await connectDB();
 
-    // Get all registered users (excluding password)
-    const registeredUsers = await User.find({})
+    // Get all registered users (excluding password and deleted users)
+    const registeredUsers = await User.find({
+      accountStatus: { $ne: "deleted" }
+    })
       .select("-password")
       .sort({ createdAt: -1 })
       .lean();
@@ -93,11 +103,21 @@ export async function GET() {
     // Combine registered users with booking data
     const combinedUsers: CombinedUser[] = registeredUsers.map((user) => {
       const bookingStats = registeredBookingMap[user._id.toString()];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const userDoc = user as any;
       return {
         _id: user._id.toString(),
         username: user.username,
         email: user.email,
         role: user.role || "user",
+        accountStatus: userDoc.accountStatus || "active",
+        suspensionInfo: userDoc.suspensionInfo ? {
+          suspendedAt: userDoc.suspensionInfo.suspendedAt?.toISOString(),
+          suspendedBy: userDoc.suspensionInfo.suspendedBy?.toString(),
+          reason: userDoc.suspensionInfo.reason,
+          suspendedUntil: userDoc.suspensionInfo.suspendedUntil?.toISOString(),
+          notes: userDoc.suspensionInfo.notes,
+        } : undefined,
         bookingCount: bookingStats?.count || 0,
         isGuest: false,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
@@ -121,6 +141,7 @@ export async function GET() {
           email: guest.userEmail,
           phone: guest.guestPhone,
           role: "guest",
+          accountStatus: "active", // Guests are always active
           bookingCount: guest.count,
           isGuest: true,
           createdAt: guest.firstBooking?.toISOString() || new Date().toISOString(),

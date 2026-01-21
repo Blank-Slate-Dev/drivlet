@@ -2,6 +2,25 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type UserRole = "user" | "admin" | "garage" | "driver";
+export type AccountStatus = "active" | "suspended" | "deleted";
+
+export interface ISuspensionInfo {
+  suspendedAt: Date;
+  suspendedBy: mongoose.Types.ObjectId;
+  reason: string;
+  suspendedUntil?: Date;
+  notes?: string;
+}
+
+export interface ISuspensionHistoryEntry {
+  suspendedAt: Date;
+  suspendedBy: mongoose.Types.ObjectId;
+  reason: string;
+  suspendedUntil?: Date;
+  reactivatedAt?: Date;
+  reactivatedBy?: mongoose.Types.ObjectId;
+  notes?: string;
+}
 
 export interface IUser extends Document {
   username: string;
@@ -11,6 +30,13 @@ export interface IUser extends Document {
   garageProfile?: mongoose.Types.ObjectId;
   driverProfile?: mongoose.Types.ObjectId;
   isApproved: boolean;
+
+  // Account status fields
+  accountStatus: AccountStatus;
+  suspensionInfo?: ISuspensionInfo;
+  suspensionHistory: ISuspensionHistoryEntry[];
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 
   // Garage location fields (for garage users without full profile yet)
   garageLocationId?: string; // Google Place ID
@@ -64,6 +90,32 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: true, // Auto-approve customers, garages and drivers need manual approval
     },
+
+    // Account status fields
+    accountStatus: {
+      type: String,
+      enum: ["active", "suspended", "deleted"],
+      default: "active",
+      index: true,
+    },
+    suspensionInfo: {
+      suspendedAt: { type: Date },
+      suspendedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      reason: { type: String },
+      suspendedUntil: { type: Date },
+      notes: { type: String, maxlength: 500 },
+    },
+    suspensionHistory: [{
+      suspendedAt: { type: Date, required: true },
+      suspendedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      reason: { type: String, required: true },
+      suspendedUntil: { type: Date },
+      reactivatedAt: { type: Date },
+      reactivatedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      notes: { type: String, maxlength: 500 },
+    }],
+    deletedAt: { type: Date },
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
 
     // Garage location fields (for garage users without full profile yet)
     garageLocationId: {
