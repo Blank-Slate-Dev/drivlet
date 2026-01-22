@@ -25,6 +25,9 @@ import {
   FileText,
   Briefcase,
   Star,
+  Trash2,
+  AlertTriangle,
+  History,
 } from "lucide-react";
 
 interface Driver {
@@ -93,6 +96,11 @@ interface Driver {
   submittedAt: string;
   reviewedAt?: string;
   rejectionReason?: string;
+  rejectionHistory?: Array<{
+    rejectedAt: string;
+    rejectedBy: string;
+    reason: string;
+  }>;
   isActive: boolean;
   canAcceptJobs: boolean;
   userId?: {
@@ -149,6 +157,9 @@ export default function AdminDriversPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [driverToReject, setDriverToReject] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const fetchDrivers = useCallback(async () => {
     try {
@@ -203,6 +214,43 @@ export default function AdminDriversPage() {
   const openRejectModal = (driverId: string) => {
     setDriverToReject(driverId);
     setShowRejectModal(true);
+  };
+
+  const handleDelete = async (driverId: string) => {
+    if (deleteConfirmText !== "DELETE") {
+      setError("Please type DELETE to confirm");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(
+        `/api/admin/drivers?driverId=${driverId}&confirm=true`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete driver");
+      }
+
+      // Refresh the list
+      await fetchDrivers();
+      setShowDeleteModal(false);
+      setDriverToDelete(null);
+      setDeleteConfirmText("");
+      setSelectedDriver(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete driver");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openDeleteModal = (driverId: string) => {
+    setDriverToDelete(driverId);
+    setDeleteConfirmText("");
+    setShowDeleteModal(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -545,6 +593,18 @@ export default function AdminDriversPage() {
                                 Reject
                               </button>
                             </>
+                          )}
+                          {driver.status === "rejected" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteModal(driver._id);
+                              }}
+                              className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </button>
                           )}
                         </div>
                       </td>
@@ -915,6 +975,54 @@ export default function AdminDriversPage() {
                     </button>
                   </div>
                 )}
+
+                {/* Rejection History */}
+                {selectedDriver.rejectionHistory && selectedDriver.rejectionHistory.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3">
+                      <History className="h-4 w-4 text-red-600" />
+                      Rejection History
+                    </div>
+                    <div className="space-y-3">
+                      {selectedDriver.rejectionHistory.map((rejection, index) => (
+                        <div key={index} className="bg-red-50 rounded-lg p-3 text-sm border border-red-100">
+                          <div className="flex justify-between items-start">
+                            <span className="text-red-800 font-medium">
+                              Rejected {formatDate(rejection.rejectedAt)}
+                            </span>
+                          </div>
+                          <p className="text-red-700 mt-1">{rejection.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Delete Option for Rejected Applications */}
+                {selectedDriver.status === "rejected" && (
+                  <div className="pt-4 border-t border-red-200 bg-red-50 -mx-6 -mb-6 p-6 rounded-b-3xl mt-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-red-900">Permanent Deletion</h4>
+                        <p className="text-xs text-red-700 mt-1">
+                          This application was rejected
+                          {selectedDriver.reviewedAt && ` on ${formatDate(selectedDriver.reviewedAt)}`}.
+                          {selectedDriver.rejectionReason && (
+                            <span className="block mt-1">Reason: {selectedDriver.rejectionReason}</span>
+                          )}
+                        </p>
+                        <button
+                          onClick={() => openDeleteModal(selectedDriver._id)}
+                          className="mt-3 flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete Application
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -952,6 +1060,63 @@ export default function AdminDriversPage() {
                   className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
                 >
                   {actionLoading ? "Rejecting..." : "Confirm Rejection"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Delete Application</h3>
+                  <p className="text-sm text-slate-500">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <p className="text-sm text-red-800">
+                  This will permanently delete the driver application and all associated data.
+                  The user account will be converted back to a regular customer account.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Type <span className="font-mono bg-slate-100 px-1 rounded">DELETE</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDriverToDelete(null);
+                    setDeleteConfirmText("");
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => driverToDelete && handleDelete(driverToDelete)}
+                  disabled={actionLoading || deleteConfirmText !== "DELETE"}
+                  className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {actionLoading ? "Deleting..." : "Permanently Delete"}
                 </button>
               </div>
             </div>

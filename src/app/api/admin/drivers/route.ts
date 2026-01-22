@@ -179,16 +179,25 @@ export async function PATCH(request: Request) {
       // Note: We keep onboardingStatus as-is for record keeping
       // The canAcceptJobs = false is what matters for blocking
     } else if (action === "reject") {
+      // Validate admin ID exists before proceeding
+      const adminId = adminCheck.session?.user?.id;
+      if (!adminId) {
+        return NextResponse.json(
+          { error: "Admin session invalid" },
+          { status: 401 }
+        );
+      }
+
       // PRESERVE AUDIT TRAIL: Add to rejection history before updating
       if (!driver.rejectionHistory) {
         driver.rejectionHistory = [];
       }
       driver.rejectionHistory.push({
         rejectedAt: new Date(),
-        rejectedBy: new mongoose.Types.ObjectId(adminCheck.session?.user.id || ""),
+        rejectedBy: new mongoose.Types.ObjectId(adminId),
         reason: rejectionReason || "No reason provided",
       });
-      
+
       // STATUS CLARITY:
       // - driver.status = "rejected" (set by statusMap above) = admin decision, source of truth
       // - driver.onboardingStatus = "not_started" = reset for potential re-application
@@ -219,8 +228,103 @@ export async function PATCH(request: Request) {
     });
   } catch (error) {
     console.error("Error updating driver:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Detailed error:", errorMessage);
     return NextResponse.json(
-      { error: "Failed to update driver" },
+      {
+        error: "Failed to update driver",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/admin/drivers - Permanently delete a driver application
+export async function DELETE(request: Request) {
+  const adminCheck = await requireAdmin();
+  if (!adminCheck.authorized) {
+    return adminCheck.response;
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const driverId = searchParams.get("driverId");
+    const confirmDelete = searchParams.get("confirm") === "true";
+
+    if (!driverId) {
+      return NextResponse.json(
+        { error: "Driver ID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!confirmDelete) {
+      return NextResponse.json(
+        { error: "Deletion must be confirmed" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    const driver = await Driver.findById(driverId);
+    if (!driver) {
+      return NextResponse.json(
+        { error: "Driver not found" },
+        { status: 404 }
+      );
+    }
+
+    // SAFETY: Only allow deletion of rejected or pending applications
+    // Approved/suspended drivers should be handled differently to preserve history
+    if (!["rejected", "pending"].includes(driver.status)) {
+      return NextResponse.json(
+        { error: "Can only delete rejected or pending applications. Suspend approved drivers instead." },
+        { status: 400 }
+      );
+    }
+
+    // Check for any completed bookings - prevent deletion if driver has job history
+    const Booking = (await import("@/models/Booking")).default;
+    const hasBookings = await Booking.exists({
+      assignedDriverId: driver._id,
+      status: { $in: ["completed", "in_progress"] },
+    });
+
+    if (hasBookings) {
+      return NextResponse.json(
+        { error: "Cannot delete driver with booking history. Archive instead." },
+        { status: 400 }
+      );
+    }
+
+    // Get associated user
+    const user = await User.findById(driver.userId);
+
+    // Delete driver document
+    await Driver.findByIdAndDelete(driverId);
+
+    // Update user: remove driver profile reference and reset role
+    if (user) {
+      user.driverProfile = undefined;
+      user.role = "user";
+      user.isApproved = true; // Reset to standard user
+      await user.save();
+    }
+
+    // Log deletion for audit
+    console.log(`[ADMIN ACTION] Driver ${driverId} permanently deleted by admin ${adminCheck.session?.user?.id}`);
+
+    return NextResponse.json({
+      success: true,
+      message: "Driver application permanently deleted",
+      deletedDriverId: driverId,
+    });
+  } catch (error) {
+    console.error("Error deleting driver:", error);
+    return NextResponse.json(
+      { error: "Failed to delete driver" },
       { status: 500 }
     );
   }
