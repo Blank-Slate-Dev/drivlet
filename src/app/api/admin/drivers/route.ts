@@ -106,6 +106,16 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { driverId, action, rejectionReason } = body;
 
+    // CRITICAL: Validate admin ID exists before any operations
+    const adminId = adminCheck.session?.user?.id;
+    if (!adminId) {
+      console.error("Admin session missing user ID:", adminCheck.session);
+      return NextResponse.json(
+        { error: "Admin session invalid - please log out and log back in" },
+        { status: 401 }
+      );
+    }
+
     if (!driverId || !action) {
       return NextResponse.json(
         { error: "Driver ID and action are required" },
@@ -140,11 +150,9 @@ export async function PATCH(request: Request) {
 
     driver.status = statusMap[action];
     driver.reviewedAt = new Date();
-    
-    // Convert string ID to ObjectId for reviewedBy
-    if (adminCheck.session?.user.id) {
-      driver.reviewedBy = new mongoose.Types.ObjectId(adminCheck.session.user.id);
-    }
+
+    // Convert string ID to ObjectId for reviewedBy (adminId already validated above)
+    driver.reviewedBy = new mongoose.Types.ObjectId(adminId);
 
     if (action === "reject" && rejectionReason) {
       driver.rejectionReason = rejectionReason;
@@ -179,15 +187,6 @@ export async function PATCH(request: Request) {
       // Note: We keep onboardingStatus as-is for record keeping
       // The canAcceptJobs = false is what matters for blocking
     } else if (action === "reject") {
-      // Validate admin ID exists before proceeding
-      const adminId = adminCheck.session?.user?.id;
-      if (!adminId) {
-        return NextResponse.json(
-          { error: "Admin session invalid" },
-          { status: 401 }
-        );
-      }
-
       // PRESERVE AUDIT TRAIL: Add to rejection history before updating
       if (!driver.rejectionHistory) {
         driver.rejectionHistory = [];
@@ -228,12 +227,19 @@ export async function PATCH(request: Request) {
     });
   } catch (error) {
     console.error("Error updating driver:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Detailed error:", errorMessage);
+    // Log detailed error for debugging
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return NextResponse.json(
       {
         error: "Failed to update driver",
-        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+        // Include details in development for debugging
+        ...(process.env.NODE_ENV === "development" && {
+          details: error instanceof Error ? error.message : "Unknown error"
+        })
       },
       { status: 500 }
     );
