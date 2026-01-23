@@ -470,7 +470,7 @@ export default function AdminDashboardPage() {
                     {stats?.overview.totalUsers || 0}
                   </span>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-1">Users & Drivers</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">All Users</h3>
                 <p className="text-sm text-slate-600 mb-4">Manage user accounts</p>
                 <div className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
                   Manage{" "}
