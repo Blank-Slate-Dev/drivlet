@@ -30,7 +30,11 @@
       "Bash(cmd /c \"rmdir /s /q .next 2>nul\")",
       "Bash(head:*)",
       "Bash(npx eslint:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(brew services:*)",
+      "Bash(mongosh:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
