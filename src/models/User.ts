@@ -37,6 +37,10 @@ export interface IUser extends Document {
   verificationCode?: string;
   verificationCodeExpires?: Date;
 
+  // Auto-login token (for post-verification auto-login)
+  autoLoginToken?: string;
+  autoLoginTokenExpires?: Date;
+
   // Account status fields
   accountStatus: AccountStatus;
   suspensionInfo?: ISuspensionInfo;
@@ -111,6 +115,16 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     verificationCodeExpires: {
+      type: Date,
+      default: null,
+    },
+
+    // Auto-login token (for post-verification auto-login)
+    autoLoginToken: {
+      type: String,
+      default: null,
+    },
+    autoLoginTokenExpires: {
       type: Date,
       default: null,
     },

@@ -16,13 +16,77 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        autoLoginToken: { label: "Auto Login Token", type: "text" },
       },
       async authorize(credentials) {
+        await connectDB();
+
+        // Check for auto-login token first (used after email verification)
+        if (credentials?.autoLoginToken) {
+          const user = await User.findOne({
+            autoLoginToken: credentials.autoLoginToken,
+            autoLoginTokenExpires: { $gt: new Date() },
+          });
+
+          if (user) {
+            // Clear the token after use (one-time use)
+            user.autoLoginToken = undefined;
+            user.autoLoginTokenExpires = undefined;
+            await user.save();
+
+            console.log("Auto-login successful for:", user.email);
+
+            // Fetch additional data for drivers
+            let onboardingStatus: OnboardingStatus | undefined;
+            let canAcceptJobs: boolean | undefined;
+
+            if (user.role === "driver" && user.driverProfile) {
+              const driver = await Driver.findById(user.driverProfile);
+              if (driver) {
+                onboardingStatus = driver.onboardingStatus;
+                canAcceptJobs = driver.canAcceptJobs;
+              }
+            }
+
+            // Fetch additional data for garages
+            let linkedGarageName: string | undefined;
+            let linkedGarageAddress: string | undefined;
+            let linkedGaragePlaceId: string | undefined;
+            let garageStatus: string | undefined;
+
+            if (user.role === "garage" && user.garageProfile) {
+              const garage = await Garage.findById(user.garageProfile);
+              if (garage) {
+                linkedGarageName = garage.linkedGarageName;
+                linkedGarageAddress = garage.linkedGarageAddress;
+                linkedGaragePlaceId = garage.linkedGaragePlaceId;
+                garageStatus = garage.status;
+              }
+            }
+
+            return {
+              id: user._id.toString(),
+              username: user.username,
+              email: user.email,
+              role: user.role || "user",
+              isApproved: user.isApproved ?? true,
+              onboardingStatus,
+              canAcceptJobs,
+              linkedGarageName,
+              linkedGarageAddress,
+              linkedGaragePlaceId,
+              garageStatus,
+            };
+          }
+
+          // Invalid or expired auto-login token
+          return null;
+        }
+
+        // Standard email/password login
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email and password are required");
         }
-
-        await connectDB();
 
         const user = await User.findOne({
           email: credentials.email.toLowerCase(),

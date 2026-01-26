@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Mail, AlertCircle, CheckCircle2, Loader2, ArrowRight, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,6 +16,7 @@ function VerifyContent() {
   const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState("");
   const [resendEmail, setResendEmail] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
@@ -44,19 +46,34 @@ function VerifyContent() {
 
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.success) {
         setSuccess(true);
-        setTimeout(() => router.push("/dashboard"), 2000);
+        setLoggingIn(true);
+
+        // Auto-login using the token
+        const signInResult = await signIn("credentials", {
+          autoLoginToken: data.autoLoginToken,
+          redirect: false,
+        });
+
+        if (signInResult?.ok) {
+          // Successfully logged in, redirect to dashboard
+          router.push("/dashboard");
+        } else {
+          // Verification worked but auto-login failed, redirect to login
+          console.log("Auto-login failed, redirecting to login");
+          router.push("/login?verified=true");
+        }
       } else {
         setError(data.error || "Verification failed. Please try again.");
         setShowResend(true);
+        setLoading(false);
       }
     } catch {
       setError("Something went wrong. Please try again.");
       setShowResend(true);
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [router]);
 
   // Auto-fill from URL and auto-submit
@@ -194,7 +211,7 @@ function VerifyContent() {
             </div>
             <div className="p-8">
               <p className="text-slate-600 mb-4">
-                Redirecting you to your dashboard...
+                {loggingIn ? "Logging you in..." : "Email verified successfully!"}
               </p>
               <Loader2 className="h-6 w-6 animate-spin text-emerald-600 mx-auto" />
             </div>

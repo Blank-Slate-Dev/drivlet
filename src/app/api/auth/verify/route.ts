@@ -1,13 +1,11 @@
 // src/app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
-// Force dynamic rendering - this route uses request.url
-export const dynamic = "force-dynamic";
-
-// GET /api/auth/verify?token=xxx - Verify email address
-export async function GET(request: NextRequest) {
+// POST /api/auth/verify - Verify email with 6-digit code
+export async function POST(request: NextRequest) {
   try {
     const { code } = await request.json();
 
@@ -42,6 +40,10 @@ export async function GET(request: NextRequest) {
       console.log("Current emailVerified status:", existingUser.emailVerified);
     }
 
+    // Generate auto-login token
+    const autoLoginToken = crypto.randomBytes(32).toString("hex");
+    const autoLoginTokenExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
     // Find and update user atomically
     const user = await User.findOneAndUpdate(
       {
@@ -49,7 +51,11 @@ export async function GET(request: NextRequest) {
         verificationCodeExpires: { $gt: new Date() },
       },
       {
-        $set: { emailVerified: true },
+        $set: {
+          emailVerified: true,
+          autoLoginToken,
+          autoLoginTokenExpires,
+        },
         $unset: { verificationCode: "", verificationCodeExpires: "" },
       },
       { new: true }
@@ -65,10 +71,13 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ Email verified successfully for:", user.email);
     console.log("New emailVerified status:", user.emailVerified);
+    console.log("Auto-login token generated");
 
     return NextResponse.json({
       success: true,
       message: "Email verified successfully",
+      autoLoginToken,
+      email: user.email,
     });
   } catch (error) {
     console.error("Error verifying email:", error);
