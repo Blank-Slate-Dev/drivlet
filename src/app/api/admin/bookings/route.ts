@@ -57,14 +57,16 @@ export async function GET(request: NextRequest) {
 
     // Transform bookings to include userMobile for registered users
     const bookingsWithUserMobile = bookings.map((booking) => {
-      const userMobile = booking.userId && typeof booking.userId === "object"
-        ? (booking.userId as { mobile?: string }).mobile
-        : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const userDoc = booking.userId as any;
+      const isPopulated = userDoc && typeof userDoc === "object" && "_id" in userDoc;
+      const userMobile = isPopulated ? userDoc.mobile : undefined;
+      const userId = isPopulated
+        ? userDoc._id?.toString()
+        : userDoc?.toString() || null;
       return {
         ...booking,
-        userId: booking.userId && typeof booking.userId === "object"
-          ? (booking.userId as { _id: string })._id
-          : booking.userId,
+        userId,
         userMobile, // Add userMobile field for registered users
       };
     });
