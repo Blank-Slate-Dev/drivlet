@@ -134,6 +134,22 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Determine if user is authenticated
   const isAuthenticated = authStatus === 'authenticated' && session?.user;
 
+  // Fetch user's saved mobile when authenticated
+  useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      fetch('/api/account/profile')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.mobile && !guestPhone) {
+            setGuestPhone(data.mobile);
+          }
+        })
+        .catch(() => {
+          // Silently fail - phone field will just be empty
+        });
+    }
+  }, [isAuthenticated, isOpen]);
+
   // Get customer info (either from session or guest fields)
   const customerName = isAuthenticated ? (session?.user?.username || '') : guestName;
   const customerEmail = isAuthenticated ? (session?.user?.email || '') : guestEmail;

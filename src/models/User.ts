@@ -25,6 +25,7 @@ export interface ISuspensionHistoryEntry {
 export interface IUser extends Document {
   username: string;
   email: string;
+  mobile?: string;
   password: string;
   role: UserRole;
   garageProfile?: mongoose.Types.ObjectId;
@@ -67,6 +68,10 @@ const UserSchema = new Schema<IUser>(
       required: [true, "Email is required"],
       unique: true,
       lowercase: true,
+      trim: true,
+    },
+    mobile: {
+      type: String,
       trim: true,
     },
     password: {

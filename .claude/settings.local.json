@@ -34,7 +34,8 @@
       "Bash(brew services:*)",
       "Bash(mongosh:*)",
       "Bash(curl:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

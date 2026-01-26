@@ -109,6 +109,7 @@ export async function GET() {
         _id: user._id.toString(),
         username: user.username,
         email: user.email,
+        phone: userDoc.mobile, // Include mobile field for registered users
         role: user.role || "user",
         accountStatus: userDoc.accountStatus || "active",
         suspensionInfo: userDoc.suspensionInfo ? {

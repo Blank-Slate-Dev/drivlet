@@ -7,12 +7,20 @@ import { validatePassword, validateEmail, validateUsername } from "@/lib/validat
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, email, password } = await request.json();
+    const { username, email, mobile, password } = await request.json();
 
     // Validate input
     if (!username || !email || !password) {
       return NextResponse.json(
         { error: "Username, email, and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate Australian mobile number if provided
+    if (mobile && !/^04\d{8}$/.test(mobile)) {
+      return NextResponse.json(
+        { error: "Please enter a valid Australian mobile number (04XX XXX XXX)" },
         { status: 400 }
       );
     }
@@ -74,12 +82,14 @@ export async function POST(request: NextRequest) {
     console.log('Creating user with data:', {
       username: username.trim(),
       email: email.toLowerCase(),
+      mobile: mobile || undefined,
       role: 'user'
     });
 
     const user = new User({
       username: username.trim(),
       email: email.toLowerCase(),
+      ...(mobile && { mobile }),
       password: hashedPassword,
       role: 'user', // Explicitly set role
     });

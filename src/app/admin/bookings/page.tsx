@@ -63,6 +63,7 @@ interface Booking {
   userName: string;
   isGuest: boolean;
   guestPhone?: string;
+  userMobile?: string; // Mobile from User model for registered users
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
@@ -457,9 +458,9 @@ export default function AdminBookingsPage() {
                         <p className="text-xs text-slate-500">
                           {booking.userEmail}
                         </p>
-                        {booking.guestPhone && (
+                        {(booking.guestPhone || booking.userMobile) && (
                           <p className="text-xs text-slate-400">
-                            {booking.guestPhone}
+                            {booking.guestPhone || booking.userMobile}
                           </p>
                         )}
                       </td>
@@ -761,10 +762,10 @@ function ViewDetailsModal({
                 <Mail className="h-3.5 w-3.5" />
                 {booking.userEmail}
               </div>
-              {booking.guestPhone && (
+              {(booking.guestPhone || booking.userMobile) && (
                 <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
                   <Phone className="h-3.5 w-3.5" />
-                  {booking.guestPhone}
+                  {booking.guestPhone || booking.userMobile}
                 </div>
               )}
             </div>

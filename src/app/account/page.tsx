@@ -1,22 +1,90 @@
 // src/app/account/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle2, AlertCircle, Phone, User } from "lucide-react";
 
 export default function AccountPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  // Profile state
+  const [mobile, setMobile] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Password state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Fetch profile on mount
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchProfile();
+    }
+  }, [status]);
+
+  const fetchProfile = async () => {
+    try {
+      setProfileLoading(true);
+      const res = await fetch("/api/account/profile");
+      if (res.ok) {
+        const data = await res.json();
+        setMobile(data.mobile || "");
+      }
+    } catch {
+      console.error("Failed to fetch profile");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileSuccess("");
+
+    // Validate mobile if provided
+    if (mobile) {
+      const cleanMobile = mobile.replace(/\s/g, "");
+      if (!/^04\d{8}$/.test(cleanMobile)) {
+        setProfileError("Please enter a valid Australian mobile number (04XX XXX XXX)");
+        return;
+      }
+    }
+
+    setSavingProfile(true);
+
+    try {
+      const res = await fetch("/api/account/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: mobile.replace(/\s/g, "") }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setProfileError(data.error || "Failed to update profile");
+        return;
+      }
+
+      setProfileSuccess("Profile updated successfully");
+    } catch {
+      setProfileError("Something went wrong. Please try again.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -97,6 +165,70 @@ export default function AccountPage() {
             </p>
           </div>
 
+          {/* Profile Section */}
+          <div className="p-6 border-b border-slate-200">
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <User className="h-5 w-5 text-slate-600" />
+                <h2 className="text-lg font-semibold text-slate-900">Profile Information</h2>
+              </div>
+              <p className="text-sm text-slate-500">
+                Update your contact information.
+              </p>
+            </div>
+
+            {profileSuccess && (
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <p className="text-emerald-700 text-sm">{profileSuccess}</p>
+              </div>
+            )}
+
+            {profileError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-red-600 text-sm">{profileError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleProfileSubmit} className="space-y-5">
+              <div>
+                <label
+                  htmlFor="mobile"
+                  className="block text-sm font-medium text-slate-700 mb-2"
+                >
+                  Mobile Number
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="mobile"
+                    type="tel"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    disabled={profileLoading}
+                    className="w-full pl-12 pr-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition disabled:opacity-50"
+                    placeholder="04XX XXX XXX"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Used for booking notifications and driver contact
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingProfile || profileLoading}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingProfile ? "Saving..." : "Save Changes"}
+              </button>
+            </form>
+          </div>
+
+          {/* Password Section */}
           <div className="p-6">
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-4">

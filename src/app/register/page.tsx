@@ -11,6 +11,7 @@ import {
   Mail,
   Lock,
   User,
+  Phone,
   AlertCircle,
   Eye,
   EyeOff,
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -45,6 +47,15 @@ export default function RegisterPage() {
       return;
     }
 
+    // Validate Australian mobile number if provided
+    if (mobile) {
+      const cleanMobile = mobile.replace(/\s/g, "");
+      if (!/^04\d{8}$/.test(cleanMobile)) {
+        setError("Please enter a valid Australian mobile number (04XX XXX XXX)");
+        return;
+      }
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -61,7 +72,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ username, email, mobile: mobile.replace(/\s/g, "") || undefined, password }),
       });
 
       const data = await res.json();
@@ -183,6 +194,28 @@ export default function RegisterPage() {
                     required
                     className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                     placeholder="you@example.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="mobile"
+                  className="block text-sm font-medium text-slate-700 mb-2"
+                >
+                  Mobile number <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="mobile"
+                    type="tel"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                    placeholder="04XX XXX XXX"
                   />
                 </div>
               </div>

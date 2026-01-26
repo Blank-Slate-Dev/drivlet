@@ -50,12 +50,27 @@ export async function GET(request: NextRequest) {
         .sort({ [sortBy]: sortOrder })
         .skip(skip)
         .limit(limit)
+        .populate("userId", "mobile") // Populate user's mobile for registered users
         .lean(),
       Booking.countDocuments(query),
     ]);
 
+    // Transform bookings to include userMobile for registered users
+    const bookingsWithUserMobile = bookings.map((booking) => {
+      const userMobile = booking.userId && typeof booking.userId === "object"
+        ? (booking.userId as { mobile?: string }).mobile
+        : undefined;
+      return {
+        ...booking,
+        userId: booking.userId && typeof booking.userId === "object"
+          ? (booking.userId as { _id: string })._id
+          : booking.userId,
+        userMobile, // Add userMobile field for registered users
+      };
+    });
+
     return NextResponse.json({
-      bookings,
+      bookings: bookingsWithUserMobile,
       pagination: {
         page,
         limit,
