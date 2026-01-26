@@ -3,8 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
-// POST /api/auth/verify - Verify email with 6-digit code
-export async function POST(request: NextRequest) {
+// Force dynamic rendering - this route uses request.url
+export const dynamic = "force-dynamic";
+
+// GET /api/auth/verify?token=xxx - Verify email address
+export async function GET(request: NextRequest) {
   try {
     const { code } = await request.json();
 
