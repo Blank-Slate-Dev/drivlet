@@ -27,11 +27,15 @@ import {
   RefreshCw,
   Sparkles,
   TrendingUp,
+  Settings,
 } from 'lucide-react';
 import { BookingModal } from '@/components/homepage';
 import { CancelBookingModal } from '@/components/CancelBookingModal';
 
 const POLLING_INTERVAL = 30000;
+
+// Feature flag for quotes functionality (disabled for now, will be enabled in a later phase)
+const QUOTES_ENABLED = false;
 
 // Stage definitions
 const STAGES = [
@@ -129,7 +133,8 @@ interface SectionNavProps {
 function SectionNav({ activeSection, onSectionChange, stats }: SectionNavProps) {
   const sections = [
     { id: 'overview' as DashboardSection, label: 'Overview', icon: Home },
-    { id: 'quotes' as DashboardSection, label: 'My Quote Requests', icon: FileText, badge: stats.pendingQuotes },
+    // Quote requests tab - hidden when QUOTES_ENABLED is false
+    ...(QUOTES_ENABLED ? [{ id: 'quotes' as DashboardSection, label: 'My Quote Requests', icon: FileText, badge: stats.pendingQuotes }] : []),
     { id: 'bookings' as DashboardSection, label: 'My Bookings', icon: Calendar },
   ];
 
@@ -154,6 +159,14 @@ function SectionNav({ activeSection, onSectionChange, stats }: SectionNavProps) 
           )}
         </button>
       ))}
+      {/* Settings link - navigates to /account page */}
+      <Link
+        href="/account"
+        className="relative flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+      >
+        <Settings className="h-4 w-4" />
+        My Settings
+      </Link>
     </div>
   );
 }
@@ -185,7 +198,9 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
           </div>
           <h2 className="text-2xl font-bold">{userName}!</h2>
           <p className="mt-2 text-emerald-100 max-w-md">
-            Here&apos;s an overview of your vehicle services and quote requests.
+            {QUOTES_ENABLED
+              ? "Here's an overview of your vehicle services and quote requests."
+              : "Here's an overview of your vehicle services and bookings."}
           </p>
         </div>
       </motion.div>
@@ -201,19 +216,21 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
           <TrendingUp className="h-5 w-5 text-emerald-600" />
           Quick Actions
         </h3>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Link
-            href="/quotes/request"
-            className="group flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition"
-          >
-            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition">
-              <Plus className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">New Quote Request</p>
-              <p className="text-xs text-slate-500">Get quotes for services</p>
-            </div>
-          </Link>
+        <div className={`grid gap-4 ${QUOTES_ENABLED ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          {QUOTES_ENABLED && (
+            <Link
+              href="/quotes/request"
+              className="group flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition"
+            >
+              <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition">
+                <Plus className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">New Quote Request</p>
+                <p className="text-xs text-slate-500">Get quotes for services</p>
+              </div>
+            </Link>
+          )}
           <button
             onClick={onBookingClick}
             className="group flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition text-left"
@@ -242,7 +259,7 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
       </motion.div>
 
       {/* Recent Activity */}
-      {(quoteRequests.length > 0 || bookings.length > 0) && (
+      {((QUOTES_ENABLED && quoteRequests.length > 0) || bookings.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -251,7 +268,7 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
         >
           <h3 className="font-semibold text-slate-900 mb-4">Recent Activity</h3>
           <div className="space-y-3">
-            {quoteRequests.slice(0, 3).map((request) => {
+            {QUOTES_ENABLED && quoteRequests.slice(0, 3).map((request) => {
               const statusConfig = QUOTE_STATUS_CONFIG[request.status];
               const StatusIcon = statusConfig.icon;
               return (
@@ -282,7 +299,7 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
                 </Link>
               );
             })}
-            {bookings.slice(0, 2).map((booking) => (
+            {bookings.slice(0, QUOTES_ENABLED ? 2 : 5).map((booking) => (
               <Link
                 key={booking._id}
                 href="/dashboard?section=bookings"
@@ -317,9 +334,9 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
               </Link>
             ))}
           </div>
-          {(quoteRequests.length > 3 || bookings.length > 2) && (
+          {((QUOTES_ENABLED && quoteRequests.length > 3) || bookings.length > (QUOTES_ENABLED ? 2 : 5)) && (
             <button
-              onClick={() => onSectionChange('quotes')}
+              onClick={() => onSectionChange(QUOTES_ENABLED ? 'quotes' : 'bookings')}
               className="mt-4 w-full py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition"
             >
               View all activity →
@@ -329,7 +346,7 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
       )}
 
       {/* Empty State */}
-      {quoteRequests.length === 0 && bookings.length === 0 && (
+      {(QUOTES_ENABLED ? (quoteRequests.length === 0 && bookings.length === 0) : bookings.length === 0) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -341,19 +358,27 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
           </div>
           <h3 className="text-lg font-semibold text-slate-900">Get started with Drivlet</h3>
           <p className="mt-1 text-slate-600 max-w-md mx-auto">
-            Request quotes from local garages or book a service with pickup and delivery.
+            {QUOTES_ENABLED
+              ? 'Request quotes from local garages or book a service with pickup and delivery.'
+              : 'Book a service with pickup and delivery.'}
           </p>
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/quotes/request"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
-            >
-              <FileText className="h-5 w-5" />
-              Request a Quote
-            </Link>
+            {QUOTES_ENABLED && (
+              <Link
+                href="/quotes/request"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
+              >
+                <FileText className="h-5 w-5" />
+                Request a Quote
+              </Link>
+            )}
             <button
               onClick={onBookingClick}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
+              className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg transition ${
+                QUOTES_ENABLED
+                  ? 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              }`}
             >
               <Car className="h-5 w-5" />
               Book a Service
@@ -828,7 +853,12 @@ function DashboardContent() {
   useEffect(() => {
     const section = searchParams.get('section');
     if (section === 'quotes' || section === 'bookings' || section === 'overview') {
-      setActiveSection(section);
+      // If quotes are disabled and user tries to access quotes section, redirect to overview
+      if (section === 'quotes' && !QUOTES_ENABLED) {
+        setActiveSection('overview');
+      } else {
+        setActiveSection(section);
+      }
     }
   }, [searchParams]);
 
@@ -1019,7 +1049,9 @@ function DashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">My Dashboard</h1>
-                <p className="mt-1 text-sm text-slate-600">Manage your quote requests and bookings</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {QUOTES_ENABLED ? 'Manage your quote requests and bookings' : 'Manage your bookings'}
+                </p>
               </div>
               <Link href="/" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition">
                 ← Back to Home
@@ -1060,7 +1092,7 @@ function DashboardContent() {
               />
             </motion.div>
           )}
-          {activeSection === 'quotes' && (
+          {QUOTES_ENABLED && activeSection === 'quotes' && (
             <motion.div
               key="quotes"
               initial={{ opacity: 0, x: -20 }}
