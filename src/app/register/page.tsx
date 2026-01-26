@@ -82,7 +82,8 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/login?registered=true");
+      // Redirect to verification page instead of login
+      router.push("/auth/verify");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

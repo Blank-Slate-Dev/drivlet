@@ -49,6 +49,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error("This account no longer exists.");
         }
 
+        // Check email verification for regular users
+        // Skip for admin, garage, and driver roles as they may use different verification flows
+        if (user.role === "user" && !user.emailVerified) {
+          throw new Error("Please verify your email before signing in. Check your inbox for the verification link.");
+        }
+
         // If user is a driver, fetch their onboarding status
         let onboardingStatus: OnboardingStatus | undefined;
         let canAcceptJobs: boolean | undefined;

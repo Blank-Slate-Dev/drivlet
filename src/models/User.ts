@@ -32,6 +32,11 @@ export interface IUser extends Document {
   driverProfile?: mongoose.Types.ObjectId;
   isApproved: boolean;
 
+  // Email verification fields
+  emailVerified: boolean;
+  verificationToken?: string;
+  verificationTokenExpires?: Date;
+
   // Account status fields
   accountStatus: AccountStatus;
   suspensionInfo?: ISuspensionInfo;
@@ -94,6 +99,20 @@ const UserSchema = new Schema<IUser>(
     isApproved: {
       type: Boolean,
       default: true, // Auto-approve customers, garages and drivers need manual approval
+    },
+
+    // Email verification fields
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      default: null,
+    },
+    verificationTokenExpires: {
+      type: Date,
+      default: null,
     },
 
     // Account status fields

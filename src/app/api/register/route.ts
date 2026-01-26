@@ -1,9 +1,11 @@
 // src/app/api/register/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { validatePassword, validateEmail, validateUsername } from "@/lib/validation";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,6 +80,10 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Create new user with explicit role
     console.log('Creating user with data:', {
       username: username.trim(),
@@ -92,14 +98,34 @@ export async function POST(request: NextRequest) {
       ...(mobile && { mobile }),
       password: hashedPassword,
       role: 'user', // Explicitly set role
+      emailVerified: false,
+      verificationToken,
+      verificationTokenExpires,
     });
 
     console.log('User object created, attempting to save...');
     await user.save();
     console.log('User saved successfully with ID:', user._id);
 
+    // Send verification email
+    try {
+      await sendVerificationEmail(
+        email.toLowerCase(),
+        username.trim(),
+        verificationToken
+      );
+      console.log('Verification email sent to:', email);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail registration if email fails - user can resend
+    }
+
     return NextResponse.json(
-      { success: true, message: "User registered successfully" },
+      {
+        success: true,
+        message: "User registered successfully. Please check your email to verify your account.",
+        requiresVerification: true,
+      },
       { status: 201 }
     );
   } catch (error) {
