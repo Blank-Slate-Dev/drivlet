@@ -54,7 +54,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   }
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+// Get app URL at runtime (not at module load time)
+function getAppUrl(): string {
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
 
 // Email verification
 export async function sendVerificationEmail(
@@ -62,7 +65,8 @@ export async function sendVerificationEmail(
   username: string,
   token: string
 ): Promise<boolean> {
-  const verificationUrl = `${APP_URL}/auth/verify?token=${token}`;
+  const appUrl = getAppUrl();
+  const verificationUrl = `${appUrl}/auth/verify?token=${token}`;
 
   const subject = "Verify your email - Drivlet";
 
