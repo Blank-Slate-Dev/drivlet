@@ -38,6 +38,7 @@ interface Stats {
     paidBookings: number;
     todaysBookings: number;
     weeklyRevenue: number;
+    totalEarnings: number;
   };
   stageStats: Record<string, number>;
   recentBookings: Array<{
@@ -284,7 +285,7 @@ export default function AdminDashboardPage() {
 
         {/* SECTION 1: Hero Metrics */}
         <div className="mb-6 grid gap-6 lg:grid-cols-3">
-          {/* Weekly Revenue Card - Primary, prominent */}
+          {/* Total Earnings Card - Primary, prominent */}
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-8 text-white shadow-lg">
             {/* Decorative pattern */}
             <div className="absolute inset-0 opacity-10">
@@ -298,21 +299,21 @@ export default function AdminDashboardPage() {
 
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5 text-emerald-200" />
-                <span className="text-emerald-100 text-sm font-medium">Weekly Revenue</span>
+                <DollarSign className="h-5 w-5 text-emerald-200" />
+                <span className="text-emerald-100 text-sm font-medium">Total Earnings</span>
               </div>
 
               <div className="text-4xl sm:text-5xl font-bold mb-2">
-                {formatCurrency(stats?.overview.weeklyRevenue || 0)}
+                {formatCurrency(stats?.overview.totalEarnings || 0)}
               </div>
 
               <div className="text-emerald-100 text-sm">
-                from {stats?.overview.completedThisWeek || 0} completed bookings
+                from {stats?.overview.paidBookings || 0} completed bookings
               </div>
 
               <div className="mt-4 flex items-center gap-1 text-emerald-200 text-sm">
-                <ArrowUpRight className="h-4 w-4" />
-                <span>This week&apos;s performance</span>
+                <TrendingUp className="h-4 w-4" />
+                <span>Lifetime earnings</span>
               </div>
             </div>
           </div>

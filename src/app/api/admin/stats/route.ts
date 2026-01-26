@@ -36,6 +36,7 @@ export async function GET() {
       bookingsByStage,
       todaysBookings,
       thisWeeksRevenue,
+      allTimeRevenue,
     ] = await Promise.all([
       // Total bookings
       Booking.countDocuments(),
@@ -106,6 +107,21 @@ export async function GET() {
           },
         },
       ]),
+
+      // Total earnings from all paid bookings (all time)
+      Booking.aggregate([
+        {
+          $match: {
+            paymentStatus: "paid",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$paymentAmount" },
+          },
+        },
+      ]),
     ]);
 
     // Transform bookings by stage into an object
@@ -116,6 +132,9 @@ export async function GET() {
 
     // Calculate weekly revenue
     const weeklyRevenue = thisWeeksRevenue.length > 0 ? thisWeeksRevenue[0].total : 0;
+
+    // Calculate total earnings (all time)
+    const totalEarnings = allTimeRevenue.length > 0 ? allTimeRevenue[0].total : 0;
 
     return NextResponse.json({
       overview: {
@@ -131,6 +150,7 @@ export async function GET() {
         paidBookings,
         todaysBookings,
         weeklyRevenue,
+        totalEarnings,
       },
       stageStats,
       recentBookings,

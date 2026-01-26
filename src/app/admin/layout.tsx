@@ -3,7 +3,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -18,6 +18,8 @@ import {
   MessageSquare,
   Car,
   MapPin,
+  Menu,
+  X,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -42,7 +44,18 @@ export default function AdminLayout({
     }
   }, [session, status, router]);
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isActive = (path: string) => pathname === path;
+
+  const navItems = [
+    { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
+    { href: "/admin/users", label: "Users", icon: Users },
+    { href: "/admin/drivers", label: "Drivers", icon: Car },
+    { href: "/admin/garages", label: "Garages", icon: Building2 },
+    { href: "/admin/location-requests", label: "Locations", icon: MapPin },
+    { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
+  ];
 
   if (status === "loading") {
     return (
@@ -90,109 +103,107 @@ export default function AdminLayout({
             }}
           />
         </div>
-        <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-              <Image
-                src="/logo.png"
-                alt="drivlet"
-                fill
-                className="object-contain brightness-0 invert"
-                priority
-              />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            {/* Left: Logo + Admin Badge */}
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center">
+                <div className="relative h-10 w-32 sm:h-12 sm:w-40">
+                  <Image
+                    src="/logo.png"
+                    alt="drivlet"
+                    fill
+                    className="object-contain brightness-0 invert"
+                    priority
+                  />
+                </div>
+              </Link>
+              <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-300">
+                <Shield className="h-3.5 w-3.5" />
+                Admin Panel
+              </span>
             </div>
-          </Link>
-          <nav className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-300">
-              <Shield className="h-3.5 w-3.5" />
-              Admin Panel
-            </span>
-            <Link
-              href="/admin/dashboard"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/dashboard")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </Link>
-            <Link
-              href="/admin/bookings"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/bookings")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Bookings</span>
-            </Link>
-            <Link
-              href="/admin/users"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/users")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Users</span>
-            </Link>
-            <Link
-              href="/admin/drivers"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/drivers")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Car className="h-4 w-4" />
-              <span className="hidden sm:inline">Drivers</span>
-            </Link>
-            <Link
-              href="/admin/garages"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/garages")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Garages</span>
-            </Link>
-            <Link
-              href="/admin/location-requests"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/location-requests")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <MapPin className="h-4 w-4" />
-              <span className="hidden sm:inline">Locations</span>
-            </Link>
-            <Link
-              href="/admin/inquiries"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive("/admin/inquiries")
-                  ? "bg-white/20 text-white"
-                  : "text-emerald-100 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Inquiries</span>
-            </Link>
-            <div className="mx-2 h-6 w-px bg-white/20" />
-            <Link
-              href="/"
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-white/10 hover:text-white"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Main Site</span>
-            </Link>
-          </nav>
+
+            {/* Center: Navigation (hidden on mobile) */}
+            <nav className="hidden lg:flex items-center gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition ${
+                      isActive(item.href)
+                        ? "bg-white/20 text-white"
+                        : "text-emerald-100 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Right: Main Site link + Mobile menu button */}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                className="hidden sm:flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-white/10 hover:text-white"
+              >
+                <Home className="h-4 w-4" />
+                <span>Main Site</span>
+              </Link>
+
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden flex items-center justify-center rounded-lg p-2 text-emerald-100 hover:bg-white/10 hover:text-white transition"
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <nav className="lg:hidden mt-3 pt-3 border-t border-white/20">
+              <div className="flex flex-col gap-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                        isActive(item.href)
+                          ? "bg-white/20 text-white"
+                          : "text-emerald-100 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+                <div className="my-2 h-px bg-white/20" />
+                <Link
+                  href="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-100 hover:bg-white/10 hover:text-white transition"
+                >
+                  <Home className="h-4 w-4" />
+                  <span>Main Site</span>
+                </Link>
+              </div>
+            </nav>
+          )}
         </div>
       </header>
 
