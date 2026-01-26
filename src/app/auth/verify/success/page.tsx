@@ -1,11 +1,32 @@
 // src/app/auth/verify/success/page.tsx
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function VerifySuccessPage() {
+  const router = useRouter();
+  const [countdown, setCountdown] = useState(3);
+
+  // Auto-redirect to dashboard after 3 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          router.push("/dashboard");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [router]);
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-emerald-50/30 to-slate-50 px-4 py-12">
       <motion.div
@@ -38,12 +59,16 @@ export default function VerifySuccessPage() {
             </p>
 
             <Link
-              href="/login"
+              href="/dashboard"
               className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition"
             >
-              Sign in to your account
+              Go to your dashboard
               <ArrowRight className="h-4 w-4" />
             </Link>
+
+            <p className="mt-4 text-sm text-slate-500">
+              Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}...
+            </p>
 
             <div className="mt-6 pt-6 border-t border-slate-200">
               <p className="text-sm text-slate-500">

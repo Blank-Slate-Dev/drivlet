@@ -59,27 +59,33 @@ function getAppUrl(): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
-// Email verification
+// Email verification with 6-digit code
 export async function sendVerificationEmail(
   email: string,
   username: string,
-  token: string
+  code: string
 ): Promise<boolean> {
   const appUrl = getAppUrl();
-  const verificationUrl = `${appUrl}/auth/verify?token=${token}`;
+  const verificationUrl = `${appUrl}/auth/verify?code=${code}`;
 
-  const subject = "Verify your email - Drivlet";
+  // Format code with spaces for readability: "123 456"
+  const formattedCode = `${code.slice(0, 3)} ${code.slice(3)}`;
+
+  const subject = `Your verification code is ${code} - Drivlet`;
 
   const textContent = `
 Verify your email address
 
 Hi ${username},
 
-Thanks for signing up for Drivlet! Please verify your email address by clicking the link below:
+Thanks for signing up for Drivlet! Your verification code is:
 
+${formattedCode}
+
+Enter this code on the verification page, or click the link below to verify automatically:
 ${verificationUrl}
 
-This link will expire in 24 hours.
+This code will expire in 24 hours.
 
 If you didn't create an account with Drivlet, you can safely ignore this email.
 
@@ -118,31 +124,41 @@ Newcastle, Australia
                 Hi ${username},
               </p>
 
-              <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Thanks for signing up for Drivlet! Please verify your email address by clicking the button below.
+              <p style="margin: 0 0 16px; color: #475569; font-size: 16px; line-height: 1.6;">
+                Thanks for signing up for Drivlet! Your verification code is:
+              </p>
+
+              <!-- Code Display -->
+              <div style="margin: 24px 0; padding: 24px; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 2px solid #86efac; border-radius: 12px; text-align: center;">
+                <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #059669; font-family: 'Courier New', monospace;">
+                  ${code.split('').join(' ')}
+                </div>
+              </div>
+
+              <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.6; text-align: center;">
+                Enter this code on the verification page
+              </p>
+
+              <!-- Divider -->
+              <div style="margin: 24px 0; border-top: 1px solid #e2e8f0;"></div>
+
+              <p style="margin: 0 0 16px; color: #475569; font-size: 14px; line-height: 1.6; text-align: center;">
+                Or click the button below to verify automatically:
               </p>
 
               <!-- Button -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td align="center" style="padding: 16px 0 32px;">
+                  <td align="center" style="padding: 8px 0 24px;">
                     <a href="${verificationUrl}" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 14px 0 rgba(5, 150, 105, 0.4);">
-                      Verify Email Address
+                      Verify Automatically
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin: 0 0 16px; color: #64748b; font-size: 14px; line-height: 1.6;">
-                Or copy and paste this link into your browser:
-              </p>
-
-              <p style="margin: 0 0 24px; padding: 12px 16px; background-color: #f1f5f9; border-radius: 8px; word-break: break-all;">
-                <a href="${verificationUrl}" style="color: #059669; text-decoration: none; font-size: 14px;">${verificationUrl}</a>
-              </p>
-
               <p style="margin: 0 0 8px; color: #64748b; font-size: 14px; line-height: 1.6;">
-                This link will expire in 24 hours.
+                This code will expire in 24 hours.
               </p>
 
               <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">

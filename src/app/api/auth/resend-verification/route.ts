@@ -1,11 +1,10 @@
 // src/app/api/auth/resend-verification/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { sendVerificationEmail } from "@/lib/email";
 
-// POST /api/auth/resend-verification - Resend verification email
+// POST /api/auth/resend-verification - Resend verification code
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
       // Don't reveal if email exists or not for security
       return NextResponse.json({
         success: true,
-        message: "If an account exists with this email, a verification link has been sent.",
+        message: "If an account exists with this email, a verification code has been sent.",
       });
     }
 
@@ -39,13 +38,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Generate new 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Update user with new token
-    user.verificationToken = verificationToken;
-    user.verificationTokenExpires = verificationTokenExpires;
+    // Update user with new code
+    user.verificationCode = verificationCode;
+    user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
     // Send verification email
@@ -53,25 +52,25 @@ export async function POST(request: NextRequest) {
       await sendVerificationEmail(
         user.email,
         user.username,
-        verificationToken
+        verificationCode
       );
-      console.log("Verification email resent to:", user.email);
+      console.log("Verification code resent to:", user.email);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
       return NextResponse.json(
-        { error: "Failed to send verification email. Please try again." },
+        { error: "Failed to send verification code. Please try again." },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: "Verification email sent. Please check your inbox.",
+      message: "Verification code sent. Please check your inbox.",
     });
   } catch (error) {
-    console.error("Error resending verification email:", error);
+    console.error("Error resending verification code:", error);
     return NextResponse.json(
-      { error: "Failed to resend verification email" },
+      { error: "Failed to resend verification code" },
       { status: 500 }
     );
   }

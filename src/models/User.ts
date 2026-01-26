@@ -34,8 +34,8 @@ export interface IUser extends Document {
 
   // Email verification fields
   emailVerified: boolean;
-  verificationToken?: string;
-  verificationTokenExpires?: Date;
+  verificationCode?: string;
+  verificationCodeExpires?: Date;
 
   // Account status fields
   accountStatus: AccountStatus;
@@ -106,11 +106,11 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
-    verificationToken: {
+    verificationCode: {
       type: String,
       default: null,
     },
-    verificationTokenExpires: {
+    verificationCodeExpires: {
       type: Date,
       default: null,
     },

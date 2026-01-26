@@ -1,7 +1,6 @@
 // src/app/api/register/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { validatePassword, validateEmail, validateUsername } from "@/lib/validation";
@@ -80,9 +79,9 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Create new user with explicit role
     console.log('Creating user with data:', {
@@ -99,8 +98,8 @@ export async function POST(request: NextRequest) {
       password: hashedPassword,
       role: 'user', // Explicitly set role
       emailVerified: false,
-      verificationToken,
-      verificationTokenExpires,
+      verificationCode,
+      verificationCodeExpires,
     });
 
     console.log('User object created, attempting to save...');
@@ -112,7 +111,7 @@ export async function POST(request: NextRequest) {
       await sendVerificationEmail(
         email.toLowerCase(),
         username.trim(),
-        verificationToken
+        verificationCode
       );
       console.log('Verification email sent to:', email);
     } catch (emailError) {
