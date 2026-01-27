@@ -82,10 +82,13 @@ export default function HowItWorksSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
 
-  const goToSlide = useCallback((index: number) => {
-    setDirection(index > currentIndex ? 1 : -1);
-    setCurrentIndex(index);
-  }, [currentIndex]);
+  const goToSlide = useCallback(
+    (index: number) => {
+      setDirection(index > currentIndex ? 1 : -1);
+      setCurrentIndex(index);
+    },
+    [currentIndex]
+  );
 
   const goToPrevious = useCallback(() => {
     setDirection(-1);
@@ -111,7 +114,7 @@ export default function HowItWorksSection() {
 
   const slideVariants = {
     enter: (direction: number) => ({
-      x: direction > 0 ? 300 : -300,
+      x: direction > 0 ? 200 : -200,
       opacity: 0,
     }),
     center: {
@@ -119,7 +122,7 @@ export default function HowItWorksSection() {
       opacity: 1,
     },
     exit: (direction: number) => ({
-      x: direction > 0 ? -300 : 300,
+      x: direction > 0 ? -200 : 200,
       opacity: 0,
     }),
   };
@@ -129,13 +132,6 @@ export default function HowItWorksSection() {
       id="how-it-works"
       className="relative overflow-hidden border-b border-slate-200 bg-white py-16 sm:py-20"
     >
-      {/* Decorative car illustration in top right - optional */}
-      <div className="absolute -right-10 -top-5 hidden opacity-60 lg:block">
-        <div className="h-32 w-48 rotate-12">
-          {/* You could add a car illustration here */}
-        </div>
-      </div>
-
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Header */}
         <div className="mb-12 text-center">
@@ -179,28 +175,27 @@ export default function HowItWorksSection() {
             </button>
 
             {/* Slides Container */}
-            <div className="relative flex w-full items-center justify-center overflow-hidden py-8">
-              {/* Previous slide preview (left) */}
-              <div className="absolute left-0 hidden w-64 opacity-40 blur-[1px] transition-opacity lg:block xl:left-4">
-                <div className="relative mx-auto h-80 w-44">
+            <div className="relative flex w-full items-center justify-center py-8">
+              {/* Previous slide preview (left) - faded */}
+              <div className="absolute left-0 hidden opacity-30 lg:block xl:left-12">
+                <div className="relative h-[276px] w-[242px]">
+                  {/* Gradient pill - shorter, only bottom portion */}
                   <div
-                    className={`absolute inset-x-0 bottom-0 h-72 w-full rounded-[2rem] bg-gradient-to-br ${steps[prevIndex].gradient}`}
+                    className={`absolute bottom-0 left-1/2 h-[140px] w-[180px] -translate-x-1/2 rounded-[2rem] bg-gradient-to-br ${steps[prevIndex].gradient}`}
                   />
-                  <div className="relative z-10 flex h-full items-end justify-center pb-2">
-                    <div className="relative h-72 w-36">
-                      <Image
-                        src={steps[prevIndex].image}
-                        alt={steps[prevIndex].title}
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                  </div>
+                  {/* Phone image */}
+                  <Image
+                    src={steps[prevIndex].image}
+                    alt={steps[prevIndex].title}
+                    width={242}
+                    height={276}
+                    className="relative z-10"
+                  />
                 </div>
               </div>
 
-              {/* Current slide */}
-              <div className="flex w-full max-w-4xl flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-16">
+              {/* Current slide - center content */}
+              <div className="flex w-full max-w-4xl flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-12">
                 {/* Step info - left side on desktop */}
                 <AnimatePresence mode="wait" custom={direction}>
                   <motion.div
@@ -210,8 +205,8 @@ export default function HowItWorksSection() {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="order-2 text-center lg:order-1 lg:w-64 lg:text-left"
+                    transition={{ duration: 0.35, ease: 'easeInOut' }}
+                    className="order-2 text-center lg:order-1 lg:w-56 lg:text-left"
                   >
                     <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
                       {currentStep.step}
@@ -234,32 +229,30 @@ export default function HowItWorksSection() {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    transition={{ duration: 0.35, ease: 'easeInOut' }}
                     className="relative order-1 lg:order-2"
                   >
-                    <div className="relative mx-auto h-96 w-56 sm:h-[420px] sm:w-64">
-                      {/* Gradient pill background */}
+                    {/* Phone container with fixed dimensions */}
+                    <div className="relative h-[276px] w-[242px]">
+                      {/* Gradient pill - shorter, only bottom portion, animates with phone */}
                       <div
-                        className={`absolute inset-x-0 bottom-0 h-80 w-full rounded-[2.5rem] bg-gradient-to-br shadow-xl sm:h-96 ${currentStep.gradient}`}
+                        className={`absolute bottom-0 left-1/2 h-[160px] w-[200px] -translate-x-1/2 rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
                       />
                       {/* Phone image */}
-                      <div className="relative z-10 flex h-full items-end justify-center pb-4">
-                        <div className="relative h-80 w-44 sm:h-96 sm:w-52">
-                          <Image
-                            src={currentStep.image}
-                            alt={currentStep.title}
-                            fill
-                            className="object-contain drop-shadow-2xl"
-                            priority
-                          />
-                        </div>
-                      </div>
+                      <Image
+                        src={currentStep.image}
+                        alt={currentStep.title}
+                        width={242}
+                        height={276}
+                        className="relative z-10 drop-shadow-xl"
+                        priority
+                      />
                     </div>
                   </motion.div>
                 </AnimatePresence>
 
                 {/* Next step preview text - right side on desktop */}
-                <div className="order-3 hidden w-64 opacity-50 lg:block">
+                <div className="order-3 hidden w-56 opacity-40 lg:block">
                   <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
                     {steps[nextIndex].step}
                   </div>
@@ -272,22 +265,21 @@ export default function HowItWorksSection() {
                 </div>
               </div>
 
-              {/* Next slide preview (right) */}
-              <div className="absolute right-0 hidden w-64 opacity-40 blur-[1px] transition-opacity lg:block xl:right-4">
-                <div className="relative mx-auto h-80 w-44">
+              {/* Next slide preview (right) - faded */}
+              <div className="absolute right-0 hidden opacity-30 lg:block xl:right-12">
+                <div className="relative h-[276px] w-[242px]">
+                  {/* Gradient pill - shorter, only bottom portion */}
                   <div
-                    className={`absolute inset-x-0 bottom-0 h-72 w-full rounded-[2rem] bg-gradient-to-br ${steps[nextIndex].gradient}`}
+                    className={`absolute bottom-0 left-1/2 h-[140px] w-[180px] -translate-x-1/2 rounded-[2rem] bg-gradient-to-br ${steps[nextIndex].gradient}`}
                   />
-                  <div className="relative z-10 flex h-full items-end justify-center pb-2">
-                    <div className="relative h-72 w-36">
-                      <Image
-                        src={steps[nextIndex].image}
-                        alt={steps[nextIndex].title}
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                  </div>
+                  {/* Phone image */}
+                  <Image
+                    src={steps[nextIndex].image}
+                    alt={steps[nextIndex].title}
+                    width={242}
+                    height={276}
+                    className="relative z-10"
+                  />
                 </div>
               </div>
             </div>
