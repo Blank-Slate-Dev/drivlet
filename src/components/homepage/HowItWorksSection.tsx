@@ -1,8 +1,7 @@
-// src/components/homepage/HowItWorksSection.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
@@ -81,25 +80,16 @@ const transportSteps = [
 export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
 
-  const goToSlide = useCallback(
-    (index: number) => {
-      setDirection(index > currentIndex ? 1 : -1);
-      setCurrentIndex(index);
-    },
-    [currentIndex]
-  );
+  const goToSlide = useCallback((index: number) => {
+    setCurrentIndex(index);
+  }, []);
 
   const goToPrevious = useCallback(() => {
-    setDirection(-1);
-    // Linear: if at start, go to end; otherwise go back one
     setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
   }, [steps.length]);
 
   const goToNext = useCallback(() => {
-    setDirection(1);
-    // Linear: if at end, restart from beginning
     setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
   }, [steps.length]);
 
@@ -110,32 +100,6 @@ export default function HowItWorksSection() {
     }, 5000);
     return () => clearInterval(timer);
   }, [goToNext]);
-
-  const currentStep = steps[currentIndex];
-  
-  // Linear previews: only show adjacent steps in forward direction
-  // Step 1: no prev, Step 2-4: show previous step
-  const hasPrevPreview = currentIndex > 0;
-  const prevStep = hasPrevPreview ? steps[currentIndex - 1] : null;
-  
-  // All steps show the next step, step 4 shows step 1 (restart indicator)
-  const nextIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
-  const nextStep = steps[nextIndex];
-
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 200 : -200,
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: (direction: number) => ({
-      x: direction > 0 ? -200 : 200,
-      opacity: 0,
-    }),
-  };
 
   return (
     <section
@@ -173,143 +137,148 @@ export default function HowItWorksSection() {
 
         {/* Carousel Container */}
         <div className="relative">
-          {/* Main carousel area */}
-          <div className="flex items-center justify-center">
-            {/* Left Arrow */}
-            <button
-              onClick={goToPrevious}
-              className="absolute left-0 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md sm:left-4 lg:left-8"
-              aria-label="Previous step"
+          {/* Left Arrow */}
+          <button
+            onClick={goToPrevious}
+            className="absolute left-0 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md sm:left-2 lg:left-4"
+            aria-label="Previous step"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+
+          {/* Carousel Track Container */}
+          <div className="overflow-hidden px-14 py-8 sm:px-16 lg:px-20">
+            {/* Sliding Track - all slides in a row */}
+            <motion.div
+              className="flex"
+              animate={{ x: `${-currentIndex * 100}%` }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
             >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
+              {steps.map((step, index) => {
+                // For each slide, determine what previews to show
+                const showLeftPreview = index > 0;
+                const leftPreview = showLeftPreview ? steps[index - 1] : null;
+                const showRightPreview = index < steps.length - 1;
+                const rightPreview = showRightPreview ? steps[index + 1] : null;
 
-            {/* Slides Container */}
-            <div className="relative flex w-full items-center justify-center py-8">
-              {/* Previous slide preview (left) - only show if not on step 1 */}
-              {hasPrevPreview && prevStep && (
-                <div className="absolute left-0 hidden items-center opacity-40 lg:flex xl:left-8">
-                  {/* Phone with gradient pill */}
-                  <div className="relative flex h-[300px] w-[260px] items-end justify-center">
-                    {/* Gradient pill background */}
-                    <div
-                      className={`absolute bottom-0 h-[170px] w-[220px] rounded-[2rem] bg-gradient-to-br ${prevStep.gradient}`}
-                    />
-                    {/* Phone image */}
-                    <Image
-                      src={prevStep.image}
-                      alt={prevStep.title}
-                      width={242}
-                      height={276}
-                      className="relative z-10"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Current slide - center content */}
-              <div className="flex w-full max-w-4xl flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-12">
-                {/* Step info - left side on desktop */}
-                <AnimatePresence mode="wait" custom={direction}>
-                  <motion.div
-                    key={`info-${currentIndex}`}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{ duration: 0.35, ease: 'easeInOut' }}
-                    className="order-2 text-center lg:order-1 lg:w-56 lg:text-left"
-                  >
-                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
-                      {currentStep.step}
-                    </div>
-                    <h3 className="mb-3 text-xl font-bold text-slate-900 sm:text-2xl">
-                      {currentStep.title}
-                    </h3>
-                    <p className="text-base leading-relaxed text-slate-600">
-                      {currentStep.description}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Phone mockup with gradient pill - center */}
-                <AnimatePresence mode="wait" custom={direction}>
-                  <motion.div
-                    key={`phone-${currentIndex}`}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{ duration: 0.35, ease: 'easeInOut' }}
-                    className="relative order-1 lg:order-2"
-                  >
-                    {/* Phone container */}
-                    <div className="relative flex h-[320px] w-[280px] items-end justify-center">
-                      {/* Gradient pill background - centered at bottom */}
-                      <div
-                        className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                      />
-                      {/* Phone image */}
-                      <Image
-                        src={currentStep.image}
-                        alt={currentStep.title}
-                        width={242}
-                        height={276}
-                        className="relative z-10 drop-shadow-xl"
-                        priority
-                      />
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Next step preview text - right side on desktop */}
-                <div className="order-3 hidden w-56 opacity-40 lg:block">
-                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
-                    {nextStep.step}
-                  </div>
-                  <h3 className="mb-3 text-xl font-bold text-slate-400">
-                    {nextStep.title}
-                  </h3>
-                  <p className="text-base leading-relaxed text-slate-400">
-                    {nextStep.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Next slide preview (right) - always show next step */}
-              <div className="absolute right-0 hidden items-center opacity-40 lg:flex xl:right-8">
-                {/* Phone with gradient pill */}
-                <div className="relative flex h-[300px] w-[260px] items-end justify-center">
-                  {/* Gradient pill background */}
+                return (
                   <div
-                    className={`absolute bottom-0 h-[170px] w-[220px] rounded-[2rem] bg-gradient-to-br ${nextStep.gradient}`}
-                  />
-                  {/* Phone image */}
-                  <Image
-                    src={nextStep.image}
-                    alt={nextStep.title}
-                    width={242}
-                    height={276}
-                    className="relative z-10"
-                  />
-                </div>
-              </div>
-            </div>
+                    key={step.step}
+                    className="flex w-full flex-shrink-0 items-center justify-center"
+                  >
+                    <div className="flex w-full max-w-6xl items-center justify-center gap-4 lg:gap-8">
+                      {/* Left phone preview */}
+                      <div className="hidden w-[200px] flex-shrink-0 lg:block xl:w-[240px]">
+                        {showLeftPreview && leftPreview && (
+                          <div className="relative flex h-[260px] w-full items-end justify-center opacity-40">
+                            <div
+                              className={`absolute bottom-0 h-[150px] w-[180px] rounded-[1.75rem] bg-gradient-to-br ${leftPreview.gradient}`}
+                            />
+                            <Image
+                              src={leftPreview.image}
+                              alt={leftPreview.title}
+                              width={200}
+                              height={228}
+                              className="relative z-10"
+                            />
+                          </div>
+                        )}
+                      </div>
 
-            {/* Right Arrow */}
-            <button
-              onClick={goToNext}
-              className="absolute right-0 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md sm:right-4 lg:right-8"
-              aria-label="Next step"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
+                      {/* Step info - left of center phone */}
+                      <div className="hidden w-48 flex-shrink-0 text-left lg:block xl:w-56">
+                        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                          {step.step}
+                        </div>
+                        <h3 className="mb-3 text-xl font-bold text-slate-900 xl:text-2xl">
+                          {step.title}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-slate-600 xl:text-base">
+                          {step.description}
+                        </p>
+                      </div>
+
+                      {/* Center phone with gradient pill */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative flex h-[320px] w-[280px] items-end justify-center">
+                          <div
+                            className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                          />
+                          <Image
+                            src={step.image}
+                            alt={step.title}
+                            width={242}
+                            height={276}
+                            className="relative z-10 drop-shadow-xl"
+                            priority={index === 0}
+                          />
+                        </div>
+                        {/* Mobile: show text below phone */}
+                        <div className="mt-6 text-center lg:hidden">
+                          <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                            {step.step}
+                          </div>
+                          <h3 className="mb-2 text-lg font-bold text-slate-900">
+                            {step.title}
+                          </h3>
+                          <p className="text-sm leading-relaxed text-slate-600">
+                            {step.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Next step preview text - right of center phone */}
+                      <div className="hidden w-48 flex-shrink-0 text-left lg:block xl:w-56">
+                        {showRightPreview && rightPreview && (
+                          <div className="opacity-40">
+                            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
+                              {rightPreview.step}
+                            </div>
+                            <h3 className="mb-3 text-xl font-bold text-slate-400 xl:text-2xl">
+                              {rightPreview.title}
+                            </h3>
+                            <p className="text-sm leading-relaxed text-slate-400 xl:text-base">
+                              {rightPreview.description}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right phone preview */}
+                      <div className="hidden w-[200px] flex-shrink-0 lg:block xl:w-[240px]">
+                        {showRightPreview && rightPreview && (
+                          <div className="relative flex h-[260px] w-full items-end justify-center opacity-40">
+                            <div
+                              className={`absolute bottom-0 h-[150px] w-[180px] rounded-[1.75rem] bg-gradient-to-br ${rightPreview.gradient}`}
+                            />
+                            <Image
+                              src={rightPreview.image}
+                              alt={rightPreview.title}
+                              width={200}
+                              height={228}
+                              className="relative z-10"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </motion.div>
           </div>
 
+          {/* Right Arrow */}
+          <button
+            onClick={goToNext}
+            className="absolute right-0 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md sm:right-2 lg:right-4"
+            aria-label="Next step"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+
           {/* Dot indicators */}
-          <div className="mt-8 flex items-center justify-center gap-2">
+          <div className="mt-6 flex items-center justify-center gap-2">
             {steps.map((_, index) => (
               <button
                 key={index}
