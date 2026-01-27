@@ -1,7 +1,8 @@
+// src/components/homepage/HowItWorksSection.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
@@ -77,6 +78,9 @@ const transportSteps = [
   },
 ];
 
+// Width of each phone slot in the track
+const PHONE_SLOT_WIDTH = 320;
+
 export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -100,6 +104,10 @@ export default function HowItWorksSection() {
     }, 5000);
     return () => clearInterval(timer);
   }, [goToNext]);
+
+  const currentStep = steps[currentIndex];
+  const showRightPreview = currentIndex < steps.length - 1;
+  const rightPreviewStep = showRightPreview ? steps[currentIndex + 1] : null;
 
   return (
     <section
@@ -146,126 +154,140 @@ export default function HowItWorksSection() {
             <ChevronLeft className="h-6 w-6" />
           </button>
 
-          {/* Carousel Track Container */}
-          <div className="overflow-hidden px-14 py-8 sm:px-16 lg:px-20">
-            {/* Sliding Track - all slides in a row */}
-            <motion.div
-              className="flex"
-              animate={{ x: `${-currentIndex * 100}%` }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-            >
-              {steps.map((step, index) => {
-                // For each slide, determine what previews to show
-                const showLeftPreview = index > 0;
-                const leftPreview = showLeftPreview ? steps[index - 1] : null;
-                const showRightPreview = index < steps.length - 1;
-                const rightPreview = showRightPreview ? steps[index + 1] : null;
+          {/* Main Content Area */}
+          <div className="flex items-center justify-center gap-6 px-14 py-8 sm:px-16 lg:gap-10 lg:px-20">
+            {/* Left Text - Current Step Info */}
+            <div className="hidden w-48 flex-shrink-0 lg:block xl:w-56">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`left-text-${currentIndex}`}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.4, ease: 'easeInOut' }}
+                  className="text-left"
+                >
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                    {currentStep.step}
+                  </div>
+                  <h3 className="mb-3 text-xl font-bold text-slate-900 xl:text-2xl">
+                    {currentStep.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-slate-600 xl:text-base">
+                    {currentStep.description}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </div>
 
-                return (
-                  <div
-                    key={step.step}
-                    className="flex w-full flex-shrink-0 items-center justify-center"
-                  >
-                    <div className="flex w-full max-w-6xl items-center justify-center gap-4 lg:gap-8">
-                      {/* Left phone preview */}
-                      <div className="hidden w-[200px] flex-shrink-0 lg:block xl:w-[240px]">
-                        {showLeftPreview && leftPreview && (
-                          <div className="relative flex h-[260px] w-full items-end justify-center opacity-40">
-                            <div
-                              className={`absolute bottom-0 h-[150px] w-[180px] rounded-[1.75rem] bg-gradient-to-br ${leftPreview.gradient}`}
-                            />
-                            <Image
-                              src={leftPreview.image}
-                              alt={leftPreview.title}
-                              width={200}
-                              height={228}
-                              className="relative z-10"
-                            />
-                          </div>
-                        )}
-                      </div>
+            {/* Phone Carousel Track */}
+            <div className="relative flex-shrink-0 overflow-visible">
+              {/* Track container with visible overflow for previews */}
+              <div
+                className="relative"
+                style={{ width: PHONE_SLOT_WIDTH, height: 360 }}
+              >
+                <motion.div
+                  className="absolute flex items-end"
+                  style={{ height: 320, bottom: 0 }}
+                  animate={{ x: -currentIndex * PHONE_SLOT_WIDTH }}
+                  transition={{ duration: 0.5, ease: 'easeInOut' }}
+                >
+                  {steps.map((step, index) => {
+                    const isActive = index === currentIndex;
+                    const distance = Math.abs(index - currentIndex);
 
-                      {/* Step info - left of center phone */}
-                      <div className="hidden w-48 flex-shrink-0 text-left lg:block xl:w-56">
-                        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
-                          {step.step}
-                        </div>
-                        <h3 className="mb-3 text-xl font-bold text-slate-900 xl:text-2xl">
-                          {step.title}
-                        </h3>
-                        <p className="text-sm leading-relaxed text-slate-600 xl:text-base">
-                          {step.description}
-                        </p>
-                      </div>
-
-                      {/* Center phone with gradient pill */}
-                      <div className="flex flex-col items-center">
-                        <div className="relative flex h-[320px] w-[280px] items-end justify-center">
+                    return (
+                      <div
+                        key={step.step}
+                        className="flex items-end justify-center transition-opacity duration-500"
+                        style={{
+                          width: PHONE_SLOT_WIDTH,
+                          height: 320,
+                          opacity: isActive ? 1 : distance === 1 ? 0.4 : 0.2,
+                        }}
+                      >
+                        <div
+                          className="relative flex items-end justify-center transition-transform duration-500"
+                          style={{
+                            transform: isActive ? 'scale(1)' : 'scale(0.85)',
+                          }}
+                        >
+                          {/* Gradient pill */}
                           <div
-                            className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                            className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg transition-all duration-500 ${step.gradient}`}
                           />
+                          {/* Phone image */}
                           <Image
                             src={step.image}
                             alt={step.title}
                             width={242}
                             height={276}
-                            className="relative z-10 drop-shadow-xl"
+                            className="relative z-10"
                             priority={index === 0}
                           />
                         </div>
-                        {/* Mobile: show text below phone */}
-                        <div className="mt-6 text-center lg:hidden">
-                          <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
-                            {step.step}
-                          </div>
-                          <h3 className="mb-2 text-lg font-bold text-slate-900">
-                            {step.title}
-                          </h3>
-                          <p className="text-sm leading-relaxed text-slate-600">
-                            {step.description}
-                          </p>
-                        </div>
                       </div>
+                    );
+                  })}
+                </motion.div>
+              </div>
 
-                      {/* Next step preview text - right of center phone */}
-                      <div className="hidden w-48 flex-shrink-0 text-left lg:block xl:w-56">
-                        {showRightPreview && rightPreview && (
-                          <div className="opacity-40">
-                            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
-                              {rightPreview.step}
-                            </div>
-                            <h3 className="mb-3 text-xl font-bold text-slate-400 xl:text-2xl">
-                              {rightPreview.title}
-                            </h3>
-                            <p className="text-sm leading-relaxed text-slate-400 xl:text-base">
-                              {rightPreview.description}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Right phone preview */}
-                      <div className="hidden w-[200px] flex-shrink-0 lg:block xl:w-[240px]">
-                        {showRightPreview && rightPreview && (
-                          <div className="relative flex h-[260px] w-full items-end justify-center opacity-40">
-                            <div
-                              className={`absolute bottom-0 h-[150px] w-[180px] rounded-[1.75rem] bg-gradient-to-br ${rightPreview.gradient}`}
-                            />
-                            <Image
-                              src={rightPreview.image}
-                              alt={rightPreview.title}
-                              width={200}
-                              height={228}
-                              className="relative z-10"
-                            />
-                          </div>
-                        )}
-                      </div>
+              {/* Mobile: show text below phone */}
+              <div className="mt-6 text-center lg:hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`mobile-text-${currentIndex}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                      {currentStep.step}
                     </div>
-                  </div>
-                );
-              })}
-            </motion.div>
+                    <h3 className="mb-2 text-lg font-bold text-slate-900">
+                      {currentStep.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      {currentStep.description}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Right Text - Next Step Preview */}
+            <div className="hidden w-48 flex-shrink-0 lg:block xl:w-56">
+              <AnimatePresence mode="wait">
+                {showRightPreview && rightPreviewStep ? (
+                  <motion.div
+                    key={`right-text-${currentIndex}`}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 0.4, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.4, ease: 'easeInOut' }}
+                    className="text-left"
+                  >
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
+                      {rightPreviewStep.step}
+                    </div>
+                    <h3 className="mb-3 text-xl font-bold text-slate-400 xl:text-2xl">
+                      {rightPreviewStep.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-slate-400 xl:text-base">
+                      {rightPreviewStep.description}
+                    </p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty-right"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0 }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Right Arrow */}
