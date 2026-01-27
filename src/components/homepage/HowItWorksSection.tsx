@@ -1,3 +1,4 @@
+// src/components/homepage/HowItWorksSection.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -92,11 +93,13 @@ export default function HowItWorksSection() {
 
   const goToPrevious = useCallback(() => {
     setDirection(-1);
+    // Linear: if at start, go to end; otherwise go back one
     setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
   }, [steps.length]);
 
   const goToNext = useCallback(() => {
     setDirection(1);
+    // Linear: if at end, restart from beginning
     setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
   }, [steps.length]);
 
@@ -109,8 +112,15 @@ export default function HowItWorksSection() {
   }, [goToNext]);
 
   const currentStep = steps[currentIndex];
-  const prevIndex = currentIndex === 0 ? steps.length - 1 : currentIndex - 1;
+  
+  // Linear previews: only show adjacent steps in forward direction
+  // Step 1: no prev, Step 2-4: show previous step
+  const hasPrevPreview = currentIndex > 0;
+  const prevStep = hasPrevPreview ? steps[currentIndex - 1] : null;
+  
+  // All steps show the next step, step 4 shows step 1 (restart indicator)
   const nextIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
+  const nextStep = steps[nextIndex];
 
   const slideVariants = {
     enter: (direction: number) => ({
@@ -176,23 +186,26 @@ export default function HowItWorksSection() {
 
             {/* Slides Container */}
             <div className="relative flex w-full items-center justify-center py-8">
-              {/* Previous slide preview (left) - faded */}
-              <div className="absolute left-0 hidden opacity-30 lg:block xl:left-12">
-                <div className="relative h-[276px] w-[242px]">
-                  {/* Gradient pill - shorter, only bottom portion */}
-                  <div
-                    className={`absolute bottom-0 left-1/2 h-[140px] w-[180px] -translate-x-1/2 rounded-[2rem] bg-gradient-to-br ${steps[prevIndex].gradient}`}
-                  />
-                  {/* Phone image */}
-                  <Image
-                    src={steps[prevIndex].image}
-                    alt={steps[prevIndex].title}
-                    width={242}
-                    height={276}
-                    className="relative z-10"
-                  />
+              {/* Previous slide preview (left) - only show if not on step 1 */}
+              {hasPrevPreview && prevStep && (
+                <div className="absolute left-0 hidden items-center opacity-40 lg:flex xl:left-8">
+                  {/* Phone with gradient pill */}
+                  <div className="relative flex h-[300px] w-[260px] items-end justify-center">
+                    {/* Gradient pill background */}
+                    <div
+                      className={`absolute bottom-0 h-[170px] w-[220px] rounded-[2rem] bg-gradient-to-br ${prevStep.gradient}`}
+                    />
+                    {/* Phone image */}
+                    <Image
+                      src={prevStep.image}
+                      alt={prevStep.title}
+                      width={242}
+                      height={276}
+                      className="relative z-10"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Current slide - center content */}
               <div className="flex w-full max-w-4xl flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-12">
@@ -232,11 +245,11 @@ export default function HowItWorksSection() {
                     transition={{ duration: 0.35, ease: 'easeInOut' }}
                     className="relative order-1 lg:order-2"
                   >
-                    {/* Phone container with fixed dimensions */}
-                    <div className="relative h-[276px] w-[242px]">
-                      {/* Gradient pill - shorter, only bottom portion, animates with phone */}
+                    {/* Phone container */}
+                    <div className="relative flex h-[320px] w-[280px] items-end justify-center">
+                      {/* Gradient pill background - centered at bottom */}
                       <div
-                        className={`absolute bottom-0 left-1/2 h-[160px] w-[200px] -translate-x-1/2 rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+                        className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
                       />
                       {/* Phone image */}
                       <Image
@@ -254,28 +267,29 @@ export default function HowItWorksSection() {
                 {/* Next step preview text - right side on desktop */}
                 <div className="order-3 hidden w-56 opacity-40 lg:block">
                   <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
-                    {steps[nextIndex].step}
+                    {nextStep.step}
                   </div>
                   <h3 className="mb-3 text-xl font-bold text-slate-400">
-                    {steps[nextIndex].title}
+                    {nextStep.title}
                   </h3>
                   <p className="text-base leading-relaxed text-slate-400">
-                    {steps[nextIndex].description}
+                    {nextStep.description}
                   </p>
                 </div>
               </div>
 
-              {/* Next slide preview (right) - faded */}
-              <div className="absolute right-0 hidden opacity-30 lg:block xl:right-12">
-                <div className="relative h-[276px] w-[242px]">
-                  {/* Gradient pill - shorter, only bottom portion */}
+              {/* Next slide preview (right) - always show next step */}
+              <div className="absolute right-0 hidden items-center opacity-40 lg:flex xl:right-8">
+                {/* Phone with gradient pill */}
+                <div className="relative flex h-[300px] w-[260px] items-end justify-center">
+                  {/* Gradient pill background */}
                   <div
-                    className={`absolute bottom-0 left-1/2 h-[140px] w-[180px] -translate-x-1/2 rounded-[2rem] bg-gradient-to-br ${steps[nextIndex].gradient}`}
+                    className={`absolute bottom-0 h-[170px] w-[220px] rounded-[2rem] bg-gradient-to-br ${nextStep.gradient}`}
                   />
                   {/* Phone image */}
                   <Image
-                    src={steps[nextIndex].image}
-                    alt={steps[nextIndex].title}
+                    src={nextStep.image}
+                    alt={nextStep.title}
                     width={242}
                     height={276}
                     className="relative z-10"
