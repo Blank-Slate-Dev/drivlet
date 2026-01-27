@@ -1160,7 +1160,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             <label htmlFor="serviceDate" className="text-sm font-medium text-slate-700">
                               <span className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-emerald-600" />
-                                Preferred Service Date *
+                                Service Date *
                               </span>
                             </label>
                             <input
