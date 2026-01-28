@@ -147,39 +147,41 @@ export default function HowItWorksSection() {
   };
 
   const currentStep = steps[currentIndex];
-  const isCurrentImageLoaded = loadedImages.has(currentIndex);
 
   // Phone with gradient pill component - reused for desktop and mobile
   // Images are 600x951 (pre-cropped), scaled down to ~220px width for display
   // Phone height at 220px width = ~349px, pill is ~70% of that and wider than phone
-  const PhoneWithPill = () => (
-    <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
-      {/* Gradient pill background - wider than phone, ~70% height */}
-      <div
-        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-      />
-      {/* Show skeleton while image loads */}
-      {!isCurrentImageLoaded && (
-        <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
-      )}
-      {/* Phone image - fades out at the bottom to blend into pill */}
-      <Image
-        src={currentStep.image}
-        alt={currentStep.title}
-        width={600}
-        height={951}
-        className={`relative z-10 h-auto w-[220px] transition-opacity duration-300 ${
-          isCurrentImageLoaded ? 'opacity-100' : 'opacity-0'
-        }`}
-        style={{
-          maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-        }}
-        priority={currentIndex === 0}
-        onLoad={() => handleImageLoad(currentIndex)}
-      />
-    </div>
-  );
+  const PhoneWithPill = ({ index }: { index: number }) => {
+    const step = steps[index];
+    const isLoaded = loadedImages.has(index);
+    
+    return (
+      <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
+        {/* Gradient pill background - wider than phone, ~70% height */}
+        <div
+          className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+        />
+        {/* Show skeleton only if image hasn't been preloaded yet */}
+        {!isLoaded && (
+          <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
+        )}
+        {/* Phone image - fades out at the bottom to blend into pill */}
+        <Image
+          src={step.image}
+          alt={step.title}
+          width={600}
+          height={951}
+          className={`relative z-10 h-auto w-[220px] ${!isLoaded ? 'opacity-0' : ''}`}
+          style={{
+            maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+          }}
+          priority={index === 0}
+          onLoad={() => handleImageLoad(index)}
+        />
+      </div>
+    );
+  };
 
   return (
     <section
@@ -272,7 +274,7 @@ export default function HowItWorksSection() {
                     exit={{ opacity: 0, x: -80 }}
                     transition={{ duration: 0.4, ease: 'easeInOut' }}
                   >
-                    <PhoneWithPill />
+                    <PhoneWithPill index={currentIndex} />
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -290,7 +292,7 @@ export default function HowItWorksSection() {
                   className="flex flex-col items-center"
                 >
                   {/* Phone with Gradient Pill */}
-                  <PhoneWithPill />
+                  <PhoneWithPill index={currentIndex} />
 
                   {/* Text below */}
                   <div className="mt-6 text-center">
