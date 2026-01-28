@@ -4,12 +4,9 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
-import {
-  HeroSection,
-  ValuePropsSection,
-  HowItWorksSection,
-  Footer,
-} from '@/components/homepage';
+import HeroSection from '@/components/homepage/HeroSection';
+import ValuePropsSection from '@/components/homepage/ValuePropsSection';
+import Footer from '@/components/homepage/Footer';
 
 // Lazy load heavy components to improve initial page load
 const BookingModal = dynamic(
@@ -18,6 +15,11 @@ const BookingModal = dynamic(
     ssr: false,
     loading: () => null,
   }
+);
+
+const HowItWorksSection = dynamic(
+  () => import('@/components/homepage/HowItWorksSection'),
+  { ssr: false }
 );
 
 const InteractiveServicesSection = dynamic(
@@ -37,13 +39,12 @@ const FAQSection = dynamic(
 
 export default function Home() {
   const [showBookingModal, setShowBookingModal] = useState(false);
-
   const openBookingModal = () => setShowBookingModal(true);
   const closeBookingModal = () => setShowBookingModal(false);
 
   return (
     <main className="min-h-screen bg-white">
-      {/* Only render modal when needed - conditional rendering for performance */}
+      {/* Only render modal when needed */}
       {showBookingModal && (
         <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
       )}
@@ -54,8 +55,10 @@ export default function Home() {
       {/* Hero Section - above the fold, load immediately */}
       <HeroSection onBookingClick={openBookingModal} />
 
-      {/* Value Props + How It Works - critical content */}
+      {/* Value Props - critical content */}
       <ValuePropsSection />
+
+      {/* How It Works - lazy loaded to prevent blocking */}
       <HowItWorksSection />
 
       {/* Services Section - lazy loaded */}
