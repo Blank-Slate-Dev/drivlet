@@ -15,7 +15,7 @@ const marketplaceSteps = [
     title: 'Book online in 2 clicks',
     description:
       'Share your rego, pick-up location, and service type. We handle the rest.',
-    image: '/Phonestep1.png',
+    image: '/step1_phone.png',
     gradient: 'from-emerald-400 to-green-500',
   },
   {
@@ -23,7 +23,7 @@ const marketplaceSteps = [
     title: 'Track your service',
     description:
       'Follow your vehicle in real-time from collection through to completion.',
-    image: '/Phonestep2.png',
+    image: '/step2_phone.png',
     gradient: 'from-violet-500 to-purple-600',
   },
   {
@@ -31,7 +31,7 @@ const marketplaceSteps = [
     title: 'We deliver to the garage',
     description:
       'Our fully insured drivers deliver your car to our vetted service centre network.',
-    image: '/Phonestep3.png',
+    image: '/step3_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
   },
   {
@@ -39,7 +39,7 @@ const marketplaceSteps = [
     title: 'We return your car',
     description:
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
-    image: '/Phonestep4.png',
+    image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
   },
 ];
@@ -50,7 +50,7 @@ const transportSteps = [
     title: 'Book your pickup',
     description:
       'Enter your rego, pickup address, and service centre details. Quick and simple.',
-    image: '/Phonestep1.png',
+    image: '/step1_phone.png',
     gradient: 'from-emerald-400 to-green-500',
   },
   {
@@ -58,7 +58,7 @@ const transportSteps = [
     title: 'Track in real-time',
     description:
       'Follow your vehicle every step of the way with live tracking updates.',
-    image: '/Phonestep2.png',
+    image: '/step2_phone.png',
     gradient: 'from-violet-500 to-purple-600',
   },
   {
@@ -66,7 +66,7 @@ const transportSteps = [
     title: 'Delivered to your service centre',
     description:
       'Our fully insured drivers deliver your car directly to your chosen garage.',
-    image: '/Phonestep3.png',
+    image: '/step3_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
   },
   {
@@ -74,7 +74,7 @@ const transportSteps = [
     title: 'Returned to you',
     description:
       'Once your service is complete, we collect and return your car — hassle-free.',
-    image: '/Phonestep4.png',
+    image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
   },
 ];
@@ -124,12 +124,13 @@ export default function HowItWorksSection() {
   const currentStep = steps[currentIndex];
 
   // Phone with gradient pill component - reused for desktop and mobile
-  // Images are 600x951 (pre-cropped), displayed at 260px width
+  // Images are 600x951 (pre-cropped), scaled down to ~220px width for display
+  // Phone height at 220px width = ~349px, pill is ~70% of that and wider than phone
   const PhoneWithPill = () => (
-    <div className="relative flex h-[440px] w-[300px] items-end justify-center pb-[24px]">
-      {/* Gradient pill background */}
+    <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
+      {/* Gradient pill background - wider than phone, ~70% height */}
       <div
-        className={`absolute bottom-0 h-[260px] w-[260px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
       />
       {/* Phone image - fades out at the bottom to blend into pill */}
       <Image
@@ -137,7 +138,7 @@ export default function HowItWorksSection() {
         alt={currentStep.title}
         width={600}
         height={951}
-        className="relative z-10 h-auto w-[260px]"
+        className="relative z-10 h-auto w-[220px]"
         style={{
           maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
