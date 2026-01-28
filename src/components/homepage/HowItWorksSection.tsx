@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
 
 // Step data with gradient colors for the pills
+// Note: Step 1 = green, Step 4 = cyan/teal (swapped)
 const marketplaceSteps = [
   {
     step: '1',
@@ -15,7 +16,7 @@ const marketplaceSteps = [
     description:
       'Share your rego, pick-up location, and service type. We handle the rest.',
     image: '/Phonestep1.png',
-    gradient: 'from-cyan-400 to-teal-500',
+    gradient: 'from-emerald-400 to-green-500',
   },
   {
     step: '2',
@@ -39,7 +40,7 @@ const marketplaceSteps = [
     description:
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
     image: '/Phonestep4.png',
-    gradient: 'from-emerald-400 to-green-500',
+    gradient: 'from-cyan-400 to-teal-500',
   },
 ];
 
@@ -50,7 +51,7 @@ const transportSteps = [
     description:
       'Enter your rego, pickup address, and service centre details. Quick and simple.',
     image: '/Phonestep1.png',
-    gradient: 'from-cyan-400 to-teal-500',
+    gradient: 'from-emerald-400 to-green-500',
   },
   {
     step: '2',
@@ -74,7 +75,7 @@ const transportSteps = [
     description:
       'Once your service is complete, we collect and return your car — hassle-free.',
     image: '/Phonestep4.png',
-    gradient: 'from-emerald-400 to-green-500',
+    gradient: 'from-cyan-400 to-teal-500',
   },
 ];
 
@@ -212,21 +213,26 @@ export default function HowItWorksSection() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -80 }}
                     transition={{ duration: 0.4, ease: 'easeInOut' }}
-                    className="relative flex h-[320px] w-[280px] items-end justify-center"
+                    className="relative h-[320px] w-[280px]"
                   >
-                    {/* Gradient pill */}
-                    <div
-                      className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                    />
-                    {/* Phone image */}
-                    <Image
-                      src={currentStep.image}
-                      alt={currentStep.title}
-                      width={242}
-                      height={276}
-                      className="relative z-10"
-                      priority
-                    />
+                    {/* Container that clips the phone at the pill boundary */}
+                    <div className="absolute bottom-0 left-1/2 h-[200px] w-[240px] -translate-x-1/2 overflow-hidden rounded-[2.5rem]">
+                      {/* Gradient pill background */}
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+                      />
+                      {/* Phone image - positioned to show from top of container */}
+                      <div className="absolute -top-[76px] left-1/2 -translate-x-1/2">
+                        <Image
+                          src={currentStep.image}
+                          alt={currentStep.title}
+                          width={242}
+                          height={276}
+                          className="relative z-10"
+                          priority
+                        />
+                      </div>
+                    </div>
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -243,19 +249,23 @@ export default function HowItWorksSection() {
                   transition={{ duration: 0.4, ease: 'easeInOut' }}
                   className="flex flex-col items-center"
                 >
-                  {/* Phone with Gradient Pill */}
-                  <div className="relative flex h-[320px] w-[280px] items-end justify-center">
-                    <div
-                      className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                    />
-                    <Image
-                      src={currentStep.image}
-                      alt={currentStep.title}
-                      width={242}
-                      height={276}
-                      className="relative z-10"
-                      priority
-                    />
+                  {/* Phone with Gradient Pill - clipped */}
+                  <div className="relative h-[320px] w-[280px]">
+                    <div className="absolute bottom-0 left-1/2 h-[200px] w-[240px] -translate-x-1/2 overflow-hidden rounded-[2.5rem]">
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+                      />
+                      <div className="absolute -top-[76px] left-1/2 -translate-x-1/2">
+                        <Image
+                          src={currentStep.image}
+                          alt={currentStep.title}
+                          width={242}
+                          height={276}
+                          className="relative z-10"
+                          priority
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Text below */}
