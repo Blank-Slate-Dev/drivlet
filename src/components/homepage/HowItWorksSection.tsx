@@ -130,13 +130,17 @@ export default function HowItWorksSection() {
       <div
         className={`absolute bottom-0 h-[204px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
       />
-      {/* Phone image - sits on top, 24px above bottom */}
+      {/* Phone image - fades out at the bottom to blend into pill */}
       <Image
         src={currentStep.image}
         alt={currentStep.title}
         width={242}
         height={276}
         className="relative z-10"
+        style={{
+          maskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)',
+        }}
         priority
       />
     </div>
