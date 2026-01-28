@@ -1,7 +1,7 @@
 // src/components/homepage/HowItWorksSection.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -90,58 +90,30 @@ export default function HowItWorksSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [prevIndex, setPrevIndex] = useState(0);
-  const hasUserInteracted = useRef(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
-
-  const stopAutoScroll = useCallback(() => {
-    hasUserInteracted.current = true;
-  }, []);
 
   const goToSlide = useCallback(
     (index: number) => {
-      stopAutoScroll();
       setDirection(index > currentIndex ? 'right' : 'left');
       setPrevIndex(currentIndex);
       setCurrentIndex(index);
     },
-    [stopAutoScroll, currentIndex]
+    [currentIndex]
   );
 
   const goToPrevious = useCallback(() => {
-    stopAutoScroll();
     setDirection('left');
     setPrevIndex(currentIndex);
     const newIndex = currentIndex === 0 ? steps.length - 1 : currentIndex - 1;
     setCurrentIndex(newIndex);
-  }, [steps.length, stopAutoScroll, currentIndex]);
+  }, [steps.length, currentIndex]);
 
   const goToNext = useCallback(() => {
-    stopAutoScroll();
-    setDirection('right');
-    setPrevIndex(currentIndex);
-    const newIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
-  }, [steps.length, stopAutoScroll, currentIndex]);
-
-  const autoAdvance = useCallback(() => {
     setDirection('right');
     setPrevIndex(currentIndex);
     const newIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
     setCurrentIndex(newIndex);
   }, [steps.length, currentIndex]);
-
-  // Auto-advance every 20 seconds, stops if user has interacted
-  useEffect(() => {
-    if (hasUserInteracted.current) return;
-
-    const timer = setInterval(() => {
-      if (!hasUserInteracted.current) {
-        autoAdvance();
-      }
-    }, 20000);
-
-    return () => clearInterval(timer);
-  }, [autoAdvance]);
 
   const handleImageLoad = (index: number) => {
     setLoadedImages((prev) => new Set([...prev, index]));
