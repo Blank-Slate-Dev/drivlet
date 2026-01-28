@@ -124,22 +124,23 @@ export default function HowItWorksSection() {
   const currentStep = steps[currentIndex];
 
   // Phone with gradient pill component - reused for desktop and mobile
+  // Images are 600x951 (pre-cropped), displayed at 260px width
   const PhoneWithPill = () => (
-    <div className="relative flex h-[344px] w-[280px] items-end justify-center pb-[24px]">
-      {/* Gradient pill background - extends 24px below the phone */}
+    <div className="relative flex h-[440px] w-[300px] items-end justify-center pb-[24px]">
+      {/* Gradient pill background */}
       <div
-        className={`absolute bottom-0 h-[204px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+        className={`absolute bottom-0 h-[260px] w-[260px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
       />
       {/* Phone image - fades out at the bottom to blend into pill */}
       <Image
         src={currentStep.image}
         alt={currentStep.title}
-        width={242}
-        height={276}
-        className="relative z-10"
+        width={600}
+        height={951}
+        className="relative z-10 h-auto w-[260px]"
         style={{
-          maskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
         }}
         priority
       />
