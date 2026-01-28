@@ -7,8 +7,6 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
 
-// Step data with gradient colors for the pills
-// Note: Step 1 = green, Step 4 = cyan/teal
 const marketplaceSteps = [
 {
 step: '1',
@@ -96,9 +94,9 @@ const hasUserInteracted = useRef(false);
 const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
 const [imagesPreloaded, setImagesPreloaded] = useState(false);
 
-const stopAutoScroll = useCallback(() => {
-hasUserInteracted.current = true;
-}, []);
+  const stopAutoScroll = useCallback(() => {
+    hasUserInteracted.current = true;
+  }, []);
 
 const goToSlide = useCallback((index: number) => {
 stopAutoScroll();
@@ -130,9 +128,8 @@ return prev === steps.length - 1 ? 0 : prev + 1;
 });
 }, [steps.length]);
 
-// Auto-advance every 20 seconds, stops if user has interacted
-useEffect(() => {
-if (hasUserInteracted.current) return;
+  useEffect(() => {
+    if (hasUserInteracted.current) return;
 
 
 const timer = setInterval(() => {
@@ -144,11 +141,19 @@ const timer = setInterval(() => {
 return () => clearInterval(timer);
 
 
-}, [autoAdvance]);
+  useEffect(() => {
+    if (imagesPreloaded) return;
 
-// Preload remaining images after first image loads
-useEffect(() => {
-if (imagesPreloaded) return;
+    const preloadTimer = setTimeout(() => {
+      steps.slice(1).forEach((step, index) => {
+        const img = new window.Image();
+        img.src = step.image;
+        img.onload = () => {
+          setLoadedImages((prev) => new Set([...prev, index + 1]));
+        };
+      });
+      setImagesPreloaded(true);
+    }, 500);
 
 
 // Preload images 2, 3, 4 after a short delay
@@ -166,13 +171,37 @@ const preloadTimer = setTimeout(() => {
 return () => clearTimeout(preloadTimer);
 
 
-}, [steps, imagesPreloaded]);
+  const currentStep = steps[currentIndex];
 
 const handleImageLoad = (index: number) => {
 setLoadedImages((prev) => new Set([...prev, index]));
 };
 
-const currentStep = steps[currentIndex];
+    return (
+      <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
+        <div
+          className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+        />
+        {!isLoaded && (
+          <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
+        )}
+        <div className="relative z-10 w-[220px]">
+          <Image
+            src={step.image}
+            alt={step.title}
+            width={600}
+            height={951}
+            className={`h-auto w-[220px] ${!isLoaded ? 'opacity-0' : ''}`}
+            priority={index === 0}
+            onLoad={() => handleImageLoad(index)}
+          />
+          <div
+            className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+          />
+        </div>
+      </div>
+    );
+  };
 
 // Phone with gradient pill component - reused for desktop and mobile
 // Images are 600x951 (pre-cropped), scaled down to ~220px width for display
@@ -283,97 +312,158 @@ fill="none"
                 transition={{ duration: 0.3 }}
                 className="text-left"
               >
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                <path
+                  d="M0 5 Q 50 0 100 5"
+                  stroke="#fbbf24"
+                  strokeWidth="2"
+                  fill="none"
+                />
+              </svg>
+            </span>
+          </p>
+        </div>
+
+        <div className="relative">
+          <button
+            onClick={goToPrevious}
+            className="absolute left-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md lg:left-4"
+            aria-label="Previous step"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+
+          <button
+            onClick={goToNext}
+            className="absolute right-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md lg:right-4"
+            aria-label="Next step"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+
+          <div className="px-16 lg:px-24">
+            <div className="hidden lg:flex lg:items-center lg:justify-center lg:gap-12">
+              <div className="w-56 flex-shrink-0">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`text-${currentIndex}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-left"
+                  >
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                      {currentStep.step}
+                    </div>
+                    <h3 className="mb-3 text-xl font-bold text-slate-900">
+                      {currentStep.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      {currentStep.description}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <div className="flex-shrink-0">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={`phone-${currentIndex}`}
+                    initial={{ opacity: 0, x: direction === 'right' ? 80 : -80 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: direction === 'right' ? -80 : 80 }}
+                    transition={{ duration: 0.4, ease: 'easeInOut' }}
+                  >
+                    <PhoneWithPill index={currentIndex} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center lg:hidden">
+              <div className="relative h-[380px] w-[300px] overflow-hidden">
+                {steps.map((step, index) => {
+                  let translateX = '0%';
+
+                  if (index === currentIndex) {
+                    translateX = '0%';
+                  } else if (index === prevIndex) {
+                    translateX = direction === 'right' ? '-100%' : '100%';
+                  } else {
+                    translateX = direction === 'right' ? '100%' : '-100%';
+                  }
+
+                  return (
+                    <div
+                      key={step.step}
+                      className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
+                      style={{
+                        transform: `translateX(${translateX})`,
+                        opacity: index === currentIndex ? 1 : 0,
+                      }}
+                    >
+                      <div
+                        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                      />
+                      <div className="relative z-10 w-[220px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={step.image}
+                          alt={step.title}
+                          className="h-auto w-[220px]"
+                          loading={index === 0 ? 'eager' : 'lazy'}
+                        />
+                        <div
+                          className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 text-center">
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
                   {currentStep.step}
                 </div>
-                <h3 className="mb-3 text-xl font-bold text-slate-900">
+                <h3 className="mb-2 text-lg font-bold text-slate-900">
                   {currentStep.title}
                 </h3>
                 <p className="text-sm leading-relaxed text-slate-600">
                   {currentStep.description}
                 </p>
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            </div>
           </div>
 
-          {/* Center: Phone with Gradient Pill */}
-          <div className="flex-shrink-0">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={`phone-${currentIndex}`}
-                initial={{ opacity: 0, x: direction === 'right' ? 80 : -80 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction === 'right' ? -80 : 80 }}
-                transition={{ duration: 0.4, ease: 'easeInOut' }}
-              >
-                <PhoneWithPill index={currentIndex} />
-              </motion.div>
-            </AnimatePresence>
+          <div className="mt-8 flex items-center justify-center gap-2">
+            {steps.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'w-8 bg-emerald-500'
+                    : 'w-2 bg-slate-300 hover:bg-slate-400'
+                }`}
+                aria-label={`Go to step ${index + 1}`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Mobile Layout - static images, CSS transforms for slide effect */}
-        <div className="flex flex-col items-center lg:hidden">
-          <div className="relative h-[380px] w-[300px] overflow-hidden">
-            {steps.map((step, index) => {
-              // Calculate position based on direction and whether this is current/prev slide
-              let translateX = '0%';
-              
-              if (index === currentIndex) {
-                // Current slide is always centered
-                translateX = '0%';
-              } else if (index === prevIndex) {
-                // Previous slide exits in opposite direction of movement
-                translateX = direction === 'right' ? '-100%' : '100%';
-              } else {
-                // All other slides - park off-screen on the incoming side
-                translateX = direction === 'right' ? '100%' : '-100%';
-              }
-              
-              return (
-                <div
-                  key={step.step}
-                  className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
-                  style={{
-                    transform: `translateX(${translateX})`,
-                    opacity: index === currentIndex ? 1 : 0,
-                  }}
-                >
-                  {/* Gradient pill background */}
-                  <div
-                    className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
-                  />
-                  {/* Phone image - using img tag to avoid Next.js re-render issues */}
-                  <div className="relative z-10 w-[220px]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={step.image}
-                      alt={step.title}
-                      className="h-auto w-[220px]"
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                    />
-                    {/* Gradient overlay */}
-                    <div 
-                      className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Text below */}
-          <div className="mt-6 text-center">
-            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
-              {currentStep.step}
-            </div>
-            <h3 className="mb-2 text-lg font-bold text-slate-900">
-              {currentStep.title}
-            </h3>
-            <p className="text-sm leading-relaxed text-slate-600">
-              {currentStep.description}
-            </p>
-          </div>
+        <div className="hidden">
+          {steps.slice(1).map((step, index) => (
+            <Image
+              key={step.image}
+              src={step.image}
+              alt=""
+              width={600}
+              height={951}
+              loading="lazy"
+              onLoad={() => handleImageLoad(index + 1)}
+            />
+          ))}
         </div>
       </div>
 
