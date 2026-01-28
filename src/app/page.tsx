@@ -7,16 +7,9 @@ import Header from '@/components/Header';
 import HeroSection from '@/components/homepage/HeroSection';
 import ValuePropsSection from '@/components/homepage/ValuePropsSection';
 import Footer from '@/components/homepage/Footer';
+import BookingModal from '@/components/homepage/BookingModal';
 
-// Lazy load heavy components to improve initial page load
-const BookingModal = dynamic(
-  () => import('@/components/homepage/BookingModal'),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-);
-
+// Lazy load below-the-fold components
 const HowItWorksSection = dynamic(
   () => import('@/components/homepage/HowItWorksSection'),
   { ssr: false }
@@ -44,10 +37,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
-      {/* Only render modal when needed */}
-      {showBookingModal && (
-        <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
-      )}
+      {/* Modal - always ready, only visible when open */}
+      <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
 
       {/* Header */}
       <Header onBookingClick={openBookingModal} />
@@ -58,7 +49,7 @@ export default function Home() {
       {/* Value Props - critical content */}
       <ValuePropsSection />
 
-      {/* How It Works - lazy loaded to prevent blocking */}
+      {/* How It Works - lazy loaded */}
       <HowItWorksSection />
 
       {/* Services Section - lazy loaded */}
