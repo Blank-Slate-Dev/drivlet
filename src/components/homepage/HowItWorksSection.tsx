@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
 
 // Step data with gradient colors for the pills
-// Note: Step 1 = green, Step 4 = cyan/teal (swapped)
+// Note: Step 1 = green, Step 4 = cyan/teal
 const marketplaceSteps = [
   {
     step: '1',
@@ -123,6 +123,30 @@ export default function HowItWorksSection() {
 
   const currentStep = steps[currentIndex];
 
+  // Phone with gradient pill component - reused for desktop and mobile
+  const PhoneWithPill = () => (
+    <div className="relative flex h-[320px] w-[280px] items-end justify-center">
+      {/* Gradient pill background */}
+      <div
+        className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+      />
+      {/* Phone image - sits on top */}
+      <Image
+        src={currentStep.image}
+        alt={currentStep.title}
+        width={242}
+        height={276}
+        className="relative z-10"
+        priority
+      />
+      {/* Bottom overlay - hides phone corners that extend beyond pill */}
+      <div className="absolute bottom-0 z-20 h-[20px] w-[280px] overflow-hidden">
+        {/* White overlay with rounded top matching pill curve, positioned to only cover corners */}
+        <div className="absolute -top-[20px] left-1/2 h-[40px] w-[240px] -translate-x-1/2 rounded-b-[2.5rem] bg-white" />
+      </div>
+    </div>
+  );
+
   return (
     <section
       id="how-it-works"
@@ -213,26 +237,8 @@ export default function HowItWorksSection() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -80 }}
                     transition={{ duration: 0.4, ease: 'easeInOut' }}
-                    className="relative h-[320px] w-[280px]"
                   >
-                    {/* Container that clips the phone at the pill boundary */}
-                    <div className="absolute bottom-0 left-1/2 h-[200px] w-[240px] -translate-x-1/2 overflow-hidden rounded-[2.5rem]">
-                      {/* Gradient pill background */}
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                      />
-                      {/* Phone image - positioned to show from top of container */}
-                      <div className="absolute -top-[76px] left-1/2 -translate-x-1/2">
-                        <Image
-                          src={currentStep.image}
-                          alt={currentStep.title}
-                          width={242}
-                          height={276}
-                          className="relative z-10"
-                          priority
-                        />
-                      </div>
-                    </div>
+                    <PhoneWithPill />
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -249,24 +255,8 @@ export default function HowItWorksSection() {
                   transition={{ duration: 0.4, ease: 'easeInOut' }}
                   className="flex flex-col items-center"
                 >
-                  {/* Phone with Gradient Pill - clipped */}
-                  <div className="relative h-[320px] w-[280px]">
-                    <div className="absolute bottom-0 left-1/2 h-[200px] w-[240px] -translate-x-1/2 overflow-hidden rounded-[2.5rem]">
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                      />
-                      <div className="absolute -top-[76px] left-1/2 -translate-x-1/2">
-                        <Image
-                          src={currentStep.image}
-                          alt={currentStep.title}
-                          width={242}
-                          height={276}
-                          className="relative z-10"
-                          priority
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  {/* Phone with Gradient Pill */}
+                  <PhoneWithPill />
 
                   {/* Text below */}
                   <div className="mt-6 text-center">
