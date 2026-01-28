@@ -108,27 +108,31 @@ export default function HowItWorksSection() {
     [stopAutoScroll, currentIndex]
   );
 
+  // Fixed: Don't mix functional updates with closure values
   const goToPrevious = useCallback(() => {
     stopAutoScroll();
     setDirection('left');
     setPrevIndex(currentIndex);
-    setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
+    const newIndex = currentIndex === 0 ? steps.length - 1 : currentIndex - 1;
+    setCurrentIndex(newIndex);
   }, [steps.length, stopAutoScroll, currentIndex]);
 
+  // Fixed: Don't mix functional updates with closure values
   const goToNext = useCallback(() => {
     stopAutoScroll();
     setDirection('right');
     setPrevIndex(currentIndex);
-    setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
+    const newIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
+    setCurrentIndex(newIndex);
   }, [steps.length, stopAutoScroll, currentIndex]);
 
+  // Fixed: Set prevIndex before updating currentIndex, not inside the callback
   const autoAdvance = useCallback(() => {
     setDirection('right');
-    setCurrentIndex((prev) => {
-      setPrevIndex(prev);
-      return prev === steps.length - 1 ? 0 : prev + 1;
-    });
-  }, [steps.length]);
+    setPrevIndex(currentIndex);
+    const newIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
+    setCurrentIndex(newIndex);
+  }, [steps.length, currentIndex]);
 
   // Auto-advance every 20 seconds, stops if user has interacted
   useEffect(() => {
@@ -299,50 +303,28 @@ export default function HowItWorksSection() {
               </div>
             </div>
 
-            {/* Mobile Layout - static images, CSS transforms for slide effect */}
+            {/* Mobile Layout - only render current slide for performance */}
             <div className="flex flex-col items-center lg:hidden">
               <div className="relative h-[380px] w-[300px] overflow-hidden">
-                {steps.map((step, index) => {
-                  let translateX = '0%';
-
-                  if (index === currentIndex) {
-                    translateX = '0%';
-                  } else if (index === prevIndex) {
-                    translateX = direction === 'right' ? '-100%' : '100%';
-                  } else {
-                    translateX = direction === 'right' ? '100%' : '-100%';
-                  }
-
-                  return (
+                <div className="flex h-full w-full items-end justify-center pb-[20px]">
+                  {/* Gradient pill background */}
+                  <div
+                    className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg transition-all duration-300 ${currentStep.gradient}`}
+                  />
+                  {/* Phone image */}
+                  <div className="relative z-10 w-[220px]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentStep.image}
+                      alt={currentStep.title}
+                      className="h-auto w-[220px]"
+                    />
+                    {/* Gradient overlay */}
                     <div
-                      key={step.step}
-                      className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
-                      style={{
-                        transform: `translateX(${translateX})`,
-                        opacity: index === currentIndex ? 1 : 0,
-                      }}
-                    >
-                      {/* Gradient pill background */}
-                      <div
-                        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
-                      />
-                      {/* Phone image - using img tag to avoid Next.js re-render issues */}
-                      <div className="relative z-10 w-[220px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={step.image}
-                          alt={step.title}
-                          className="h-auto w-[220px]"
-                          loading={index === 0 ? 'eager' : 'lazy'}
-                        />
-                        {/* Gradient overlay */}
-                        <div
-                          className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                      className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent transition-all duration-300 ${currentStep.overlayColor}`}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Text below */}
