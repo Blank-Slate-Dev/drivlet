@@ -1,7 +1,7 @@
 // src/components/homepage/HowItWorksSection.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -81,26 +81,44 @@ const transportSteps = [
 export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
+  const hasUserInteracted = useRef(false);
 
-  const goToSlide = useCallback((index: number) => {
-    setCurrentIndex(index);
+  const stopAutoScroll = useCallback(() => {
+    hasUserInteracted.current = true;
   }, []);
 
+  const goToSlide = useCallback((index: number) => {
+    stopAutoScroll();
+    setCurrentIndex(index);
+  }, [stopAutoScroll]);
+
   const goToPrevious = useCallback(() => {
+    stopAutoScroll();
     setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
-  }, [steps.length]);
+  }, [steps.length, stopAutoScroll]);
 
   const goToNext = useCallback(() => {
+    stopAutoScroll();
+    setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
+  }, [steps.length, stopAutoScroll]);
+
+  // Auto-advance only (doesn't stop auto-scroll)
+  const autoAdvance = useCallback(() => {
     setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
   }, [steps.length]);
 
-  // Auto-advance every 5 seconds
+  // Auto-advance every 20 seconds, stops if user has interacted
   useEffect(() => {
+    if (hasUserInteracted.current) return;
+
     const timer = setInterval(() => {
-      goToNext();
-    }, 5000);
+      if (!hasUserInteracted.current) {
+        autoAdvance();
+      }
+    }, 20000);
+
     return () => clearInterval(timer);
-  }, [goToNext]);
+  }, [autoAdvance]);
 
   const currentStep = steps[currentIndex];
 
@@ -160,16 +178,16 @@ export default function HowItWorksSection() {
           {/* Main Content */}
           <div className="px-16 lg:px-24">
             {/* Desktop Layout */}
-            <div className="hidden lg:flex lg:items-center lg:justify-center lg:gap-8">
+            <div className="hidden lg:flex lg:items-center lg:justify-center lg:gap-12">
               {/* Left: Current Step Text */}
-              <div className="w-52 flex-shrink-0">
+              <div className="w-56 flex-shrink-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`text-${currentIndex}`}
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -30 }}
-                    transition={{ duration: 0.4 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
                     className="text-left"
                   >
                     <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
@@ -190,10 +208,10 @@ export default function HowItWorksSection() {
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`phone-${currentIndex}`}
-                    initial={{ opacity: 0, x: 100 }}
+                    initial={{ opacity: 0, x: 80 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    transition={{ duration: 0.5, ease: 'easeInOut' }}
+                    exit={{ opacity: 0, x: -80 }}
+                    transition={{ duration: 0.4, ease: 'easeInOut' }}
                     className="relative flex h-[320px] w-[280px] items-end justify-center"
                   >
                     {/* Gradient pill */}
@@ -212,32 +230,6 @@ export default function HowItWorksSection() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-
-              {/* Right: Next Step Preview Text (if exists) */}
-              <div className="w-52 flex-shrink-0">
-                <AnimatePresence mode="wait">
-                  {currentIndex < steps.length - 1 && (
-                    <motion.div
-                      key={`preview-text-${currentIndex}`}
-                      initial={{ opacity: 0, x: 30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -30 }}
-                      transition={{ duration: 0.4 }}
-                      className="text-left opacity-40"
-                    >
-                      <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-xl font-bold text-slate-300">
-                        {steps[currentIndex + 1].step}
-                      </div>
-                      <h3 className="mb-3 text-xl font-bold text-slate-400">
-                        {steps[currentIndex + 1].title}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-slate-400">
-                        {steps[currentIndex + 1].description}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
             </div>
 
             {/* Mobile Layout */}
@@ -245,10 +237,10 @@ export default function HowItWorksSection() {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`mobile-${currentIndex}`}
-                  initial={{ opacity: 0, x: 100 }}
+                  initial={{ opacity: 0, x: 80 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  transition={{ duration: 0.5, ease: 'easeInOut' }}
+                  exit={{ opacity: 0, x: -80 }}
+                  transition={{ duration: 0.4, ease: 'easeInOut' }}
                   className="flex flex-col items-center"
                 >
                   {/* Phone with Gradient Pill */}
