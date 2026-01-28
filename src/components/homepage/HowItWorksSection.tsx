@@ -1,7 +1,7 @@
 // src/components/homepage/HowItWorksSection.tsx
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -31,7 +31,7 @@ const marketplaceSteps = [
     title: 'We deliver to the garage',
     description:
       'Our fully insured drivers deliver your car to our vetted service centre network.',
-    image: '/step1_phone.png', // Temporarily using step1 image until step3 is ready
+    image: '/step1_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
     overlayColor: 'to-indigo-600/90',
   },
@@ -40,7 +40,7 @@ const marketplaceSteps = [
     title: 'We return your car',
     description:
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
-    image: '/step2_phone.png', // Temporarily using step2 image until step4 is ready
+    image: '/step2_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
   },
@@ -70,7 +70,7 @@ const transportSteps = [
     title: 'Delivered to your service centre',
     description:
       'Our fully insured drivers deliver your car directly to your chosen garage.',
-    image: '/step1_phone.png', // Temporarily using step1 image until step3 is ready
+    image: '/step1_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
     overlayColor: 'to-indigo-600/90',
   },
@@ -79,7 +79,7 @@ const transportSteps = [
     title: 'Returned to you',
     description:
       'Once your service is complete, we collect and return your car — hassle-free.',
-    image: '/step2_phone.png', // Temporarily using step2 image until step4 is ready
+    image: '/step2_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
   },
@@ -89,13 +89,20 @@ export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
-  const [prevIndex, setPrevIndex] = useState(0);
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
+
+  // Detect screen size after mount to avoid hydration mismatch
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
 
   const goToSlide = useCallback(
     (index: number) => {
       setDirection(index > currentIndex ? 'right' : 'left');
-      setPrevIndex(currentIndex);
       setCurrentIndex(index);
     },
     [currentIndex]
@@ -103,17 +110,13 @@ export default function HowItWorksSection() {
 
   const goToPrevious = useCallback(() => {
     setDirection('left');
-    setPrevIndex(currentIndex);
-    const newIndex = currentIndex === 0 ? steps.length - 1 : currentIndex - 1;
-    setCurrentIndex(newIndex);
-  }, [steps.length, currentIndex]);
+    setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
+  }, [steps.length]);
 
   const goToNext = useCallback(() => {
     setDirection('right');
-    setPrevIndex(currentIndex);
-    const newIndex = currentIndex === steps.length - 1 ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
-  }, [steps.length, currentIndex]);
+    setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
+  }, [steps.length]);
 
   const handleImageLoad = (index: number) => {
     setLoadedImages((prev) => new Set([...prev, index]));
@@ -121,40 +124,26 @@ export default function HowItWorksSection() {
 
   const currentStep = steps[currentIndex];
 
-  // Phone with gradient pill component - reused for desktop
-  const PhoneWithPill = ({ index }: { index: number }) => {
-    const step = steps[index];
-    const isLoaded = loadedImages.has(index);
-
+  // Show nothing until we know the screen size
+  if (isDesktop === null) {
     return (
-      <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
-        {/* Gradient pill background - wider than phone, ~70% height */}
-        <div
-          className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
-        />
-        {/* Show skeleton only if image hasn't been preloaded yet */}
-        {!isLoaded && (
-          <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
-        )}
-        {/* Phone image container with fade overlay */}
-        <div className="relative z-10 w-[220px]">
-          <Image
-            src={step.image}
-            alt={step.title}
-            width={600}
-            height={951}
-            className={`h-auto w-[220px] ${!isLoaded ? 'opacity-0' : ''}`}
-            priority={index === 0}
-            onLoad={() => handleImageLoad(index)}
-          />
-          {/* Gradient overlay to fade bottom of phone into pill */}
-          <div
-            className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
-          />
+      <section
+        id="how-it-works"
+        className="relative border-b border-slate-200 bg-white py-16 sm:py-20"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
+              How it works
+            </h2>
+          </div>
+          <div className="flex justify-center">
+            <div className="h-[380px] w-[300px] animate-pulse rounded-3xl bg-slate-100" />
+          </div>
         </div>
-      </div>
+      </section>
     );
-  };
+  }
 
   return (
     <section
@@ -211,88 +200,107 @@ export default function HowItWorksSection() {
 
           {/* Main Content */}
           <div className="px-16 lg:px-24">
-            {/* Desktop Layout */}
-            <div className="hidden lg:flex lg:items-center lg:justify-center lg:gap-12">
-              {/* Left: Current Step Text */}
-              <div className="w-56 flex-shrink-0">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`text-${currentIndex}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="text-left"
-                  >
-                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
-                      {currentStep.step}
-                    </div>
-                    <h3 className="mb-3 text-xl font-bold text-slate-900">
-                      {currentStep.title}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-slate-600">
-                      {currentStep.description}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+            {/* Desktop Layout - with framer-motion */}
+            {isDesktop && (
+              <div className="flex items-center justify-center gap-12">
+                {/* Left: Current Step Text */}
+                <div className="w-56 flex-shrink-0">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={`text-${currentIndex}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-left"
+                    >
+                      <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                        {currentStep.step}
+                      </div>
+                      <h3 className="mb-3 text-xl font-bold text-slate-900">
+                        {currentStep.title}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-slate-600">
+                        {currentStep.description}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
 
-              {/* Center: Phone with Gradient Pill */}
-              <div className="flex-shrink-0">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={`phone-${currentIndex}`}
-                    initial={{ opacity: 0, x: direction === 'right' ? 80 : -80 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: direction === 'right' ? -80 : 80 }}
-                    transition={{ duration: 0.4, ease: 'easeInOut' }}
-                  >
-                    <PhoneWithPill index={currentIndex} />
-                  </motion.div>
-                </AnimatePresence>
+                {/* Center: Phone with Gradient Pill */}
+                <div className="flex-shrink-0">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={`phone-${currentIndex}`}
+                      initial={{ opacity: 0, x: direction === 'right' ? 80 : -80 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: direction === 'right' ? -80 : 80 }}
+                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                    >
+                      <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
+                        <div
+                          className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+                        />
+                        {!loadedImages.has(currentIndex) && (
+                          <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
+                        )}
+                        <div className="relative z-10 w-[220px]">
+                          <Image
+                            src={currentStep.image}
+                            alt={currentStep.title}
+                            width={600}
+                            height={951}
+                            className={`h-auto w-[220px] ${!loadedImages.has(currentIndex) ? 'opacity-0' : ''}`}
+                            priority={currentIndex === 0}
+                            onLoad={() => handleImageLoad(currentIndex)}
+                          />
+                          <div
+                            className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Mobile Layout - simple, no complex animations */}
-            <div className="flex flex-col items-center lg:hidden">
-              <div className="relative h-[380px] w-[300px]">
-                <div className="flex h-full w-full items-end justify-center pb-[20px]">
-                  {/* Gradient pill background */}
-                  <div
-                    className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                  />
-                  {/* Phone image */}
-                  <div className="relative z-10 w-[220px]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={currentStep.image}
-                      alt={currentStep.title}
-                      className="h-auto w-[220px]"
-                      onError={(e) => {
-                        e.currentTarget.style.opacity = '0';
-                      }}
-                    />
-                    {/* Gradient overlay */}
+            {/* Mobile Layout - NO framer-motion, simple render */}
+            {!isDesktop && (
+              <div className="flex flex-col items-center">
+                <div className="relative h-[380px] w-[300px]">
+                  <div className="flex h-full w-full items-end justify-center pb-[20px]">
                     <div
-                      className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
+                      className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
                     />
+                    <div className="relative z-10 w-[220px]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={currentStep.image}
+                        alt={currentStep.title}
+                        className="h-auto w-[220px]"
+                      />
+                      <div
+                        className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Text below */}
-              <div className="mt-6 text-center">
-                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
-                  {currentStep.step}
+                {/* Text below */}
+                <div className="mt-6 text-center">
+                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                    {currentStep.step}
+                  </div>
+                  <h3 className="mb-2 text-lg font-bold text-slate-900">
+                    {currentStep.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    {currentStep.description}
+                  </p>
                 </div>
-                <h3 className="mb-2 text-lg font-bold text-slate-900">
-                  {currentStep.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-slate-600">
-                  {currentStep.description}
-                </p>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Dot indicators */}
