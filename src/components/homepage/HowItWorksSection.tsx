@@ -31,7 +31,7 @@ const marketplaceSteps = [
     title: 'We deliver to the garage',
     description:
       'Our fully insured drivers deliver your car to our vetted service centre network.',
-    image: '/step3_phone.png',
+    image: '/step1_phone.png', // Temporarily using step1 image until step3 is ready
     gradient: 'from-indigo-600 to-slate-800',
     overlayColor: 'to-indigo-600/90',
   },
@@ -40,7 +40,7 @@ const marketplaceSteps = [
     title: 'We return your car',
     description:
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
-    image: '/step4_phone.png',
+    image: '/step2_phone.png', // Temporarily using step2 image until step4 is ready
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
   },
@@ -70,7 +70,7 @@ const transportSteps = [
     title: 'Delivered to your service centre',
     description:
       'Our fully insured drivers deliver your car directly to your chosen garage.',
-    image: '/step3_phone.png',
+    image: '/step1_phone.png', // Temporarily using step1 image until step3 is ready
     gradient: 'from-indigo-600 to-slate-800',
     overlayColor: 'to-indigo-600/90',
   },
@@ -79,7 +79,7 @@ const transportSteps = [
     title: 'Returned to you',
     description:
       'Once your service is complete, we collect and return your car — hassle-free.',
-    image: '/step4_phone.png',
+    image: '/step2_phone.png', // Temporarily using step2 image until step4 is ready
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
   },
@@ -92,7 +92,6 @@ export default function HowItWorksSection() {
   const [prevIndex, setPrevIndex] = useState(0);
   const hasUserInteracted = useRef(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
-  const [imagesPreloaded, setImagesPreloaded] = useState(false);
 
   const stopAutoScroll = useCallback(() => {
     hasUserInteracted.current = true;
@@ -108,7 +107,6 @@ export default function HowItWorksSection() {
     [stopAutoScroll, currentIndex]
   );
 
-  // Fixed: Don't mix functional updates with closure values
   const goToPrevious = useCallback(() => {
     stopAutoScroll();
     setDirection('left');
@@ -117,7 +115,6 @@ export default function HowItWorksSection() {
     setCurrentIndex(newIndex);
   }, [steps.length, stopAutoScroll, currentIndex]);
 
-  // Fixed: Don't mix functional updates with closure values
   const goToNext = useCallback(() => {
     stopAutoScroll();
     setDirection('right');
@@ -126,7 +123,6 @@ export default function HowItWorksSection() {
     setCurrentIndex(newIndex);
   }, [steps.length, stopAutoScroll, currentIndex]);
 
-  // Fixed: Set prevIndex before updating currentIndex, not inside the callback
   const autoAdvance = useCallback(() => {
     setDirection('right');
     setPrevIndex(currentIndex);
@@ -147,31 +143,13 @@ export default function HowItWorksSection() {
     return () => clearInterval(timer);
   }, [autoAdvance]);
 
-  // Preload images 2, 3, 4 after a short delay
-  useEffect(() => {
-    if (imagesPreloaded) return;
-
-    const preloadTimer = setTimeout(() => {
-      steps.slice(1).forEach((step, index) => {
-        const img = new window.Image();
-        img.src = step.image;
-        img.onload = () => {
-          setLoadedImages((prev) => new Set([...prev, index + 1]));
-        };
-      });
-      setImagesPreloaded(true);
-    }, 500);
-
-    return () => clearTimeout(preloadTimer);
-  }, [steps, imagesPreloaded]);
-
   const handleImageLoad = (index: number) => {
     setLoadedImages((prev) => new Set([...prev, index]));
   };
 
   const currentStep = steps[currentIndex];
 
-  // Phone with gradient pill component - reused for desktop and mobile
+  // Phone with gradient pill component - reused for desktop
   const PhoneWithPill = ({ index }: { index: number }) => {
     const step = steps[index];
     const isLoaded = loadedImages.has(index);
@@ -303,13 +281,13 @@ export default function HowItWorksSection() {
               </div>
             </div>
 
-            {/* Mobile Layout - only render current slide for performance */}
+            {/* Mobile Layout - simple, no complex animations */}
             <div className="flex flex-col items-center lg:hidden">
-              <div className="relative h-[380px] w-[300px] overflow-hidden">
+              <div className="relative h-[380px] w-[300px]">
                 <div className="flex h-full w-full items-end justify-center pb-[20px]">
                   {/* Gradient pill background */}
                   <div
-                    className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg transition-all duration-300 ${currentStep.gradient}`}
+                    className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
                   />
                   {/* Phone image */}
                   <div className="relative z-10 w-[220px]">
@@ -318,10 +296,13 @@ export default function HowItWorksSection() {
                       src={currentStep.image}
                       alt={currentStep.title}
                       className="h-auto w-[220px]"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0';
+                      }}
                     />
                     {/* Gradient overlay */}
                     <div
-                      className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent transition-all duration-300 ${currentStep.overlayColor}`}
+                      className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
                     />
                   </div>
                 </div>
@@ -357,21 +338,6 @@ export default function HowItWorksSection() {
               />
             ))}
           </div>
-        </div>
-
-        {/* Hidden preload images for Next.js optimization */}
-        <div className="hidden">
-          {steps.slice(1).map((step, index) => (
-            <Image
-              key={step.image}
-              src={step.image}
-              alt=""
-              width={600}
-              height={951}
-              loading="lazy"
-              onLoad={() => handleImageLoad(index + 1)}
-            />
-          ))}
         </div>
       </div>
     </section>
