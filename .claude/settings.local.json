@@ -37,7 +37,8 @@
       "Bash(python3:*)",
       "Bash(pkill:*)",
       "Bash(git checkout:*)",
-      "Bash(iconv:*)"
+      "Bash(iconv:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

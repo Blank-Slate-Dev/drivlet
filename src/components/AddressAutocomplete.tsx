@@ -88,18 +88,12 @@ export default function AddressAutocomplete({
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ✅ robust keyboard-open signal (esp. iOS Safari)
-  const keyboardOpen = useKeyboardOpen();
-
-  // Track focus ourselves (don’t trust event order)
+  // Track focus ourselves (don't trust event order)
   const isInputFocusedRef = useRef(false);
 
   // Outside tap handling (tap vs scroll)
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
   const SCROLL_THRESHOLD = 10;
-
-  // ✅ "focus shield" — first outside tap dismisses keyboard but must NOT focus other fields
-  const suppressNextFocusRef = useRef(false);
 
   // Dropdown item tap-vs-scroll discrimination (so scrolling list never selects)
   const itemPointerRef = useRef<{
@@ -125,48 +119,18 @@ export default function AddressAutocomplete({
     isInputFocusedRef.current = false;
   };
 
-  // ✅ Outside handler that:
-  // - first outside tap (keyboard open / focused): dismiss keyboard, KEEP dropdown, and prevent focusing other fields
-  // - second outside tap (keyboard closed): close dropdown
+  // Handle outside clicks/taps to close dropdown
+  // Less aggressive approach that doesn't block all pointer events
   useEffect(() => {
-    const isFocusable = (el: EventTarget | null) => {
-      const node = el as HTMLElement | null;
-      if (!node) return false;
-      const tag = node.tagName?.toLowerCase();
-      if (!tag) return false;
-      if (node.isContentEditable) return true;
-      return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
-    };
-
-    const onPointerDownCapture = (e: PointerEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
 
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
-
-      // If keyboard is open OR input is focused, treat this as "dismiss keyboard"
-      if (keyboardOpen || isInputFocusedRef.current) {
-        suppressNextFocusRef.current = true;
-
-        // Prevent the tap from focusing another element
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Blur our input to close keyboard
-        inputRef.current?.blur();
-
-        // Keep dropdown open
-        setIsOpen(true);
-
-        // Release focus shield shortly after
-        window.setTimeout(() => {
-          suppressNextFocusRef.current = false;
-        }, 350);
-      }
     };
 
-    const onPointerUpCapture = (e: PointerEvent) => {
+    const onPointerUp = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
@@ -178,33 +142,25 @@ export default function AddressAutocomplete({
       const dx = Math.abs(e.clientX - start.x);
       const dy = Math.abs(e.clientY - start.y);
       const isTap = dx < SCROLL_THRESHOLD && dy < SCROLL_THRESHOLD;
-      if (!isTap) return;
 
-      // Second outside tap: only close if keyboard is not open and input isn't focused
-      if (!keyboardOpen && !isInputFocusedRef.current) {
+      // Only close on a clean tap (not a scroll/swipe)
+      if (isTap) {
+        // Close dropdown and blur input
         setIsOpen(false);
+        isInputFocusedRef.current = false;
+        inputRef.current?.blur();
       }
     };
 
-    const onFocusInCapture = (e: FocusEvent) => {
-      if (!suppressNextFocusRef.current) return;
-      if (!isFocusable(e.target)) return;
-
-      // If iOS still tries to focus something, undo it.
-      e.preventDefault?.();
-      (e.target as HTMLElement)?.blur?.();
-    };
-
-    document.addEventListener('pointerdown', onPointerDownCapture, true);
-    document.addEventListener('pointerup', onPointerUpCapture, true);
-    document.addEventListener('focusin', onFocusInCapture, true);
+    // Use regular event listeners (not capture) to allow events to proceed normally
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerup', onPointerUp);
 
     return () => {
-      document.removeEventListener('pointerdown', onPointerDownCapture, true);
-      document.removeEventListener('pointerup', onPointerUpCapture, true);
-      document.removeEventListener('focusin', onFocusInCapture, true);
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerup', onPointerUp);
     };
-  }, [keyboardOpen]);
+  }, []);
 
   // Initialize Google Maps
   useEffect(() => {

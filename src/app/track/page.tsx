@@ -339,6 +339,12 @@ function TrackingContent() {
   // SSE connection state
   const [isConnected, setIsConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
+
+  // Store SSE params in refs to avoid stale closures
+  const sseParamsRef = useRef<{ bookingId: string; email: string; rego: string } | null>(null);
 
   // Payment state
   const [showPayment, setShowPayment] = useState(false);
@@ -357,9 +363,22 @@ function TrackingContent() {
 
   // Connect to SSE for real-time updates
   const connectSSE = (bookingId: string, emailParam: string, regoParam: string) => {
-    // Close existing connection
+    // Store params in ref for reconnection
+    sseParamsRef.current = { bookingId, email: emailParam, rego: regoParam };
+
+    // Close existing connection and clear any pending reconnect
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    // Don't connect if page is hidden
+    if (document.hidden) {
+      return;
     }
 
     const url = `/api/bookings/${bookingId}/stream?email=${encodeURIComponent(emailParam)}&rego=${encodeURIComponent(regoParam)}`;
@@ -369,6 +388,7 @@ function TrackingContent() {
     eventSource.onopen = () => {
       console.log('SSE connected');
       setIsConnected(true);
+      reconnectAttemptsRef.current = 0; // Reset on successful connection
     };
 
     eventSource.onmessage = (event) => {
@@ -378,7 +398,7 @@ function TrackingContent() {
         if (data.type === 'connected') {
           console.log('SSE connection confirmed for booking:', data.bookingId);
         } else if (data.type === 'heartbeat') {
-          console.log('SSE heartbeat received');
+          // Heartbeat received - connection is alive
         } else if (data.type === 'update') {
           console.log('SSE update received:', data);
           // Update booking state with new data (including payment info and driver)
@@ -410,24 +430,62 @@ function TrackingContent() {
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE error:', err);
+    eventSource.onerror = () => {
+      console.log('SSE connection error or closed');
       setIsConnected(false);
-      // Attempt to reconnect after 5 seconds
-      setTimeout(() => {
-        if (booking && trackingCode) {
-          connectSSE(booking._id, email, registration);
+
+      // Don't reconnect if we've exceeded max attempts or page is hidden
+      if (reconnectAttemptsRef.current >= maxReconnectAttempts || document.hidden) {
+        return;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s, 8s... up to 30s
+      const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+      reconnectAttemptsRef.current += 1;
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        const params = sseParamsRef.current;
+        if (params && !document.hidden) {
+          connectSSE(params.bookingId, params.email, params.rego);
         }
-      }, 5000);
+      }, backoffMs);
     };
   };
 
-  // Cleanup SSE on unmount
+  // Close SSE connection
+  const closeSSE = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    setIsConnected(false);
+  };
+
+  // Handle visibility changes - disconnect when hidden, reconnect when visible
   useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden - close connection to save resources
+        closeSSE();
+      } else {
+        // Page is visible - reconnect if we have params
+        const params = sseParamsRef.current;
+        if (params) {
+          reconnectAttemptsRef.current = 0; // Reset attempts on visibility change
+          connectSSE(params.bookingId, params.email, params.rego);
+        }
       }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      closeSSE();
     };
   }, []);
 
@@ -663,12 +721,9 @@ function TrackingContent() {
   };
 
   const handleTrackAnother = () => {
-    // Close SSE connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    setIsConnected(false);
+    // Close SSE connection and clear params
+    closeSSE();
+    sseParamsRef.current = null;
     setBooking(null);
     setHasSearched(false);
     setTrackingCode("");

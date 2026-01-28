@@ -84,13 +84,10 @@ export default function GarageAutocomplete({
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const keyboardOpen = useKeyboardOpen();
   const isInputFocusedRef = useRef(false);
 
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
   const SCROLL_THRESHOLD = 10;
-
-  const suppressNextFocusRef = useRef(false);
 
   const itemPointerRef = useRef<{
     pointerId: number;
@@ -113,40 +110,18 @@ export default function GarageAutocomplete({
     isInputFocusedRef.current = false;
   };
 
-  // ✅ Outside handler matching AddressAutocomplete behavior
+  // Handle outside clicks/taps to close dropdown
+  // Less aggressive approach that doesn't block all pointer events
   useEffect(() => {
-    const isFocusable = (el: EventTarget | null) => {
-      const node = el as HTMLElement | null;
-      if (!node) return false;
-      const tag = node.tagName?.toLowerCase();
-      if (!tag) return false;
-      if (node.isContentEditable) return true;
-      return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
-    };
-
-    const onPointerDownCapture = (e: PointerEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
 
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
-
-      if (keyboardOpen || isInputFocusedRef.current) {
-        suppressNextFocusRef.current = true;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        inputRef.current?.blur();
-        setIsOpen(true);
-
-        window.setTimeout(() => {
-          suppressNextFocusRef.current = false;
-        }, 350);
-      }
     };
 
-    const onPointerUpCapture = (e: PointerEvent) => {
+    const onPointerUp = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
@@ -158,31 +133,25 @@ export default function GarageAutocomplete({
       const dx = Math.abs(e.clientX - start.x);
       const dy = Math.abs(e.clientY - start.y);
       const isTap = dx < SCROLL_THRESHOLD && dy < SCROLL_THRESHOLD;
-      if (!isTap) return;
 
-      if (!keyboardOpen && !isInputFocusedRef.current) {
+      // Only close on a clean tap (not a scroll/swipe)
+      if (isTap) {
+        // Close dropdown and blur input
         setIsOpen(false);
+        isInputFocusedRef.current = false;
+        inputRef.current?.blur();
       }
     };
 
-    const onFocusInCapture = (e: FocusEvent) => {
-      if (!suppressNextFocusRef.current) return;
-      if (!isFocusable(e.target)) return;
-
-      e.preventDefault?.();
-      (e.target as HTMLElement)?.blur?.();
-    };
-
-    document.addEventListener('pointerdown', onPointerDownCapture, true);
-    document.addEventListener('pointerup', onPointerUpCapture, true);
-    document.addEventListener('focusin', onFocusInCapture, true);
+    // Use regular event listeners (not capture) to allow events to proceed normally
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerup', onPointerUp);
 
     return () => {
-      document.removeEventListener('pointerdown', onPointerDownCapture, true);
-      document.removeEventListener('pointerup', onPointerUpCapture, true);
-      document.removeEventListener('focusin', onFocusInCapture, true);
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerup', onPointerUp);
     };
-  }, [keyboardOpen]);
+  }, []);
 
   // Initialize Google Maps
   useEffect(() => {

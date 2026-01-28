@@ -214,10 +214,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   }, [availableDropoffOptions, latestDropoff]);
 
   /**
-   * HARD background scroll lock:
-   * - Uses position:fixed technique to prevent any body/html scrolling.
-   * - Preserves scrollbar gutter so the page doesn't "jump" horizontally when the scrollbar disappears.
-   * - Prevents wheel/touchmove events from "scroll chaining" the page when the modal content hits the top/bottom.
+   * Background scroll lock using CSS-only approach.
+   * More mobile-friendly than position:fixed which causes iOS issues.
    */
   const lockBackgroundScroll = useCallback(() => {
     const html = document.documentElement;
@@ -231,29 +229,20 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     // Store state so we can restore perfectly
     body.dataset.scrollY = String(scrollY);
     body.dataset.prevBodyPaddingRight = body.style.paddingRight || '';
-    body.dataset.prevBodyBoxSizing = body.style.boxSizing || '';
     body.dataset.prevHtmlOverflow = html.style.overflow || '';
     body.dataset.prevBodyOverflow = body.style.overflow || '';
-    body.dataset.prevBodyPosition = body.style.position || '';
-    body.dataset.prevBodyTop = body.style.top || '';
-    body.dataset.prevBodyLeft = body.style.left || '';
-    body.dataset.prevBodyRight = body.style.right || '';
-    body.dataset.prevBodyWidth = body.style.width || '';
+    body.dataset.prevTouchAction = body.style.touchAction || '';
 
     // Preserve gutter to prevent layout shift
     if (scrollbarWidth > 0) {
-      body.style.boxSizing = 'border-box';
       body.style.paddingRight = `${scrollbarWidth}px`;
     }
 
-    // Lock both html & body
+    // Lock scrolling - simpler approach that works better on mobile
     html.style.overflow = 'hidden';
     body.style.overflow = 'hidden';
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.left = '0';
-    body.style.right = '0';
-    body.style.width = '100%';
+    // Disable touch scrolling on body but allow within modal
+    body.style.touchAction = 'none';
   }, []);
 
   const unlockBackgroundScroll = useCallback(() => {
@@ -265,25 +254,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     // Restore styles
     html.style.overflow = body.dataset.prevHtmlOverflow ?? '';
     body.style.overflow = body.dataset.prevBodyOverflow ?? '';
-    body.style.position = body.dataset.prevBodyPosition ?? '';
-    body.style.top = body.dataset.prevBodyTop ?? '';
-    body.style.left = body.dataset.prevBodyLeft ?? '';
-    body.style.right = body.dataset.prevBodyRight ?? '';
-    body.style.width = body.dataset.prevBodyWidth ?? '';
     body.style.paddingRight = body.dataset.prevBodyPaddingRight ?? '';
-    body.style.boxSizing = body.dataset.prevBodyBoxSizing ?? '';
+    body.style.touchAction = body.dataset.prevTouchAction ?? '';
 
     // Cleanup
     delete body.dataset.scrollY;
     delete body.dataset.prevBodyPaddingRight;
-    delete body.dataset.prevBodyBoxSizing;
     delete body.dataset.prevHtmlOverflow;
     delete body.dataset.prevBodyOverflow;
-    delete body.dataset.prevBodyPosition;
-    delete body.dataset.prevBodyTop;
-    delete body.dataset.prevBodyLeft;
-    delete body.dataset.prevBodyRight;
-    delete body.dataset.prevBodyWidth;
+    delete body.dataset.prevTouchAction;
 
     // Restore scroll position after unlocking
     window.scrollTo(0, scrollY);
@@ -294,27 +273,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
     lockBackgroundScroll();
 
-    // Prevent wheel/touchmove from scrolling the page when modal content can't scroll further
-    const shouldAllowScroll = (target: EventTarget | null) => {
-      const el = target as HTMLElement | null;
-      if (!el) return false;
-      const container = modalContentRef.current;
-      if (!container) return false;
-      return container.contains(el);
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      if (!shouldAllowScroll(e.target)) {
-        e.preventDefault();
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (!shouldAllowScroll(e.target)) {
-        e.preventDefault();
-      }
-    };
-
+    // Only handle keyboard navigation - touch/wheel handled by CSS
     const onKeyDown = (e: KeyboardEvent) => {
       // Prevent page scroll via keyboard when modal is open (space/page up/down/arrows)
       const keys = [' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'];
@@ -328,13 +287,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       }
     };
 
-    window.addEventListener('wheel', onWheel, { passive: false });
-    window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('keydown', onKeyDown);
 
     return () => {
-      window.removeEventListener('wheel', onWheel as any);
-      window.removeEventListener('touchmove', onTouchMove as any);
       window.removeEventListener('keydown', onKeyDown);
       unlockBackgroundScroll();
     };
@@ -566,8 +521,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
-              onWheel={(e) => e.preventDefault()}
-              onTouchMove={(e) => e.preventDefault()}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -575,8 +528,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-[101] flex items-center justify-center p-4"
-              onWheel={(e) => e.stopPropagation()}
-              onTouchMove={(e) => e.stopPropagation()}
             >
               <div className="w-full max-w-md">
                 <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-2xl">
@@ -672,8 +623,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
             onClick={onClose}
-            onWheel={(e) => e.preventDefault()}
-            onTouchMove={(e) => e.preventDefault()}
           />
 
           <motion.div
@@ -682,8 +631,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[101] flex items-center justify-center p-4"
-            onWheel={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
           >
             <div className="w-full max-w-2xl">
               <div className="relative rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -733,12 +680,11 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </div>
                 </div>
 
-                {/* IMPORTANT: overscroll-contain prevents "scroll chaining" to the page */}
+                {/* overscroll-contain prevents "scroll chaining" to the page, touch-auto re-enables touch on modal content */}
                 <div
                   ref={modalContentRef}
                   className="max-h-[70vh] overflow-y-auto overscroll-contain p-6 sm:p-8"
-                  onWheel={(e) => e.stopPropagation()}
-                  onTouchMove={(e) => e.stopPropagation()}
+                  style={{ touchAction: 'auto' }}
                 >
                   {/* Payment Step */}
                   {currentStep === 'payment' && clientSecret && (
