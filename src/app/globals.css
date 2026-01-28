@@ -24,11 +24,7 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ==============================================
-   Prevent iOS Safari zoom on input focus
-   iOS zooms in on inputs with font-size < 16px
-   This sets 16px on mobile, reverts on desktop
-   ============================================== */
+/* Prevent iOS Safari zoom on input focus */
 @media screen and (max-width: 767px) {
   input,
   select,
@@ -37,58 +33,21 @@ body {
   }
 }
 
-/* ==============================================
-   Mobile Performance Optimizations
-   ============================================== */
-@media (max-width: 768px) {
-  .mobile-device * {
-    /* Disable expensive will-change on mobile */
-    will-change: auto !important;
-  }
-
-  /* Simplify complex animations on mobile */
-  .mobile-device [class*="motion-"] {
-    animation-duration: 0.1s !important;
-  }
-
-  /* Optimize scrolling performance */
-  .mobile-device {
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
 /* Respect reduced motion preference */
-.reduce-motion *,
-.reduce-motion *::before,
-.reduce-motion *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
-}
-
-/* Optimize hardware acceleration for smoother animations */
-.motion-safe {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-}
-
-/* Improve touch targets on mobile */
-@media (max-width: 768px) {
-  button,
-  a,
-  [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
 /* Prevent text selection issues on touch */
 .no-select {
   -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
