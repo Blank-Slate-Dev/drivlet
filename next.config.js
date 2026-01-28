@@ -1,3 +1,5 @@
+// next.config.js
+
 // Security headers to protect against common attacks
 const securityHeaders = [
   {
@@ -43,6 +45,18 @@ const nextConfig = {
         headers: securityHeaders,
       },
     ];
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.blob.vercel-storage.com",
+      },
+    ],
   },
 };
 
