@@ -17,6 +17,7 @@ const marketplaceSteps = [
       'Share your rego, pick-up location, and service type. We handle the rest.',
     image: '/step1_phone.png',
     gradient: 'from-emerald-400 to-green-500',
+    overlayColor: 'to-emerald-400/90',
   },
   {
     step: '2',
@@ -25,6 +26,7 @@ const marketplaceSteps = [
       'Follow your vehicle in real-time from collection through to completion.',
     image: '/step2_phone.png',
     gradient: 'from-violet-500 to-purple-600',
+    overlayColor: 'to-violet-500/90',
   },
   {
     step: '3',
@@ -33,6 +35,7 @@ const marketplaceSteps = [
       'Our fully insured drivers deliver your car to our vetted service centre network.',
     image: '/step3_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
+    overlayColor: 'to-indigo-600/90',
   },
   {
     step: '4',
@@ -41,6 +44,7 @@ const marketplaceSteps = [
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
     image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
+    overlayColor: 'to-cyan-400/90',
   },
 ];
 
@@ -52,6 +56,7 @@ const transportSteps = [
       'Enter your rego, pickup address, and service centre details. Quick and simple.',
     image: '/step1_phone.png',
     gradient: 'from-emerald-400 to-green-500',
+    overlayColor: 'to-emerald-400/90',
   },
   {
     step: '2',
@@ -60,6 +65,7 @@ const transportSteps = [
       'Follow your vehicle every step of the way with live tracking updates.',
     image: '/step2_phone.png',
     gradient: 'from-violet-500 to-purple-600',
+    overlayColor: 'to-violet-500/90',
   },
   {
     step: '3',
@@ -68,6 +74,7 @@ const transportSteps = [
       'Our fully insured drivers deliver your car directly to your chosen garage.',
     image: '/step3_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
+    overlayColor: 'to-indigo-600/90',
   },
   {
     step: '4',
@@ -76,6 +83,7 @@ const transportSteps = [
       'Once your service is complete, we collect and return your car — hassle-free.',
     image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
+    overlayColor: 'to-cyan-400/90',
   },
 ];
 
@@ -165,20 +173,22 @@ export default function HowItWorksSection() {
         {!isLoaded && (
           <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
         )}
-        {/* Phone image - fades out at the bottom to blend into pill */}
-        <Image
-          src={step.image}
-          alt={step.title}
-          width={600}
-          height={951}
-          className={`relative z-10 h-auto w-[220px] ${!isLoaded ? 'opacity-0' : ''}`}
-          style={{
-            maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-          }}
-          priority={index === 0}
-          onLoad={() => handleImageLoad(index)}
-        />
+        {/* Phone image container with fade overlay */}
+        <div className="relative z-10 w-[220px]">
+          <Image
+            src={step.image}
+            alt={step.title}
+            width={600}
+            height={951}
+            className={`h-auto w-[220px] ${!isLoaded ? 'opacity-0' : ''}`}
+            priority={index === 0}
+            onLoad={() => handleImageLoad(index)}
+          />
+          {/* Gradient overlay to fade bottom of phone into pill */}
+          <div 
+            className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+          />
+        </div>
       </div>
     );
   };
@@ -280,15 +290,15 @@ export default function HowItWorksSection() {
               </div>
             </div>
 
-            {/* Mobile Layout */}
+            {/* Mobile Layout - uses opacity only (no x-transform to avoid GPU flicker) */}
             <div className="flex flex-col items-center lg:hidden">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`mobile-${currentIndex}`}
-                  initial={{ opacity: 0, x: 80 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -80 }}
-                  transition={{ duration: 0.4, ease: 'easeInOut' }}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
                   className="flex flex-col items-center"
                 >
                   {/* Phone with Gradient Pill */}
