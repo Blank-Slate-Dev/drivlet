@@ -35,7 +35,9 @@
       "Bash(mongosh:*)",
       "Bash(curl:*)",
       "Bash(python3:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(git checkout:*)",
+      "Bash(iconv:*)"
     ],
     "deny": [],
     "ask": []

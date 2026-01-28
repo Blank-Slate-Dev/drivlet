@@ -150,9 +150,23 @@ function QuoteTimerComponent({
     updateTimer();
 
     // Determine update interval based on time remaining
+    // Reduce update frequency on mobile devices to save battery/CPU
     const getInterval = () => {
       if (!timeRemaining) return 60000;
       if (timeRemaining.expired) return 0; // Stop updates
+
+      // Detect mobile device
+      const isMobileDevice = typeof window !== 'undefined' &&
+        (window.innerWidth < 768 || 'ontouchstart' in window);
+
+      if (isMobileDevice) {
+        // Mobile: Update less frequently to save battery/CPU
+        if (timeRemaining.totalHours < 1) return 5000; // 5 seconds instead of 1
+        if (timeRemaining.totalHours < 24) return 60000; // 1 minute
+        return 300000; // 5 minutes for longer durations
+      }
+
+      // Desktop: Normal update frequency
       if (timeRemaining.totalHours < 1) return 1000; // Every second
       return 60000; // Every minute
     };
@@ -260,9 +274,20 @@ function QuoteTimerBadgeComponent({
 
     updateTimer();
 
+    // Reduce update frequency on mobile devices
     const getInterval = () => {
       if (!timeRemaining) return 60000;
       if (timeRemaining.expired) return 0;
+
+      const isMobileDevice = typeof window !== 'undefined' &&
+        (window.innerWidth < 768 || 'ontouchstart' in window);
+
+      if (isMobileDevice) {
+        if (timeRemaining.totalHours < 1) return 5000;
+        if (timeRemaining.totalHours < 24) return 60000;
+        return 300000;
+      }
+
       if (timeRemaining.totalHours < 1) return 1000;
       return 60000;
     };

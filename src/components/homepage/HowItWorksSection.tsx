@@ -1,96 +1,96 @@
 // src/components/homepage/HowItWorksSection.tsx
-‘use client’;
+'use client';
 
-import { useState, useEffect, useCallback, useRef } from ‘react’;
-import { motion, AnimatePresence } from ‘framer-motion’;
-import Image from ‘next/image’;
-import { ChevronLeft, ChevronRight } from ‘lucide-react’;
-import { FEATURES } from ‘@/lib/featureFlags’;
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { FEATURES } from '@/lib/featureFlags';
 
 // Step data with gradient colors for the pills
 // Note: Step 1 = green, Step 4 = cyan/teal
 const marketplaceSteps = [
 {
-step: ‘1’,
-title: ‘Book online in 2 clicks’,
+step: '1',
+title: 'Book online in 2 clicks',
 description:
-‘Share your rego, pick-up location, and service type. We handle the rest.’,
-image: ‘/step1_phone.png’,
-gradient: ‘from-emerald-400 to-green-500’,
-overlayColor: ‘to-emerald-400/90’,
+'Share your rego, pick-up location, and service type. We handle the rest.',
+image: '/step1_phone.png',
+gradient: 'from-emerald-400 to-green-500',
+overlayColor: 'to-emerald-400/90',
 },
 {
-step: ‘2’,
-title: ‘Track your service’,
+step: '2',
+title: 'Track your service',
 description:
-‘Follow your vehicle in real-time from collection through to completion.’,
-image: ‘/step2_phone.png’,
-gradient: ‘from-violet-500 to-purple-600’,
-overlayColor: ‘to-violet-500/90’,
+'Follow your vehicle in real-time from collection through to completion.',
+image: '/step2_phone.png',
+gradient: 'from-violet-500 to-purple-600',
+overlayColor: 'to-violet-500/90',
 },
 {
-step: ‘3’,
-title: ‘We deliver to the garage’,
+step: '3',
+title: 'We deliver to the garage',
 description:
-‘Our fully insured drivers deliver your car to our vetted service centre network.’,
-image: ‘/step3_phone.png’,
-gradient: ‘from-indigo-600 to-slate-800’,
-overlayColor: ‘to-indigo-600/90’,
+'Our fully insured drivers deliver your car to our vetted service centre network.',
+image: '/step3_phone.png',
+gradient: 'from-indigo-600 to-slate-800',
+overlayColor: 'to-indigo-600/90',
 },
 {
-step: ‘4’,
-title: ‘We return your car’,
+step: '4',
+title: 'We return your car',
 description:
-‘Once serviced, we bring your car back to you — safe, sound, and ready to drive.’,
-image: ‘/step4_phone.png’,
-gradient: ‘from-cyan-400 to-teal-500’,
-overlayColor: ‘to-cyan-400/90’,
+'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
+image: '/step4_phone.png',
+gradient: 'from-cyan-400 to-teal-500',
+overlayColor: 'to-cyan-400/90',
 },
 ];
 
 const transportSteps = [
 {
-step: ‘1’,
-title: ‘Book your pickup’,
+step: '1',
+title: 'Book your pickup',
 description:
-‘Enter your rego, pickup address, and service centre details. Quick and simple.’,
-image: ‘/step1_phone.png’,
-gradient: ‘from-emerald-400 to-green-500’,
-overlayColor: ‘to-emerald-400/90’,
+'Enter your rego, pickup address, and service centre details. Quick and simple.',
+image: '/step1_phone.png',
+gradient: 'from-emerald-400 to-green-500',
+overlayColor: 'to-emerald-400/90',
 },
 {
-step: ‘2’,
-title: ‘Track in real-time’,
+step: '2',
+title: 'Track in real-time',
 description:
-‘Follow your vehicle every step of the way with live tracking updates.’,
-image: ‘/step2_phone.png’,
-gradient: ‘from-violet-500 to-purple-600’,
-overlayColor: ‘to-violet-500/90’,
+'Follow your vehicle every step of the way with live tracking updates.',
+image: '/step2_phone.png',
+gradient: 'from-violet-500 to-purple-600',
+overlayColor: 'to-violet-500/90',
 },
 {
-step: ‘3’,
-title: ‘Delivered to your service centre’,
+step: '3',
+title: 'Delivered to your service centre',
 description:
-‘Our fully insured drivers deliver your car directly to your chosen garage.’,
-image: ‘/step3_phone.png’,
-gradient: ‘from-indigo-600 to-slate-800’,
-overlayColor: ‘to-indigo-600/90’,
+'Our fully insured drivers deliver your car directly to your chosen garage.',
+image: '/step3_phone.png',
+gradient: 'from-indigo-600 to-slate-800',
+overlayColor: 'to-indigo-600/90',
 },
 {
-step: ‘4’,
-title: ‘Returned to you’,
+step: '4',
+title: 'Returned to you',
 description:
-‘Once your service is complete, we collect and return your car — hassle-free.’,
-image: ‘/step4_phone.png’,
-gradient: ‘from-cyan-400 to-teal-500’,
-overlayColor: ‘to-cyan-400/90’,
+'Once your service is complete, we collect and return your car — hassle-free.',
+image: '/step4_phone.png',
+gradient: 'from-cyan-400 to-teal-500',
+overlayColor: 'to-cyan-400/90',
 },
 ];
 
 export default function HowItWorksSection() {
 const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
 const [currentIndex, setCurrentIndex] = useState(0);
-const [direction, setDirection] = useState<‘left’ | ‘right’>(‘right’);
+const [direction, setDirection] = useState<'left' | 'right'>('right');
 const [prevIndex, setPrevIndex] = useState(0);
 const hasUserInteracted = useRef(false);
 const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
@@ -102,28 +102,28 @@ hasUserInteracted.current = true;
 
 const goToSlide = useCallback((index: number) => {
 stopAutoScroll();
-setDirection(index > currentIndex ? ‘right’ : ‘left’);
+setDirection(index > currentIndex ? 'right' : 'left');
 setPrevIndex(currentIndex);
 setCurrentIndex(index);
 }, [stopAutoScroll, currentIndex]);
 
 const goToPrevious = useCallback(() => {
 stopAutoScroll();
-setDirection(‘left’);
+setDirection('left');
 setPrevIndex(currentIndex);
 setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
 }, [steps.length, stopAutoScroll, currentIndex]);
 
 const goToNext = useCallback(() => {
 stopAutoScroll();
-setDirection(‘right’);
+setDirection('right');
 setPrevIndex(currentIndex);
 setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
 }, [steps.length, stopAutoScroll, currentIndex]);
 
-// Auto-advance only (doesn’t stop auto-scroll)
+// Auto-advance only (doesn't stop auto-scroll)
 const autoAdvance = useCallback(() => {
-setDirection(‘right’);
+setDirection('right');
 setCurrentIndex((prev) => {
 setPrevIndex(prev);
 return prev === steps.length - 1 ? 0 : prev + 1;
@@ -134,7 +134,7 @@ return prev === steps.length - 1 ? 0 : prev + 1;
 useEffect(() => {
 if (hasUserInteracted.current) return;
 
-```
+
 const timer = setInterval(() => {
   if (!hasUserInteracted.current) {
     autoAdvance();
@@ -142,7 +142,7 @@ const timer = setInterval(() => {
 }, 20000);
 
 return () => clearInterval(timer);
-```
+
 
 }, [autoAdvance]);
 
@@ -150,7 +150,7 @@ return () => clearInterval(timer);
 useEffect(() => {
 if (imagesPreloaded) return;
 
-```
+
 // Preload images 2, 3, 4 after a short delay
 const preloadTimer = setTimeout(() => {
   steps.slice(1).forEach((step, index) => {
@@ -164,12 +164,12 @@ const preloadTimer = setTimeout(() => {
 }, 500);
 
 return () => clearTimeout(preloadTimer);
-```
+
 
 }, [steps, imagesPreloaded]);
 
 const handleImageLoad = (index: number) => {
-setLoadedImages((prev) => new Set([…prev, index]));
+setLoadedImages((prev) => new Set([...prev, index]));
 };
 
 const currentStep = steps[currentIndex];
@@ -181,7 +181,7 @@ const PhoneWithPill = ({ index }: { index: number }) => {
 const step = steps[index];
 const isLoaded = loadedImages.has(index);
 
-```
+
 return (
   <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
     {/* Gradient pill background - wider than phone, ~70% height */}
@@ -210,7 +210,7 @@ return (
     </div>
   </div>
 );
-```
+
 
 };
 
@@ -227,8 +227,8 @@ How it works
 </h2>
 <p className="mt-3 text-lg text-slate-600">
 {FEATURES.SERVICE_SELECTION
-? ‘Car maintenance, made easy in’
-: ‘Vehicle transport, made easy in’}{’ ’}
+? 'Car maintenance, made easy in'
+: 'Vehicle transport, made easy in'}{' '}
 <span className="relative inline-block font-semibold">
 4 steps
 <svg
@@ -248,7 +248,7 @@ fill="none"
 </p>
 </div>
 
-```
+
     {/* Carousel Container */}
     <div className="relative">
       {/* Navigation Arrows */}
@@ -410,7 +410,7 @@ fill="none"
     </div>
   </div>
 </section>
-```
+
 
 );
 }

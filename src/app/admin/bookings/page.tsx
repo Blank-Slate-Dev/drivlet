@@ -1,7 +1,8 @@
 // src/app/admin/bookings/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   Search,
   Filter,
@@ -100,7 +101,8 @@ export default function AdminBookingsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 400); // Debounce search for performance
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [userTypeFilter, setUserTypeFilter] = useState("all");
@@ -115,7 +117,7 @@ export default function AdminBookingsPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: "15",
-        ...(search && { search }),
+        ...(debouncedSearch && { search: debouncedSearch }),
         ...(statusFilter !== "all" && { status: statusFilter }),
         ...(stageFilter !== "all" && { stage: stageFilter }),
       });
@@ -142,7 +144,7 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, stageFilter, userTypeFilter]);
+  }, [page, debouncedSearch, statusFilter, stageFilter, userTypeFilter]);
 
   useEffect(() => {
     fetchBookings();
@@ -344,9 +346,9 @@ export default function AdminBookingsPage() {
             <input
               type="text"
               placeholder="Search by name, email, registration..."
-              value={search}
+              value={searchInput}
               onChange={(e) => {
-                setSearch(e.target.value);
+                setSearchInput(e.target.value);
                 setPage(1);
               }}
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"

@@ -2,17 +2,38 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
 import {
-  BookingModal,
   HeroSection,
   ValuePropsSection,
   HowItWorksSection,
-  InteractiveServicesSection,
-  ContactCTASection,
-  FAQSection,
   Footer,
 } from '@/components/homepage';
+
+// Lazy load heavy components to improve initial page load
+const BookingModal = dynamic(
+  () => import('@/components/homepage/BookingModal'),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
+
+const InteractiveServicesSection = dynamic(
+  () => import('@/components/homepage/InteractiveServicesSection'),
+  { ssr: false }
+);
+
+const ContactCTASection = dynamic(
+  () => import('@/components/homepage/ContactCTASection'),
+  { ssr: false }
+);
+
+const FAQSection = dynamic(
+  () => import('@/components/homepage/FAQSection'),
+  { ssr: false }
+);
 
 export default function Home() {
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -22,26 +43,28 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
-      {/* Booking Modal */}
-      <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
+      {/* Only render modal when needed - conditional rendering for performance */}
+      {showBookingModal && (
+        <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
+      )}
 
       {/* Header */}
       <Header onBookingClick={openBookingModal} />
 
-      {/* Hero Section */}
+      {/* Hero Section - above the fold, load immediately */}
       <HeroSection onBookingClick={openBookingModal} />
 
-      {/* Value Props + How It Works with floating car */}
-        <ValuePropsSection />
-        <HowItWorksSection />
+      {/* Value Props + How It Works - critical content */}
+      <ValuePropsSection />
+      <HowItWorksSection />
 
-      {/* Services Section */}
+      {/* Services Section - lazy loaded */}
       <InteractiveServicesSection onBookingClick={openBookingModal} />
 
-      {/* Contact CTA Section */}
+      {/* Contact CTA Section - lazy loaded */}
       <ContactCTASection />
 
-      {/* FAQ Section */}
+      {/* FAQ Section - lazy loaded */}
       <FAQSection />
 
       {/* Footer */}
