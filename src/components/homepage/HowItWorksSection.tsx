@@ -290,34 +290,50 @@ export default function HowItWorksSection() {
               </div>
             </div>
 
-            {/* Mobile Layout - uses opacity only (no x-transform to avoid GPU flicker) */}
+            {/* Mobile Layout - static images, CSS-only transitions, no React re-renders */}
             <div className="flex flex-col items-center lg:hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`mobile-${currentIndex}`}
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  className="flex flex-col items-center"
-                >
-                  {/* Phone with Gradient Pill */}
-                  <PhoneWithPill index={currentIndex} />
-
-                  {/* Text below */}
-                  <div className="mt-6 text-center">
-                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
-                      {currentStep.step}
+              <div className="relative h-[380px] w-[300px]">
+                {steps.map((step, index) => (
+                  <div
+                    key={step.step}
+                    className={`absolute inset-0 flex items-end justify-center pb-[20px] transition-opacity duration-300 ${
+                      index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                    }`}
+                  >
+                    {/* Gradient pill background */}
+                    <div
+                      className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                    />
+                    {/* Phone image - using img tag to avoid Next.js re-render issues */}
+                    <div className="relative z-10 w-[220px]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={step.image}
+                        alt={step.title}
+                        className="h-auto w-[220px]"
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                      />
+                      {/* Gradient overlay */}
+                      <div 
+                        className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+                      />
                     </div>
-                    <h3 className="mb-2 text-lg font-bold text-slate-900">
-                      {currentStep.title}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-slate-600">
-                      {currentStep.description}
-                    </p>
                   </div>
-                </motion.div>
-              </AnimatePresence>
+                ))}
+              </div>
+
+              {/* Text below */}
+              <div className="mt-6 text-center">
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                  {currentStep.step}
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-slate-900">
+                  {currentStep.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  {currentStep.description}
+                </p>
+              </div>
             </div>
           </div>
 
