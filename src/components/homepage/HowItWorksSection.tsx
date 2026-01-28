@@ -83,6 +83,8 @@ export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
   const hasUserInteracted = useRef(false);
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
+  const [imagesPreloaded, setImagesPreloaded] = useState(false);
 
   const stopAutoScroll = useCallback(() => {
     hasUserInteracted.current = true;
@@ -121,7 +123,31 @@ export default function HowItWorksSection() {
     return () => clearInterval(timer);
   }, [autoAdvance]);
 
+  // Preload remaining images after first image loads
+  useEffect(() => {
+    if (imagesPreloaded) return;
+
+    // Preload images 2, 3, 4 after a short delay
+    const preloadTimer = setTimeout(() => {
+      steps.slice(1).forEach((step, index) => {
+        const img = new window.Image();
+        img.src = step.image;
+        img.onload = () => {
+          setLoadedImages((prev) => new Set([...prev, index + 1]));
+        };
+      });
+      setImagesPreloaded(true);
+    }, 500);
+
+    return () => clearTimeout(preloadTimer);
+  }, [steps, imagesPreloaded]);
+
+  const handleImageLoad = (index: number) => {
+    setLoadedImages((prev) => new Set([...prev, index]));
+  };
+
   const currentStep = steps[currentIndex];
+  const isCurrentImageLoaded = loadedImages.has(currentIndex);
 
   // Phone with gradient pill component - reused for desktop and mobile
   // Images are 600x951 (pre-cropped), scaled down to ~220px width for display
@@ -132,18 +158,25 @@ export default function HowItWorksSection() {
       <div
         className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
       />
+      {/* Show skeleton while image loads */}
+      {!isCurrentImageLoaded && (
+        <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
+      )}
       {/* Phone image - fades out at the bottom to blend into pill */}
       <Image
         src={currentStep.image}
         alt={currentStep.title}
         width={600}
         height={951}
-        className="relative z-10 h-auto w-[220px]"
+        className={`relative z-10 h-auto w-[220px] transition-opacity duration-300 ${
+          isCurrentImageLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
         style={{
           maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
         }}
-        priority
+        priority={currentIndex === 0}
+        onLoad={() => handleImageLoad(currentIndex)}
       />
     </div>
   );
@@ -291,6 +324,21 @@ export default function HowItWorksSection() {
               />
             ))}
           </div>
+        </div>
+
+        {/* Hidden preload images for Next.js optimization */}
+        <div className="hidden">
+          {steps.slice(1).map((step, index) => (
+            <Image
+              key={step.image}
+              src={step.image}
+              alt=""
+              width={600}
+              height={951}
+              loading="lazy"
+              onLoad={() => handleImageLoad(index + 1)}
+            />
+          ))}
         </div>
       </div>
     </section>
