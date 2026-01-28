@@ -125,12 +125,12 @@ export default function HowItWorksSection() {
 
   // Phone with gradient pill component - reused for desktop and mobile
   const PhoneWithPill = () => (
-    <div className="relative flex h-[320px] w-[280px] items-end justify-center">
-      {/* Gradient pill background */}
+    <div className="relative flex h-[344px] w-[280px] items-end justify-center pb-[24px]">
+      {/* Gradient pill background - extends 24px below the phone */}
       <div
-        className={`absolute bottom-0 h-[180px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+        className={`absolute bottom-0 h-[204px] w-[240px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
       />
-      {/* Phone image - sits on top */}
+      {/* Phone image - sits on top, 24px above bottom */}
       <Image
         src={currentStep.image}
         alt={currentStep.title}
@@ -139,11 +139,6 @@ export default function HowItWorksSection() {
         className="relative z-10"
         priority
       />
-      {/* Bottom overlay - hides phone corners that extend beyond pill */}
-      <div className="absolute bottom-0 z-20 h-[20px] w-[280px] overflow-hidden">
-        {/* White overlay with rounded top matching pill curve, positioned to only cover corners */}
-        <div className="absolute -top-[20px] left-1/2 h-[40px] w-[240px] -translate-x-1/2 rounded-b-[2.5rem] bg-white" />
-      </div>
     </div>
   );
 
