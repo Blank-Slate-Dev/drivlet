@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const driver = await Driver.findById(user.driverProfile);
+    const driver = await Driver.findById(user.driverProfile).lean();
     if (!driver) {
       return NextResponse.json({ error: "Driver not found" }, { status: 404 });
     }
@@ -77,9 +77,12 @@ export async function POST(request: Request) {
       access: "public",
     });
 
-    // Update driver's profile photo
-    driver.profilePhoto = blob.url;
-    await driver.save();
+    // Use findByIdAndUpdate to avoid full document validation
+    await Driver.findByIdAndUpdate(
+      user.driverProfile,
+      { $set: { profilePhoto: blob.url } },
+      { runValidators: false } // Skip validation for this update
+    );
 
     return NextResponse.json({
       success: true,
@@ -120,7 +123,7 @@ export async function DELETE() {
       );
     }
 
-    const driver = await Driver.findById(user.driverProfile);
+    const driver = await Driver.findById(user.driverProfile).lean();
     if (!driver) {
       return NextResponse.json({ error: "Driver not found" }, { status: 404 });
     }
@@ -134,9 +137,12 @@ export async function DELETE() {
       }
     }
 
-    // Clear profile photo
-    driver.profilePhoto = undefined;
-    await driver.save();
+    // Use findByIdAndUpdate to avoid full document validation
+    await Driver.findByIdAndUpdate(
+      user.driverProfile,
+      { $unset: { profilePhoto: 1 } },
+      { runValidators: false }
+    );
 
     return NextResponse.json({
       success: true,

@@ -54,10 +54,10 @@ export interface IBooking extends Document {
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
-  serviceDate: Date;
+  serviceDate?: Date;
 
   // Tracking code for secure booking lookup
-  trackingCode: string;
+  trackingCode?: string;
 
   // Existing booking fields (for stage 1)
   hasExistingBooking: boolean;
@@ -235,24 +235,18 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
     },
+    // Made optional and removed past-date validator (validation happens at booking creation, not on updates)
     serviceDate: {
       type: Date,
-      required: true,
-      validate: {
-        validator: function(date: Date) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          return date >= today;
-        },
-        message: "Service date cannot be in the past"
-      }
+      required: false,
     },
 
-    // Tracking code for secure booking lookup
+    // Tracking code - made optional for backwards compatibility with old bookings
     trackingCode: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
+      sparse: true, // Allows multiple null values with unique index
       uppercase: true,
       trim: true,
       index: true,
