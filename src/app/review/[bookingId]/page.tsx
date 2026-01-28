@@ -16,7 +16,14 @@ import {
   Send,
   Wrench,
   MessageSquare,
+  User,
+  Truck,
 } from "lucide-react";
+
+interface DriverInfo {
+  firstName: string;
+  profilePhoto: string | null;
+}
 
 interface BookingInfo {
   _id: string;
@@ -27,10 +34,18 @@ interface BookingInfo {
   vehicleRegistration: string;
   completedAt?: string;
   hasReview: boolean;
+  hasDriverReview: boolean;
+  driver?: DriverInfo | null;
 }
 
 interface RatingCategory {
   key: "quality" | "communication" | "timeliness" | "value";
+  label: string;
+  description: string;
+}
+
+interface DriverRatingCategory {
+  key: "professionalism" | "punctuality" | "communication" | "vehicleCare";
   label: string;
   description: string;
 }
@@ -58,6 +73,29 @@ const RATING_CATEGORIES: RatingCategory[] = [
   },
 ];
 
+const DRIVER_RATING_CATEGORIES: DriverRatingCategory[] = [
+  {
+    key: "professionalism",
+    label: "Professionalism",
+    description: "Was the driver professional and courteous?",
+  },
+  {
+    key: "punctuality",
+    label: "Punctuality",
+    description: "Was the driver on time for pickup and delivery?",
+  },
+  {
+    key: "communication",
+    label: "Communication",
+    description: "Did the driver communicate well?",
+  },
+  {
+    key: "vehicleCare",
+    label: "Vehicle Care",
+    description: "Did they handle your vehicle with care?",
+  },
+];
+
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -70,7 +108,10 @@ export default function ReviewPage() {
   const [error, setError] = useState("");
   const [booking, setBooking] = useState<BookingInfo | null>(null);
 
-  // Form state
+  // Review type toggle
+  const [reviewType, setReviewType] = useState<"garage" | "driver">("garage");
+
+  // Garage review state
   const [overallRating, setOverallRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [categoryRatings, setCategoryRatings] = useState({
@@ -81,6 +122,17 @@ export default function ReviewPage() {
   });
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+
+  // Driver review state
+  const [driverOverallRating, setDriverOverallRating] = useState(0);
+  const [driverHoverRating, setDriverHoverRating] = useState(0);
+  const [driverCategoryRatings, setDriverCategoryRatings] = useState({
+    professionalism: 0,
+    punctuality: 0,
+    communication: 0,
+    vehicleCare: 0,
+  });
+  const [driverContent, setDriverContent] = useState("");
 
   // Guest fields (when not logged in)
   const [guestName, setGuestName] = useState("");
@@ -97,12 +149,23 @@ export default function ReviewPage() {
         return;
       }
 
-      if (data.booking.hasReview) {
-        setError("A review has already been submitted for this booking.");
+      setBooking(data.booking);
+
+      // If garage review exists but driver review doesn't, default to driver
+      if (data.booking.hasReview && !data.booking.hasDriverReview && data.booking.driver) {
+        setReviewType("driver");
+      }
+
+      // If both reviews exist, show error
+      if (data.booking.hasReview && data.booking.hasDriverReview) {
+        setError("All reviews have already been submitted for this booking.");
         return;
       }
 
-      setBooking(data.booking);
+      // If no driver, only allow garage review
+      if (!data.booking.driver) {
+        setReviewType("garage");
+      }
     } catch {
       setError("Failed to load booking information");
     } finally {
@@ -114,7 +177,7 @@ export default function ReviewPage() {
     fetchBooking();
   }, [fetchBooking]);
 
-  // Auto-calculate overall from categories
+  // Auto-calculate overall from categories (garage)
   useEffect(() => {
     const values = Object.values(categoryRatings);
     const filled = values.filter((v) => v > 0);
@@ -124,24 +187,57 @@ export default function ReviewPage() {
     }
   }, [categoryRatings]);
 
+  // Auto-calculate overall from categories (driver)
+  useEffect(() => {
+    const values = Object.values(driverCategoryRatings);
+    const filled = values.filter((v) => v > 0);
+    if (filled.length === 4) {
+      const avg = filled.reduce((a, b) => a + b, 0) / filled.length;
+      setDriverOverallRating(Math.round(avg));
+    }
+  }, [driverCategoryRatings]);
+
   const handleSubmit = async () => {
-    // Validation
-    if (overallRating === 0) {
-      setError("Please provide an overall rating");
-      return;
-    }
+    setError("");
 
-    const missingCategories = RATING_CATEGORIES.filter(
-      (cat) => categoryRatings[cat.key] === 0
-    );
-    if (missingCategories.length > 0) {
-      setError(`Please rate: ${missingCategories.map((c) => c.label).join(", ")}`);
-      return;
-    }
+    if (reviewType === "garage") {
+      // Garage review validation
+      if (overallRating === 0) {
+        setError("Please provide an overall rating");
+        return;
+      }
 
-    if (content.trim().length < 10) {
-      setError("Please write at least 10 characters in your review");
-      return;
+      const missingCategories = RATING_CATEGORIES.filter(
+        (cat) => categoryRatings[cat.key] === 0
+      );
+      if (missingCategories.length > 0) {
+        setError(`Please rate: ${missingCategories.map((c) => c.label).join(", ")}`);
+        return;
+      }
+
+      if (content.trim().length < 10) {
+        setError("Please write at least 10 characters in your review");
+        return;
+      }
+    } else {
+      // Driver review validation
+      if (driverOverallRating === 0) {
+        setError("Please provide an overall rating");
+        return;
+      }
+
+      const missingCategories = DRIVER_RATING_CATEGORIES.filter(
+        (cat) => driverCategoryRatings[cat.key] === 0
+      );
+      if (missingCategories.length > 0) {
+        setError(`Please rate: ${missingCategories.map((c) => c.label).join(", ")}`);
+        return;
+      }
+
+      if (driverContent.trim().length < 10) {
+        setError("Please write at least 10 characters in your review");
+        return;
+      }
     }
 
     // Guest validation
@@ -157,25 +253,43 @@ export default function ReviewPage() {
     }
 
     setSubmitting(true);
-    setError("");
 
     try {
-      const res = await fetch("/api/reviews", {
+      const endpoint = reviewType === "garage" ? "/api/reviews" : "/api/reviews";
+      const body =
+        reviewType === "garage"
+          ? {
+              bookingId,
+              type: "garage",
+              overallRating,
+              ratingBreakdown: categoryRatings,
+              title: title.trim() || undefined,
+              content: content.trim(),
+              ...(session?.user
+                ? {}
+                : {
+                    name: guestName.trim(),
+                    email: guestEmail.trim().toLowerCase(),
+                  }),
+            }
+          : {
+              bookingId,
+              type: "driver",
+              overallRating: driverOverallRating,
+              ratingBreakdown: driverCategoryRatings,
+              content: driverContent.trim(),
+              ...(session?.user
+                ? {}
+                : {
+                    name: guestName.trim(),
+                    email: guestEmail.trim().toLowerCase(),
+                  }),
+            };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          overallRating,
-          ratingBreakdown: categoryRatings,
-          title: title.trim() || undefined,
-          content: content.trim(),
-          ...(session?.user
-            ? {}
-            : {
-                name: guestName.trim(),
-                email: guestEmail.trim().toLowerCase(),
-              }),
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -222,6 +336,7 @@ export default function ReviewPage() {
 
   // Success state
   if (submitted) {
+    const finalRating = reviewType === "garage" ? overallRating : driverOverallRating;
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 flex items-center justify-center px-4">
         <motion.div
@@ -240,20 +355,50 @@ export default function ReviewPage() {
             </motion.div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Thank you!</h1>
             <p className="text-slate-500 mb-6">
-              Your review has been submitted and will be published after moderation.
+              Your {reviewType === "garage" ? "garage" : "driver"} review has been submitted
+              {reviewType === "garage" ? " and will be published after moderation." : "."}
             </p>
             <div className="flex items-center justify-center gap-1 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                   key={star}
                   className={`h-8 w-8 ${
-                    star <= overallRating
+                    star <= finalRating
                       ? "text-amber-400 fill-amber-400"
                       : "text-slate-200"
                   }`}
                 />
               ))}
             </div>
+
+            {/* Show option to review the other party */}
+            {reviewType === "garage" && booking?.driver && !booking.hasDriverReview && (
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setReviewType("driver");
+                  setError("");
+                }}
+                className="w-full mb-4 inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 py-3 font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+              >
+                <Truck className="h-5 w-5" />
+                Also Review Your Driver
+              </button>
+            )}
+            {reviewType === "driver" && !booking?.hasReview && booking?.garageName && (
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setReviewType("garage");
+                  setError("");
+                }}
+                className="w-full mb-4 inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 py-3 font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+              >
+                <Wrench className="h-5 w-5" />
+                Also Review The Garage
+              </button>
+            )}
+
             <Link
               href="/"
               className="inline-flex items-center justify-center gap-2 w-full rounded-lg bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 transition"
@@ -265,6 +410,9 @@ export default function ReviewPage() {
       </div>
     );
   }
+
+  const canReviewGarage = booking?.garageName && !booking.hasReview;
+  const canReviewDriver = booking?.driver && !booking.hasDriverReview;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -290,7 +438,7 @@ export default function ReviewPage() {
             </div>
             <div>
               <h2 className="font-semibold text-slate-900">
-                Review your service at {booking?.garageName || "the garage"}
+                Review your experience
               </h2>
               <p className="text-sm text-slate-500 mt-1">
                 {booking?.serviceType} · {booking?.vehicleRegistration}
@@ -298,6 +446,34 @@ export default function ReviewPage() {
             </div>
           </div>
         </div>
+
+        {/* Review Type Toggle */}
+        {canReviewGarage && canReviewDriver && (
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setReviewType("garage")}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition ${
+                reviewType === "garage"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Wrench className="h-5 w-5" />
+              Review Garage
+            </button>
+            <button
+              onClick={() => setReviewType("driver")}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition ${
+                reviewType === "driver"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Truck className="h-5 w-5" />
+              Review Driver
+            </button>
+          </div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -310,13 +486,43 @@ export default function ReviewPage() {
         {/* Review Form */}
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="p-6 border-b border-slate-100">
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-emerald-600" />
-              Write Your Review
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Help other customers by sharing your experience
-            </p>
+            {reviewType === "garage" ? (
+              <>
+                <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-emerald-600" />
+                  Review {booking?.garageName || "the garage"}
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Help other customers by sharing your experience
+                </p>
+              </>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 overflow-hidden rounded-full bg-slate-100 ring-2 ring-emerald-100">
+                  {booking?.driver?.profilePhoto ? (
+                    <Image
+                      src={booking.driver.profilePhoto}
+                      alt={booking.driver.firstName}
+                      width={56}
+                      height={56}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <User className="h-7 w-7 text-slate-400" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">
+                    Review {booking?.driver?.firstName}
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    How was your experience with your driver?
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-6 space-y-8">
@@ -330,14 +536,29 @@ export default function ReviewPage() {
                   <button
                     key={star}
                     type="button"
-                    onMouseEnter={() => setHoverRating(star)}
-                    onMouseLeave={() => setHoverRating(0)}
-                    onClick={() => setOverallRating(star)}
+                    onMouseEnter={() =>
+                      reviewType === "garage"
+                        ? setHoverRating(star)
+                        : setDriverHoverRating(star)
+                    }
+                    onMouseLeave={() =>
+                      reviewType === "garage"
+                        ? setHoverRating(0)
+                        : setDriverHoverRating(0)
+                    }
+                    onClick={() =>
+                      reviewType === "garage"
+                        ? setOverallRating(star)
+                        : setDriverOverallRating(star)
+                    }
                     className="p-1 transition-transform hover:scale-110"
                   >
                     <Star
                       className={`h-10 w-10 transition-colors ${
-                        star <= (hoverRating || overallRating)
+                        star <=
+                        (reviewType === "garage"
+                          ? hoverRating || overallRating
+                          : driverHoverRating || driverOverallRating)
                           ? "text-amber-400 fill-amber-400"
                           : "text-slate-200"
                       }`}
@@ -345,7 +566,9 @@ export default function ReviewPage() {
                   </button>
                 ))}
                 <span className="ml-3 text-lg font-medium text-slate-900">
-                  {overallRating > 0 ? `${overallRating}/5` : ""}
+                  {(reviewType === "garage" ? overallRating : driverOverallRating) > 0
+                    ? `${reviewType === "garage" ? overallRating : driverOverallRating}/5`
+                    : ""}
                 </span>
               </div>
             </div>
@@ -356,7 +579,10 @@ export default function ReviewPage() {
                 Rate each category *
               </label>
               <div className="space-y-4">
-                {RATING_CATEGORIES.map((category) => (
+                {(reviewType === "garage"
+                  ? RATING_CATEGORIES
+                  : DRIVER_RATING_CATEGORIES
+                ).map((category) => (
                   <div
                     key={category.key}
                     className="flex items-center justify-between gap-4 py-3 border-b border-slate-100 last:border-0"
@@ -370,17 +596,29 @@ export default function ReviewPage() {
                         <button
                           key={star}
                           type="button"
-                          onClick={() =>
-                            setCategoryRatings((prev) => ({
-                              ...prev,
-                              [category.key]: star,
-                            }))
-                          }
+                          onClick={() => {
+                            if (reviewType === "garage") {
+                              setCategoryRatings((prev) => ({
+                                ...prev,
+                                [category.key]: star,
+                              }));
+                            } else {
+                              setDriverCategoryRatings((prev) => ({
+                                ...prev,
+                                [category.key]: star,
+                              }));
+                            }
+                          }}
                           className="p-0.5"
                         >
                           <Star
                             className={`h-6 w-6 transition-colors ${
-                              star <= categoryRatings[category.key]
+                              star <=
+                              (reviewType === "garage"
+                                ? categoryRatings[category.key as keyof typeof categoryRatings]
+                                : driverCategoryRatings[
+                                    category.key as keyof typeof driverCategoryRatings
+                                  ])
                                 ? "text-amber-400 fill-amber-400"
                                 : "text-slate-200 hover:text-amber-200"
                             }`}
@@ -393,20 +631,22 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Review Title (optional)
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Summarize your experience"
-                maxLength={100}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
+            {/* Title (Garage only) */}
+            {reviewType === "garage" && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Review Title (optional)
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Summarize your experience"
+                  maxLength={100}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+            )}
 
             {/* Content */}
             <div>
@@ -414,15 +654,24 @@ export default function ReviewPage() {
                 Your Review *
               </label>
               <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Tell others about your experience..."
+                value={reviewType === "garage" ? content : driverContent}
+                onChange={(e) =>
+                  reviewType === "garage"
+                    ? setContent(e.target.value)
+                    : setDriverContent(e.target.value)
+                }
+                placeholder={
+                  reviewType === "garage"
+                    ? "Tell others about your experience with the garage..."
+                    : "How was your experience with the driver?"
+                }
                 rows={5}
-                maxLength={2000}
+                maxLength={reviewType === "garage" ? 2000 : 1000}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none"
               />
               <p className="mt-1 text-xs text-slate-400">
-                {content.length}/2000 characters (minimum 10)
+                {(reviewType === "garage" ? content : driverContent).length}/
+                {reviewType === "garage" ? 2000 : 1000} characters (minimum 10)
               </p>
             </div>
 

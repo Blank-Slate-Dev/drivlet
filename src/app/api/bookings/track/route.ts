@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
+import Driver from '@/models/Driver';
 import { isValidTrackingCodeFormat } from '@/lib/trackingCode';
 import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
@@ -109,6 +110,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get driver info if assigned
+    let driverInfo = null;
+    if (booking.assignedDriverId) {
+      const driver = await Driver.findById(booking.assignedDriverId).lean();
+      if (driver) {
+        driverInfo = {
+          firstName: driver.firstName,
+          profilePhoto: driver.profilePhoto || null,
+          rating: driver.metrics?.averageRating || 0,
+          totalRatings: driver.metrics?.totalRatings || 0,
+          completedJobs: driver.metrics?.completedJobs || 0,
+          memberSince: driver.createdAt,
+        };
+      }
+    }
+
     // Return booking data (sanitized - don't expose sensitive fields)
     return NextResponse.json({
       _id: booking._id,
@@ -120,6 +137,7 @@ export async function GET(request: NextRequest) {
       garageName: booking.garageName,
       garageAddress: booking.garageAddress,
       serviceType: booking.serviceType,
+      serviceDate: booking.serviceDate,
       status: booking.status,
       currentStage: booking.currentStage,
       overallProgress: booking.overallProgress,
@@ -129,6 +147,8 @@ export async function GET(request: NextRequest) {
       servicePaymentStatus: booking.servicePaymentStatus,
       servicePaymentAmount: booking.servicePaymentAmount,
       servicePaymentUrl: booking.servicePaymentUrl,
+      // Driver info (if assigned)
+      driver: driverInfo,
     });
 
   } catch (error) {

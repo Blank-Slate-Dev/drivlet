@@ -30,6 +30,9 @@ import {
   WifiOff,
   Camera,
   Calendar,
+  Star,
+  User,
+  Briefcase,
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
@@ -37,6 +40,16 @@ import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+// Driver info type
+interface DriverInfo {
+  firstName: string;
+  profilePhoto: string | null;
+  rating: number;
+  totalRatings: number;
+  completedJobs: number;
+  memberSince: string;
+}
 
 // Booking type
 interface Booking {
@@ -63,6 +76,8 @@ interface Booking {
   servicePaymentStatus?: 'pending' | 'paid';
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
+  // Driver info
+  driver?: DriverInfo | null;
 }
 
 // Stage definitions for visual display
@@ -118,6 +133,101 @@ function useAnimatedCounter(target: number, duration: number = 500) {
   }, [target, duration]);
 
   return count;
+}
+
+// Driver Card Component
+function DriverCard({ driver }: { driver: DriverInfo }) {
+  const memberSinceDate = new Date(driver.memberSince);
+  const now = new Date();
+  const monthsDiff = (now.getFullYear() - memberSinceDate.getFullYear()) * 12 + 
+    (now.getMonth() - memberSinceDate.getMonth());
+  
+  let experienceText = "New driver";
+  if (monthsDiff >= 12) {
+    const years = Math.floor(monthsDiff / 12);
+    experienceText = `${years}+ year${years > 1 ? 's' : ''} with drivlet`;
+  } else if (monthsDiff >= 1) {
+    experienceText = `${monthsDiff} month${monthsDiff > 1 ? 's' : ''} with drivlet`;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-4"
+    >
+      <div className="flex items-center gap-4">
+        {/* Driver Photo */}
+        <div className="relative">
+          <div className="h-16 w-16 overflow-hidden rounded-full bg-white ring-2 ring-emerald-200 ring-offset-2">
+            {driver.profilePhoto ? (
+              <Image
+                src={driver.profilePhoto}
+                alt={driver.firstName}
+                width={64}
+                height={64}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-emerald-100">
+                <User className="h-8 w-8 text-emerald-600" />
+              </div>
+            )}
+          </div>
+          {/* Verified badge */}
+          <div className="absolute -bottom-1 -right-1 rounded-full bg-emerald-500 p-1">
+            <CheckCircle2 className="h-3 w-3 text-white" />
+          </div>
+        </div>
+
+        {/* Driver Info */}
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold text-slate-900">{driver.firstName}</h4>
+            <span className="text-sm text-slate-500">is your driver</span>
+          </div>
+          
+          {/* Rating */}
+          {driver.totalRatings > 0 ? (
+            <div className="mt-1 flex items-center gap-1.5">
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-3.5 w-3.5 ${
+                      star <= Math.round(driver.rating)
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-slate-200"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm font-medium text-slate-700">
+                {driver.rating.toFixed(1)}
+              </span>
+              <span className="text-xs text-slate-500">
+                ({driver.totalRatings} review{driver.totalRatings !== 1 ? 's' : ''})
+              </span>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-slate-500">New driver - no reviews yet</p>
+          )}
+
+          {/* Stats */}
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+            <span className="flex items-center gap-1">
+              <Briefcase className="h-3 w-3 text-emerald-600" />
+              {driver.completedJobs} jobs completed
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3 text-emerald-600" />
+              {experienceText}
+            </span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 // Stripe Payment Form Component
@@ -246,13 +356,13 @@ function TrackingContent() {
   const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
   // Connect to SSE for real-time updates
-  const connectSSE = (bookingId: string, code: string) => {
+  const connectSSE = (bookingId: string, emailParam: string, regoParam: string) => {
     // Close existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
 
-    const url = `/api/bookings/${bookingId}/stream?code=${encodeURIComponent(code)}`;
+    const url = `/api/bookings/${bookingId}/stream?email=${encodeURIComponent(emailParam)}&rego=${encodeURIComponent(regoParam)}`;
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
@@ -271,7 +381,7 @@ function TrackingContent() {
           console.log('SSE heartbeat received');
         } else if (data.type === 'update') {
           console.log('SSE update received:', data);
-          // Update booking state with new data (including payment info)
+          // Update booking state with new data (including payment info and driver)
           setBooking(prev => {
             if (!prev) return prev;
             return {
@@ -282,6 +392,7 @@ function TrackingContent() {
               servicePaymentStatus: data.servicePaymentStatus,
               servicePaymentAmount: data.servicePaymentAmount,
               servicePaymentUrl: data.servicePaymentUrl,
+              driver: data.driver || prev.driver,
               updatedAt: data.updatedAt,
               updates: data.latestUpdate
                 ? [...prev.updates.filter(u => u.timestamp !== data.latestUpdate.timestamp), data.latestUpdate]
@@ -305,7 +416,7 @@ function TrackingContent() {
       // Attempt to reconnect after 5 seconds
       setTimeout(() => {
         if (booking && trackingCode) {
-          connectSSE(booking._id, trackingCode);
+          connectSSE(booking._id, email, registration);
         }
       }, 5000);
     };
@@ -441,7 +552,7 @@ function TrackingContent() {
         }
 
         // Connect to SSE for real-time updates
-        connectSSE(data._id, codeToSearch);
+        connectSSE(data._id, emailToSearch.toLowerCase().trim(), regoToSearch.toUpperCase().trim());
       } else {
         if (response.status === 410) {
           // Booking expired (completed or cancelled)
@@ -527,7 +638,7 @@ function TrackingContent() {
       if (attempts <= 0) return;
 
       try {
-        const response = await fetch(`/api/bookings/track?code=${encodeURIComponent(trackingCode)}`);
+        const response = await fetch(`/api/bookings/track?code=${encodeURIComponent(trackingCode)}&email=${encodeURIComponent(email)}&rego=${encodeURIComponent(registration)}`);
         const data = await response.json();
 
         if (response.ok) {
@@ -858,6 +969,11 @@ function TrackingContent() {
                       />
                     </div>
                   </div>
+
+                  {/* Driver Card - Show when driver is assigned */}
+                  {booking.driver && (
+                    <DriverCard driver={booking.driver} />
+                  )}
 
                   {/* Payment Success Banner */}
                   {paymentSuccess && (

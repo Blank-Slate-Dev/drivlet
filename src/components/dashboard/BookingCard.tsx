@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Car,
   MapPin,
@@ -16,6 +17,9 @@ import {
   Wrench,
   Building2,
   Camera,
+  Star,
+  User,
+  Briefcase,
 } from "lucide-react";
 import VehiclePhotosViewer from "@/components/customer/VehiclePhotosViewer";
 
@@ -30,6 +34,15 @@ interface IFlag {
   type: "manual_transmission" | "high_value_vehicle" | "other";
   reason: string;
   createdAt: string;
+}
+
+interface DriverInfo {
+  firstName: string;
+  profilePhoto: string | null;
+  rating: number;
+  totalRatings: number;
+  completedJobs: number;
+  memberSince: string;
 }
 
 interface BookingData {
@@ -52,6 +65,7 @@ interface BookingData {
   updates: IUpdate[];
   createdAt: string;
   paymentAmount?: number;
+  driver?: DriverInfo | null;
 }
 
 interface BookingCardProps {
@@ -211,6 +225,53 @@ export default function BookingCard({ booking }: BookingCardProps) {
               </div>
             )}
 
+            {/* Driver Info - Compact view */}
+            {booking.driver && (booking.status === "in_progress" || booking.status === "completed") && (
+              <div className="mt-3 flex items-center gap-3 p-2 bg-white/60 rounded-lg border border-slate-200/50">
+                <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-100 ring-2 ring-white">
+                  {booking.driver.profilePhoto ? (
+                    <Image
+                      src={booking.driver.profilePhoto}
+                      alt={booking.driver.firstName}
+                      width={40}
+                      height={40}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <User className="h-5 w-5 text-slate-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-900">
+                      {booking.driver.firstName}
+                    </span>
+                    <span className="text-xs text-slate-500">Driver</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    {booking.driver.totalRatings > 0 ? (
+                      <span className="flex items-center gap-1 text-amber-600">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        {booking.driver.rating.toFixed(1)}
+                        <span className="text-slate-400">
+                          ({booking.driver.totalRatings})
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">New driver</span>
+                    )}
+                    <span className="text-slate-300">•</span>
+                    <span className="flex items-center gap-1 text-slate-500">
+                      <Briefcase className="h-3 w-3" />
+                      {booking.driver.completedJobs} jobs
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* View Photos Button - show for active or completed bookings */}
             {(booking.status === "in_progress" || booking.status === "completed") && (
               <button
@@ -315,6 +376,50 @@ export default function BookingCard({ booking }: BookingCardProps) {
                   </div>
                 )}
               </dl>
+
+              {/* Driver Details in Expanded View */}
+              {booking.driver && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">
+                    Your Driver
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-100 ring-2 ring-emerald-100">
+                      {booking.driver.profilePhoto ? (
+                        <Image
+                          src={booking.driver.profilePhoto}
+                          alt={booking.driver.firstName}
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <User className="h-6 w-6 text-slate-400" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        {booking.driver.firstName}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs">
+                        {booking.driver.totalRatings > 0 ? (
+                          <span className="flex items-center gap-1 text-amber-600">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {booking.driver.rating.toFixed(1)} ({booking.driver.totalRatings} reviews)
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">New driver</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {booking.driver.completedJobs} jobs completed
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Activity Timeline */}

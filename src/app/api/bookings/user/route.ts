@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import Driver from "@/models/Driver";
+import mongoose from "mongoose";
 
 // Force dynamic rendering - this route uses headers via getServerSession
 export const dynamic = 'force-dynamic';
@@ -71,6 +73,38 @@ export async function GET(request: NextRequest) {
       .sort(sortOrder)
       .lean();
 
+    // Get all unique driver IDs from bookings
+    const driverIds = [...new Set(
+      bookings
+        .filter(b => b.assignedDriverId)
+        .map(b => b.assignedDriverId!.toString())
+    )];
+
+    // Fetch all drivers at once
+    const drivers = driverIds.length > 0
+      ? await Driver.find({ _id: { $in: driverIds.map(id => new mongoose.Types.ObjectId(id)) } }).lean()
+      : [];
+
+    // Create a map for quick driver lookup
+    const driverMap = new Map(
+      drivers.map(d => [d._id.toString(), {
+        firstName: d.firstName,
+        profilePhoto: d.profilePhoto || null,
+        rating: d.metrics?.averageRating || 0,
+        totalRatings: d.metrics?.totalRatings || 0,
+        completedJobs: d.metrics?.completedJobs || 0,
+        memberSince: d.createdAt,
+      }])
+    );
+
+    // Attach driver info to bookings
+    const bookingsWithDrivers = bookings.map(booking => ({
+      ...booking,
+      driver: booking.assignedDriverId
+        ? driverMap.get(booking.assignedDriverId.toString()) || null
+        : null,
+    }));
+
     // Get stats for the user (matching same conditions as main query)
     const stats = await Booking.aggregate([
       { $match: { $or: orConditions } },
@@ -96,7 +130,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      bookings,
+      bookings: bookingsWithDrivers,
       stats: statsMap,
     });
   } catch (error) {

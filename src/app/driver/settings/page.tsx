@@ -1,9 +1,10 @@
 // src/app/driver/settings/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   Settings,
   User,
@@ -27,6 +28,9 @@ import {
   ToggleRight,
   Edit2,
   X,
+  Camera,
+  Upload,
+  Trash2,
 } from "lucide-react";
 
 interface DriverSettings {
@@ -92,6 +96,11 @@ export default function DriverSettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [activeSection, setActiveSection] = useState("profile");
+
+  // Photo upload state
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Editable fields
   const [phone, setPhone] = useState("");
@@ -167,6 +176,100 @@ export default function DriverSettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to save settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setPhotoError("Please upload a JPEG, PNG, or WebP image");
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Image must be smaller than 5MB");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setPhotoError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/driver/profile-photo", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to upload photo");
+      }
+
+      // Update local state with new photo URL
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              profile: { ...prev.profile, profilePhoto: data.url },
+            }
+          : null
+      );
+
+      setSuccess("Profile photo updated!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!settings?.profile.profilePhoto) return;
+
+    setUploadingPhoto(true);
+    setPhotoError("");
+
+    try {
+      const res = await fetch("/api/driver/profile-photo", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete photo");
+      }
+
+      // Update local state
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              profile: { ...prev.profile, profilePhoto: undefined },
+            }
+          : null
+      );
+
+      setSuccess("Profile photo removed!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Failed to delete photo");
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -339,6 +442,91 @@ export default function DriverSettingsPage() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
+              {/* Profile Photo */}
+              <div className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                  Profile Photo
+                </h3>
+                <p className="mb-4 text-sm text-slate-500">
+                  This photo will be shown to customers when you accept their job.
+                  A professional photo helps build trust.
+                </p>
+
+                <div className="flex items-center gap-6">
+                  {/* Photo Preview */}
+                  <div className="relative">
+                    <div className="h-24 w-24 overflow-hidden rounded-full bg-slate-100 ring-4 ring-slate-50">
+                      {settings.profile.profilePhoto ? (
+                        <Image
+                          src={settings.profile.profilePhoto}
+                          alt="Profile"
+                          width={96}
+                          height={96}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <User className="h-10 w-10 text-slate-400" />
+                        </div>
+                      )}
+                    </div>
+                    {uploadingPhoto && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap gap-3">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id="photo-upload"
+                      />
+                      <label
+                        htmlFor="photo-upload"
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          uploadingPhoto
+                            ? "bg-slate-100 text-slate-400"
+                            : "bg-emerald-600 text-white hover:bg-emerald-500"
+                        }`}
+                      >
+                        {uploadingPhoto ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        {settings.profile.profilePhoto ? "Change Photo" : "Upload Photo"}
+                      </label>
+
+                      {settings.profile.profilePhoto && (
+                        <button
+                          onClick={handleDeletePhoto}
+                          disabled={uploadingPhoto}
+                          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    {photoError && (
+                      <p className="mt-2 text-sm text-red-600">{photoError}</p>
+                    )}
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      JPEG, PNG or WebP. Max 5MB. Square images work best.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Basic Info (Read Only) */}
               <div className="rounded-xl border border-slate-200 bg-white p-6">
                 <h3 className="mb-4 text-lg font-semibold text-slate-900">

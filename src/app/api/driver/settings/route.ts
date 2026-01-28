@@ -42,7 +42,7 @@ export async function GET() {
         email: user.email,
         phone: driver.phone,
         address: driver.address,
-        profilePhoto: driver.profilePhoto,
+        profilePhoto: driver.profilePhoto || null,
       },
       license: {
         number: driver.license?.number ? `****${driver.license.number.slice(-4)}` : null,
@@ -67,7 +67,12 @@ export async function GET() {
       canAcceptJobs: driver.canAcceptJobs,
       status: driver.status,
       onboardingStatus: driver.onboardingStatus,
-      metrics: driver.metrics,
+      metrics: driver.metrics || {
+        totalJobs: 0,
+        completedJobs: 0,
+        averageRating: 0,
+        totalRatings: 0,
+      },
       memberSince: driver.createdAt,
     });
   } catch (error) {
@@ -219,6 +224,7 @@ export async function PATCH(request: NextRequest) {
         maxJobsPerDay: driver.maxJobsPerDay,
         preferredAreas: driver.preferredAreas,
         isActive: driver.isActive,
+        profilePhoto: driver.profilePhoto || null,
       },
     });
   } catch (error) {
