@@ -1,10 +1,8 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Script from 'next/script';
 import './globals.css';
 import SessionProvider from '@/components/SessionProvider';
-import PerformanceWrapper from '@/components/PerformanceWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -32,7 +30,7 @@ export const metadata: Metadata = {
     title: 'drivlet – Service done, without the run.',
     description:
       'Book a car service that happens while you work. We collect your car, coordinate with trusted garages, and return it before the end of your day.',
-    url: 'https://drivlet.example', // update later when you have a real domain
+    url: 'https://drivlet.example',
     siteName: 'drivlet',
   },
   icons: {
@@ -47,32 +45,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scroll-smooth">
-      <head>
-        {/* Early mobile detection to prevent layout shifts */}
-        <Script
-          id="mobile-detection"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                if (window.innerWidth < 768 || 'ontouchstart' in window) {
-                  document.documentElement.classList.add('mobile-device');
-                  window.__DRIVLET_MOBILE__ = true;
-                }
-                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                  document.documentElement.classList.add('reduce-motion');
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
       <body
         className={`${inter.className} bg-slate-50 text-slate-900 antialiased`}
       >
-        <PerformanceWrapper>
-          <SessionProvider>{children}</SessionProvider>
-        </PerformanceWrapper>
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );
