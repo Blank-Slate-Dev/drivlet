@@ -91,8 +91,9 @@ export default function HowItWorksSection() {
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
+  const [isAnimating, setIsAnimating] = useState(false);
 
-  // Detect screen size after mount to avoid hydration mismatch
+  // Detect screen size after mount
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
     checkDesktop();
@@ -102,21 +103,30 @@ export default function HowItWorksSection() {
 
   const goToSlide = useCallback(
     (index: number) => {
+      if (isAnimating || index === currentIndex) return;
+      setIsAnimating(true);
       setDirection(index > currentIndex ? 'right' : 'left');
       setCurrentIndex(index);
+      setTimeout(() => setIsAnimating(false), 400);
     },
-    [currentIndex]
+    [currentIndex, isAnimating]
   );
 
   const goToPrevious = useCallback(() => {
+    if (isAnimating) return;
+    setIsAnimating(true);
     setDirection('left');
     setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
-  }, [steps.length]);
+    setTimeout(() => setIsAnimating(false), 400);
+  }, [steps.length, isAnimating]);
 
   const goToNext = useCallback(() => {
+    if (isAnimating) return;
+    setIsAnimating(true);
     setDirection('right');
     setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
-  }, [steps.length]);
+    setTimeout(() => setIsAnimating(false), 400);
+  }, [steps.length, isAnimating]);
 
   const handleImageLoad = (index: number) => {
     setLoadedImages((prev) => new Set([...prev, index]));
@@ -124,7 +134,7 @@ export default function HowItWorksSection() {
 
   const currentStep = steps[currentIndex];
 
-  // Show nothing until we know the screen size
+  // Loading state
   if (isDesktop === null) {
     return (
       <section
@@ -184,7 +194,8 @@ export default function HowItWorksSection() {
           {/* Navigation Arrows */}
           <button
             onClick={goToPrevious}
-            className="absolute left-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md lg:left-4"
+            disabled={isAnimating}
+            className="absolute left-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-50 lg:left-4"
             aria-label="Previous step"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -192,7 +203,8 @@ export default function HowItWorksSection() {
 
           <button
             onClick={goToNext}
-            className="absolute right-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md lg:right-4"
+            disabled={isAnimating}
+            className="absolute right-2 top-1/2 z-30 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-50 lg:right-4"
             aria-label="Next step"
           >
             <ChevronRight className="h-6 w-6" />
@@ -232,9 +244,9 @@ export default function HowItWorksSection() {
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div
                       key={`phone-${currentIndex}`}
-                      initial={{ opacity: 0, x: direction === 'right' ? 80 : -80 }}
+                      initial={{ opacity: 0, x: direction === 'right' ? 100 : -100 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: direction === 'right' ? -80 : 80 }}
+                      exit={{ opacity: 0, x: direction === 'right' ? -100 : 100 }}
                       transition={{ duration: 0.4, ease: 'easeInOut' }}
                     >
                       <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
@@ -265,37 +277,53 @@ export default function HowItWorksSection() {
               </div>
             )}
 
-            {/* Mobile Layout - NO framer-motion, simple render */}
+            {/* Mobile Layout - CSS transitions */}
             {!isDesktop && (
               <div className="flex flex-col items-center">
-                <div className="relative h-[380px] w-[300px]">
-                  <div className="flex h-full w-full items-end justify-center pb-[20px]">
+                <div className="relative h-[380px] w-[300px] overflow-hidden">
+                  {steps.map((step, index) => (
                     <div
-                      className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
-                    />
-                    <div className="relative z-10 w-[220px]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={currentStep.image}
-                        alt={currentStep.title}
-                        className="h-auto w-[220px]"
-                      />
+                      key={step.step}
+                      className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
+                      style={{
+                        transform: `translateX(${
+                          index === currentIndex
+                            ? '0%'
+                            : index < currentIndex
+                              ? '-100%'
+                              : '100%'
+                        })`,
+                        opacity: index === currentIndex ? 1 : 0,
+                      }}
+                    >
                       <div
-                        className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
+                        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
                       />
+                      <div className="relative z-10 w-[220px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={step.image}
+                          alt={step.title}
+                          className="h-auto w-[220px]"
+                          loading={index === 0 ? 'eager' : 'lazy'}
+                        />
+                        <div
+                          className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Text below */}
+                {/* Text below - with fade transition */}
                 <div className="mt-6 text-center">
-                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500 transition-all duration-300">
                     {currentStep.step}
                   </div>
-                  <h3 className="mb-2 text-lg font-bold text-slate-900">
+                  <h3 className="mb-2 text-lg font-bold text-slate-900 transition-all duration-300">
                     {currentStep.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-slate-600">
+                  <p className="text-sm leading-relaxed text-slate-600 transition-all duration-300">
                     {currentStep.description}
                   </p>
                 </div>
@@ -309,6 +337,7 @@ export default function HowItWorksSection() {
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
+                disabled={isAnimating}
                 className={`h-2 rounded-full transition-all duration-300 ${
                   index === currentIndex
                     ? 'w-8 bg-emerald-500'
