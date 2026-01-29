@@ -6,15 +6,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
-import { 
-  generateConnectToDriverTwiML,
-  generateNoBookingFoundTwiML,
-  generateNoDriverAssignedTwiML,
-  generateErrorTwiML,
-  formatPhoneNumber,
-} from "@/lib/twilio-voice";
+
+const TWILIO_PHONE_NUMBER = '+61259416665';
+
+// Format phone number to E.164
+function formatPhoneNumber(phone: string): string {
+  let formatted = phone.replace(/[\s\-()]/g, '');
+  if (formatted.startsWith('0')) {
+    formatted = '+61' + formatted.substring(1);
+  } else if (!formatted.startsWith('+')) {
+    formatted = '+61' + formatted;
+  }
+  return formatted;
+}
 
 export async function POST(request: NextRequest) {
+  console.log('🔵 INCOMING CALL WEBHOOK HIT');
+  
   try {
     // Twilio sends form data
     const formData = await request.formData();
@@ -32,17 +40,15 @@ export async function POST(request: NextRequest) {
 
     if (!callerNumber) {
       console.error('❌ No caller number provided');
-      const twiml = generateErrorTwiML();
-      return new NextResponse(twiml, {
-        status: 200,
-        headers: { 'Content-Type': 'application/xml' },
-      });
+      return new NextResponse(
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Sorry, we could not identify your phone number. Goodbye.</Say></Response>`,
+        { status: 200, headers: { 'Content-Type': 'application/xml' } }
+      );
     }
 
     await connectDB();
 
     // Normalize the caller's phone number for matching
-    // Try multiple formats since storage might vary
     const normalizedCaller = formatPhoneNumber(callerNumber);
     const callerWithoutPlus = normalizedCaller.replace('+', '');
     const callerLocal = callerNumber.startsWith('+61') 
@@ -56,7 +62,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Find active booking for this caller
-    // Check multiple phone formats and look for non-completed, non-cancelled bookings
     const booking = await Booking.findOne({
       $or: [
         { guestPhone: callerNumber },
@@ -67,15 +72,17 @@ export async function POST(request: NextRequest) {
       ],
       status: { $in: ['pending', 'in_progress'] },
       assignedDriverId: { $exists: true },
-    }).sort({ createdAt: -1 }); // Get most recent matching booking
+    }).sort({ createdAt: -1 });
 
     if (!booking) {
       console.log('❌ No active booking found for caller:', callerNumber);
-      const twiml = generateNoBookingFoundTwiML();
-      return new NextResponse(twiml, {
-        status: 200,
-        headers: { 'Content-Type': 'application/xml' },
-      });
+      return new NextResponse(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Sorry, we couldn't find an active booking for your phone number. If you need assistance, please contact us through our website. Goodbye.</Say>
+</Response>`,
+        { status: 200, headers: { 'Content-Type': 'application/xml' } }
+      );
     }
 
     console.log('✅ Found booking:', {
@@ -87,22 +94,15 @@ export async function POST(request: NextRequest) {
     // Get the assigned driver
     const driver = await Driver.findById(booking.assignedDriverId);
 
-    if (!driver) {
-      console.error('❌ Driver not found for booking:', booking._id);
-      const twiml = generateNoDriverAssignedTwiML();
-      return new NextResponse(twiml, {
-        status: 200,
-        headers: { 'Content-Type': 'application/xml' },
-      });
-    }
-
-    if (!driver.phone) {
-      console.error('❌ Driver has no phone number:', driver._id);
-      const twiml = generateNoDriverAssignedTwiML();
-      return new NextResponse(twiml, {
-        status: 200,
-        headers: { 'Content-Type': 'application/xml' },
-      });
+    if (!driver || !driver.phone) {
+      console.error('❌ Driver not found or has no phone:', booking.assignedDriverId);
+      return new NextResponse(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Sorry, we couldn't connect you to your driver at this time. Please try again in a few minutes. Goodbye.</Say>
+</Response>`,
+        { status: 200, headers: { 'Content-Type': 'application/xml' } }
+      );
     }
 
     console.log('📞 Connecting caller to driver:', {
@@ -121,10 +121,15 @@ export async function POST(request: NextRequest) {
 
     // Generate TwiML to connect to driver
     const driverPhone = formatPhoneNumber(driver.phone);
-    const twiml = generateConnectToDriverTwiML(
-      driverPhone, 
-      driver.firstName
-    );
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling Drivlet. Connecting you to your driver now.</Say>
+  <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
+    <Number>${driverPhone}</Number>
+  </Dial>
+  <Say voice="alice">Your driver did not answer. Please try again in a few minutes. Goodbye.</Say>
+</Response>`;
 
     return new NextResponse(twiml, {
       status: 200,
@@ -133,15 +138,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error in incoming call webhook:', error);
-    const errorTwiML = generateErrorTwiML();
-    return new NextResponse(errorTwiML, {
-      status: 200, // Must return 200 for Twilio to process TwiML
-      headers: { 'Content-Type': 'application/xml' },
-    });
+    return new NextResponse(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Sorry, we encountered an error. Please try again later. Goodbye.</Say></Response>`,
+      { status: 200, headers: { 'Content-Type': 'application/xml' } }
+    );
   }
 }
 
-// Twilio may also send GET requests
 export async function GET(request: NextRequest) {
   return POST(request);
 }
