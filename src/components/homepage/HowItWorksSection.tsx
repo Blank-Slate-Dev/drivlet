@@ -85,6 +85,21 @@ const transportSteps = [
   },
 ];
 
+const phoneVariants = {
+  enter: (direction: 'left' | 'right') => ({
+    opacity: 0,
+    x: direction === 'right' ? 200 : -200,
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+  },
+  exit: (direction: 'left' | 'right') => ({
+    opacity: 0,
+    x: direction === 'right' ? -200 : 200,
+  }),
+};
+
 export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -240,13 +255,15 @@ export default function HowItWorksSection() {
                 </div>
 
                 {/* Center: Phone with Gradient Pill */}
-                <div className="flex-shrink-0">
-                  <AnimatePresence mode="wait" initial={false}>
+                <div className="relative flex-shrink-0">
+                  <AnimatePresence mode="popLayout" initial={false} custom={direction}>
                     <motion.div
                       key={`phone-${currentIndex}`}
-                      initial={{ opacity: 0, x: direction === 'right' ? 100 : -100 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: direction === 'right' ? -100 : 100 }}
+                      custom={direction}
+                      variants={phoneVariants}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
                       transition={{ duration: 0.4, ease: 'easeInOut' }}
                     >
                       <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
@@ -315,15 +332,15 @@ export default function HowItWorksSection() {
                   ))}
                 </div>
 
-                {/* Text below - with fade transition */}
+                {/* Text below */}
                 <div className="mt-6 text-center">
-                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500 transition-all duration-300">
+                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
                     {currentStep.step}
                   </div>
-                  <h3 className="mb-2 text-lg font-bold text-slate-900 transition-all duration-300">
+                  <h3 className="mb-2 text-lg font-bold text-slate-900">
                     {currentStep.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-slate-600 transition-all duration-300">
+                  <p className="text-sm leading-relaxed text-slate-600">
                     {currentStep.description}
                   </p>
                 </div>
