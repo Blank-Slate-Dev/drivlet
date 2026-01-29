@@ -88,7 +88,7 @@ const transportSteps = [
 const phoneVariants = {
   enter: (direction: 'left' | 'right') => ({
     opacity: 0,
-    x: direction === 'right' ? 200 : -200,
+    x: direction === 'right' ? 100 : -100,
   }),
   center: {
     opacity: 1,
@@ -96,7 +96,7 @@ const phoneVariants = {
   },
   exit: (direction: 'left' | 'right') => ({
     opacity: 0,
-    x: direction === 'right' ? -200 : 200,
+    x: direction === 'right' ? -100 : 100,
   }),
 };
 
@@ -122,7 +122,7 @@ export default function HowItWorksSection() {
       setIsAnimating(true);
       setDirection(index > currentIndex ? 'right' : 'left');
       setCurrentIndex(index);
-      setTimeout(() => setIsAnimating(false), 400);
+      setTimeout(() => setIsAnimating(false), 500);
     },
     [currentIndex, isAnimating]
   );
@@ -132,7 +132,7 @@ export default function HowItWorksSection() {
     setIsAnimating(true);
     setDirection('left');
     setCurrentIndex((prev) => (prev === 0 ? steps.length - 1 : prev - 1));
-    setTimeout(() => setIsAnimating(false), 400);
+    setTimeout(() => setIsAnimating(false), 500);
   }, [steps.length, isAnimating]);
 
   const goToNext = useCallback(() => {
@@ -140,7 +140,7 @@ export default function HowItWorksSection() {
     setIsAnimating(true);
     setDirection('right');
     setCurrentIndex((prev) => (prev === steps.length - 1 ? 0 : prev + 1));
-    setTimeout(() => setIsAnimating(false), 400);
+    setTimeout(() => setIsAnimating(false), 500);
   }, [steps.length, isAnimating]);
 
   const handleImageLoad = (index: number) => {
@@ -238,7 +238,7 @@ export default function HowItWorksSection() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.2 }}
                       className="text-left"
                     >
                       <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
@@ -256,7 +256,7 @@ export default function HowItWorksSection() {
 
                 {/* Center: Phone with Gradient Pill */}
                 <div className="relative flex-shrink-0">
-                  <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+                  <AnimatePresence mode="wait" initial={false} custom={direction}>
                     <motion.div
                       key={`phone-${currentIndex}`}
                       custom={direction}
@@ -264,7 +264,7 @@ export default function HowItWorksSection() {
                       initial="enter"
                       animate="center"
                       exit="exit"
-                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
                     >
                       <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
                         <div
