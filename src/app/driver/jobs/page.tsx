@@ -10,7 +10,6 @@ import {
   Clock,
   Car,
   CheckCircle,
-  XCircle,
   Loader2,
   RefreshCw,
   AlertTriangle,
@@ -25,6 +24,7 @@ import {
   CreditCard,
   X,
   Camera,
+  PhoneCall,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 
@@ -85,6 +85,10 @@ export default function DriverJobsPage() {
   // Photo upload modal state
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoJob, setPhotoJob] = useState<Job | null>(null);
+
+  // Call customer state
+  const [callingCustomer, setCallingCustomer] = useState<string | null>(null);
+  const [callSuccess, setCallSuccess] = useState<string | null>(null);
 
   const openPhotoModal = (job: Job) => {
     setPhotoJob(job);
@@ -153,6 +157,40 @@ export default function DriverJobsPage() {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // Call customer handler
+  const handleCallCustomer = async (job: Job) => {
+    if (!job.customerPhone) {
+      setError("Customer phone number not available");
+      return;
+    }
+
+    setCallingCustomer(job._id);
+    setError("");
+
+    try {
+      const res = await fetch("/api/driver/call-customer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: job._id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to initiate call");
+      }
+
+      // Show success message
+      setCallSuccess(job._id);
+      setTimeout(() => setCallSuccess(null), 5000);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to call customer");
+    } finally {
+      setCallingCustomer(null);
     }
   };
 
@@ -303,6 +341,9 @@ export default function DriverJobsPage() {
                   onAction={handleJobAction}
                   onOpenPayment={openPaymentModal}
                   onOpenPhotos={openPhotoModal}
+                  onCallCustomer={handleCallCustomer}
+                  callingCustomer={callingCustomer}
+                  callSuccess={callSuccess}
                 />
               ))}
             </AnimatePresence>
@@ -481,6 +522,9 @@ function JobCard({
   onAction,
   onOpenPayment,
   onOpenPhotos,
+  onCallCustomer,
+  callingCustomer,
+  callSuccess,
 }: {
   job: Job;
   activeTab: TabType;
@@ -488,8 +532,13 @@ function JobCard({
   onAction: (jobId: string, action: "accept" | "decline" | "start" | "picked_up" | "at_garage" | "complete") => void;
   onOpenPayment: (job: Job) => void;
   onOpenPhotos: (job: Job) => void;
+  onCallCustomer: (job: Job) => void;
+  callingCustomer: string | null;
+  callSuccess: string | null;
 }) {
   const isLoading = actionLoading === job._id;
+  const isCalling = callingCustomer === job._id;
+  const isCallSuccess = callSuccess === job._id;
 
   // Calculate photo progress
   const photoCount = job.checkpointStatus
@@ -565,6 +614,42 @@ function JobCard({
               <AlertTriangle className="h-3 w-3" />
               Manual transmission
             </span>
+          </div>
+        )}
+
+        {/* Call Customer Button - Show for active jobs with phone number */}
+        {activeTab !== "available" && job.customerPhone && (
+          <div className="mt-3">
+            {isCallSuccess ? (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                <div>
+                  <span className="text-sm font-medium text-emerald-800">Call initiated!</span>
+                  <p className="text-xs text-emerald-600">Your phone will ring shortly.</p>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => onCallCustomer(job)}
+                disabled={isCalling}
+                className="flex items-center justify-center gap-2 w-full rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 px-4 py-3 text-sm font-semibold text-white transition"
+              >
+                {isCalling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <PhoneCall className="h-4 w-4" />
+                    Call Customer
+                  </>
+                )}
+              </button>
+            )}
+            <p className="mt-1 text-xs text-slate-500 text-center">
+              Your number stays private - customer sees business number
+            </p>
           </div>
         )}
 
