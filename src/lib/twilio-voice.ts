@@ -131,7 +131,6 @@ export async function initiateDriverToCustomerCall(
         Method: 'POST',
         StatusCallback: `${appUrl}/api/twilio/voice/status`,
         StatusCallbackMethod: 'POST',
-        StatusCallbackEvent: 'initiated ringing answered completed',
       }),
     });
 
