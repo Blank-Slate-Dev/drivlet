@@ -26,16 +26,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Build TwiML response
+    // Driver hears this message, then gets connected to the customer
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Connecting you to ${customerName}.</Say>
+  <Say voice="alice">Connecting your call now.</Say>
   <Dial callerId="${twilioPhoneNumber}" timeout="30">
     <Number>${customerPhone}</Number>
   </Dial>
-  <Say voice="alice">The customer did not answer. Goodbye.</Say>
+  <Say voice="alice">The customer did not answer. Please try again later. Goodbye.</Say>
 </Response>`;
 
-    console.log('✅ Returning TwiML:', twiml);
+    console.log('✅ Returning TwiML');
 
     return new NextResponse(twiml, {
       status: 200,
@@ -44,8 +45,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ OUTBOUND ERROR:', error);
-    console.error('❌ Error message:', error instanceof Error ? error.message : 'Unknown');
-    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
     
     return new NextResponse(
       `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Sorry, we encountered an error. Please try again later. Goodbye.</Say></Response>`,
