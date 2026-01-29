@@ -49,6 +49,7 @@ export async function sendSMS(to: string, message: string): Promise<boolean> {
     const data: TwilioMessageResponse = await response.json();
     console.log('✅ SMS sent successfully, SID:', data.sid);
     return true;
+
   } catch (error) {
     console.error('❌ Failed to send SMS:', error);
     return false;
@@ -67,5 +68,31 @@ export async function sendServicePaymentSMS(
   
   const message = `Hi ${customerName}! Your car (${vehicleRego}) service is done. Pay $${amountFormatted} to get it back: ${paymentUrl} - drivlet`;
 
+  return sendSMS(phoneNumber, message);
+}
+
+// Booking confirmation SMS
+export async function sendBookingConfirmationSMS(
+  phoneNumber: string,
+  customerName: string,
+  vehicleRego: string,
+  pickupTime: string,
+  trackingUrl: string
+): Promise<boolean> {
+  const message = `Hi ${customerName}! Your drivlet booking for ${vehicleRego} is confirmed. Pickup: ${pickupTime}. Track: ${trackingUrl}`;
+  
+  return sendSMS(phoneNumber, message);
+}
+
+// Driver en route SMS
+export async function sendDriverEnRouteSMS(
+  phoneNumber: string,
+  customerName: string,
+  driverName: string
+): Promise<boolean> {
+  const businessNumber = process.env.TWILIO_PHONE_NUMBER || 'our business number';
+  
+  const message = `Hi ${customerName}! Your driver ${driverName} is on the way. To call them, dial ${businessNumber} - drivlet`;
+  
   return sendSMS(phoneNumber, message);
 }
