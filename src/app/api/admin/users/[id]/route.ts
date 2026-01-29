@@ -72,8 +72,12 @@ export async function PATCH(
         );
       }
 
-      // Archive current suspension to history if exists
-      if (user.suspensionInfo && user.accountStatus === "suspended") {
+      // Archive current suspension to history if exists and has required fields
+      if (user.suspensionInfo &&
+          user.accountStatus === "suspended" &&
+          user.suspensionInfo.suspendedAt &&
+          user.suspensionInfo.suspendedBy &&
+          user.suspensionInfo.reason) {
         user.suspensionHistory.push({
           suspendedAt: user.suspensionInfo.suspendedAt,
           suspendedBy: user.suspensionInfo.suspendedBy,
@@ -103,8 +107,11 @@ export async function PATCH(
         );
       }
 
-      // Archive suspension to history
-      if (user.suspensionInfo) {
+      // Archive suspension to history only if all required fields exist
+      if (user.suspensionInfo &&
+          user.suspensionInfo.suspendedAt &&
+          user.suspensionInfo.suspendedBy &&
+          user.suspensionInfo.reason) {
         user.suspensionHistory.push({
           suspendedAt: user.suspensionInfo.suspendedAt,
           suspendedBy: user.suspensionInfo.suspendedBy,
@@ -184,13 +191,24 @@ export async function DELETE(
       );
     }
 
+    // Check if already deleted
+    if (user.accountStatus === "deleted") {
+      return NextResponse.json(
+        { error: "User account is already deleted" },
+        { status: 400 }
+      );
+    }
+
     // Soft delete: mark as deleted but keep record
     user.accountStatus = "deleted";
     user.deletedAt = new Date();
     user.deletedBy = new mongoose.Types.ObjectId(adminUserId);
 
-    // Archive any active suspension
-    if (user.suspensionInfo) {
+    // Archive any active suspension to history only if all required fields exist
+    if (user.suspensionInfo &&
+        user.suspensionInfo.suspendedAt &&
+        user.suspensionInfo.suspendedBy &&
+        user.suspensionInfo.reason) {
       user.suspensionHistory.push({
         suspendedAt: user.suspensionInfo.suspendedAt,
         suspendedBy: user.suspensionInfo.suspendedBy,
@@ -200,18 +218,36 @@ export async function DELETE(
         reactivatedAt: new Date(),
         reactivatedBy: new mongoose.Types.ObjectId(adminUserId),
       });
-      user.suspensionInfo = undefined;
     }
+
+    // Clear suspension info regardless (deletion supersedes suspension)
+    user.suspensionInfo = undefined;
 
     await user.save();
 
+    console.log(`[ADMIN ACTION] User ${user._id} (${user.email}) soft deleted by admin ${adminUserId}`);
+
     return NextResponse.json({
       success: true,
-      message: "User account deleted successfully"
+      message: "User account deleted successfully. Account data is preserved and can be recovered if needed.",
+      deletedUser: {
+        id: user._id.toString(),
+        email: user.email,
+        username: user.username,
+        deletedAt: user.deletedAt,
+      }
     });
 
   } catch (error) {
     console.error("Error deleting user:", error);
+
+    if (process.env.NODE_ENV === "development" && error instanceof Error) {
+      return NextResponse.json(
+        { error: "Failed to delete user", details: error.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to delete user" },
       { status: 500 }
