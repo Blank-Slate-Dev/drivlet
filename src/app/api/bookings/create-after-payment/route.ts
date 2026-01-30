@@ -70,6 +70,16 @@ export async function POST(request: NextRequest) {
       const isManual = metadata.isManualTransmission === 'true';
       const transmissionType = metadata.transmissionType || 'automatic';
 
+      // Parse selected services
+      let selectedServices = [];
+      try {
+        selectedServices = JSON.parse(metadata.selectedServices || '[]');
+      } catch {
+        console.log('⚠️ Could not parse selectedServices, using empty array');
+      }
+      const primaryServiceCategory = metadata.primaryServiceCategory || null;
+      const serviceNotes = metadata.serviceNotes || '';
+
       // Build flags array
       const flags = [];
       if (isManual) {
@@ -96,6 +106,7 @@ export async function POST(request: NextRequest) {
         serviceType: hasExisting
           ? `Existing Booking - ${metadata.garageName}`
           : (metadata.serviceType || 'Standard Service'),
+        serviceDate: metadata.serviceDate ? new Date(metadata.serviceDate) : new Date(),
         pickupAddress: metadata.pickupAddress,
         pickupTime: metadata.earliestPickup,
         dropoffTime: metadata.latestDropoff,
@@ -105,10 +116,15 @@ export async function POST(request: NextRequest) {
         trackingCode,
         hasExistingBooking: hasExisting,
         garageName: metadata.garageName || null,
+        garageAddress: metadata.garageAddress || null,
+        garagePlaceId: metadata.garagePlaceId || null,
         existingBookingRef: metadata.existingBookingRef || null,
         existingBookingNotes: null,
         transmissionType,
         isManualTransmission: isManual,
+        selectedServices,
+        primaryServiceCategory,
+        serviceNotes,
         flags,
         paymentStatus: 'paid',
         paymentId: paymentIntentId,
