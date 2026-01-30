@@ -88,22 +88,28 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password are required");
         }
 
-        const user = await User.findOne({
-          email: credentials.email.toLowerCase(),
-        });
+        // IMPORTANT: Trim whitespace from inputs
+        // Mobile keyboards often add trailing spaces
+        const email = credentials.email.trim().toLowerCase();
+        const password = credentials.password.trim();
+
+        console.log("🔐 Login attempt for:", email);
+
+        const user = await User.findOne({ email });
 
         if (!user) {
+          console.log("❌ No user found for:", email);
           throw new Error("No user found with this email");
         }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
+        const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
+          console.log("❌ Invalid password for:", email);
           throw new Error("Invalid password");
         }
+
+        console.log("✅ Password valid for:", email);
 
         // Check account status - prevent suspended or deleted users from logging in
         if (user.accountStatus === "suspended") {
