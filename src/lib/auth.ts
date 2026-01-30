@@ -88,12 +88,18 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password are required");
         }
 
-        // IMPORTANT: Trim whitespace from inputs
-        // Mobile keyboards often add trailing spaces
+        // Trim whitespace from inputs
         const email = credentials.email.trim().toLowerCase();
         const password = credentials.password.trim();
 
-        console.log("🔐 Login attempt for:", email);
+        // DEBUG: Log detailed password info (REMOVE IN PRODUCTION)
+        console.log("🔐 Login attempt:", {
+          email,
+          passwordLength: password.length,
+          passwordChars: password.split('').map(c => c.charCodeAt(0)),
+          firstChar: password.charAt(0),
+          lastChar: password.charAt(password.length - 1),
+        });
 
         const user = await User.findOne({ email });
 
@@ -102,14 +108,28 @@ export const authOptions: NextAuthOptions = {
           throw new Error("No user found with this email");
         }
 
+        // DEBUG: Test with the known password directly
+        const knownPassword = "Testtest1!";
+        const isKnownPasswordValid = await bcrypt.compare(knownPassword, user.password);
+        console.log("🔍 Known password test:", { isKnownPasswordValid });
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        
+        console.log("🔐 Password comparison:", {
+          email,
+          isValid: isPasswordValid,
+          submittedLength: password.length,
+          knownLength: knownPassword.length,
+          lengthMatch: password.length === knownPassword.length,
+          exactMatch: password === knownPassword,
+        });
 
         if (!isPasswordValid) {
           console.log("❌ Invalid password for:", email);
           throw new Error("Invalid password");
         }
 
-        console.log("✅ Password valid for:", email);
+        console.log("✅ Login successful for:", email);
 
         // Check account status - prevent suspended or deleted users from logging in
         if (user.accountStatus === "suspended") {
@@ -120,7 +140,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Check email verification for regular users
-        // Skip for admin, garage, and driver roles as they may use different verification flows
         if (user.role === "user" && !user.emailVerified) {
           throw new Error("Please verify your email before signing in. Check your inbox for the verification link.");
         }
@@ -186,14 +205,12 @@ export const authOptions: NextAuthOptions = {
         token.isApproved = user.isApproved;
         token.onboardingStatus = user.onboardingStatus;
         token.canAcceptJobs = user.canAcceptJobs;
-        // Garage data
         token.linkedGarageName = user.linkedGarageName;
         token.linkedGarageAddress = user.linkedGarageAddress;
         token.linkedGaragePlaceId = user.linkedGaragePlaceId;
         token.garageStatus = user.garageStatus;
       }
 
-      // Refresh driver status on session update
       if (trigger === "update" && token.role === "driver") {
         await connectDB();
         const dbUser = await User.findById(token.id);
@@ -207,7 +224,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Refresh garage status on session update
       if (trigger === "update" && token.role === "garage") {
         await connectDB();
         const dbUser = await User.findById(token.id);
