@@ -50,10 +50,13 @@ export interface IBooking extends Document {
   // Core booking details
   pickupTime: string;
   dropoffTime: string;
+  pickupTimeSlot?: string;
+  dropoffTimeSlot?: string;
   pickupAddress: string;
   vehicleRegistration: string;
   vehicleState: string;
   serviceType: string;
+  estimatedServiceDuration?: number;
   serviceDate?: Date;
 
   // Tracking code for secure booking lookup
@@ -216,6 +219,18 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
     },
+    pickupTimeSlot: {
+      type: String,
+      enum: ['8am-9am', '9am-10am', '10am-11am'],
+      required: false,
+      index: true,
+    },
+    dropoffTimeSlot: {
+      type: String,
+      enum: ['1pm-2pm', '2pm-3pm', '3pm-4pm', '4pm-5pm'],
+      required: false,
+      index: true,
+    },
     pickupAddress: {
       type: String,
       required: true,
@@ -234,6 +249,10 @@ const BookingSchema = new Schema<IBooking>(
     serviceType: {
       type: String,
       required: true,
+    },
+    estimatedServiceDuration: {
+      type: Number,
+      required: false,
     },
     // Made optional and removed past-date validator (validation happens at booking creation, not on updates)
     serviceDate: {
@@ -478,6 +497,8 @@ const BookingSchema = new Schema<IBooking>(
 // Indexes for efficient queries
 BookingSchema.index({ status: 1, createdAt: -1 });
 BookingSchema.index({ serviceDate: 1, status: 1 });
+BookingSchema.index({ serviceDate: 1, pickupTimeSlot: 1, status: 1 });
+BookingSchema.index({ serviceDate: 1, dropoffTimeSlot: 1, status: 1 });
 BookingSchema.index({ trackingCode: 1, status: 1 });
 BookingSchema.index({ isGuest: 1 });
 BookingSchema.index({ hasExistingBooking: 1 });

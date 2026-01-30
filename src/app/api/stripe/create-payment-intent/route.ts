@@ -49,6 +49,9 @@ export async function POST(request: NextRequest) {
       selectedServices,
       primaryServiceCategory,
       serviceNotes,
+      pickupTimeSlot,
+      dropoffTimeSlot,
+      estimatedServiceDuration,
     } = body;
 
     // Validate required fields
@@ -93,6 +96,9 @@ export async function POST(request: NextRequest) {
         selectedServices: selectedServices || '[]',
         primaryServiceCategory: primaryServiceCategory || '',
         serviceNotes: serviceNotes || '',
+        pickupTimeSlot: pickupTimeSlot || '',
+        dropoffTimeSlot: dropoffTimeSlot || '',
+        estimatedServiceDuration: estimatedServiceDuration ? String(estimatedServiceDuration) : '',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}`,

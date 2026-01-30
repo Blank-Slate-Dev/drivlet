@@ -34,6 +34,7 @@ import {
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
 import { FEATURES } from "@/lib/featureFlags";
+import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
 
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
@@ -72,6 +73,9 @@ interface Booking {
   pickupAddress: string;
   pickupTime: string;
   dropoffTime: string;
+  pickupTimeSlot?: string;
+  dropoffTimeSlot?: string;
+  estimatedServiceDuration?: number;
   trackingCode?: string;
   hasExistingBooking: boolean;
   garageName?: string;
@@ -483,8 +487,16 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-700">
-                          {FEATURES.SERVICE_SELECTION ? booking.serviceType : 'Transport'}
+                          {(() => {
+                            const svcType = getServiceTypeByValue(booking.serviceType);
+                            return svcType ? svcType.label : booking.serviceType;
+                          })()}
                         </p>
+                        {booking.estimatedServiceDuration && (
+                          <p className="text-xs text-slate-500">
+                            ~{booking.estimatedServiceDuration}h
+                          </p>
+                        )}
                         <div className="mt-1 flex flex-wrap gap-1">
                           {booking.hasExistingBooking && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
@@ -502,8 +514,15 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-900">
-                          {booking.pickupTime}
+                          {booking.pickupTimeSlot
+                            ? getPickupSlotLabel(booking.pickupTimeSlot)
+                            : booking.pickupTime}
                         </p>
+                        {booking.dropoffTimeSlot && (
+                          <p className="text-xs text-emerald-600">
+                            Return: {getDropoffSlotLabel(booking.dropoffTimeSlot)}
+                          </p>
+                        )}
                         <p className="text-xs text-slate-500 truncate max-w-[150px]">
                           {booking.pickupAddress}
                         </p>
@@ -842,11 +861,18 @@ function ViewDetailsModal({
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Wrench className="h-4 w-4 text-emerald-600" />
-              {FEATURES.SERVICE_SELECTION ? 'Service Details' : 'Transport Details'}
+              Service Details
             </div>
             <div className="mt-3">
-              <p className="text-xs text-slate-500">{FEATURES.SERVICE_SELECTION ? 'Service Type' : 'Booking Type'}</p>
-              <p className="font-medium text-slate-900">{FEATURES.SERVICE_SELECTION ? booking.serviceType : 'Vehicle Transport'}</p>
+              <p className="text-xs text-slate-500">Service Type</p>
+              <p className="font-medium text-slate-900">
+                {(() => {
+                  const svcType = getServiceTypeByValue(booking.serviceType);
+                  return svcType
+                    ? `${svcType.label} (~${svcType.estimatedHours}h)`
+                    : booking.serviceType;
+                })()}
+              </p>
             </div>
             {booking.serviceDate && (
               <div className="mt-3">
@@ -941,14 +967,28 @@ function ViewDetailsModal({
             </div>
             <div className="mt-3 grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-500">Pickup Time</p>
-                <p className="font-medium text-slate-900">{booking.pickupTime}</p>
+                <p className="text-xs text-slate-500">Pickup Slot</p>
+                <p className="font-medium text-slate-900">
+                  {booking.pickupTimeSlot
+                    ? getPickupSlotLabel(booking.pickupTimeSlot)
+                    : booking.pickupTime}
+                </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Dropoff Time</p>
-                <p className="font-medium text-slate-900">{booking.dropoffTime}</p>
+                <p className="text-xs text-slate-500">Drop-off Slot</p>
+                <p className="font-medium text-slate-900">
+                  {booking.dropoffTimeSlot
+                    ? getDropoffSlotLabel(booking.dropoffTimeSlot)
+                    : booking.dropoffTime}
+                </p>
               </div>
             </div>
+            {booking.estimatedServiceDuration && (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500">Estimated Duration</p>
+                <p className="font-medium text-slate-900">{booking.estimatedServiceDuration} hours</p>
+              </div>
+            )}
             <div className="mt-3">
               <p className="text-xs text-slate-500">Pickup Address</p>
               <p className="text-sm text-slate-900">{booking.pickupAddress}</p>

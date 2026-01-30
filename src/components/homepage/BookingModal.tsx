@@ -22,6 +22,10 @@ import {
   Phone,
   Copy,
   Calendar,
+  Check,
+  Zap,
+  Wrench,
+  Settings,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
@@ -35,6 +39,14 @@ import {
   getCategoryById,
 } from '@/constants/serviceCategories';
 import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
+import {
+  PICKUP_SLOTS,
+  DROPOFF_SLOTS,
+  SERVICE_TYPES,
+  getPickupSlotLabel,
+  getDropoffSlotLabel,
+  getServiceTypeByValue,
+} from '@/config/timeSlots';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '@/components/StripePaymentForm';
@@ -95,11 +107,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Form state
   const [regoPlate, setRegoPlate] = useState('');
   const [regoState, setRegoState] = useState<StateCode>('NSW');
-  const [earliestPickup, setEarliestPickup] = useState('09:00');
-  const [latestDropoff, setLatestDropoff] = useState('17:00');
+  const [selectedPickupSlot, setSelectedPickupSlot] = useState('');
+  const [selectedDropoffSlot, setSelectedDropoffSlot] = useState('');
+  const [selectedServiceType, setSelectedServiceType] = useState('regular_service');
   const [pickupAddress, setPickupAddress] = useState('');
   const [serviceDate, setServiceDate] = useState('');
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
+
+  // Slot availability
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [slotAvailability, setSlotAvailability] = useState<any>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Guest checkout fields
   const [guestName, setGuestName] = useState('');
@@ -155,23 +173,34 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const customerEmail = isAuthenticated ? (session?.user?.email || '') : guestEmail;
   const customerPhone = guestPhone;
 
-  const selectedPickupMinutes = useMemo(() => {
-    const selected = allPickupTimeOptions.find((t) => t.value === earliestPickup);
-    return selected?.minutes ?? 0;
-  }, [earliestPickup]);
-
-  const selectedDropoffMinutes = useMemo(() => {
-    const selected = allDropoffTimeOptions.find((t) => t.value === latestDropoff);
-    return selected?.minutes ?? 0;
-  }, [latestDropoff]);
-
-  const availablePickupOptions = useMemo(() => {
-    return allPickupTimeOptions.filter((time) => time.minutes <= selectedDropoffMinutes - MIN_GAP_MINUTES);
-  }, [selectedDropoffMinutes]);
-
-  const availableDropoffOptions = useMemo(() => {
-    return allDropoffTimeOptions.filter((time) => time.minutes >= selectedPickupMinutes + MIN_GAP_MINUTES);
-  }, [selectedPickupMinutes]);
+  // Fetch slot availability when date changes
+  useEffect(() => {
+    if (serviceDate) {
+      setLoadingSlots(true);
+      fetch(`/api/bookings/slot-availability?date=${serviceDate}`)
+        .then(res => res.json())
+        .then(data => {
+          setSlotAvailability(data);
+          // Clear selections if the previously selected slot is now full
+          if (selectedPickupSlot && data.pickupSlots) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pickup = data.pickupSlots.find((s: any) => s.slot === selectedPickupSlot);
+            if (pickup?.isFull) setSelectedPickupSlot('');
+          }
+          if (selectedDropoffSlot && data.dropoffSlots) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const dropoff = data.dropoffSlots.find((s: any) => s.slot === selectedDropoffSlot);
+            if (dropoff?.isFull) setSelectedDropoffSlot('');
+          }
+        })
+        .catch(() => {
+          // Silently fail - slots will just not show availability
+        })
+        .finally(() => setLoadingSlots(false));
+    } else {
+      setSlotAvailability(null);
+    }
+  }, [serviceDate]);
 
   // Get minimum date (tomorrow)
   const getMinDate = () => {
@@ -199,19 +228,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     });
   };
 
-  useEffect(() => {
-    const isCurrentPickupValid = availablePickupOptions.some((t) => t.value === earliestPickup);
-    if (!isCurrentPickupValid && availablePickupOptions.length > 0) {
-      setEarliestPickup(availablePickupOptions[0].value);
+  // Service type icon helper
+  const getServiceIcon = (value: string) => {
+    switch (value) {
+      case 'quick_service': return Zap;
+      case 'regular_service': return Wrench;
+      case 'major_service': return Settings;
+      default: return Wrench;
     }
-  }, [availablePickupOptions, earliestPickup]);
-
-  useEffect(() => {
-    const isCurrentDropoffValid = availableDropoffOptions.some((t) => t.value === latestDropoff);
-    if (!isCurrentDropoffValid && availableDropoffOptions.length > 0) {
-      setLatestDropoff(availableDropoffOptions[0].value);
-    }
-  }, [availableDropoffOptions, latestDropoff]);
+  };
 
   /**
    * Background scroll lock using CSS-only approach.
@@ -306,8 +331,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setServiceDate('');
         setSelectedPlaceDetails(null);
         setSubmitError(null);
-        setEarliestPickup('09:00');
-        setLatestDropoff('17:00');
+        setSelectedPickupSlot('');
+        setSelectedDropoffSlot('');
+        setSelectedServiceType('regular_service');
+        setSlotAvailability(null);
         setGarageSearch('');
         setGarageAddress('');
         setGaragePlaceId('');
@@ -381,11 +408,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (selectedDate < today) {
       return 'Service date cannot be in the past.';
     }
-    if (!earliestPickup) {
-      return 'Please select a pick-up time.';
+    if (!selectedPickupSlot) {
+      return 'Please select a pickup time slot.';
     }
-    if (!latestDropoff) {
-      return 'Please select a drop-off time.';
+    if (!selectedDropoffSlot) {
+      return 'Please select a drop-off time slot.';
+    }
+    if (!selectedServiceType) {
+      return 'Please select a service type.';
     }
 
     // Garage is mandatory
@@ -419,6 +449,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setSubmitError(null);
 
     try {
+      const serviceTypeInfo = getServiceTypeByValue(selectedServiceType);
+
       const response = await fetch('/api/stripe/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -427,16 +459,19 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           customerEmail,
           customerPhone,
           pickupAddress: pickupAddress.trim(),
-          serviceType: 'Existing Garage Booking',
+          serviceType: selectedServiceType,
           serviceDate: new Date(serviceDate).toISOString(),
           vehicleRegistration: regoPlate.trim().toUpperCase(),
           vehicleState: regoState,
-          earliestPickup: getTimeLabel(earliestPickup, allPickupTimeOptions),
-          latestDropoff: getTimeLabel(latestDropoff, allDropoffTimeOptions),
+          pickupTimeSlot: selectedPickupSlot,
+          dropoffTimeSlot: selectedDropoffSlot,
+          earliestPickup: getPickupSlotLabel(selectedPickupSlot),
+          latestDropoff: getDropoffSlotLabel(selectedDropoffSlot),
+          estimatedServiceDuration: serviceTypeInfo?.estimatedHours || 4,
           hasExistingBooking: true,
           garageName: garageSearch.trim(),
           garageAddress: garageAddress.trim(),
-          garagePlaceId: garagePlaceId, // Google Places ID for exact matching
+          garagePlaceId: garagePlaceId,
           garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions),
           additionalNotes: additionalNotes.trim(),
           transmissionType,
@@ -553,7 +588,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                       <div className="flex justify-between">
                         <span className="text-slate-500">Pickup</span>
                         <span className="font-medium text-slate-900">
-                          {getTimeLabel(earliestPickup, allPickupTimeOptions)}
+                          {getPickupSlotLabel(selectedPickupSlot)}
                         </span>
                       </div>
                     </div>
@@ -818,7 +853,25 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </p>
                         </div>
 
-                        {/* Times */}
+                        {/* Service Type */}
+                        {(() => {
+                          const svcInfo = getServiceTypeByValue(selectedServiceType);
+                          const SvcIcon = getServiceIcon(selectedServiceType);
+                          return (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                <SvcIcon className="h-4 w-4 text-emerald-600" />
+                                Service Type
+                              </h3>
+                              <p className="font-medium text-slate-900">{svcInfo?.label || selectedServiceType}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Estimated ~{svcInfo?.estimatedHours || 4} hours at service center
+                              </p>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Time Slots */}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
                             <Clock className="h-4 w-4 text-emerald-600" />
@@ -826,15 +879,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </h3>
                           <div className="grid gap-2 text-sm sm:grid-cols-2">
                             <div>
-                              <span className="text-slate-500">Pickup from:</span>
+                              <span className="text-slate-500">Pickup slot:</span>
                               <p className="font-medium text-slate-900">
-                                {getTimeLabel(earliestPickup, allPickupTimeOptions)}
+                                {getPickupSlotLabel(selectedPickupSlot)}
                               </p>
                             </div>
                             <div>
-                              <span className="text-slate-500">Return by:</span>
+                              <span className="text-slate-500">Drop-off slot:</span>
                               <p className="font-medium text-slate-900">
-                                {getTimeLabel(latestDropoff, allDropoffTimeOptions)}
+                                {getDropoffSlotLabel(selectedDropoffSlot)}
                               </p>
                             </div>
                           </div>
@@ -1064,41 +1117,46 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             </div>
                           )}
 
-                          {/* Time inputs */}
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                              <label className="text-sm font-medium text-slate-700">Earliest pick-up time *</label>
-                              <select
-                                value={earliestPickup}
-                                onChange={(e) => setEarliestPickup(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                              >
-                                {availablePickupOptions.map((time) => (
-                                  <option key={`earliest-${time.value}`} value={time.value}>
-                                    {time.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <p className="text-xs text-slate-400">Available 6:00am – 2:00pm</p>
+                          {/* Service Type Selection */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Service Type *</label>
+                            <div className="grid gap-3">
+                              {SERVICE_TYPES.map((service) => {
+                                const SvcIcon = getServiceIcon(service.value);
+                                return (
+                                  <button
+                                    key={service.value}
+                                    type="button"
+                                    onClick={() => setSelectedServiceType(service.value)}
+                                    disabled={isProcessing}
+                                    className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                                      selectedServiceType === service.value
+                                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
+                                        : 'border-slate-200 bg-white hover:border-emerald-300'
+                                    } disabled:opacity-50`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <SvcIcon className={`h-5 w-5 mt-0.5 ${
+                                        selectedServiceType === service.value ? 'text-emerald-600' : 'text-slate-400'
+                                      }`} />
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                          <h4 className="font-semibold text-slate-900">{service.label}</h4>
+                                          <span className="text-sm text-slate-500">~{service.estimatedHours}hrs</span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-slate-600">{service.description}</p>
+                                      </div>
+                                      {selectedServiceType === service.value && (
+                                        <Check className="h-5 w-5 text-emerald-600 mt-0.5" />
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-sm font-medium text-slate-700">Latest drop-off time *</label>
-                              <select
-                                value={latestDropoff}
-                                onChange={(e) => setLatestDropoff(e.target.value)}
-                                disabled={isProcessing}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                              >
-                                {availableDropoffOptions.map((time) => (
-                                  <option key={`latest-${time.value}`} value={time.value}>
-                                    {time.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <p className="text-xs text-slate-400">Available 9:00am – 7:00pm (min. 2hr gap)</p>
-                            </div>
+                            <p className="text-xs text-slate-400">
+                              Estimated time your vehicle will be at the service center
+                            </p>
                           </div>
 
                           {/* Service Date */}
@@ -1123,6 +1181,110 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             <p className="text-xs text-slate-400">
                               Select a date between tomorrow and {formatDateDisplay(getMaxDate())}
                             </p>
+                          </div>
+
+                          {/* Pickup Time Slot */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Pickup Time Slot *</label>
+                            {!serviceDate ? (
+                              <p className="text-sm text-slate-400 py-3">Select a service date first to see available slots</p>
+                            ) : loadingSlots ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                              </div>
+                            ) : (
+                              <div className="grid gap-2">
+                                {(slotAvailability?.pickupSlots || PICKUP_SLOTS.map((s: typeof PICKUP_SLOTS[number]) => ({
+                                  slot: s.value, label: s.label, booked: 0, available: 2, isFull: false,
+                                }))).map((slot: { slot: string; label: string; available: number; isFull: boolean }) => (
+                                  <button
+                                    key={slot.slot}
+                                    type="button"
+                                    onClick={() => !slot.isFull && setSelectedPickupSlot(slot.slot)}
+                                    disabled={slot.isFull || isProcessing}
+                                    className={`relative rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                                      slot.isFull
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-50'
+                                        : selectedPickupSlot === slot.slot
+                                          ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
+                                          : 'border-slate-200 bg-white hover:border-emerald-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <Clock className="h-4 w-4 text-slate-400" />
+                                        <span className="font-medium text-slate-900">{slot.label}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {slot.isFull ? (
+                                          <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Full</span>
+                                        ) : (
+                                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                                            {slot.available} left
+                                          </span>
+                                        )}
+                                        {selectedPickupSlot === slot.slot && (
+                                          <Check className="h-5 w-5 text-emerald-600" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-slate-400">Morning pickup slots only</p>
+                          </div>
+
+                          {/* Dropoff Time Slot */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Drop-off Time Slot *</label>
+                            {!serviceDate ? (
+                              <p className="text-sm text-slate-400 py-3">Select a service date first to see available slots</p>
+                            ) : loadingSlots ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                              </div>
+                            ) : (
+                              <div className="grid gap-2">
+                                {(slotAvailability?.dropoffSlots || DROPOFF_SLOTS.map((s: typeof DROPOFF_SLOTS[number]) => ({
+                                  slot: s.value, label: s.label, booked: 0, available: 2, isFull: false,
+                                }))).map((slot: { slot: string; label: string; available: number; isFull: boolean }) => (
+                                  <button
+                                    key={slot.slot}
+                                    type="button"
+                                    onClick={() => !slot.isFull && setSelectedDropoffSlot(slot.slot)}
+                                    disabled={slot.isFull || isProcessing}
+                                    className={`relative rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                                      slot.isFull
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-50'
+                                        : selectedDropoffSlot === slot.slot
+                                          ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
+                                          : 'border-slate-200 bg-white hover:border-emerald-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <Clock className="h-4 w-4 text-slate-400" />
+                                        <span className="font-medium text-slate-900">{slot.label}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {slot.isFull ? (
+                                          <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Full</span>
+                                        ) : (
+                                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                                            {slot.available} left
+                                          </span>
+                                        )}
+                                        {selectedDropoffSlot === slot.slot && (
+                                          <Check className="h-5 w-5 text-emerald-600" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-slate-400">Afternoon drop-off slots</p>
                           </div>
 
                           {/* Address with Autocomplete */}
