@@ -54,6 +54,21 @@ import StripePaymentForm from '@/components/StripePaymentForm';
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+const VEHICLE_COLORS = [
+  { value: 'white', label: 'White', hex: '#FFFFFF' },
+  { value: 'black', label: 'Black', hex: '#000000' },
+  { value: 'silver', label: 'Silver', hex: '#C0C0C0' },
+  { value: 'grey', label: 'Grey', hex: '#808080' },
+  { value: 'red', label: 'Red', hex: '#DC2626' },
+  { value: 'blue', label: 'Blue', hex: '#2563EB' },
+  { value: 'green', label: 'Green', hex: '#059669' },
+  { value: 'yellow', label: 'Yellow', hex: '#EAB308' },
+  { value: 'orange', label: 'Orange', hex: '#EA580C' },
+  { value: 'brown', label: 'Brown', hex: '#92400E' },
+  { value: 'beige', label: 'Beige', hex: '#D4AF37' },
+  { value: 'other', label: 'Other', hex: '#6B7280' },
+] as const;
+
 // Price display - $65 flat rate for transport only (Phase 1)
 const PRICE_DISPLAY = TRANSPORT_PRICE_DISPLAY;
 
@@ -130,6 +145,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [garagePlaceId, setGaragePlaceId] = useState(''); // Google Places ID for exact matching
   const [garageBookingTime, setGarageBookingTime] = useState('09:00');
   const [additionalNotes, setAdditionalNotes] = useState('');
+
+  // Vehicle details
+  const [vehicleYear, setVehicleYear] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleColor, setVehicleColor] = useState('');
+  const [customColor, setCustomColor] = useState('');
 
   // Vehicle valuation and transmission
   const [isHighValueVehicle, setIsHighValueVehicle] = useState(false);
@@ -346,6 +367,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setClientSecret(null);
         setPaymentIntentId(null);
         setIsProcessing(false);
+        setVehicleYear('');
+        setVehicleModel('');
+        setVehicleColor('');
+        setCustomColor('');
         setIsHighValueVehicle(false);
         setTransmissionType('automatic');
         setSelectedServices([]);
@@ -394,6 +419,29 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
     if (!regoPlate.trim()) {
       return 'Please enter your vehicle registration number.';
+    }
+    if (!vehicleYear.trim()) {
+      return 'Please enter your vehicle year.';
+    }
+    if (!/^\d{4}$/.test(vehicleYear)) {
+      return 'Please enter a valid 4-digit year.';
+    }
+    const year = parseInt(vehicleYear);
+    const currentYear = new Date().getFullYear();
+    if (year < 1900 || year > currentYear + 1) {
+      return `Please enter a year between 1900 and ${currentYear + 1}.`;
+    }
+    if (!vehicleModel.trim()) {
+      return 'Please enter your vehicle make and model.';
+    }
+    if (vehicleModel.trim().length < 3) {
+      return 'Vehicle make and model must be at least 3 characters.';
+    }
+    if (!vehicleColor) {
+      return 'Please select your vehicle color.';
+    }
+    if (vehicleColor === 'other' && !customColor.trim()) {
+      return 'Please enter your custom vehicle color.';
     }
     if (!pickupAddress.trim()) {
       return 'Please enter your pick-up address.';
@@ -463,6 +511,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           serviceDate: new Date(serviceDate).toISOString(),
           vehicleRegistration: regoPlate.trim().toUpperCase(),
           vehicleState: regoState,
+          vehicleYear,
+          vehicleModel: vehicleModel.trim(),
+          vehicleColor: vehicleColor === 'other' ? customColor.trim() : vehicleColor,
           pickupTimeSlot: selectedPickupSlot,
           dropoffTimeSlot: selectedDropoffSlot,
           earliestPickup: getPickupSlotLabel(selectedPickupSlot),
@@ -825,9 +876,24 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             Vehicle
                           </h3>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-700">
-                              {regoPlate.toUpperCase()} ({regoState})
-                            </span>
+                            <div>
+                              <span className="text-sm font-medium text-slate-900">
+                                {vehicleYear} {vehicleModel}
+                              </span>
+                              <div className="mt-1 flex items-center gap-2">
+                                <div
+                                  className="h-4 w-4 rounded-full border border-slate-300"
+                                  style={{
+                                    backgroundColor: VEHICLE_COLORS.find(
+                                      c => c.value === vehicleColor
+                                    )?.hex || '#6B7280',
+                                  }}
+                                />
+                                <span className="text-sm capitalize text-slate-600">
+                                  {vehicleColor === 'other' ? customColor : vehicleColor}
+                                </span>
+                              </div>
+                            </div>
                             <RegistrationPlate plate={regoPlate} state={regoState} />
                           </div>
                           <div className="mt-2 flex justify-between border-t border-slate-200 pt-2">
@@ -1300,9 +1366,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             />
                           </div>
 
-                          {/* Vehicle Registration Section */}
+                          {/* Vehicle Details Section */}
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                            <h3 className="mb-4 text-sm font-semibold text-slate-900">Vehicle Registration</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Car className="h-5 w-5 text-emerald-600" />
+                              <h3 className="text-sm font-semibold text-slate-900">Vehicle Details</h3>
+                            </div>
+                            <p className="mb-4 text-xs text-slate-500">Help our drivers identify your vehicle easily</p>
 
                             <div className="grid gap-4 sm:grid-cols-2">
                               <div className="space-y-1.5">
@@ -1336,10 +1406,74 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                   <option value="ACT">ACT</option>
                                 </select>
                               </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600">Year *</label>
+                                <input
+                                  type="text"
+                                  placeholder="2020"
+                                  maxLength={4}
+                                  value={vehicleYear}
+                                  onChange={(e) => setVehicleYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                  disabled={isProcessing}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600">Make & Model *</label>
+                                <input
+                                  type="text"
+                                  placeholder="Toyota Camry"
+                                  value={vehicleModel}
+                                  onChange={(e) => setVehicleModel(e.target.value)}
+                                  disabled={isProcessing}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              </div>
                             </div>
 
                             <div className="mt-5 flex justify-center">
                               <RegistrationPlate plate={regoPlate} state={regoState} />
+                            </div>
+
+                            {/* Vehicle Color */}
+                            <div className="mt-5 space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Color *</label>
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {VEHICLE_COLORS.map((color) => (
+                                  <button
+                                    key={color.value}
+                                    type="button"
+                                    onClick={() => setVehicleColor(color.value)}
+                                    disabled={isProcessing}
+                                    className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left transition-all ${
+                                      vehicleColor === color.value
+                                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
+                                        : 'border-slate-200 bg-white hover:border-emerald-300'
+                                    } disabled:opacity-50`}
+                                  >
+                                    <div
+                                      className="h-5 w-5 rounded-full border-2 border-slate-300 flex-shrink-0"
+                                      style={{ backgroundColor: color.hex }}
+                                    />
+                                    <span className="text-sm font-medium text-slate-900">{color.label}</span>
+                                    {vehicleColor === color.value && (
+                                      <Check className="ml-auto h-4 w-4 text-emerald-600 flex-shrink-0" />
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              {vehicleColor === 'other' && (
+                                <input
+                                  type="text"
+                                  value={customColor}
+                                  onChange={(e) => setCustomColor(e.target.value)}
+                                  placeholder="Enter custom color"
+                                  disabled={isProcessing}
+                                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
+                                />
+                              )}
                             </div>
 
                             {/* Transmission Type */}

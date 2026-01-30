@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
       pickupTimeSlot,
       dropoffTimeSlot,
       estimatedServiceDuration,
+      vehicleYear,
+      vehicleModel,
+      vehicleColor,
     } = body;
 
     // Validate required fields
@@ -99,6 +102,9 @@ export async function POST(request: NextRequest) {
         pickupTimeSlot: pickupTimeSlot || '',
         dropoffTimeSlot: dropoffTimeSlot || '',
         estimatedServiceDuration: estimatedServiceDuration ? String(estimatedServiceDuration) : '',
+        vehicleYear: vehicleYear || '',
+        vehicleModel: vehicleModel || '',
+        vehicleColor: vehicleColor || '',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}`,

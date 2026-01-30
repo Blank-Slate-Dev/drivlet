@@ -55,6 +55,9 @@ export interface IBooking extends Document {
   pickupAddress: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   serviceType: string;
   estimatedServiceDuration?: number;
   serviceDate?: Date;
@@ -245,6 +248,21 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: true,
       uppercase: true,
+    },
+    vehicleYear: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    vehicleModel: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    vehicleColor: {
+      type: String,
+      required: false,
+      trim: true,
     },
     serviceType: {
       type: String,
