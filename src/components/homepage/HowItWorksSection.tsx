@@ -31,7 +31,7 @@ const marketplaceSteps = [
     title: 'We deliver to the garage',
     description:
       'Our fully insured drivers deliver your car to our vetted service centre network.',
-    image: '/step1_phone.png',
+    image: '/step3_phone.png',
     gradient: 'from-indigo-600 to-slate-800',
     overlayColor: 'to-indigo-600/90',
   },
@@ -40,7 +40,7 @@ const marketplaceSteps = [
     title: 'We return your car',
     description:
       'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
-    image: '/step2_phone.png',
+    image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
   },
