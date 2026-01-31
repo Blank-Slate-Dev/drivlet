@@ -4,6 +4,9 @@ import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import { MAX_BOOKINGS_PER_SLOT, PICKUP_SLOTS, DROPOFF_SLOTS } from '@/config/timeSlots';
 
+// Force dynamic rendering - this route uses request.url for query params
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
