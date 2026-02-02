@@ -31,38 +31,6 @@ interface AddressAutocompleteProps {
   biasToNewcastle?: boolean;
 }
 
-/**
- * iOS keyboard detection using VisualViewport.
- * When the keyboard opens, visualViewport.height shrinks.
- */
-function useKeyboardOpen(): boolean {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const THRESHOLD_PX = 120; // generous to avoid false positives
-    const compute = () => {
-      const delta = window.innerHeight - vv.height;
-      setOpen(delta > THRESHOLD_PX);
-    };
-
-    compute();
-    vv.addEventListener('resize', compute);
-    vv.addEventListener('scroll', compute);
-    window.addEventListener('orientationchange', compute);
-
-    return () => {
-      vv.removeEventListener('resize', compute);
-      vv.removeEventListener('scroll', compute);
-      window.removeEventListener('orientationchange', compute);
-    };
-  }, []);
-
-  return open;
-}
-
 export default function AddressAutocomplete({
   value,
   onChange,
@@ -74,10 +42,6 @@ export default function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
-  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-
   const [isReady, setIsReady] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +51,7 @@ export default function AddressAutocomplete({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Track focus ourselves (don't trust event order)
   const isInputFocusedRef = useRef(false);
@@ -95,7 +60,7 @@ export default function AddressAutocomplete({
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
   const SCROLL_THRESHOLD = 10;
 
-  // Dropdown item tap-vs-scroll discrimination (so scrolling list never selects)
+  // Dropdown item tap-vs-scroll discrimination
   const itemPointerRef = useRef<{
     pointerId: number;
     startX: number;
@@ -114,13 +79,10 @@ export default function AddressAutocomplete({
   };
 
   const handleInputBlur = () => {
-    // IMPORTANT: do NOT close dropdown here.
-    // iOS will blur when user taps outside to dismiss the keyboard.
     isInputFocusedRef.current = false;
   };
 
   // Handle outside clicks/taps to close dropdown
-  // Less aggressive approach that doesn't block all pointer events
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return;
@@ -143,16 +105,13 @@ export default function AddressAutocomplete({
       const dy = Math.abs(e.clientY - start.y);
       const isTap = dx < SCROLL_THRESHOLD && dy < SCROLL_THRESHOLD;
 
-      // Only close on a clean tap (not a scroll/swipe)
       if (isTap) {
-        // Close dropdown and blur input
         setIsOpen(false);
         isInputFocusedRef.current = false;
         inputRef.current?.blur();
       }
     };
 
-    // Use regular event listeners (not capture) to allow events to proceed normally
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('pointerup', onPointerUp);
 
@@ -173,19 +132,20 @@ export default function AddressAutocomplete({
 
     const initServices = () => {
       try {
-        autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-        const dummyDiv = document.createElement('div');
-        placesServiceRef.current = new google.maps.places.PlacesService(dummyDiv);
-        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-        setIsReady(true);
-        setError(null);
+        // Check if the new Places API is available
+        if (google.maps.places && google.maps.places.Place) {
+          setIsReady(true);
+          setError(null);
+        } else {
+          setError('Places API not available');
+        }
       } catch (err) {
         console.error('Error initializing services:', err);
         setError('Failed to initialize address search');
       }
     };
 
-    if (window.google?.maps?.places) {
+    if (window.google?.maps?.places?.Place) {
       initServices();
       return;
     }
@@ -194,7 +154,7 @@ export default function AddressAutocomplete({
 
     if (existingScript) {
       const checkLoaded = setInterval(() => {
-        if (window.google?.maps?.places) {
+        if (window.google?.maps?.places?.Place) {
           clearInterval(checkLoaded);
           initServices();
         }
@@ -202,7 +162,7 @@ export default function AddressAutocomplete({
 
       setTimeout(() => {
         clearInterval(checkLoaded);
-        if (!window.google?.maps?.places) {
+        if (!window.google?.maps?.places?.Place) {
           setError('Failed to load Google Maps');
         }
       }, 10000);
@@ -211,12 +171,19 @@ export default function AddressAutocomplete({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
 
     script.onload = () => {
-      setTimeout(initServices, 100);
+      const checkReady = setInterval(() => {
+        if (window.google?.maps?.places?.Place) {
+          clearInterval(checkReady);
+          initServices();
+        }
+      }, 100);
+
+      setTimeout(() => clearInterval(checkReady), 10000);
     };
 
     script.onerror = () => {
@@ -226,49 +193,67 @@ export default function AddressAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions
+  // Search for predictions using new API
   const searchPredictions = useCallback(
-    (input: string) => {
-      if (!autocompleteServiceRef.current || !input.trim()) {
+    async (input: string) => {
+      if (!isReady || !input.trim()) {
         setPredictions([]);
         setIsSearching(false);
         return;
       }
 
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setIsSearching(true);
 
-      const newcastleBounds = new google.maps.LatLngBounds(
-        new google.maps.LatLng(-33.1, 151.4),
-        new google.maps.LatLng(-32.7, 151.9)
-      );
+      try {
+        // Newcastle area center coordinates
+        const newcastleCenter = { lat: -32.9283, lng: 151.7817 };
 
-      const request: google.maps.places.AutocompletionRequest = {
-        input,
-        componentRestrictions: { country: 'au' },
-        types: ['address'],
-        sessionToken: sessionTokenRef.current || undefined,
-      };
+        const request: google.maps.places.AutocompleteRequest = {
+          input,
+          includedRegionCodes: ['au'],
+          includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
+          locationBias: biasToNewcastle
+            ? {
+                center: newcastleCenter,
+                radius: 50000, // 50km radius around Newcastle
+              }
+            : undefined,
+        };
 
-      if (biasToNewcastle) {
-        request.bounds = newcastleBounds;
-      }
+        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
 
-      autocompleteServiceRef.current.getPlacePredictions(request, (results, status) => {
-        setIsSearching(false);
-
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const mapped: Prediction[] = results.map((result) => ({
-            placeId: result.place_id,
-            mainText: result.structured_formatting.main_text,
-            secondaryText: result.structured_formatting.secondary_text,
-          }));
+        if (suggestions && suggestions.length > 0) {
+          const mapped: Prediction[] = suggestions
+            .filter((suggestion) => suggestion.placePrediction)
+            .map((suggestion) => {
+              const prediction = suggestion.placePrediction!;
+              return {
+                placeId: prediction.placeId,
+                mainText: prediction.mainText?.text || '',
+                secondaryText: prediction.secondaryText?.text || '',
+              };
+            });
           setPredictions(mapped);
         } else {
           setPredictions([]);
         }
-      });
+      } catch (err) {
+        // Don't log abort errors
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Autocomplete error:', err);
+        }
+        setPredictions([]);
+      } finally {
+        setIsSearching(false);
+      }
     },
-    [biasToNewcastle]
+    [biasToNewcastle, isReady]
   );
 
   // Debounced search
@@ -289,48 +274,46 @@ export default function AddressAutocomplete({
     };
   }, [value, isOpen, isReady, searchPredictions]);
 
-  // Handle selection
+  // Handle selection using new API
   const handleSelect = useCallback(
-    (prediction: Prediction) => {
-      if (!placesServiceRef.current) return;
+    async (prediction: Prediction) => {
+      try {
+        const place = new google.maps.places.Place({ id: prediction.placeId });
 
-      placesServiceRef.current.getDetails(
-        {
-          placeId: prediction.placeId,
-          fields: ['formatted_address', 'geometry', 'place_id', 'address_components'],
-          sessionToken: sessionTokenRef.current || undefined,
-        },
-        (place, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-            const address = place.formatted_address || '';
-            onChange(address);
-            setPredictions([]);
-            setIsOpen(false);
-            isInputFocusedRef.current = false;
+        await place.fetchFields({
+          fields: ['formattedAddress', 'location', 'addressComponents', 'id'],
+        });
 
-            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+        const address = place.formattedAddress || '';
+        onChange(address);
+        setPredictions([]);
+        setIsOpen(false);
+        isInputFocusedRef.current = false;
 
-            if (onSelect) {
-              const components = place.address_components || [];
-              const getComponent = (type: string) =>
-                components.find((c) => c.types.includes(type))?.long_name || '';
+        if (onSelect) {
+          const components = place.addressComponents || [];
 
-              const details: PlaceDetails = {
-                formattedAddress: address,
-                placeId: place.place_id,
-                lat: place.geometry?.location?.lat(),
-                lng: place.geometry?.location?.lng(),
-                streetNumber: getComponent('street_number'),
-                streetName: getComponent('route'),
-                suburb: getComponent('locality'),
-                state: getComponent('administrative_area_level_1'),
-                postcode: getComponent('postal_code'),
-              };
-              onSelect(details);
-            }
-          }
+          const getComponent = (type: string) => {
+            const component = components.find((c) => c.types.includes(type));
+            return component?.longText || '';
+          };
+
+          const details: PlaceDetails = {
+            formattedAddress: address,
+            placeId: place.id,
+            lat: place.location?.lat(),
+            lng: place.location?.lng(),
+            streetNumber: getComponent('street_number'),
+            streetName: getComponent('route'),
+            suburb: getComponent('locality'),
+            state: getComponent('administrative_area_level_1'),
+            postcode: getComponent('postal_code'),
+          };
+          onSelect(details);
         }
-      );
+      } catch (err) {
+        console.error('Error fetching place details:', err);
+      }
     },
     [onChange, onSelect]
   );
@@ -410,7 +393,6 @@ export default function AddressAutocomplete({
                 <li
                   key={prediction.placeId}
                   onPointerDown={(e) => {
-                    // allow scrolling; just track for tap-vs-scroll
                     itemPointerRef.current = {
                       pointerId: e.pointerId,
                       startX: e.clientX,
@@ -435,7 +417,6 @@ export default function AddressAutocomplete({
                     if (!st || st.pointerId !== e.pointerId) return;
                     itemPointerRef.current = null;
 
-                    // Only select on a true tap (not a scroll)
                     if (!st.moved && st.prediction) {
                       handleSelect(st.prediction);
                     }
