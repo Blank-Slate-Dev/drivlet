@@ -610,6 +610,7 @@ export default function AdminBookingsPage() {
                           <Link
                             href={getTrackingLink(booking)}
                             target="_blank"
+                            rel="noopener noreferrer"
                             className="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
                             title="View Tracking Page"
                           >
@@ -1119,6 +1120,7 @@ function ViewDetailsModal({
             <Link
               href={getTrackingLink(booking)}
               target="_blank"
+              rel="noopener noreferrer"
               className="flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               <ExternalLink className="h-4 w-4" />

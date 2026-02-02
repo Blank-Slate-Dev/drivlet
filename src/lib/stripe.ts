@@ -10,5 +10,5 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // Fixed price for drivlet transport service (Phase 1 - Transport Only)
-export const DRIVLET_PRICE = 6500; // $65.00 in cents
-export const DRIVLET_PRICE_DISPLAY = '$65.00';
+export const DRIVLET_PRICE = 12000; // $120.00 in cents
+export const DRIVLET_PRICE_DISPLAY = '$120.00';

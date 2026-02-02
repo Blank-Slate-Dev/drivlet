@@ -69,7 +69,7 @@ const VEHICLE_COLORS = [
   { value: 'other', label: 'Other', hex: '#6B7280' },
 ] as const;
 
-// Price display - $65 flat rate for transport only (Phase 1)
+// Price display - $120 flat rate for transport only (Phase 1)
 const PRICE_DISPLAY = TRANSPORT_PRICE_DISPLAY;
 
 interface BookingModalProps {
@@ -677,6 +677,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   <div className="mt-6 space-y-3">
                     <Link
                       href={trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
                     >
                       <MapPin className="h-4 w-4" />
