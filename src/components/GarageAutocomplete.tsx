@@ -367,7 +367,7 @@ export default function GarageAutocomplete({
             placeId: place.id,
             lat: place.location?.lat(),
             lng: place.location?.lng(),
-            phoneNumber: place.nationalPhoneNumber,
+            phoneNumber: place.nationalPhoneNumber ?? undefined,
           };
           onSelect(details);
         }
