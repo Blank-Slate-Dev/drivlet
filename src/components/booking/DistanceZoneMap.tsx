@@ -100,7 +100,7 @@ export default function DistanceZoneMap({
         center: pickupPos,
         radius,
         fillColor: color.fill,
-        fillOpacity: 0.07,
+        fillOpacity: 0.18,
         strokeColor: color.stroke,
         strokeWeight: 2,
         strokeOpacity: 0.55,
