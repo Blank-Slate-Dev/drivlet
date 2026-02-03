@@ -90,7 +90,7 @@ export default function DistanceZoneMap({
     // --- Zone circles (centred on pickup, drawn largest-first) ---
     // Red is drawn as a huge background so everything beyond 18 km appears red.
     const circleConfigs = [
-      { radius: 200000, color: ZONE_COLORS.red, opacity: 0.18, strokeW: 0 },   // red fill everywhere
+      { radius: 5000000, color: ZONE_COLORS.red, opacity: 0.18, strokeW: 0 },   // red fill everywhere
       { radius: 18000, color: ZONE_COLORS.orange, opacity: 0.22, strokeW: 2 },  // 15–18 km
       { radius: 15000, color: ZONE_COLORS.yellow, opacity: 0.22, strokeW: 2 },  // 12–15 km
       { radius: 12000, color: ZONE_COLORS.green, opacity: 0.22, strokeW: 2 },   // 0–12 km
