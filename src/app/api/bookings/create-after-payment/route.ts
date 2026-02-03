@@ -80,6 +80,11 @@ export async function POST(request: NextRequest) {
       const primaryServiceCategory = metadata.primaryServiceCategory || null;
       const serviceNotes = metadata.serviceNotes || '';
 
+      // Parse distance zone data from payment metadata
+      const distanceZone = metadata.distanceZone || 'green';
+      const distanceSurcharge = metadata.distanceSurcharge ? parseInt(metadata.distanceSurcharge, 10) : 0;
+      const distanceKm = metadata.distanceKm ? parseFloat(metadata.distanceKm) : 0;
+
       // Build flags array
       const flags = [];
       if (isManual) {
@@ -94,6 +99,15 @@ export async function POST(request: NextRequest) {
       console.log('🔑 Generating tracking code...');
       const trackingCode = await generateUniqueTrackingCode();
       console.log('✅ Tracking code generated:', trackingCode);
+
+      // Build the confirmation message
+      let confirmationMessage = hasExisting
+        ? `We've received your pick-up request for your existing booking at ${metadata.garageName}.`
+        : "We've received your booking request and will confirm shortly.";
+
+      if (distanceSurcharge > 0) {
+        confirmationMessage += ` A distance surcharge of $${(distanceSurcharge / 100).toFixed(2)} was applied (${distanceKm} km, ${distanceZone} zone).`;
+      }
 
       const bookingData = {
         userId: null,
@@ -123,6 +137,10 @@ export async function POST(request: NextRequest) {
         garagePlaceId: metadata.garagePlaceId || null,
         existingBookingRef: metadata.existingBookingRef || null,
         existingBookingNotes: null,
+        // Distance zone pricing
+        distanceZone,
+        distanceSurcharge,
+        distanceKm,
         transmissionType,
         isManualTransmission: isManual,
         selectedServices,
@@ -138,9 +156,7 @@ export async function POST(request: NextRequest) {
         updates: [{
           stage: 'booking_confirmed',
           timestamp: new Date(),
-          message: hasExisting
-            ? `We've received your pick-up request for your existing booking at ${metadata.garageName}.`
-            : 'We\'ve received your booking request and will confirm shortly.',
+          message: confirmationMessage,
           updatedBy: 'system',
         }],
         createdAt: new Date(),
@@ -148,6 +164,7 @@ export async function POST(request: NextRequest) {
       };
 
       console.log('📝 Creating booking atomically with paymentId:', paymentIntentId);
+      console.log(`📍 Distance zone: ${distanceZone} (${distanceKm} km, surcharge: $${(distanceSurcharge / 100).toFixed(2)})`);
 
       // Use findOneAndUpdate with upsert to atomically create or find existing booking
       // This prevents race conditions between webhook and this fallback endpoint
