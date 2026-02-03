@@ -73,6 +73,11 @@ export interface IBooking extends Document {
   existingBookingRef?: string;
   existingBookingNotes?: string;
 
+  // Distance zone pricing
+  distanceZone?: string;       // green | yellow | orange | red
+  distanceSurcharge?: number;  // surcharge in cents (0, 2900, 4900)
+  distanceKm?: number;         // distance in km (e.g. 13.2)
+
   // Garage assignment (for future stages)
   assignedGarageId?: Types.ObjectId;
   assignedAt?: Date;
@@ -272,18 +277,17 @@ const BookingSchema = new Schema<IBooking>(
       type: Number,
       required: false,
     },
-    // Made optional and removed past-date validator (validation happens at booking creation, not on updates)
     serviceDate: {
       type: Date,
       required: false,
     },
 
-    // Tracking code - made optional for backwards compatibility with old bookings
+    // Tracking code
     trackingCode: {
       type: String,
       required: false,
       unique: true,
-      sparse: true, // Allows multiple null values with unique index
+      sparse: true,
       uppercase: true,
       trim: true,
       index: true,
@@ -313,6 +317,24 @@ const BookingSchema = new Schema<IBooking>(
     existingBookingNotes: {
       type: String,
       required: false,
+    },
+
+    // Distance zone pricing
+    distanceZone: {
+      type: String,
+      enum: ['green', 'yellow', 'orange', 'red'],
+      required: false,
+    },
+    distanceSurcharge: {
+      type: Number,
+      required: false,
+      default: 0,
+      min: 0,
+    },
+    distanceKm: {
+      type: Number,
+      required: false,
+      min: 0,
     },
 
     // Garage assignment (for future stages)
