@@ -26,11 +26,13 @@ import {
   Zap,
   Wrench,
   Settings,
+  Info,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from './RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
 import GarageAutocomplete, { GarageDetails } from '@/components/GarageAutocomplete';
 import ServiceSelector from '@/components/booking/ServiceSelector';
+import DistanceZoneMap from '@/components/booking/DistanceZoneMap';
 import {
   SERVICE_CATEGORIES,
   SelectedServiceCategory,
@@ -38,7 +40,8 @@ import {
   formatSelectedServices,
   getCategoryById,
 } from '@/constants/serviceCategories';
-import { FEATURES, TRANSPORT_PRICE_DISPLAY } from '@/lib/featureFlags';
+import { FEATURES, TRANSPORT_PRICE_DISPLAY, TRANSPORT_PRICE } from '@/lib/featureFlags';
+import { calculateDistance, getDistanceZone, ZoneInfo } from '@/lib/distanceZones';
 import {
   PICKUP_SLOTS,
   DROPOFF_SLOTS,
@@ -68,9 +71,6 @@ const VEHICLE_COLORS = [
   { value: 'beige', label: 'Beige', hex: '#D4AF37' },
   { value: 'other', label: 'Other', hex: '#6B7280' },
 ] as const;
-
-// Price display - $120 flat rate for transport only (Phase 1)
-const PRICE_DISPLAY = TRANSPORT_PRICE_DISPLAY;
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -108,6 +108,14 @@ const MIN_GAP_MINUTES = 120;
 // Garage booking time options (typical garage hours)
 const garageBookingTimeOptions = generateTimeOptions(7, 17);
 
+// ── Zone badge colour helper ───────────────────────────────────────────
+const ZONE_BADGE_STYLES: Record<string, string> = {
+  green: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  yellow: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  orange: 'bg-orange-100 text-orange-800 border-orange-300',
+  red: 'bg-red-100 text-red-800 border-red-300',
+};
+
 type Step = 'details' | 'review' | 'payment' | 'success';
 
 export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
@@ -142,7 +150,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Garage booking details (mandatory)
   const [garageSearch, setGarageSearch] = useState('');
   const [garageAddress, setGarageAddress] = useState('');
-  const [garagePlaceId, setGaragePlaceId] = useState(''); // Google Places ID for exact matching
+  const [garagePlaceId, setGaragePlaceId] = useState('');
+  const [garageLat, setGarageLat] = useState<number | null>(null);
+  const [garageLng, setGarageLng] = useState<number | null>(null);
   const [garageBookingTime, setGarageBookingTime] = useState('09:00');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
@@ -173,6 +183,32 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Determine if user is authenticated
   const isAuthenticated = authStatus === 'authenticated' && session?.user;
 
+  // ── Distance zone calculation ─────────────────────────────────────────
+  const distanceZoneInfo: ZoneInfo | null = useMemo(() => {
+    if (
+      selectedPlaceDetails?.lat != null &&
+      selectedPlaceDetails?.lng != null &&
+      garageLat != null &&
+      garageLng != null
+    ) {
+      const km = calculateDistance(
+        selectedPlaceDetails.lat,
+        selectedPlaceDetails.lng,
+        garageLat,
+        garageLng
+      );
+      return getDistanceZone(km);
+    }
+    return null;
+  }, [selectedPlaceDetails, garageLat, garageLng]);
+
+  // Dynamic total price (base + zone surcharge)
+  const totalPriceCents = TRANSPORT_PRICE + (distanceZoneInfo?.surchargeAmount ?? 0);
+  const totalPriceDisplay = `$${(totalPriceCents / 100).toFixed(2)}`;
+
+  // Is the booking blocked by a red zone?
+  const isRedZone = distanceZoneInfo?.zone === 'red';
+
   // Fetch user's saved mobile when authenticated
   useEffect(() => {
     if (isAuthenticated && isOpen) {
@@ -202,7 +238,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         .then(res => res.json())
         .then(data => {
           setSlotAvailability(data);
-          // Clear selections if the previously selected slot is now full
           if (selectedPickupSlot && data.pickupSlots) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const pickup = data.pickupSlots.find((s: any) => s.slot === selectedPickupSlot);
@@ -215,7 +250,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           }
         })
         .catch(() => {
-          // Silently fail - slots will just not show availability
+          // Silently fail
         })
         .finally(() => setLoadingSlots(false));
     } else {
@@ -261,33 +296,26 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   /**
    * Background scroll lock using CSS-only approach.
-   * More mobile-friendly than position:fixed which causes iOS issues.
    */
   const lockBackgroundScroll = useCallback(() => {
     const html = document.documentElement;
     const body = document.body;
 
     const scrollY = window.scrollY || window.pageYOffset || 0;
-
-    // Measure scrollbar width (desktop)
     const scrollbarWidth = window.innerWidth - html.clientWidth;
 
-    // Store state so we can restore perfectly
     body.dataset.scrollY = String(scrollY);
     body.dataset.prevBodyPaddingRight = body.style.paddingRight || '';
     body.dataset.prevHtmlOverflow = html.style.overflow || '';
     body.dataset.prevBodyOverflow = body.style.overflow || '';
     body.dataset.prevTouchAction = body.style.touchAction || '';
 
-    // Preserve gutter to prevent layout shift
     if (scrollbarWidth > 0) {
       body.style.paddingRight = `${scrollbarWidth}px`;
     }
 
-    // Lock scrolling - simpler approach that works better on mobile
     html.style.overflow = 'hidden';
     body.style.overflow = 'hidden';
-    // Disable touch scrolling on body but allow within modal
     body.style.touchAction = 'none';
   }, []);
 
@@ -297,20 +325,17 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
     const scrollY = Number(body.dataset.scrollY || '0');
 
-    // Restore styles
     html.style.overflow = body.dataset.prevHtmlOverflow ?? '';
     body.style.overflow = body.dataset.prevBodyOverflow ?? '';
     body.style.paddingRight = body.dataset.prevBodyPaddingRight ?? '';
     body.style.touchAction = body.dataset.prevTouchAction ?? '';
 
-    // Cleanup
     delete body.dataset.scrollY;
     delete body.dataset.prevBodyPaddingRight;
     delete body.dataset.prevHtmlOverflow;
     delete body.dataset.prevBodyOverflow;
     delete body.dataset.prevTouchAction;
 
-    // Restore scroll position after unlocking
     window.scrollTo(0, scrollY);
   }, []);
 
@@ -319,12 +344,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
     lockBackgroundScroll();
 
-    // Only handle keyboard navigation - touch/wheel handled by CSS
     const onKeyDown = (e: KeyboardEvent) => {
-      // Prevent page scroll via keyboard when modal is open (space/page up/down/arrows)
       const keys = [' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'];
       if (keys.includes(e.key)) {
-        // Allow inside inputs/textareas/selects within modal
         const active = document.activeElement as HTMLElement | null;
         const container = modalContentRef.current;
         if (!container || !active || !container.contains(active)) {
@@ -359,6 +381,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setGarageSearch('');
         setGarageAddress('');
         setGaragePlaceId('');
+        setGarageLat(null);
+        setGarageLng(null);
         setGarageBookingTime('09:00');
         setAdditionalNotes('');
         setGuestName('');
@@ -381,13 +405,30 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     }
   }, [isOpen]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────
+
   const handleAddressSelect = (details: PlaceDetails) => {
     setSelectedPlaceDetails(details);
+  };
+
+  /** Clear stale place details when user types a new pickup address */
+  const handlePickupAddressChange = (value: string) => {
+    setPickupAddress(value);
+    setSelectedPlaceDetails(null);
   };
 
   const handleGarageSelect = (details: GarageDetails) => {
     setGarageAddress(details.formattedAddress);
     setGaragePlaceId(details.placeId || '');
+    setGarageLat(details.lat ?? null);
+    setGarageLng(details.lng ?? null);
+  };
+
+  /** Clear stale garage coords when user types a new garage name */
+  const handleGarageSearchChange = (value: string) => {
+    setGarageSearch(value);
+    setGarageLat(null);
+    setGarageLng(null);
   };
 
   const getTimeLabel = (value: string, options: TimeOption[]): string => {
@@ -401,78 +442,44 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return 'Vehicles valued at $100,000 or more cannot be booked at this time.';
     }
 
-    // Guest info validation
-    if (!isAuthenticated) {
-      if (!guestName.trim()) {
-        return 'Please enter your full name.';
-      }
-      if (!guestEmail.trim()) {
-        return 'Please enter your email address.';
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
-        return 'Please enter a valid email address.';
-      }
-      if (!guestPhone.trim()) {
-        return 'Please enter your phone number.';
-      }
+    // Block red-zone bookings
+    if (isRedZone) {
+      return 'Your pickup address is too far from the selected garage (over 18 km). Please choose a closer garage or contact our team for assistance.';
     }
 
-    if (!regoPlate.trim()) {
-      return 'Please enter your vehicle registration number.';
+    // Guest info validation
+    if (!isAuthenticated) {
+      if (!guestName.trim()) return 'Please enter your full name.';
+      if (!guestEmail.trim()) return 'Please enter your email address.';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) return 'Please enter a valid email address.';
+      if (!guestPhone.trim()) return 'Please enter your phone number.';
     }
-    if (!vehicleYear.trim()) {
-      return 'Please enter your vehicle year.';
-    }
-    if (!/^\d{4}$/.test(vehicleYear)) {
-      return 'Please enter a valid 4-digit year.';
-    }
+
+    if (!regoPlate.trim()) return 'Please enter your vehicle registration number.';
+    if (!vehicleYear.trim()) return 'Please enter your vehicle year.';
+    if (!/^\d{4}$/.test(vehicleYear)) return 'Please enter a valid 4-digit year.';
     const year = parseInt(vehicleYear);
     const currentYear = new Date().getFullYear();
-    if (year < 1900 || year > currentYear + 1) {
-      return `Please enter a year between 1900 and ${currentYear + 1}.`;
-    }
-    if (!vehicleModel.trim()) {
-      return 'Please enter your vehicle make and model.';
-    }
-    if (vehicleModel.trim().length < 3) {
-      return 'Vehicle make and model must be at least 3 characters.';
-    }
-    if (!vehicleColor) {
-      return 'Please select your vehicle color.';
-    }
-    if (vehicleColor === 'other' && !customColor.trim()) {
-      return 'Please enter your custom vehicle color.';
-    }
-    if (!pickupAddress.trim()) {
-      return 'Please enter your pick-up address.';
-    }
-    if (!serviceDate) {
-      return 'Please select a service date.';
-    }
-    // Validate date is not in the past
+    if (year < 1900 || year > currentYear + 1) return `Please enter a year between 1900 and ${currentYear + 1}.`;
+    if (!vehicleModel.trim()) return 'Please enter your vehicle make and model.';
+    if (vehicleModel.trim().length < 3) return 'Vehicle make and model must be at least 3 characters.';
+    if (!vehicleColor) return 'Please select your vehicle color.';
+    if (vehicleColor === 'other' && !customColor.trim()) return 'Please enter your custom vehicle color.';
+    if (!pickupAddress.trim()) return 'Please enter your pick-up address.';
+    if (!serviceDate) return 'Please select a service date.';
+
     const selectedDate = new Date(serviceDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (selectedDate < today) {
-      return 'Service date cannot be in the past.';
-    }
-    if (!selectedPickupSlot) {
-      return 'Please select a pickup time slot.';
-    }
-    if (!selectedDropoffSlot) {
-      return 'Please select a drop-off time slot.';
-    }
-    if (!selectedServiceType) {
-      return 'Please select a service type.';
-    }
+    if (selectedDate < today) return 'Service date cannot be in the past.';
+
+    if (!selectedPickupSlot) return 'Please select a pickup time slot.';
+    if (!selectedDropoffSlot) return 'Please select a drop-off time slot.';
+    if (!selectedServiceType) return 'Please select a service type.';
 
     // Garage is mandatory
-    if (!garageSearch.trim()) {
-      return 'Please enter your garage/mechanic name.';
-    }
-    if (!garageBookingTime) {
-      return 'Please select your garage booking time.';
-    }
+    if (!garageSearch.trim()) return 'Please enter your garage/mechanic name.';
+    if (!garageBookingTime) return 'Please select your garage booking time.';
 
     // Service selection validation (only required when marketplace features enabled)
     if (FEATURES.SERVICE_SELECTION && getTotalSelectedCount(selectedServices) === 0) {
@@ -530,6 +537,14 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           selectedServices: JSON.stringify(selectedServices),
           primaryServiceCategory,
           serviceNotes: serviceNotes.trim(),
+          // Distance zone data
+          distanceZone: distanceZoneInfo?.zone || 'green',
+          distanceSurcharge: distanceZoneInfo?.surchargeAmount ?? 0,
+          distanceKm: distanceZoneInfo?.distance ?? 0,
+          pickupLat: selectedPlaceDetails?.lat ?? 0,
+          pickupLng: selectedPlaceDetails?.lng ?? 0,
+          garageLat: garageLat ?? 0,
+          garageLng: garageLng ?? 0,
         }),
       });
 
@@ -551,7 +566,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   };
 
   const handlePaymentSuccess = async () => {
-    // Save the booking to database after successful payment
     if (paymentIntentId) {
       try {
         console.log('💾 Saving booking to database...');
@@ -565,7 +579,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
         if (response.ok) {
           console.log('✅ Booking saved:', data.bookingId);
-          // Save the tracking code if provided
           if (data.trackingCode) {
             setTrackingCode(data.trackingCode);
             console.log('🔑 Tracking code:', data.trackingCode);
@@ -595,7 +608,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     ? `/track?code=${encodeURIComponent(trackingCode)}`
     : `/track`;
 
-  // Success state - using same flexbox centering as main modal for consistency
+  // ════════════════════════════════════════════════════════════════════════
+  // SUCCESS STEP
+  // ════════════════════════════════════════════════════════════════════════
   if (currentStep === 'success') {
     return (
       <AnimatePresence>
@@ -700,6 +715,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     );
   }
 
+  // ════════════════════════════════════════════════════════════════════════
+  // MAIN MODAL (details / review / payment)
+  // ════════════════════════════════════════════════════════════════════════
   return (
     <AnimatePresence>
       {isOpen && (
@@ -731,7 +749,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   <X className="h-5 w-5" />
                 </button>
 
-                {/* Step Indicator - Fixed centering */}
+                {/* Step Indicator */}
                 <div className="border-b border-slate-100 px-6 py-4 sm:px-8">
                   <div className="flex items-start justify-center">
                     {['details', 'review', 'payment'].map((step, index) => (
@@ -768,13 +786,13 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </div>
                 </div>
 
-                {/* overscroll-contain prevents "scroll chaining" to the page, touch-auto re-enables touch on modal content */}
+                {/* Scrollable content */}
                 <div
                   ref={modalContentRef}
                   className="max-h-[70vh] overflow-y-auto overscroll-contain p-6 sm:p-8"
                   style={{ touchAction: 'auto' }}
                 >
-                  {/* Payment Step */}
+                  {/* ───────────────────── PAYMENT STEP ───────────────────── */}
                   {currentStep === 'payment' && clientSecret && (
                     <>
                       <div className="mb-5">
@@ -824,7 +842,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     </>
                   )}
 
-                  {/* Review Step */}
+                  {/* ───────────────────── REVIEW STEP ────────────────────── */}
                   {currentStep === 'review' && (
                     <>
                       <div className="mb-5">
@@ -970,7 +988,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <p className="text-sm text-slate-900">{pickupAddress}</p>
                         </div>
 
-                        {/* Selected Services - HIDDEN IN PHASE 1 (Transport Only) */}
+                        {/* Selected Services - HIDDEN IN PHASE 1 */}
                         {FEATURES.SERVICE_SELECTION && getTotalSelectedCount(selectedServices) > 0 && (
                           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-700">
@@ -1011,6 +1029,36 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </div>
                         </div>
 
+                        {/* Distance Zone (review summary) */}
+                        {distanceZoneInfo && (
+                          <div className={`rounded-2xl border p-4 ${
+                            distanceZoneInfo.zone === 'green'
+                              ? 'border-emerald-200 bg-emerald-50'
+                              : distanceZoneInfo.zone === 'yellow'
+                              ? 'border-yellow-200 bg-yellow-50'
+                              : 'border-orange-200 bg-orange-50'
+                          }`}>
+                            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                              <MapPin className="h-4 w-4" />
+                              Distance Zone
+                            </h3>
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${ZONE_BADGE_STYLES[distanceZoneInfo.zone]}`}>
+                                <span className={`h-2 w-2 rounded-full ${
+                                  distanceZoneInfo.zone === 'green' ? 'bg-emerald-500' :
+                                  distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500' :
+                                  'bg-orange-500'
+                                }`} />
+                                {distanceZoneInfo.label}
+                              </span>
+                              <span className="text-slate-600">{distanceZoneInfo.distance} km</span>
+                              {distanceZoneInfo.surchargeAmount > 0 && (
+                                <span className="font-medium text-slate-800">{distanceZoneInfo.surchargeDisplay}</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Additional Notes */}
                         {additionalNotes && (
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1019,11 +1067,26 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           </div>
                         )}
 
-                        {/* Price */}
+                        {/* Price – with breakdown when surcharge applies */}
                         <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-semibold text-emerald-800">Total</span>
-                            <span className="text-2xl font-bold text-emerald-700">{PRICE_DISPLAY} AUD</span>
+                          <div className="space-y-2">
+                            {distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0 && (
+                              <>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-emerald-700">Transport fee</span>
+                                  <span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span>
+                                  <span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span>
+                                </div>
+                                <div className="border-t border-emerald-200" />
+                              </>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <span className="text-lg font-semibold text-emerald-800">Total</span>
+                              <span className="text-2xl font-bold text-emerald-700">{totalPriceDisplay} AUD</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1049,7 +1112,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     </>
                   )}
 
-                  {/* Details Step */}
+                  {/* ───────────────────── DETAILS STEP ───────────────────── */}
                   {currentStep === 'details' && (
                     <>
                       <div className="mb-5">
@@ -1061,7 +1124,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         </div>
                       </div>
 
-                      {submitError && !isHighValueVehicle && (
+                      {submitError && !isHighValueVehicle && !isRedZone && (
                         <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
                           <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
                           <p className="text-sm font-medium text-red-800">{submitError}</p>
@@ -1360,7 +1423,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             <label className="text-sm font-medium text-slate-700">Pick-up address *</label>
                             <AddressAutocomplete
                               value={pickupAddress}
-                              onChange={setPickupAddress}
+                              onChange={handlePickupAddressChange}
                               onSelect={handleAddressSelect}
                               placeholder="Start typing your address..."
                               disabled={isProcessing}
@@ -1510,7 +1573,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             </div>
                           </div>
 
-                          {/* Service Selection Section - HIDDEN IN PHASE 1 (Transport Only) */}
+                          {/* Service Selection Section - HIDDEN IN PHASE 1 */}
                           {FEATURES.SERVICE_SELECTION && (
                             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                               <ServiceSelector
@@ -1529,7 +1592,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <h3 className="mb-4 text-sm font-semibold text-slate-900">Your Existing Garage Booking</h3>
                             <p className="mb-4 text-xs text-slate-600">
-                              Provide details of the booking you've already made with your garage. We'll coordinate the pickup and drop-off.
+                              Provide details of the booking you&apos;ve already made with your garage. We&apos;ll coordinate the pickup and drop-off.
                             </p>
 
                             <div className="space-y-4">
@@ -1537,7 +1600,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                                 <label className="text-xs font-medium text-slate-600">Garage / Mechanic *</label>
                                 <GarageAutocomplete
                                   value={garageSearch}
-                                  onChange={setGarageSearch}
+                                  onChange={handleGarageSearchChange}
                                   onSelect={handleGarageSelect}
                                   placeholder="Search for your garage (e.g. Ultra Tune Jesmond)"
                                   disabled={isProcessing}
@@ -1574,17 +1637,134 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                               </div>
                             </div>
                           </div>
+
+                          {/* ═══════ DISTANCE ZONE MAP & INFO ═══════ */}
+                          {distanceZoneInfo && selectedPlaceDetails?.lat != null && garageLat != null && garageLng != null && (
+                            <div
+                              className={`rounded-2xl border-2 p-5 space-y-4 ${
+                                distanceZoneInfo.zone === 'green'
+                                  ? 'border-emerald-300 bg-emerald-50/50'
+                                  : distanceZoneInfo.zone === 'yellow'
+                                  ? 'border-yellow-300 bg-yellow-50/50'
+                                  : distanceZoneInfo.zone === 'orange'
+                                  ? 'border-orange-300 bg-orange-50/50'
+                                  : 'border-red-300 bg-red-50/50'
+                              }`}
+                            >
+                              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                <MapPin className="h-4 w-4" />
+                                Distance &amp; Pricing Zone
+                              </h3>
+
+                              {/* Map */}
+                              <DistanceZoneMap
+                                pickupLat={selectedPlaceDetails.lat!}
+                                pickupLng={selectedPlaceDetails.lng!}
+                                garageLat={garageLat}
+                                garageLng={garageLng}
+                                zone={distanceZoneInfo.zone}
+                              />
+
+                              {/* Zone result */}
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${
+                                    ZONE_BADGE_STYLES[distanceZoneInfo.zone]
+                                  }`}
+                                >
+                                  <span
+                                    className={`h-2.5 w-2.5 rounded-full ${
+                                      distanceZoneInfo.zone === 'green'
+                                        ? 'bg-emerald-500'
+                                        : distanceZoneInfo.zone === 'yellow'
+                                        ? 'bg-yellow-500'
+                                        : distanceZoneInfo.zone === 'orange'
+                                        ? 'bg-orange-500'
+                                        : 'bg-red-500'
+                                    }`}
+                                  />
+                                  {distanceZoneInfo.label}
+                                </span>
+                                <span className="text-sm font-medium text-slate-700">
+                                  {distanceZoneInfo.distance} km
+                                </span>
+                                {distanceZoneInfo.zone !== 'red' && distanceZoneInfo.surchargeAmount > 0 && (
+                                  <span className="text-sm font-semibold text-slate-800">
+                                    {distanceZoneInfo.surchargeDisplay} surcharge
+                                  </span>
+                                )}
+                                {distanceZoneInfo.zone === 'green' && (
+                                  <span className="text-sm font-medium text-emerald-700">No extra fee</span>
+                                )}
+                              </div>
+
+                              {/* Red zone warning */}
+                              {isRedZone && (
+                                <div className="rounded-xl border border-red-300 bg-red-100 p-4">
+                                  <div className="flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" />
+                                    <div>
+                                      <p className="text-sm font-semibold text-red-800">
+                                        Out of service range
+                                      </p>
+                                      <p className="mt-1 text-sm text-red-700">
+                                        Your pickup address is over 18 km from the selected garage. Online booking isn&apos;t
+                                        available for this distance. Please choose a closer garage, or{' '}
+                                        <Link href="/contact" className="font-semibold underline hover:text-red-900">
+                                          contact our team
+                                        </Link>{' '}
+                                        to arrange a custom quote.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Zone legend */}
+                              <div className="rounded-xl bg-white/70 border border-slate-200 p-3">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Zone Guide</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span className="text-slate-600">0–12 km: No extra fee</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                                    <span className="text-slate-600">12–15 km: +$29</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                                    <span className="text-slate-600">15–18 km: +$49</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                                    <span className="text-slate-600">18 km+: Contact us</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Hint when coords are missing (user typed instead of selecting) */}
+                          {!distanceZoneInfo && pickupAddress.trim() && garageSearch.trim() && (
+                            <div className="flex items-start gap-2 rounded-xl bg-blue-50 border border-blue-200 p-3">
+                              <Info className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" />
+                              <p className="text-xs text-blue-700">
+                                Select your pickup address and garage from the dropdown suggestions to see the distance zone map and any applicable surcharges.
+                              </p>
+                            </div>
+                          )}
                         </div>
                         {/* End of greyed-out wrapper */}
 
                         {/* Submit */}
                         <button
                           type="submit"
-                          disabled={isProcessing || isHighValueVehicle}
+                          disabled={isProcessing || isHighValueVehicle || isRedZone}
                           className="w-full rounded-full bg-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span className="inline-flex items-center gap-2">
-                            Continue to Review
+                            Continue to Review — {totalPriceDisplay}
                             <ArrowRight className="h-5 w-5" />
                           </span>
                         </button>
