@@ -94,6 +94,9 @@ export default function Header({ onBookingClick }: HeaderProps) {
           <a href="#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
+          <Link href="/contact" className="transition hover:text-emerald-600">
+            Contact
+          </Link>
           {FEATURES.QUOTE_SYSTEM && (
             <Link href="/quotes/request" className="flex items-center gap-1.5 transition hover:text-emerald-600">
               <FileText className="h-4 w-4" />
@@ -420,6 +423,13 @@ export default function Header({ onBookingClick }: HeaderProps) {
                 >
                   FAQ
                 </a>
+                <Link
+                  href="/contact"
+                  className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  Contact
+                </Link>
                 {FEATURES.QUOTE_SYSTEM && (
                   <Link
                     href="/quotes/request"

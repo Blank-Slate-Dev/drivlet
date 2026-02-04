@@ -2,6 +2,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { MapPin, Phone, Mail } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { FEATURES } from '@/lib/featureFlags';
@@ -73,9 +74,9 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#contact" className="transition hover:text-white">
+                <Link href="/contact" className="transition hover:text-white">
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

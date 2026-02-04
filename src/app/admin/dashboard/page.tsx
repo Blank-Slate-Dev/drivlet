@@ -22,6 +22,7 @@ import {
   MessageSquare,
   ArrowUpRight,
   Zap,
+  Star,
 } from "lucide-react";
 
 interface Stats {
@@ -507,6 +508,23 @@ export default function AdminDashboardPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-1">Inquiries</h3>
                 <p className="text-sm text-slate-600 mb-4">Customer support requests</p>
+                <div className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
+                  Manage{" "}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </div>
+            </Link>
+
+            {/* Testimonials */}
+            <Link href="/admin/testimonials">
+              <div className="group relative rounded-xl border border-slate-200 bg-white p-6 transition-all hover:shadow-md hover:border-emerald-300">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="rounded-lg p-3 bg-yellow-500">
+                    <Star className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">Testimonials</h3>
+                <p className="text-sm text-slate-600 mb-4">Manage customer reviews</p>
                 <div className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
                   Manage{" "}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

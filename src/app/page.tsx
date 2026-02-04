@@ -20,8 +20,8 @@ const InteractiveServicesSection = dynamic(
   { ssr: false }
 );
 
-const ContactCTASection = dynamic(
-  () => import('@/components/homepage/ContactCTASection'),
+const TestimonialsSection = dynamic(
+  () => import('@/components/homepage/TestimonialsSection'),
   { ssr: false }
 );
 
@@ -55,8 +55,8 @@ export default function Home() {
       {/* Services Section - lazy loaded */}
       <InteractiveServicesSection onBookingClick={openBookingModal} />
 
-      {/* Contact CTA Section - lazy loaded */}
-      <ContactCTASection />
+      {/* Testimonials Section - lazy loaded */}
+      <TestimonialsSection />
 
       {/* FAQ Section - lazy loaded */}
       <FAQSection />

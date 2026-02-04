@@ -38,7 +38,8 @@
       "Bash(pkill:*)",
       "Bash(git checkout:*)",
       "Bash(iconv:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []

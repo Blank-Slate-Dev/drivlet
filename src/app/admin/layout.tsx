@@ -16,6 +16,7 @@ import {
   Users,
   Building2,
   MessageSquare,
+  Star,
   Car,
   MapPin,
   Menu,
@@ -55,6 +56,7 @@ export default function AdminLayout({
     { href: "/admin/garages", label: "Garages", icon: Building2 },
     { href: "/admin/location-requests", label: "Locations", icon: MapPin },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
+    { href: "/admin/testimonials", label: "Testimonials", icon: Star },
   ];
 
   if (status === "loading") {
