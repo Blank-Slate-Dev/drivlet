@@ -35,7 +35,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Mayfield, Newcastle",
     rating: 5,
     review:
-      "Oakley made it so easy. Booked online in two minutes, car collected from home and back by the afternoon. Super convenient.",
+      "Booked online in two minutes and Oakley had my car collected and back by the afternoon. Super convenient.",
     vehicleType: "Mazda CX-5",
     serviceType: "Major Service",
   },
@@ -46,7 +46,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Belconnen, Canberra",
     rating: 5,
     review:
-      "Hanzla went above and beyond. I was nervous but he was so careful and communicative. Seamless from start to finish.",
+      "Was nervous about someone else driving my car but Hanzla was so careful and communicative. Seamless from start to finish.",
     vehicleType: "Kia Sportage",
     serviceType: "Regular Service",
   },
@@ -57,7 +57,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Lambton, Newcastle",
     rating: 5,
     review:
-      "Gerome was super professional and friendly. He sent me photos when the car arrived at the mechanic. Great for busy parents!",
+      "Really impressed with the service. Gerome even sent me photos when the car arrived at the mechanic. Great for busy parents!",
     vehicleType: "Hyundai Tucson",
     serviceType: "Quick Service",
   },
@@ -68,7 +68,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Merewether, Newcastle",
     rating: 5,
     review:
-      "Raheel handled everything perfectly. Needed a major service and didn't have to rearrange my day. The tracking feature is brilliant.",
+      "Needed a major service and didn't have to rearrange my day. Raheel handled everything perfectly and the tracking feature is brilliant.",
     vehicleType: "Ford Ranger",
     serviceType: "Major Service",
   },
@@ -79,7 +79,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Adamstown, Newcastle",
     rating: 5,
     review:
-      "Tom was great — on time, polite, and my car came back spotless. Honestly the easiest service experience I've ever had.",
+      "Tom was great — on time, polite, and my car came back spotless. Easiest service experience I've ever had.",
     vehicleType: "Volkswagen Golf",
     serviceType: "Regular Service",
   },
@@ -90,7 +90,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Jesmond, Newcastle",
     rating: 5,
     review:
-      "Matt was fantastic. He kept me in the loop the entire time and even called to confirm drop-off. Will be using Drivlet every time now.",
+      "The whole process was so smooth. Matt kept me in the loop the entire time and even called to confirm drop-off. Will use Drivlet every time now.",
     vehicleType: "Honda CR-V",
     serviceType: "Quick Service",
   },
@@ -101,7 +101,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Woden, Canberra",
     rating: 5,
     review:
-      "Abdul was incredibly professional. Picked up my car early and had it back ahead of schedule. Can't wait for Drivlet to grow here!",
+      "Picked up my car early and had it back ahead of schedule — Abdul was incredibly professional. Can't wait for Drivlet to grow here!",
     vehicleType: "Subaru Outback",
     serviceType: "Major Service",
   },
@@ -329,7 +329,7 @@ export default function TestimonialsSection() {
 
         {/* Cards */}
         {loading ? (
-          <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: itemsPerPage }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -349,7 +349,7 @@ export default function TestimonialsSection() {
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.15}
                 onDragEnd={handleDragEnd}
-                className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4 cursor-grab active:cursor-grabbing sm:cursor-default"
+                className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 cursor-grab active:cursor-grabbing sm:cursor-default"
               >
                 {currentTestimonials.map((testimonial) => (
                   <TestimonialCard
