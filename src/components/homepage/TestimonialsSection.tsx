@@ -15,6 +15,60 @@ interface Testimonial {
   serviceType?: string;
 }
 
+// Placeholder testimonials shown when no real ones exist in the database
+const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
+  {
+    _id: "placeholder-1",
+    customerName: "Emily R.",
+    customerLocation: "Charlestown, Newcastle",
+    rating: 5,
+    review:
+      "Sharjeel was absolutely fantastic — he picked up my car right on time and kept me updated the whole way. I didn't have to take a single minute off work. Will definitely be using Drivlet again!",
+    vehicleType: "Toyota Corolla",
+    serviceType: "Regular Service",
+  },
+  {
+    _id: "placeholder-2",
+    customerName: "James T.",
+    customerLocation: "Mayfield, Newcastle",
+    rating: 5,
+    review:
+      "Oakley made the whole process so easy. I booked online in two minutes, he collected my car from home and had it back by the afternoon. Honestly the most convenient thing I've used in years.",
+    vehicleType: "Mazda CX-5",
+    serviceType: "Major Service",
+  },
+  {
+    _id: "placeholder-3",
+    customerName: "Sarah K.",
+    customerLocation: "Lambton, Newcastle",
+    rating: 5,
+    review:
+      "Raheel was super professional and really friendly. He even sent me photos when the car was dropped off at the mechanic. Such a great service for busy parents — I can't recommend it enough.",
+    vehicleType: "Hyundai Tucson",
+    serviceType: "Quick Service",
+  },
+  {
+    _id: "placeholder-4",
+    customerName: "Daniel W.",
+    customerLocation: "Merewether, Newcastle",
+    rating: 5,
+    review:
+      "Tom handled everything perfectly. My car needed a major service and I didn't have to rearrange my whole day. The tracking feature is brilliant — I could see exactly where my car was the whole time.",
+    vehicleType: "Ford Ranger",
+    serviceType: "Major Service",
+  },
+  {
+    _id: "placeholder-5",
+    customerName: "Priya M.",
+    customerLocation: "Belconnen, Canberra",
+    rating: 5,
+    review:
+      "Hanzla went above and beyond with my booking. I was nervous about someone else driving my car but he was so careful and communicative. The whole experience was seamless from start to finish. Can't wait for Drivlet to expand here!",
+    vehicleType: "Kia Sportage",
+    serviceType: "Regular Service",
+  },
+];
+
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
@@ -76,7 +130,7 @@ function SkeletonCard() {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
       <div className="flex gap-1 mb-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="h-4 w-4 rounded bg-slate-200" />
         ))}
       </div>
@@ -107,10 +161,15 @@ export default function TestimonialsSection() {
         const res = await fetch("/api/testimonials");
         if (res.ok) {
           const data = await res.json();
-          setTestimonials(data.testimonials || []);
+          const fetched = data.testimonials || [];
+          // Use real testimonials if available, otherwise fall back to placeholders
+          setTestimonials(fetched.length > 0 ? fetched : PLACEHOLDER_TESTIMONIALS);
+        } else {
+          setTestimonials(PLACEHOLDER_TESTIMONIALS);
         }
       } catch {
-        console.error("Failed to fetch testimonials");
+        console.error("Failed to fetch testimonials, using placeholders");
+        setTestimonials(PLACEHOLDER_TESTIMONIALS);
       } finally {
         setLoading(false);
       }
@@ -137,9 +196,6 @@ export default function TestimonialsSection() {
     currentPage * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE + ITEMS_PER_PAGE
   );
-
-  // Don't render if fetch failed and no testimonials
-  if (!loading && testimonials.length === 0) return null;
 
   return (
     <section
