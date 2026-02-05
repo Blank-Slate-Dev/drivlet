@@ -13,15 +13,15 @@ interface DistanceZoneMapProps {
   zone: DistanceZone;
 }
 
-// Zone border/fill colours
+// Zone border/fill colours — chosen to read clearly on a desaturated map
 const ZONE_COLORS: Record<
   string,
   { fill: string; stroke: string }
 > = {
-  green: { fill: '#22c55e', stroke: '#16a34a' },
-  yellow: { fill: '#eab308', stroke: '#ca8a04' },
-  orange: { fill: '#f97316', stroke: '#ea580c' },
-  red: { fill: '#ef4444', stroke: '#dc2626' },
+  green: { fill: '#34d399', stroke: '#059669' },   // bright emerald
+  yellow: { fill: '#fbbf24', stroke: '#d97706' },   // vivid amber
+  orange: { fill: '#fb923c', stroke: '#ea580c' },   // strong orange
+  red: { fill: '#f87171', stroke: '#dc2626' },      // clear red
 };
 
 export default function DistanceZoneMap({
@@ -79,6 +79,14 @@ export default function DistanceZoneMap({
         fullscreenControl: false,
         gestureHandling: 'cooperative',
         styles: [
+          // Desaturate the entire map so zone colours pop cleanly
+          { elementType: 'geometry', stylers: [{ saturation: -80 }, { lightness: 10 }] },
+          { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
+          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+          { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e0e0e0' }] },
+          { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9d6e3' }, { saturation: -40 }] },
           { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
           { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
         ],
@@ -90,10 +98,10 @@ export default function DistanceZoneMap({
     // --- Zone circles (centred on pickup, drawn largest-first) ---
     // Red is drawn as a huge background so everything beyond 18 km appears red.
     const circleConfigs = [
-      { radius: 5000000, color: ZONE_COLORS.red, opacity: 0.45, strokeW: 0 },   // red fill everywhere
-      { radius: 18000, color: ZONE_COLORS.orange, opacity: 0.22, strokeW: 2 },  // 15–18 km
-      { radius: 15000, color: ZONE_COLORS.yellow, opacity: 0.22, strokeW: 2 },  // 12–15 km
-      { radius: 12000, color: ZONE_COLORS.green, opacity: 0.22, strokeW: 2 },   // 0–12 km
+      { radius: 5000000, color: ZONE_COLORS.red, opacity: 0.30, strokeW: 0 },    // red fill everywhere
+      { radius: 18000, color: ZONE_COLORS.orange, opacity: 0.35, strokeW: 2.5 },  // 15–18 km
+      { radius: 15000, color: ZONE_COLORS.yellow, opacity: 0.35, strokeW: 2.5 },  // 12–15 km
+      { radius: 12000, color: ZONE_COLORS.green, opacity: 0.35, strokeW: 2.5 },   // 0–12 km
     ];
 
     circleConfigs.forEach(({ radius, color, opacity, strokeW }) => {
@@ -105,7 +113,7 @@ export default function DistanceZoneMap({
         fillOpacity: opacity,
         strokeColor: color.stroke,
         strokeWeight: strokeW,
-        strokeOpacity: strokeW > 0 ? 0.55 : 0,
+        strokeOpacity: strokeW > 0 ? 0.7 : 0,
         clickable: false,
       });
       objectsRef.current.push(circle);
