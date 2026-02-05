@@ -22,6 +22,22 @@ export interface ISuspensionHistoryEntry {
   notes?: string;
 }
 
+export interface IEmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+}
+
+export interface IPaymentMethod {
+  stripePaymentMethodId: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+  addedAt: Date;
+}
+
 export interface IUser extends Document {
   username: string;
   email: string;
@@ -47,6 +63,12 @@ export interface IUser extends Document {
   suspensionHistory: ISuspensionHistoryEntry[];
   deletedAt?: Date;
   deletedBy?: mongoose.Types.ObjectId;
+
+  // Customer profile fields
+  profilePhoto?: string;
+  stripeCustomerId?: string;
+  paymentMethods: IPaymentMethod[];
+  emergencyContact?: IEmergencyContact;
 
   // Garage location fields (for garage users without full profile yet)
   garageLocationId?: string; // Google Place ID
@@ -154,6 +176,31 @@ const UserSchema = new Schema<IUser>(
     }],
     deletedAt: { type: Date },
     deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
+
+    // Customer profile fields
+    profilePhoto: {
+      type: String,
+      trim: true,
+    },
+    stripeCustomerId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    paymentMethods: [{
+      stripePaymentMethodId: { type: String, required: true },
+      brand: { type: String, required: true },
+      last4: { type: String, required: true },
+      expMonth: { type: Number, required: true },
+      expYear: { type: Number, required: true },
+      isDefault: { type: Boolean, default: false },
+      addedAt: { type: Date, default: Date.now },
+    }],
+    emergencyContact: {
+      name: { type: String, trim: true, maxlength: 100 },
+      relationship: { type: String, trim: true, maxlength: 50 },
+      phone: { type: String, trim: true },
+    },
 
     // Garage location fields (for garage users without full profile yet)
     garageLocationId: {

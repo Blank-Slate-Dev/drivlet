@@ -70,6 +70,7 @@ export const authOptions: NextAuthOptions = {
               email: user.email,
               role: user.role || "user",
               isApproved: user.isApproved ?? true,
+              profilePhoto: user.profilePhoto,
               onboardingStatus,
               canAcceptJobs,
               linkedGarageName,
@@ -178,6 +179,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           role: user.role || "user",
           isApproved: user.isApproved ?? true,
+          profilePhoto: user.profilePhoto,
           onboardingStatus,
           canAcceptJobs,
           linkedGarageName,
@@ -203,6 +205,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.role = user.role as UserRole;
         token.isApproved = user.isApproved;
+        token.profilePhoto = user.profilePhoto;
         token.onboardingStatus = user.onboardingStatus;
         token.canAcceptJobs = user.canAcceptJobs;
         token.linkedGarageName = user.linkedGarageName;
@@ -221,6 +224,14 @@ export const authOptions: NextAuthOptions = {
             token.onboardingStatus = driver.onboardingStatus;
             token.canAcceptJobs = driver.canAcceptJobs;
           }
+        }
+      }
+
+      if (trigger === "update" && token.role === "user") {
+        await connectDB();
+        const dbUser = await User.findById(token.id);
+        if (dbUser) {
+          token.profilePhoto = dbUser.profilePhoto;
         }
       }
 
@@ -248,6 +259,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.role = token.role as UserRole;
         session.user.isApproved = token.isApproved as boolean;
+        session.user.profilePhoto = token.profilePhoto as string | undefined;
         session.user.onboardingStatus = token.onboardingStatus as OnboardingStatus | undefined;
         session.user.canAcceptJobs = token.canAcceptJobs as boolean | undefined;
         session.user.linkedGarageName = token.linkedGarageName as string | undefined;

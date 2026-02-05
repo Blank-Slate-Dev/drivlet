@@ -11,6 +11,8 @@ declare module "next-auth" {
       username: string;
       role: UserRole;
       isApproved: boolean;
+      // Customer profile fields
+      profilePhoto?: string;
       // Driver-specific onboarding fields
       onboardingStatus?: OnboardingStatus;
       canAcceptJobs?: boolean;
@@ -29,6 +31,7 @@ declare module "next-auth" {
     username: string;
     role: UserRole;
     isApproved: boolean;
+    profilePhoto?: string;
     onboardingStatus?: OnboardingStatus;
     canAcceptJobs?: boolean;
     // Garage-specific fields
@@ -46,6 +49,7 @@ declare module "next-auth/jwt" {
     username: string;
     role: UserRole;
     isApproved: boolean;
+    profilePhoto?: string;
     onboardingStatus?: OnboardingStatus;
     canAcceptJobs?: boolean;
     // Garage-specific fields

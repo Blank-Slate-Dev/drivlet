@@ -17,7 +17,7 @@ export async function GET() {
     await connectDB();
 
     const user = await User.findById(session.user.id).select(
-      "username email mobile createdAt"
+      "username email mobile profilePhoto emergencyContact createdAt"
     );
 
     if (!user) {
@@ -28,6 +28,8 @@ export async function GET() {
       username: user.username,
       email: user.email,
       mobile: user.mobile || "",
+      profilePhoto: user.profilePhoto || null,
+      emergencyContact: user.emergencyContact || null,
       createdAt: user.createdAt,
     });
   } catch (error) {
