@@ -7,11 +7,17 @@ import { connectDB } from "@/lib/mongodb";
 import Testimonial from "@/models/Testimonial";
 import { sanitizeString } from "@/lib/validation";
 
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
 // PATCH - Update testimonial
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
+  const { id } = await context.params;
+
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +33,7 @@ export async function PATCH(
   try {
     await connectDB();
 
-    const testimonial = await Testimonial.findById(params.id);
+    const testimonial = await Testimonial.findById(id);
     if (!testimonial) {
       return NextResponse.json({ error: "Testimonial not found" }, { status: 404 });
     }
@@ -104,8 +110,10 @@ export async function PATCH(
 // DELETE - Remove testimonial
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
+  const { id } = await context.params;
+
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -114,7 +122,7 @@ export async function DELETE(
   try {
     await connectDB();
 
-    const testimonial = await Testimonial.findByIdAndDelete(params.id);
+    const testimonial = await Testimonial.findByIdAndDelete(id);
     if (!testimonial) {
       return NextResponse.json({ error: "Testimonial not found" }, { status: 404 });
     }
