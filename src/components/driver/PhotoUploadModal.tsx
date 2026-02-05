@@ -198,7 +198,7 @@ export default function PhotoUploadModal({
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
-        className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl"
+        className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col"
       >
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-4">
@@ -242,7 +242,7 @@ export default function PhotoUploadModal({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-180px)]">
+        <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -269,6 +269,17 @@ export default function PhotoUploadModal({
               ))}
             </div>
           )}
+        </div>
+
+        {/* Save & Close Footer */}
+        <div className="sticky bottom-0 z-10 bg-white border-t border-slate-200 px-4 py-4">
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 active:scale-[0.98] transition flex items-center justify-center gap-2"
+          >
+            <Check className="h-5 w-5" />
+            Save & Close
+          </button>
         </div>
 
         {/* Hidden file input */}

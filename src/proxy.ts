@@ -1,4 +1,4 @@
-// src/middleware.ts
+// src/proxy.ts
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
