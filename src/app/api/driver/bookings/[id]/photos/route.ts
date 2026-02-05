@@ -350,9 +350,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
 
-    // Delete file from storage (async, don't block)
+    // Delete file from cloud storage (async, don't block)
     const { deleteFromStorage } = await import("@/lib/storage");
-    deleteFromStorage(photo.photoPath).catch((err) => {
+    const deleteUrl = photo.cloudUrl || photo.photoPath;
+    deleteFromStorage(deleteUrl).catch((err) => {
       console.error("Failed to delete photo file:", err);
     });
 

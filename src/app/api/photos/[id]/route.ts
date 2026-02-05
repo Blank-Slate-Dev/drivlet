@@ -7,7 +7,6 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import User from "@/models/User";
 import VehiclePhoto from "@/models/VehiclePhoto";
-import { getFromStorage } from "@/lib/storage";
 import mongoose from "mongoose";
 
 interface RouteContext {
@@ -79,32 +78,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // If cloud URL exists, redirect to it
+    // Redirect to cloud storage URL
     if (photo.cloudUrl) {
       return NextResponse.redirect(photo.cloudUrl);
     }
 
-    // Serve from local storage
-    const fileBuffer = await getFromStorage(photo.photoPath);
-    if (!fileBuffer) {
-      return NextResponse.json(
-        { error: "Photo file not found in storage" },
-        { status: 404 }
-      );
-    }
-
-    // Return image with appropriate headers
-    // Convert Buffer to Uint8Array for NextResponse compatibility
-    const uint8Array = new Uint8Array(fileBuffer);
-    return new NextResponse(uint8Array, {
-      status: 200,
-      headers: {
-        "Content-Type": photo.mimeType,
-        "Content-Length": String(fileBuffer.length),
-        "Cache-Control": "private, max-age=3600", // Cache for 1 hour
-        "Content-Disposition": `inline; filename="vehicle-photo-${photoId}.${photo.mimeType === "image/png" ? "png" : "jpg"}"`,
-      },
-    });
+    // No cloud URL available (legacy photo or upload issue)
+    return NextResponse.json(
+      { error: "Photo file not available — no cloud URL stored" },
+      { status: 404 }
+    );
   } catch (error) {
     console.error("Error serving photo:", error);
     return NextResponse.json(
