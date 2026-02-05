@@ -21,7 +21,7 @@ const ZONE_COLORS: Record<
   green: { fill: '#34d399', stroke: '#059669' },   // bright emerald
   yellow: { fill: '#fbbf24', stroke: '#d97706' },   // vivid amber
   orange: { fill: '#fb923c', stroke: '#ea580c' },   // strong orange
-  red: { fill: '#f87171', stroke: '#dc2626' },      // clear red
+  red: { fill: '#ef4444', stroke: '#dc2626' },      // deeper red
 };
 
 export default function DistanceZoneMap({
@@ -98,7 +98,7 @@ export default function DistanceZoneMap({
     // --- Zone circles (centred on pickup, drawn largest-first) ---
     // Red is drawn as a huge background so everything beyond 18 km appears red.
     const circleConfigs = [
-      { radius: 5000000, color: ZONE_COLORS.red, opacity: 0.30, strokeW: 0 },    // red fill everywhere
+      { radius: 5000000, color: ZONE_COLORS.red, opacity: 0.45, strokeW: 0 },    // red fill everywhere
       { radius: 18000, color: ZONE_COLORS.orange, opacity: 0.35, strokeW: 2.5 },  // 15–18 km
       { radius: 15000, color: ZONE_COLORS.yellow, opacity: 0.35, strokeW: 2.5 },  // 12–15 km
       { radius: 12000, color: ZONE_COLORS.green, opacity: 0.35, strokeW: 2.5 },   // 0–12 km
