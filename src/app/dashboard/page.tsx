@@ -28,9 +28,15 @@ import {
   Sparkles,
   TrendingUp,
   Settings,
+  ClipboardCheck,
+  PackageCheck,
+  FileWarning,
 } from 'lucide-react';
 import { BookingModal } from '@/components/homepage';
 import { CancelBookingModal } from '@/components/CancelBookingModal';
+import PickupConsentForm from '@/components/forms/PickupConsentForm';
+import ReturnConfirmationForm from '@/components/forms/ReturnConfirmationForm';
+import ClaimLodgementForm from '@/components/forms/ClaimLodgementForm';
 
 const POLLING_INTERVAL = 30000;
 
@@ -55,20 +61,45 @@ interface Update {
   updatedBy: string;
 }
 
+interface SignedFormRef {
+  formId: string;
+  formType: 'pickup_consent' | 'return_confirmation' | 'claim_lodgement';
+  submittedAt: string;
+}
+
+interface DriverInfo {
+  firstName: string;
+  profilePhoto: string | null;
+  rating: number;
+  totalRatings: number;
+  completedJobs: number;
+  memberSince: string;
+}
+
 interface Booking {
   _id: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   serviceType: string;
   currentStage: string;
   overallProgress: number;
   pickupTime: string;
   dropoffTime: string;
   pickupAddress: string;
+  garageName?: string;
+  garageAddress?: string;
+  transmissionType: string;
   status: string;
   updates: Update[];
   createdAt: string;
   updatedAt: string;
+  userName?: string;
+  userEmail?: string;
+  driver?: DriverInfo | null;
+  signedForms?: SignedFormRef[];
 }
 
 type QuoteRequestStatus = 'open' | 'quoted' | 'accepted' | 'expired' | 'cancelled';
@@ -91,7 +122,6 @@ interface QuoteRequest {
 
 type DashboardSection = 'overview' | 'quotes' | 'bookings';
 
-// ✅ FIX: Proper Record<...> generic syntax + avoid React.ElementType (no React import needed)
 const QUOTE_STATUS_CONFIG: Record<
   QuoteRequestStatus,
   { label: string; icon: ElementType; color: string; bgColor: string }
@@ -123,6 +153,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+// ── Helper: check what forms a booking still needs ─────────────────
+function getPendingForms(booking: Booking): { pickup: boolean; return_: boolean } {
+  const signed = booking.signedForms ?? [];
+  const hasPickup = signed.some((f) => f.formType === 'pickup_consent');
+  const hasReturn = signed.some((f) => f.formType === 'return_confirmation');
+
+  // Pickup form relevant once car is picked up or later
+  const pickupStages = ['car_picked_up', 'at_garage', 'service_in_progress', 'driver_returning', 'delivered'];
+  const needsPickup = pickupStages.includes(booking.currentStage) && !hasPickup;
+
+  // Return form relevant once delivered
+  const needsReturn = booking.currentStage === 'delivered' && !hasReturn;
+
+  return { pickup: needsPickup, return_: needsReturn };
+}
+
 // Section Navigation Component
 interface SectionNavProps {
   activeSection: DashboardSection;
@@ -133,7 +179,6 @@ interface SectionNavProps {
 function SectionNav({ activeSection, onSectionChange, stats }: SectionNavProps) {
   const sections = [
     { id: 'overview' as DashboardSection, label: 'Overview', icon: Home },
-    // Quote requests tab - hidden when QUOTES_ENABLED is false
     ...(QUOTES_ENABLED ? [{ id: 'quotes' as DashboardSection, label: 'My Quote Requests', icon: FileText, badge: stats.pendingQuotes }] : []),
     { id: 'bookings' as DashboardSection, label: 'My Bookings', icon: Calendar },
   ];
@@ -159,7 +204,6 @@ function SectionNav({ activeSection, onSectionChange, stats }: SectionNavProps) 
           )}
         </button>
       ))}
-      {/* Settings link - navigates to /account page */}
       <Link
         href="/account"
         className="relative flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
@@ -178,11 +222,67 @@ interface OverviewSectionProps {
   userName: string;
   onSectionChange: (section: DashboardSection) => void;
   onBookingClick: () => void;
+  onOpenForm: (bookingId: string, formType: 'pickup' | 'return' | 'claim') => void;
 }
 
-function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, onBookingClick }: OverviewSectionProps) {
+function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, onBookingClick, onOpenForm }: OverviewSectionProps) {
+  // Check for action-required forms on active bookings
+  const activeBookings = bookings.filter((b) => b.status === 'in_progress' || b.status === 'pending');
+  const formsNeeded: { booking: Booking; pickup: boolean; return_: boolean }[] = [];
+  for (const b of activeBookings) {
+    const pending = getPendingForms(b);
+    if (pending.pickup || pending.return_) {
+      formsNeeded.push({ booking: b, ...pending });
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* ── Action Required Banner ── */}
+      {formsNeeded.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          {formsNeeded.map(({ booking, pickup, return_ }) => (
+            <div
+              key={booking._id}
+              className="mb-4 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-5"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-200">
+                  <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900">Action Required</h3>
+                  <p className="mt-0.5 text-sm text-amber-700">
+                    {booking.vehicleRegistration} ({booking.vehicleState}) needs your signature on{' '}
+                    {pickup && return_ ? 'pickup consent & return confirmation forms' : pickup ? 'the pickup consent form' : 'the return confirmation form'}.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {pickup && (
+                      <button
+                        onClick={() => onOpenForm(booking._id, 'pickup')}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                        Sign Pickup Form
+                      </button>
+                    )}
+                    {return_ && (
+                      <button
+                        onClick={() => onOpenForm(booking._id, 'return')}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+                      >
+                        <PackageCheck className="h-4 w-4" />
+                        Sign Return Form
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      )}
+
       {/* Welcome Banner */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -441,7 +541,6 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
 
   return (
     <div className="space-y-6">
-      {/* Header with actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">My Quote Requests</h2>
@@ -466,7 +565,6 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
         </div>
       </div>
 
-      {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setActiveFilter('all')}
@@ -498,7 +596,6 @@ function QuoteRequestsSection({ quoteRequests, loading, onRefresh, refreshing }:
         })}
       </div>
 
-      {/* Quote requests list */}
       {filteredRequests.length === 0 ? (
         <div className="text-center py-12">
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-4">
@@ -622,9 +719,10 @@ interface BookingsSectionProps {
   loading: boolean;
   onCancelBooking: (id: string, rego: string) => void;
   onBookingClick: () => void;
+  onOpenForm: (bookingId: string, formType: 'pickup' | 'return' | 'claim') => void;
 }
 
-function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, onBookingClick }: BookingsSectionProps) {
+function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, onBookingClick, onOpenForm }: BookingsSectionProps) {
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-AU', {
       day: 'numeric',
@@ -668,12 +766,54 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
     );
   }
 
+  // Check pending forms for active booking
+  const pendingForms = activeBooking ? getPendingForms(activeBooking) : null;
+  const hasSignedPickup = activeBooking?.signedForms?.some((f) => f.formType === 'pickup_consent');
+  const hasSignedReturn = activeBooking?.signedForms?.some((f) => f.formType === 'return_confirmation');
+
   return (
     <div className="space-y-6">
       {/* Active Booking */}
       {activeBooking && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <h2 className="text-xl font-semibold text-slate-900">Active Booking</h2>
+
+          {/* Action Required Banner for active booking */}
+          {pendingForms && (pendingForms.pickup || pendingForms.return_) && (
+            <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-200">
+                  <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900">Signature Required</h3>
+                  <p className="mt-0.5 text-sm text-amber-700">
+                    Please sign the following form{pendingForms.pickup && pendingForms.return_ ? 's' : ''} for your booking.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {pendingForms.pickup && (
+                      <button
+                        onClick={() => onOpenForm(activeBooking._id, 'pickup')}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                        Sign Pickup Consent
+                      </button>
+                    )}
+                    {pendingForms.return_ && (
+                      <button
+                        onClick={() => onOpenForm(activeBooking._id, 'return')}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+                      >
+                        <PackageCheck className="h-4 w-4" />
+                        Sign Return Confirmation
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Booking Header */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -696,6 +836,24 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
                 <Car className="h-8 w-8 text-emerald-600" />
               </div>
             </div>
+
+            {/* Form status badges */}
+            {(hasSignedPickup || hasSignedReturn) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {hasSignedPickup && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Pickup Consent Signed
+                  </span>
+                )}
+                {hasSignedReturn && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Return Confirmed
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Status Summary */}
@@ -747,28 +905,34 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
             <p className="mt-4 text-xs text-slate-400">Last updated: {formatDateTime(activeBooking.updatedAt)}</p>
           </div>
 
-          {/* Cancel Button */}
-          {activeBooking.status === 'pending' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-                    <XCircle className="h-5 w-5 text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Need to cancel?</p>
-                    <p className="text-xs text-slate-500">Free cancellation if more than 24 hours before pickup</p>
-                  </div>
-                </div>
+          {/* Form Actions & Cancel */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Lodge Claim — always available on active bookings */}
+              {(activeBooking.status === 'in_progress' || activeBooking.status === 'completed') && (
+                <button
+                  onClick={() => onOpenForm(activeBooking._id, 'claim')}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-200"
+                >
+                  <FileWarning className="h-4 w-4" />
+                  Lodge a Claim
+                </button>
+              )}
+              {/* Cancel */}
+              {activeBooking.status === 'pending' && (
                 <button
                   onClick={() => onCancelBooking(activeBooking._id, activeBooking.vehicleRegistration)}
-                  className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                 >
+                  <XCircle className="h-4 w-4" />
                   Cancel Booking
                 </button>
-              </div>
+              )}
             </div>
-          )}
+            {activeBooking.status === 'pending' && (
+              <p className="mt-2 text-xs text-slate-500">Free cancellation if more than 24 hours before pickup</p>
+            )}
+          </div>
         </motion.div>
       )}
 
@@ -846,14 +1010,20 @@ function DashboardContent() {
   const [cancelModalBooking, setCancelModalBooking] = useState<{ id: string; rego: string } | null>(null);
   const [refreshingQuotes, setRefreshingQuotes] = useState(false);
 
+  // Form modal state
+  const [formModal, setFormModal] = useState<{
+    bookingId: string;
+    type: 'pickup' | 'return' | 'claim';
+  } | null>(null);
+
   const previousBookingsRef = useRef<Booking[]>([]);
   const isInitialLoadRef = useRef(true);
+  const autoPromptedRef = useRef<Set<string>>(new Set());
 
   // Handle URL params for section
   useEffect(() => {
     const section = searchParams.get('section');
     if (section === 'quotes' || section === 'bookings' || section === 'overview') {
-      // If quotes are disabled and user tries to access quotes section, redirect to overview
       if (section === 'quotes' && !QUOTES_ENABLED) {
         setActiveSection('overview');
       } else {
@@ -864,7 +1034,6 @@ function DashboardContent() {
 
   const handleSectionChange = (section: DashboardSection) => {
     setActiveSection(section);
-    // Update URL without full page reload
     const url = new URL(window.location.href);
     if (section === 'overview') {
       url.searchParams.delete('section');
@@ -873,6 +1042,44 @@ function DashboardContent() {
     }
     window.history.pushState({}, '', url.toString());
   };
+
+  // ── Open form modal handler ──────────────────────────────────────
+  const handleOpenForm = useCallback(
+    (bookingId: string, formType: 'pickup' | 'return' | 'claim') => {
+      setFormModal({ bookingId, type: formType });
+    },
+    []
+  );
+
+  const handleFormSuccess = useCallback(() => {
+    setFormModal(null);
+    // Refresh bookings to update signed form status
+    fetchBookings(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── SSE auto-prompt: when stage changes to pickup/delivered, auto-open form ──
+  const checkAutoPrompt = useCallback(
+    (newBookings: Booking[]) => {
+      for (const b of newBookings) {
+        if (b.status !== 'in_progress' && b.status !== 'pending') continue;
+        const pending = getPendingForms(b);
+        // Auto-prompt pickup form
+        if (pending.pickup && !autoPromptedRef.current.has(`${b._id}-pickup`)) {
+          autoPromptedRef.current.add(`${b._id}-pickup`);
+          setFormModal({ bookingId: b._id, type: 'pickup' });
+          return; // One at a time
+        }
+        // Auto-prompt return form
+        if (pending.return_ && !autoPromptedRef.current.has(`${b._id}-return`)) {
+          autoPromptedRef.current.add(`${b._id}-return`);
+          setFormModal({ bookingId: b._id, type: 'return' });
+          return;
+        }
+      }
+    },
+    []
+  );
 
   const detectBookingChanges = useCallback((newBookings: Booking[]) => {
     if (isInitialLoadRef.current || previousBookingsRef.current.length === 0) {
@@ -909,6 +1116,8 @@ function DashboardContent() {
         if (isPolling) {
           const changeMessage = detectBookingChanges(data);
           if (changeMessage) setUpdateNotification(changeMessage);
+          // Check for auto-prompt on polling updates
+          checkAutoPrompt(data);
         }
 
         previousBookingsRef.current = data;
@@ -921,7 +1130,7 @@ function DashboardContent() {
         if (!isPolling) setLoading(false);
       }
     },
-    [detectBookingChanges]
+    [detectBookingChanges, checkAutoPrompt]
   );
 
   const fetchQuoteRequests = useCallback(async (showRefresh = false) => {
@@ -969,6 +1178,28 @@ function DashboardContent() {
   const activeBooking = bookings.find((b) => b.status === 'in_progress' || b.status === 'pending');
   const pendingQuotes = quoteRequests.filter((q) => q.status === 'open' || q.status === 'quoted').length;
   const userName = session?.user?.username ?? session?.user?.email?.split('@')[0] ?? 'User';
+
+  // Resolve the booking for the current form modal
+  const formBooking = formModal ? bookings.find((b) => b._id === formModal.bookingId) : null;
+  const formBookingData = formBooking
+    ? {
+        _id: formBooking._id,
+        userName: formBooking.userName || session?.user?.name || '',
+        userEmail: formBooking.userEmail || session?.user?.email || '',
+        vehicleRegistration: formBooking.vehicleRegistration,
+        vehicleState: formBooking.vehicleState,
+        vehicleModel: formBooking.vehicleModel,
+        vehicleYear: formBooking.vehicleYear,
+        vehicleColor: formBooking.vehicleColor,
+        pickupAddress: formBooking.pickupAddress,
+        garageName: formBooking.garageName,
+        garageAddress: formBooking.garageAddress,
+        transmissionType: formBooking.transmissionType,
+        pickupTime: formBooking.pickupTime,
+        dropoffTime: formBooking.dropoffTime,
+        createdAt: formBooking.createdAt,
+      }
+    : null;
 
   if (authStatus === 'loading' || loading) {
     return (
@@ -1020,6 +1251,34 @@ function DashboardContent() {
           fetchBookings(false);
         }}
       />
+
+      {/* ── Form Modals ── */}
+      {formBookingData && formModal?.type === 'pickup' && (
+        <PickupConsentForm
+          booking={formBookingData}
+          isOpen={true}
+          onClose={() => setFormModal(null)}
+          onSuccess={handleFormSuccess}
+          driverName={formBooking?.driver?.firstName || ''}
+        />
+      )}
+      {formBookingData && formModal?.type === 'return' && (
+        <ReturnConfirmationForm
+          booking={formBookingData}
+          isOpen={true}
+          onClose={() => setFormModal(null)}
+          onSuccess={handleFormSuccess}
+          driverName={formBooking?.driver?.firstName || ''}
+        />
+      )}
+      {formBookingData && formModal?.type === 'claim' && (
+        <ClaimLodgementForm
+          booking={formBookingData}
+          isOpen={true}
+          onClose={() => setFormModal(null)}
+          onSuccess={handleFormSuccess}
+        />
+      )}
 
       {/* Update Notification Toast */}
       {updateNotification && (
@@ -1089,6 +1348,7 @@ function DashboardContent() {
                 userName={userName}
                 onSectionChange={handleSectionChange}
                 onBookingClick={() => setShowBookingModal(true)}
+                onOpenForm={handleOpenForm}
               />
             </motion.div>
           )}
@@ -1122,6 +1382,7 @@ function DashboardContent() {
                 loading={loading}
                 onCancelBooking={(id, rego) => setCancelModalBooking({ id, rego })}
                 onBookingClick={() => setShowBookingModal(true)}
+                onOpenForm={handleOpenForm}
               />
             </motion.div>
           )}
