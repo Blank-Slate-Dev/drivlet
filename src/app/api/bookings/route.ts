@@ -4,9 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import Driver from "@/models/Driver";
+import mongoose from "mongoose";
 import { requireValidOrigin } from "@/lib/validation";
 
-// GET /api/bookings - Get user's own bookings
+// GET /api/bookings - Get user's own bookings (used by main dashboard)
 export async function GET() {
   const session = await getServerSession(authOptions);
 
@@ -48,7 +50,51 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    return NextResponse.json(bookings);
+    // Get all unique driver IDs from bookings
+    const driverIds = [
+      ...new Set(
+        bookings
+          .filter((b) => b.assignedDriverId)
+          .map((b) => b.assignedDriverId!.toString())
+      ),
+    ];
+
+    // Fetch all drivers at once
+    const drivers =
+      driverIds.length > 0
+        ? await Driver.find({
+            _id: {
+              $in: driverIds.map(
+                (id) => new mongoose.Types.ObjectId(id)
+              ),
+            },
+          }).lean()
+        : [];
+
+    // Create a map for quick driver lookup
+    const driverMap = new Map(
+      drivers.map((d) => [
+        d._id.toString(),
+        {
+          firstName: d.firstName,
+          profilePhoto: d.profilePhoto || null,
+          rating: d.metrics?.averageRating || 0,
+          totalRatings: d.metrics?.totalRatings || 0,
+          completedJobs: d.metrics?.completedJobs || 0,
+          memberSince: d.createdAt,
+        },
+      ])
+    );
+
+    // Attach driver info to bookings
+    const bookingsWithDrivers = bookings.map((booking) => ({
+      ...booking,
+      driver: booking.assignedDriverId
+        ? driverMap.get(booking.assignedDriverId.toString()) || null
+        : null,
+    }));
+
+    return NextResponse.json(bookingsWithDrivers);
   } catch (error) {
     console.error("Error fetching bookings:", error);
     return NextResponse.json(
