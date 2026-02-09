@@ -1,3 +1,4 @@
+// src/components/forms/SignaturePad.tsx
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
