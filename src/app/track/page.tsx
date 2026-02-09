@@ -33,10 +33,16 @@ import {
   Star,
   User,
   Briefcase,
+  ClipboardCheck,
+  PackageCheck,
+  FileWarning,
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
 import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
+import PickupConsentForm from "@/components/forms/PickupConsentForm";
+import ReturnConfirmationForm from "@/components/forms/ReturnConfirmationForm";
+import ClaimLodgementForm from "@/components/forms/ClaimLodgementForm";
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -51,11 +57,20 @@ interface DriverInfo {
   memberSince: string;
 }
 
+interface SignedFormRef {
+  formId: string;
+  formType: "pickup_consent" | "return_confirmation" | "claim_lodgement";
+  submittedAt: string;
+}
+
 // Booking type
 interface Booking {
   _id: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   serviceType: string;
   serviceDate?: string;
   pickupAddress: string;
@@ -65,6 +80,10 @@ interface Booking {
   overallProgress: number;
   status: string;
   garageName?: string;
+  garageAddress?: string;
+  transmissionType?: string;
+  userName?: string;
+  userEmail?: string;
   updates: Array<{
     stage: string;
     timestamp: string;
@@ -78,6 +97,8 @@ interface Booking {
   servicePaymentUrl?: string;
   // Driver info
   driver?: DriverInfo | null;
+  // Signed forms
+  signedForms?: SignedFormRef[];
 }
 
 // Stage definitions for visual display
@@ -91,6 +112,9 @@ const STAGES = [
   { id: "returning", label: "Returning", icon: Truck },
   { id: "delivered", label: "Delivered", icon: Home },
 ];
+
+// Stages where pickup form is relevant
+const PICKUP_FORM_STAGES = ["car_picked_up", "at_service_location", "service_in_progress", "ready_for_return", "returning", "delivered"];
 
 // Helper to get stage index for progress display
 const getDisplayStageIndex = (stageId: string): number => {
@@ -157,7 +181,6 @@ function DriverCard({ driver }: { driver: DriverInfo }) {
       className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-4"
     >
       <div className="flex items-center gap-4">
-        {/* Driver Photo */}
         <div className="relative">
           <div className="h-16 w-16 overflow-hidden rounded-full bg-white ring-2 ring-emerald-200 ring-offset-2">
             {driver.profilePhoto ? (
@@ -174,20 +197,17 @@ function DriverCard({ driver }: { driver: DriverInfo }) {
               </div>
             )}
           </div>
-          {/* Verified badge */}
           <div className="absolute -bottom-1 -right-1 rounded-full bg-emerald-500 p-1">
             <CheckCircle2 className="h-3 w-3 text-white" />
           </div>
         </div>
 
-        {/* Driver Info */}
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h4 className="font-semibold text-slate-900">{driver.firstName}</h4>
             <span className="text-sm text-slate-500">is your driver</span>
           </div>
           
-          {/* Rating */}
           {driver.totalRatings > 0 ? (
             <div className="mt-1 flex items-center gap-1.5">
               <div className="flex items-center gap-0.5">
@@ -213,7 +233,6 @@ function DriverCard({ driver }: { driver: DriverInfo }) {
             <p className="mt-1 text-sm text-slate-500">New driver - no reviews yet</p>
           )}
 
-          {/* Stats */}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-600">
             <span className="flex items-center gap-1">
               <Briefcase className="h-3 w-3 text-emerald-600" />
@@ -356,17 +375,102 @@ function TrackingContent() {
   // Photo viewer state
   const [showPhotos, setShowPhotos] = useState(false);
 
+  // Form modal state
+  const [showPickupForm, setShowPickupForm] = useState(false);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [showClaimForm, setShowClaimForm] = useState(false);
+  const autoPromptedRef = useRef<Set<string>>(new Set());
+
   // Animated progress counter
   const currentDisplayIndex = booking ?
     getDisplayStageIndex(booking.currentStage) : 0;
   const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
+  // Check which forms are pending
+  const hasPickupConsent = booking?.signedForms?.some((f) => f.formType === "pickup_consent");
+  const hasReturnConfirmation = booking?.signedForms?.some((f) => f.formType === "return_confirmation");
+  const needsPickupForm = booking && PICKUP_FORM_STAGES.includes(booking.currentStage) && !hasPickupConsent;
+  const needsReturnForm = booking && booking.currentStage === "delivered" && !hasReturnConfirmation;
+
+  // Build booking data for form pre-fill
+  const bookingForForms = booking
+    ? {
+        _id: booking._id,
+        userName: booking.userName || email,
+        userEmail: booking.userEmail || email,
+        vehicleRegistration: booking.vehicleRegistration,
+        vehicleState: booking.vehicleState,
+        vehicleModel: booking.vehicleModel,
+        vehicleYear: booking.vehicleYear,
+        vehicleColor: booking.vehicleColor,
+        pickupAddress: booking.pickupAddress,
+        garageName: booking.garageName,
+        garageAddress: booking.garageAddress,
+        transmissionType: booking.transmissionType || "automatic",
+        pickupTime: booking.pickupTime,
+        dropoffTime: booking.dropoffTime,
+        createdAt: booking.createdAt,
+      }
+    : null;
+
+  // Auto-prompt forms when stage changes via SSE
+  const checkAutoPromptForms = (bookingData: Booking) => {
+    if (!bookingData || bookingData.status === "cancelled" || bookingData.status === "completed") return;
+
+    const signed = bookingData.signedForms ?? [];
+    const hasPickup = signed.some((f) => f.formType === "pickup_consent");
+    const hasReturn = signed.some((f) => f.formType === "return_confirmation");
+
+    // Auto-prompt pickup form
+    if (
+      PICKUP_FORM_STAGES.includes(bookingData.currentStage) &&
+      !hasPickup &&
+      !autoPromptedRef.current.has(`${bookingData._id}-pickup`)
+    ) {
+      autoPromptedRef.current.add(`${bookingData._id}-pickup`);
+      setShowPickupForm(true);
+      return;
+    }
+
+    // Auto-prompt return form
+    if (
+      bookingData.currentStage === "delivered" &&
+      !hasReturn &&
+      !autoPromptedRef.current.has(`${bookingData._id}-return`)
+    ) {
+      autoPromptedRef.current.add(`${bookingData._id}-return`);
+      setShowReturnForm(true);
+    }
+  };
+
+  // Handle form submission success — refresh booking data
+  const handleFormSuccess = async () => {
+    setShowPickupForm(false);
+    setShowReturnForm(false);
+    setShowClaimForm(false);
+    // Re-fetch booking to get updated signedForms
+    if (trackingCode && email && registration) {
+      try {
+        const params = new URLSearchParams({
+          code: trackingCode,
+          email: email.toLowerCase().trim(),
+          rego: registration.toUpperCase().trim(),
+        });
+        const response = await fetch(`/api/bookings/track?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          setBooking(data);
+        }
+      } catch (err) {
+        console.error("Error refreshing booking after form:", err);
+      }
+    }
+  };
+
   // Connect to SSE for real-time updates
   const connectSSE = (bookingId: string, emailParam: string, regoParam: string) => {
-    // Store params in ref for reconnection
     sseParamsRef.current = { bookingId, email: emailParam, rego: regoParam };
 
-    // Close existing connection and clear any pending reconnect
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -376,7 +480,6 @@ function TrackingContent() {
       reconnectTimeoutRef.current = null;
     }
 
-    // Don't connect if page is hidden
     if (document.hidden) {
       return;
     }
@@ -388,7 +491,7 @@ function TrackingContent() {
     eventSource.onopen = () => {
       console.log('SSE connected');
       setIsConnected(true);
-      reconnectAttemptsRef.current = 0; // Reset on successful connection
+      reconnectAttemptsRef.current = 0;
     };
 
     eventSource.onmessage = (event) => {
@@ -401,10 +504,9 @@ function TrackingContent() {
           // Heartbeat received - connection is alive
         } else if (data.type === 'update') {
           console.log('SSE update received:', data);
-          // Update booking state with new data (including payment info and driver)
           setBooking(prev => {
             if (!prev) return prev;
-            return {
+            const updated = {
               ...prev,
               currentStage: data.currentStage,
               overallProgress: data.overallProgress,
@@ -413,14 +515,19 @@ function TrackingContent() {
               servicePaymentAmount: data.servicePaymentAmount,
               servicePaymentUrl: data.servicePaymentUrl,
               driver: data.driver || prev.driver,
+              signedForms: data.signedForms || prev.signedForms,
               updatedAt: data.updatedAt,
               updates: data.latestUpdate
                 ? [...prev.updates.filter(u => u.timestamp !== data.latestUpdate.timestamp), data.latestUpdate]
                 : prev.updates,
             };
+
+            // Check if forms should auto-open after this SSE update
+            checkAutoPromptForms(updated);
+
+            return updated;
           });
 
-          // If payment status changed to paid, clear payment success flag
           if (data.servicePaymentStatus === 'paid') {
             setPaymentSuccess(false);
           }
@@ -434,12 +541,10 @@ function TrackingContent() {
       console.log('SSE connection error or closed');
       setIsConnected(false);
 
-      // Don't reconnect if we've exceeded max attempts or page is hidden
       if (reconnectAttemptsRef.current >= maxReconnectAttempts || document.hidden) {
         return;
       }
 
-      // Exponential backoff: 1s, 2s, 4s, 8s... up to 30s
       const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
       reconnectAttemptsRef.current += 1;
 
@@ -452,7 +557,6 @@ function TrackingContent() {
     };
   };
 
-  // Close SSE connection
   const closeSSE = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -465,17 +569,14 @@ function TrackingContent() {
     setIsConnected(false);
   };
 
-  // Handle visibility changes - disconnect when hidden, reconnect when visible
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Page is hidden - close connection to save resources
         closeSSE();
       } else {
-        // Page is visible - reconnect if we have params
         const params = sseParamsRef.current;
         if (params) {
-          reconnectAttemptsRef.current = 0; // Reset attempts on visibility change
+          reconnectAttemptsRef.current = 0;
           connectSSE(params.bookingId, params.email, params.rego);
         }
       }
@@ -487,28 +588,24 @@ function TrackingContent() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       closeSSE();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load saved credentials on mount and auto-search
   useEffect(() => {
     const loadBooking = async () => {
-      // Priority: URL params > localStorage
       const codeParam = searchParams.get("code");
       const emailParam = searchParams.get("email");
       const regoParam = searchParams.get("rego");
 
-      // If all three URL params are present, auto-search
       if (codeParam && codeParam.length === 6 && emailParam && regoParam) {
         setTrackingCode(codeParam.toUpperCase());
         setEmail(emailParam);
         setRegistration(regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
-        // Save to localStorage for persistence
         localStorage.setItem("drivlet_track_code", codeParam.toUpperCase());
         localStorage.setItem("drivlet_track_email", emailParam);
         localStorage.setItem("drivlet_track_rego", regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
         await handleSearch(codeParam, emailParam, regoParam);
       } else {
-        // Try to load from localStorage
         const savedCode = localStorage.getItem("drivlet_track_code");
         const savedEmail = localStorage.getItem("drivlet_track_email");
         const savedRego = localStorage.getItem("drivlet_track_rego");
@@ -519,7 +616,6 @@ function TrackingContent() {
           setRegistration(savedRego);
           await handleSearch(savedCode, savedEmail, savedRego);
         } else {
-          // Pre-fill any available params
           if (codeParam) setTrackingCode(codeParam.toUpperCase());
           if (emailParam) setEmail(emailParam);
           if (regoParam) setRegistration(regoParam.toUpperCase().replace(/[^A-Z0-9]/g, ''));
@@ -532,18 +628,15 @@ function TrackingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Client-side validation
   const validateForm = (): boolean => {
     const errors: typeof fieldErrors = {};
     let isValid = true;
 
-    // Validate tracking code
     if (!trackingCode || trackingCode.length !== 6) {
       errors.trackingCode = "Please enter a valid 6-character tracking code";
       isValid = false;
     }
 
-    // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
       errors.email = "Email address is required";
@@ -553,7 +646,6 @@ function TrackingContent() {
       isValid = false;
     }
 
-    // Validate registration
     if (!registration) {
       errors.registration = "Vehicle registration is required";
       isValid = false;
@@ -571,11 +663,9 @@ function TrackingContent() {
     const emailToSearch = emailParam || email;
     const regoToSearch = regoParam || registration;
 
-    // Clear previous errors
     setFieldErrors({});
     setError("");
 
-    // If called without params (from form submit), validate
     if (!code && !validateForm()) {
       return;
     }
@@ -595,25 +685,24 @@ function TrackingContent() {
 
       if (response.ok) {
         setBooking(data);
-        // Save credentials for refresh persistence
         localStorage.setItem("drivlet_track_code", codeToSearch.toUpperCase());
         localStorage.setItem("drivlet_track_email", emailToSearch.toLowerCase().trim());
         localStorage.setItem("drivlet_track_rego", regoToSearch.toUpperCase().trim());
-        // Only reset payment UI if this is a fresh search (not a refresh after payment)
         if (!paymentSuccess) {
           setShowPayment(false);
           setClientSecret(null);
         }
-        // If DB now shows paid, we can clear our local success state
         if (data.servicePaymentStatus === "paid") {
           setPaymentSuccess(false);
         }
 
         // Connect to SSE for real-time updates
         connectSSE(data._id, emailToSearch.toLowerCase().trim(), regoToSearch.toUpperCase().trim());
+
+        // Check for auto-prompt on initial load
+        checkAutoPromptForms(data);
       } else {
         if (response.status === 410) {
-          // Booking expired (completed or cancelled)
           setIsExpired(true);
         }
         setError(data.error || "Booking not found");
@@ -665,7 +754,6 @@ function TrackingContent() {
     setShowPayment(false);
     setPaymentError("");
 
-    // Immediately confirm payment with our server (verifies with Stripe directly)
     if (booking?._id) {
       try {
         const confirmResponse = await fetch(`/api/bookings/${booking._id}/confirm-service-payment`, {
@@ -676,14 +764,13 @@ function TrackingContent() {
         const confirmData = await confirmResponse.json();
 
         if (confirmData.success) {
-          // Update local booking state immediately
           setBooking(prev => prev ? {
             ...prev,
             servicePaymentStatus: 'paid',
             currentStage: 'ready_for_return',
             overallProgress: 85,
           } : null);
-          setPaymentSuccess(false); // DB confirmed, show the DB banner instead
+          setPaymentSuccess(false);
           return;
         }
       } catch (err) {
@@ -691,7 +778,6 @@ function TrackingContent() {
       }
     }
 
-    // SSE will handle the update automatically, but fall back to polling if needed
     const pollForUpdate = async (attempts: number) => {
       if (attempts <= 0) return;
 
@@ -721,9 +807,9 @@ function TrackingContent() {
   };
 
   const handleTrackAnother = () => {
-    // Close SSE connection and clear params
     closeSSE();
     sseParamsRef.current = null;
+    autoPromptedRef.current.clear();
     setBooking(null);
     setHasSearched(false);
     setTrackingCode("");
@@ -731,7 +817,6 @@ function TrackingContent() {
     setRegistration("");
     setFieldErrors({});
     setPaymentSuccess(false);
-    // Clear saved credentials
     localStorage.removeItem("drivlet_track_code");
     localStorage.removeItem("drivlet_track_email");
     localStorage.removeItem("drivlet_track_rego");
@@ -831,7 +916,6 @@ function TrackingContent() {
                   exit={{ opacity: 0, y: -10 }}
                 >
                   <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Error Display */}
                     {error && (
                       <div className={`flex items-start gap-3 p-4 rounded-xl ${isExpired ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'}`}>
                         {isExpired ? (
@@ -852,7 +936,6 @@ function TrackingContent() {
                       </div>
                     )}
 
-                    {/* Tracking Code Input */}
                     <div>
                       <label htmlFor="trackingCode" className="block text-sm font-medium text-slate-700 mb-2">
                         Tracking Code
@@ -894,7 +977,6 @@ function TrackingContent() {
                       )}
                     </div>
 
-                    {/* Email Input */}
                     <div>
                       <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
                         Email Address
@@ -935,7 +1017,6 @@ function TrackingContent() {
                       )}
                     </div>
 
-                    {/* Registration Number Input */}
                     <div>
                       <label htmlFor="registration" className="block text-sm font-medium text-slate-700 mb-2">
                         Vehicle Registration Number
@@ -949,7 +1030,6 @@ function TrackingContent() {
                           id="registration"
                           value={registration}
                           onChange={(e) => {
-                            // Transform: uppercase, remove spaces and special chars
                             const cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
                             setRegistration(cleaned);
                             if (fieldErrors.registration) {
@@ -997,7 +1077,6 @@ function TrackingContent() {
                       )}
                     </button>
 
-                    {/* Help Text */}
                     <div className="pt-4 border-t border-slate-100">
                       <p className="text-xs text-slate-500 text-center">
                         Can't find your tracking code?{' '}
@@ -1025,9 +1104,68 @@ function TrackingContent() {
                     </div>
                   </div>
 
-                  {/* Driver Card - Show when driver is assigned */}
+                  {/* Driver Card */}
                   {booking.driver && (
                     <DriverCard driver={booking.driver} />
+                  )}
+
+                  {/* ── Action Required Banner ── */}
+                  {(needsPickupForm || needsReturnForm) && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-200">
+                          <ClipboardCheck className="h-4 w-4 text-amber-700" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-amber-900">Signature Required</p>
+                          <p className="mt-0.5 text-xs text-amber-700">
+                            Please sign the {needsPickupForm && needsReturnForm ? 'pickup and return forms' : needsPickupForm ? 'pickup consent form' : 'return confirmation form'}.
+                          </p>
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {needsPickupForm && (
+                              <button
+                                onClick={() => setShowPickupForm(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500"
+                              >
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                Sign Pickup Form
+                              </button>
+                            )}
+                            {needsReturnForm && (
+                              <button
+                                onClick={() => setShowReturnForm(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-500"
+                              >
+                                <PackageCheck className="h-3.5 w-3.5" />
+                                Sign Return Form
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Signed Form Badges */}
+                  {(hasPickupConsent || hasReturnConfirmation) && (
+                    <div className="flex flex-wrap gap-2">
+                      {hasPickupConsent && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Pickup Signed
+                        </span>
+                      )}
+                      {hasReturnConfirmation && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Return Confirmed
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   {/* Payment Success Banner */}
@@ -1170,14 +1308,59 @@ function TrackingContent() {
                     </div>
                   </div>
 
-                  {/* View Photos Button */}
-                  <button
-                    onClick={() => setShowPhotos(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
-                  >
-                    <Camera className="h-4 w-4" />
-                    View Vehicle Photos
-                  </button>
+                  {/* Action Buttons — Photos, Forms, Claim */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setShowPhotos(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
+                    >
+                      <Camera className="h-4 w-4" />
+                      View Vehicle Photos
+                    </button>
+
+                    {/* Form Buttons Row */}
+                    {(booking.status === "in_progress" || booking.status === "pending") && (
+                      <div className="flex flex-wrap gap-2">
+                        {!hasPickupConsent && PICKUP_FORM_STAGES.includes(booking.currentStage) && (
+                          <button
+                            onClick={() => setShowPickupForm(true)}
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-100 px-3 py-2.5 text-sm font-medium text-emerald-700 transition hover:bg-emerald-200"
+                          >
+                            <ClipboardCheck className="h-4 w-4" />
+                            Pickup Form
+                          </button>
+                        )}
+                        {hasPickupConsent && (
+                          <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-xs font-medium text-emerald-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Pickup Signed
+                          </span>
+                        )}
+                        {!hasReturnConfirmation && booking.currentStage === "delivered" && (
+                          <button
+                            onClick={() => setShowReturnForm(true)}
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-100 px-3 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-200"
+                          >
+                            <PackageCheck className="h-4 w-4" />
+                            Return Form
+                          </button>
+                        )}
+                        {hasReturnConfirmation && (
+                          <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs font-medium text-blue-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Return Signed
+                          </span>
+                        )}
+                        <button
+                          onClick={() => setShowClaimForm(true)}
+                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-3 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-200"
+                        >
+                          <FileWarning className="h-4 w-4" />
+                          Lodge Claim
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Payment Section */}
                   {needsPayment && (
@@ -1297,6 +1480,34 @@ function TrackingContent() {
           isOpen={showPhotos}
           onClose={() => setShowPhotos(false)}
         />
+      )}
+
+      {/* Form Modals */}
+      {bookingForForms && (
+        <>
+          <PickupConsentForm
+            booking={bookingForForms}
+            isOpen={showPickupForm}
+            onClose={() => setShowPickupForm(false)}
+            onSuccess={handleFormSuccess}
+            driverName={booking?.driver?.firstName || ""}
+          />
+
+          <ReturnConfirmationForm
+            booking={bookingForForms}
+            isOpen={showReturnForm}
+            onClose={() => setShowReturnForm(false)}
+            onSuccess={handleFormSuccess}
+            driverName={booking?.driver?.firstName || ""}
+          />
+
+          <ClaimLodgementForm
+            booking={bookingForForms}
+            isOpen={showClaimForm}
+            onClose={() => setShowClaimForm(false)}
+            onSuccess={handleFormSuccess}
+          />
+        </>
       )}
     </main>
   );
