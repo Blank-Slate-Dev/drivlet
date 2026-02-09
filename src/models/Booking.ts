@@ -37,6 +37,13 @@ export interface IGarageResponse {
   notes?: string;
 }
 
+// Signed form reference (lightweight pointer to SignedForm collection)
+export interface ISignedFormRef {
+  formId: Types.ObjectId;
+  formType: 'pickup_consent' | 'return_confirmation' | 'claim_lodgement';
+  submittedAt: Date;
+}
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -145,6 +152,9 @@ export interface IBooking extends Document {
 
   // Vehicle photo checkpoint tracking
   checkpointStatus: ICheckpointStatus;
+
+  // Signed forms (lightweight references to SignedForm collection)
+  signedForms: ISignedFormRef[];
 }
 
 const UpdateSchema = new Schema<IUpdate>(
@@ -183,6 +193,19 @@ const GarageResponseSchema = new Schema<IGarageResponse>(
     respondedAt: { type: Date, required: true },
     respondedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     notes: { type: String },
+  },
+  { _id: false }
+);
+
+const SignedFormRefSchema = new Schema<ISignedFormRef>(
+  {
+    formId: { type: Schema.Types.ObjectId, ref: 'SignedForm', required: true },
+    formType: {
+      type: String,
+      enum: ['pickup_consent', 'return_confirmation', 'claim_lodgement'],
+      required: true,
+    },
+    submittedAt: { type: Date, required: true },
   },
   { _id: false }
 );
@@ -527,6 +550,12 @@ const BookingSchema = new Schema<IBooking>(
       service_dropoff: { type: Number, default: 0, min: 0, max: 5 },
       service_pickup: { type: Number, default: 0, min: 0, max: 5 },
       final_delivery: { type: Number, default: 0, min: 0, max: 5 },
+    },
+
+    // Signed forms (lightweight references to SignedForm collection)
+    signedForms: {
+      type: [SignedFormRefSchema],
+      default: [],
     },
   },
   {
