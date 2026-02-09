@@ -31,6 +31,21 @@ interface IFlag {
   createdAt: string;
 }
 
+interface SignedFormRef {
+  formId: string;
+  formType: "pickup_consent" | "return_confirmation" | "claim_lodgement";
+  submittedAt: string;
+}
+
+interface DriverInfo {
+  firstName: string;
+  profilePhoto: string | null;
+  rating: number;
+  totalRatings: number;
+  completedJobs: number;
+  memberSince: string;
+}
+
 interface BookingData {
   _id: string;
   pickupTime: string;
@@ -38,9 +53,13 @@ interface BookingData {
   pickupAddress: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   serviceType: string;
   hasExistingBooking: boolean;
   garageName?: string;
+  garageAddress?: string;
   existingBookingRef?: string;
   transmissionType: "automatic" | "manual";
   isManualTransmission: boolean;
@@ -51,6 +70,10 @@ interface BookingData {
   updates: IUpdate[];
   createdAt: string;
   paymentAmount?: number;
+  userName?: string;
+  userEmail?: string;
+  driver?: DriverInfo | null;
+  signedForms?: SignedFormRef[];
 }
 
 interface BookingStats {
@@ -268,7 +291,11 @@ export default function BookingsPage() {
         {bookings.length > 0 ? (
           <div className="space-y-4">
             {bookings.map((booking) => (
-              <BookingCard key={booking._id} booking={booking} />
+              <BookingCard
+                key={booking._id}
+                booking={booking}
+                onFormsUpdated={fetchBookings}
+              />
             ))}
           </div>
         ) : (
