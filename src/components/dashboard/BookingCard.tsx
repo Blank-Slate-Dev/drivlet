@@ -20,8 +20,14 @@ import {
   Star,
   User,
   Briefcase,
+  FileWarning,
+  ClipboardCheck,
+  PackageCheck,
 } from "lucide-react";
 import VehiclePhotosViewer from "@/components/customer/VehiclePhotosViewer";
+import PickupConsentForm from "@/components/forms/PickupConsentForm";
+import ReturnConfirmationForm from "@/components/forms/ReturnConfirmationForm";
+import ClaimLodgementForm from "@/components/forms/ClaimLodgementForm";
 
 interface IUpdate {
   stage: string;
@@ -45,6 +51,12 @@ interface DriverInfo {
   memberSince: string;
 }
 
+interface SignedFormRef {
+  formId: string;
+  formType: "pickup_consent" | "return_confirmation" | "claim_lodgement";
+  submittedAt: string;
+}
+
 interface BookingData {
   _id: string;
   pickupTime: string;
@@ -52,9 +64,13 @@ interface BookingData {
   pickupAddress: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   serviceType: string;
   hasExistingBooking: boolean;
   garageName?: string;
+  garageAddress?: string;
   existingBookingRef?: string;
   transmissionType: "automatic" | "manual";
   isManualTransmission: boolean;
@@ -66,10 +82,14 @@ interface BookingData {
   createdAt: string;
   paymentAmount?: number;
   driver?: DriverInfo | null;
+  userName?: string;
+  userEmail?: string;
+  signedForms?: SignedFormRef[];
 }
 
 interface BookingCardProps {
   booking: BookingData;
+  onFormsUpdated?: () => void;
 }
 
 const statusConfig = {
@@ -118,11 +138,42 @@ const stageLabels: Record<string, string> = {
   completed: "Completed",
 };
 
-export default function BookingCard({ booking }: BookingCardProps) {
+export default function BookingCard({ booking, onFormsUpdated }: BookingCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showPickupForm, setShowPickupForm] = useState(false);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [showClaimForm, setShowClaimForm] = useState(false);
   const config = statusConfig[booking.status];
   const StatusIcon = config.icon;
+
+  const hasPickupConsent = booking.signedForms?.some(
+    (f) => f.formType === "pickup_consent"
+  );
+  const hasReturnConfirmation = booking.signedForms?.some(
+    (f) => f.formType === "return_confirmation"
+  );
+  const hasClaimLodged = booking.signedForms?.some(
+    (f) => f.formType === "claim_lodgement"
+  );
+
+  const bookingForForms = {
+    _id: booking._id,
+    userName: booking.userName || "",
+    userEmail: booking.userEmail || "",
+    vehicleRegistration: booking.vehicleRegistration,
+    vehicleState: booking.vehicleState,
+    vehicleModel: booking.vehicleModel,
+    vehicleYear: booking.vehicleYear,
+    vehicleColor: booking.vehicleColor,
+    pickupAddress: booking.pickupAddress,
+    garageName: booking.garageName,
+    garageAddress: booking.garageAddress,
+    transmissionType: booking.transmissionType,
+    pickupTime: booking.pickupTime,
+    dropoffTime: booking.dropoffTime,
+    createdAt: booking.createdAt,
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -150,6 +201,13 @@ export default function BookingCard({ booking }: BookingCardProps) {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleFormSuccess = () => {
+    setShowPickupForm(false);
+    setShowReturnForm(false);
+    setShowClaimForm(false);
+    onFormsUpdated?.();
   };
 
   return (
@@ -272,15 +330,55 @@ export default function BookingCard({ booking }: BookingCardProps) {
               </div>
             )}
 
-            {/* View Photos Button - show for active or completed bookings */}
+            {/* Action Buttons Row - Forms & Photos */}
             {(booking.status === "in_progress" || booking.status === "completed") && (
-              <button
-                onClick={() => setShowPhotos(true)}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition"
-              >
-                <Camera className="h-4 w-4" />
-                View Vehicle Photos
-              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setShowPhotos(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition"
+                >
+                  <Camera className="h-4 w-4" />
+                  View Photos
+                </button>
+
+                {!hasPickupConsent ? (
+                  <button
+                    onClick={() => setShowPickupForm(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 transition"
+                  >
+                    <ClipboardCheck className="h-4 w-4" />
+                    Pickup Form
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Pickup Signed
+                  </span>
+                )}
+
+                {!hasReturnConfirmation ? (
+                  <button
+                    onClick={() => setShowReturnForm(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-100 hover:bg-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition"
+                  >
+                    <PackageCheck className="h-4 w-4" />
+                    Return Form
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-medium text-blue-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Return Signed
+                  </span>
+                )}
+
+                <button
+                  onClick={() => setShowClaimForm(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-100 hover:bg-amber-200 px-3 py-2 text-sm font-medium text-amber-700 transition"
+                >
+                  <FileWarning className="h-4 w-4" />
+                  {hasClaimLodged ? "View / New Claim" : "Lodge Claim"}
+                </button>
+              </div>
             )}
           </div>
 
@@ -420,6 +518,33 @@ export default function BookingCard({ booking }: BookingCardProps) {
                   </div>
                 </div>
               )}
+
+              {/* Signed Forms Status in Expanded View */}
+              {booking.signedForms && booking.signedForms.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">
+                    Signed Forms
+                  </h4>
+                  <div className="space-y-2">
+                    {booking.signedForms.map((form, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          <span className="text-slate-700 capitalize">
+                            {form.formType.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          {formatDateTime(form.submittedAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Activity Timeline */}
@@ -465,6 +590,30 @@ export default function BookingCard({ booking }: BookingCardProps) {
         vehicleRegistration={`${booking.vehicleRegistration} (${booking.vehicleState})`}
         isOpen={showPhotos}
         onClose={() => setShowPhotos(false)}
+      />
+
+      {/* Form Modals */}
+      <PickupConsentForm
+        booking={bookingForForms}
+        isOpen={showPickupForm}
+        onClose={() => setShowPickupForm(false)}
+        onSuccess={handleFormSuccess}
+        driverName={booking.driver?.firstName || ""}
+      />
+
+      <ReturnConfirmationForm
+        booking={bookingForForms}
+        isOpen={showReturnForm}
+        onClose={() => setShowReturnForm(false)}
+        onSuccess={handleFormSuccess}
+        driverName={booking.driver?.firstName || ""}
+      />
+
+      <ClaimLodgementForm
+        booking={bookingForForms}
+        isOpen={showClaimForm}
+        onClose={() => setShowClaimForm(false)}
+        onSuccess={handleFormSuccess}
       />
     </div>
   );
