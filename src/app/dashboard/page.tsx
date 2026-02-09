@@ -1184,7 +1184,7 @@ function DashboardContent() {
   const formBookingData = formBooking
     ? {
         _id: formBooking._id,
-        userName: formBooking.userName || session?.user?.name || '',
+        userName: formBooking.userName || session?.user?.username || session?.user?.email?.split('@')[0] || '',
         userEmail: formBooking.userEmail || session?.user?.email || '',
         vehicleRegistration: formBooking.vehicleRegistration,
         vehicleState: formBooking.vehicleState,
