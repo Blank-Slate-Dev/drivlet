@@ -22,6 +22,9 @@ import {
   MessageSquare,
   AlertTriangle,
   CheckCircle2,
+  ClipboardCheck,
+  Download,
+  FileWarning,
   Phone,
   Mail,
   Building,
@@ -57,6 +60,12 @@ interface Update {
   timestamp: string;
   message: string;
   updatedBy: string;
+}
+
+interface SignedFormRef {
+  formId: string;
+  formType: "pickup_consent" | "return_confirmation" | "claim_lodgement";
+  submittedAt: string;
 }
 
 interface SelectedService {
@@ -99,6 +108,7 @@ interface Booking {
   selectedServices?: SelectedService[];
   primaryServiceCategory?: string | null;
   serviceNotes?: string;
+  signedForms?: SignedFormRef[];
   currentStage: string;
   overallProgress: number;
   status: string;
@@ -1071,6 +1081,49 @@ function ViewDetailsModal({
               </span>
             </p>
           </div>
+
+          {/* Signed Forms */}
+          {booking.signedForms && booking.signedForms.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+                Signed Forms ({booking.signedForms.length})
+              </div>
+              <div className="mt-3 space-y-2">
+                {booking.signedForms.map((form, index) => {
+                  const labelMap: Record<string, { label: string; color: string; bgColor: string; borderColor: string }> = {
+                    pickup_consent: { label: "Pickup Consent", color: "text-emerald-700", bgColor: "bg-emerald-50", borderColor: "border-emerald-200" },
+                    return_confirmation: { label: "Return Confirmation", color: "text-blue-700", bgColor: "bg-blue-50", borderColor: "border-blue-200" },
+                    claim_lodgement: { label: "Claim Lodgement", color: "text-amber-700", bgColor: "bg-amber-50", borderColor: "border-amber-200" },
+                  };
+                  const config = labelMap[form.formType] || { label: form.formType, color: "text-slate-700", bgColor: "bg-slate-50", borderColor: "border-slate-200" };
+                  return (
+                    <div key={index} className={`flex items-center justify-between rounded-lg border ${config.borderColor} ${config.bgColor} px-3 py-2`}>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className={`h-4 w-4 ${config.color}`} />
+                        <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500">
+                          {new Date(form.submittedAt).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <a
+                          href={`/api/admin/forms/${form.formId}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition hover:opacity-80 ${config.bgColor} ${config.color} border ${config.borderColor}`}
+                          title="Download / Print Form"
+                        >
+                          <Download className="h-3 w-3" />
+                          PDF
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">

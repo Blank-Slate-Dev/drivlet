@@ -101,20 +101,19 @@ interface Booking {
   signedForms?: SignedFormRef[];
 }
 
-// Stage definitions for visual display
+// Stage definitions for visual display — matches admin/backend stage IDs
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", icon: CheckCircle2 },
   { id: "driver_en_route", label: "Driver En Route", icon: Truck },
   { id: "car_picked_up", label: "Car Picked Up", icon: Package },
-  { id: "at_service_location", label: "At Service Location", icon: MapPin },
+  { id: "at_garage", label: "At Garage", icon: MapPin },
   { id: "service_in_progress", label: "Service In Progress", icon: Wrench },
-  { id: "ready_for_return", label: "Ready For Return", icon: CheckCircle2 },
-  { id: "returning", label: "Returning", icon: Truck },
+  { id: "driver_returning", label: "Driver Returning", icon: Truck },
   { id: "delivered", label: "Delivered", icon: Home },
 ];
 
-// Stages where pickup form is relevant
-const PICKUP_FORM_STAGES = ["car_picked_up", "at_service_location", "service_in_progress", "ready_for_return", "returning", "delivered"];
+// Stages where pickup form is relevant (from car_picked_up onwards)
+const PICKUP_FORM_STAGES = ["car_picked_up", "at_garage", "service_in_progress", "driver_returning", "delivered"];
 
 // Helper to get stage index for progress display
 const getDisplayStageIndex = (stageId: string): number => {
@@ -386,9 +385,10 @@ function TrackingContent() {
     getDisplayStageIndex(booking.currentStage) : 0;
   const animatedProgress = useAnimatedCounter(booking?.overallProgress || 0, 800);
 
-  // Check which forms are pending
+  // Check which forms are pending / signed
   const hasPickupConsent = booking?.signedForms?.some((f) => f.formType === "pickup_consent");
   const hasReturnConfirmation = booking?.signedForms?.some((f) => f.formType === "return_confirmation");
+  const hasClaimLodged = booking?.signedForms?.some((f) => f.formType === "claim_lodgement");
   const needsPickupForm = booking && PICKUP_FORM_STAGES.includes(booking.currentStage) && !hasPickupConsent;
   const needsReturnForm = booking && booking.currentStage === "delivered" && !hasReturnConfirmation;
 
@@ -767,8 +767,8 @@ function TrackingContent() {
           setBooking(prev => prev ? {
             ...prev,
             servicePaymentStatus: 'paid',
-            currentStage: 'ready_for_return',
-            overallProgress: 85,
+            currentStage: 'driver_returning',
+            overallProgress: 86,
           } : null);
           setPaymentSuccess(false);
           return;
@@ -1151,7 +1151,7 @@ function TrackingContent() {
                   )}
 
                   {/* Signed Form Badges */}
-                  {(hasPickupConsent || hasReturnConfirmation) && (
+                  {(hasPickupConsent || hasReturnConfirmation || hasClaimLodged) && (
                     <div className="flex flex-wrap gap-2">
                       {hasPickupConsent && (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600">
@@ -1163,6 +1163,12 @@ function TrackingContent() {
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Return Confirmed
+                        </span>
+                      )}
+                      {hasClaimLodged && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Claim Lodged
                         </span>
                       )}
                     </div>
@@ -1351,13 +1357,20 @@ function TrackingContent() {
                             Return Signed
                           </span>
                         )}
-                        <button
-                          onClick={() => setShowClaimForm(true)}
-                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-3 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-200"
-                        >
-                          <FileWarning className="h-4 w-4" />
-                          Lodge Claim
-                        </button>
+                        {!hasClaimLodged ? (
+                          <button
+                            onClick={() => setShowClaimForm(true)}
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-3 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-200"
+                          >
+                            <FileWarning className="h-4 w-4" />
+                            Lodge Claim
+                          </button>
+                        ) : (
+                          <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5 text-xs font-medium text-green-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Claim Lodged
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
