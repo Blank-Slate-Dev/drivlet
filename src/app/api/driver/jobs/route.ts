@@ -175,6 +175,7 @@ export async function GET(request: NextRequest) {
       page,
       totalPages: Math.ceil(total / limit),
       canAcceptJobs: driver.canAcceptJobs,
+      isClockedIn: driver.isClockedIn,
     });
   } catch (error) {
     console.error("Error fetching driver jobs:", error);
@@ -246,6 +247,14 @@ export async function POST(request: NextRequest) {
 
     // ========== ACCEPT JOB ==========
     if (action === "accept") {
+      // Check if driver is clocked in
+      if (!driver.isClockedIn) {
+        return NextResponse.json(
+          { error: "You must be clocked in to accept jobs" },
+          { status: 400 }
+        );
+      }
+
       // Check daily limit
       const today = new Date();
       today.setHours(0, 0, 0, 0);

@@ -103,6 +103,9 @@ interface Driver {
   }>;
   isActive: boolean;
   canAcceptJobs: boolean;
+  isClockedIn?: boolean;
+  lastClockIn?: string;
+  lastClockOut?: string;
   userId?: {
     email: string;
     username: string;
@@ -116,6 +119,7 @@ interface Stats {
   approved: number;
   rejected: number;
   suspended: number;
+  clockedIn?: number;
 }
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected" | "suspended";
@@ -504,6 +508,7 @@ export default function AdminDriversPage() {
                     <th className="px-6 py-4">License</th>
                     <th className="px-6 py-4">Type</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Clock</th>
                     <th className="px-6 py-4">Submitted</th>
                     <th className="px-6 py-4">Actions</th>
                   </tr>
@@ -561,6 +566,20 @@ export default function AdminDriversPage() {
                           {getStatusIcon(driver.status)}
                           {driver.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {driver.status === "approved" ? (
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                            driver.isClockedIn
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${driver.isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                            {driver.isClockedIn ? "Active" : "Off"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-slate-600">{formatDate(driver.submittedAt)}</p>
@@ -871,6 +890,46 @@ export default function AdminDriversPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Clock Status (for approved drivers) */}
+                {selectedDriver.status === "approved" && (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3">
+                      <Clock className="h-4 w-4 text-emerald-600" />
+                      Clock Status
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                          selectedDriver.isClockedIn ? "bg-emerald-100" : "bg-slate-100"
+                        }`}>
+                          <Clock className={`h-5 w-5 ${selectedDriver.isClockedIn ? "text-emerald-600" : "text-slate-500"}`} />
+                        </div>
+                        <div>
+                          <p className={`font-medium ${selectedDriver.isClockedIn ? "text-emerald-700" : "text-slate-700"}`}>
+                            {selectedDriver.isClockedIn ? "Currently Clocked In" : "Not Clocked In"}
+                          </p>
+                          {selectedDriver.isClockedIn && selectedDriver.lastClockIn && (
+                            <p className="text-xs text-slate-500">
+                              Since {formatDateTime(selectedDriver.lastClockIn)}
+                            </p>
+                          )}
+                          {!selectedDriver.isClockedIn && selectedDriver.lastClockOut && (
+                            <p className="text-xs text-slate-500">
+                              Last clocked out: {formatDateTime(selectedDriver.lastClockOut)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {selectedDriver.isClockedIn && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Metrics (for approved drivers) */}
                 {selectedDriver.status === "approved" && selectedDriver.metrics && (

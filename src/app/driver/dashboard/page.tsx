@@ -3,7 +3,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Car,
@@ -19,11 +19,45 @@ import {
   RefreshCw,
   Briefcase,
   Settings,
+  Play,
+  Square,
+  Loader2,
 } from "lucide-react";
+
+interface ClockStatus {
+  isClockedIn: boolean;
+  lastClockIn: string | null;
+  lastClockOut: string | null;
+  currentTimeEntryId: string | null;
+  canAcceptJobs: boolean;
+  onboardingStatus: string;
+  todaySummary: {
+    hoursWorked: number;
+    minutesWorked: number;
+    jobsCompleted: number;
+  };
+}
 
 export default function DriverDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const [clockStatus, setClockStatus] = useState<ClockStatus | null>(null);
+  const [clockLoading, setClockLoading] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Fetch clock status
+  const fetchClockStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/driver/clock");
+      if (res.ok) {
+        const data = await res.json();
+        setClockStatus(data);
+      }
+    } catch (error) {
+      console.error("Error fetching clock status:", error);
+    }
+  }, []);
 
   useEffect(() => {
     // Check if driver is approved by admin
@@ -31,12 +65,72 @@ export default function DriverDashboardPage() {
       router.push("/driver/pending");
     }
     // CRITICAL: Check if driver has completed onboarding
-    // This enforces the state machine - approved ≠ can work
-    // insuranceEligible is derived from onboardingStatus === "active"
     if (status === "authenticated" && session?.user?.onboardingStatus !== "active") {
       router.push("/driver/onboarding");
     }
   }, [session, status, router]);
+
+  // Fetch clock status on mount
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchClockStatus();
+    }
+  }, [status, fetchClockStatus]);
+
+  // Live timer when clocked in
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (clockStatus?.isClockedIn && clockStatus.lastClockIn) {
+      const updateElapsed = () => {
+        const clockInTime = new Date(clockStatus.lastClockIn!).getTime();
+        const now = Date.now();
+        setElapsedTime(Math.floor((now - clockInTime) / 1000));
+      };
+
+      updateElapsed();
+      interval = setInterval(updateElapsed, 1000);
+    } else {
+      setElapsedTime(0);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [clockStatus?.isClockedIn, clockStatus?.lastClockIn]);
+
+  // Format elapsed time
+  const formatElapsedTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Handle clock in/out
+  const handleClockAction = async () => {
+    setClockLoading(true);
+    try {
+      const action = clockStatus?.isClockedIn ? "clock_out" : "clock_in";
+      const res = await fetch("/api/driver/clock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+
+      if (res.ok) {
+        await fetchClockStatus();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to process clock action");
+      }
+    } catch (error) {
+      console.error("Error with clock action:", error);
+      alert("Failed to process clock action");
+    } finally {
+      setClockLoading(false);
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -57,7 +151,7 @@ export default function DriverDashboardPage() {
 
   // Mock data - replace with actual API calls
   const stats = {
-    todayJobs: 3,
+    todayJobs: clockStatus?.todaySummary?.jobsCompleted ?? 0,
     weekEarnings: 420,
     rating: 4.9,
     completedJobs: 127,
@@ -86,21 +180,131 @@ export default function DriverDashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Page Header - Compact, matches admin */}
+      {/* Page Header with Clock Button */}
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-500">Welcome back, {session?.user?.username}</p>
         </div>
-        <button className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50">
-          <RefreshCw className="h-3.5 w-3.5" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Clock In/Out Button */}
+          {clockStatus && (
+            <button
+              onClick={handleClockAction}
+              disabled={clockLoading || !clockStatus.canAcceptJobs}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                clockStatus.isClockedIn
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+              } ${(!clockStatus.canAcceptJobs || clockLoading) && "opacity-50 cursor-not-allowed"}`}
+            >
+              {clockLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : clockStatus.isClockedIn ? (
+                <Square className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {clockStatus.isClockedIn ? "Clock Out" : "Clock In"}
+            </button>
+          )}
+          <button
+            onClick={fetchClockStatus}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Stats Row - Compact, matches admin style */}
+      {/* Clock Status Banner */}
+      {clockStatus && (
+        <div
+          className={`mb-4 rounded-lg p-4 ${
+            clockStatus.isClockedIn
+              ? "bg-emerald-50 border border-emerald-200"
+              : "bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  clockStatus.isClockedIn ? "bg-emerald-100" : "bg-slate-200"
+                }`}
+              >
+                <Clock
+                  className={`h-6 w-6 ${
+                    clockStatus.isClockedIn ? "text-emerald-600" : "text-slate-500"
+                  }`}
+                />
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    clockStatus.isClockedIn ? "text-emerald-800" : "text-slate-700"
+                  }`}
+                >
+                  {clockStatus.isClockedIn ? "Currently Clocked In" : "Not Clocked In"}
+                </p>
+                {clockStatus.isClockedIn && clockStatus.lastClockIn && (
+                  <p className="text-xs text-emerald-600">
+                    Since {new Date(clockStatus.lastClockIn).toLocaleTimeString()}
+                  </p>
+                )}
+                {!clockStatus.isClockedIn && clockStatus.lastClockOut && (
+                  <p className="text-xs text-slate-500">
+                    Last clocked out: {new Date(clockStatus.lastClockOut).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Elapsed Timer */}
+            {clockStatus.isClockedIn && (
+              <div className="text-right">
+                <p className="text-xs text-emerald-600 font-medium">Elapsed Time</p>
+                <p className="text-2xl font-mono font-bold text-emerald-700">
+                  {formatElapsedTime(elapsedTime)}
+                </p>
+              </div>
+            )}
+
+            {/* Today's Summary */}
+            <div className="flex items-center gap-6 text-sm">
+              <div className="text-center">
+                <p className="text-xs text-slate-500">Today&apos;s Hours</p>
+                <p className="font-semibold text-slate-900">
+                  {clockStatus.todaySummary.hoursWorked}h {clockStatus.todaySummary.minutesWorked}m
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500">Jobs Completed</p>
+                <p className="font-semibold text-slate-900">
+                  {clockStatus.todaySummary.jobsCompleted}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {!clockStatus.isClockedIn && clockStatus.canAcceptJobs && (
+            <p className="mt-3 text-xs text-slate-600">
+              Clock in to start accepting jobs
+            </p>
+          )}
+
+          {!clockStatus.canAcceptJobs && (
+            <p className="mt-3 text-xs text-red-600">
+              You must complete onboarding before you can clock in
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Stats Row */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Earnings card - Primary accent */}
+        {/* Earnings card */}
         <div className="rounded-lg bg-emerald-600 p-3">
           <div className="flex items-center gap-3">
             <DollarSign className="h-5 w-5 text-emerald-100" />
@@ -145,7 +349,7 @@ export default function DriverDashboardPage() {
         </div>
       </div>
 
-      {/* Quick Links - Single row, compact cards */}
+      {/* Quick Links */}
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
         <Link
           href="/driver/jobs"
@@ -184,7 +388,7 @@ export default function DriverDashboardPage() {
         </Link>
       </div>
 
-      {/* Upcoming Jobs - Compact table style */}
+      {/* Upcoming Jobs */}
       <div className="rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2">

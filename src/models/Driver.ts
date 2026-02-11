@@ -152,6 +152,12 @@ export interface IDriver extends Document {
   isActive: boolean; // Can toggle availability
   canAcceptJobs: boolean; // ONLY true when onboardingStatus === "active" AND insuranceEligible
 
+  // Clock In/Out tracking
+  isClockedIn: boolean;
+  lastClockIn?: Date;
+  lastClockOut?: Date;
+  currentTimeEntryId?: mongoose.Types.ObjectId;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -458,6 +464,22 @@ const DriverSchema = new Schema<IDriver>(
       type: Boolean,
       default: false, // ONLY true when onboardingStatus === "active"
     },
+
+    // Clock In/Out tracking
+    isClockedIn: {
+      type: Boolean,
+      default: false,
+    },
+    lastClockIn: {
+      type: Date,
+    },
+    lastClockOut: {
+      type: Date,
+    },
+    currentTimeEntryId: {
+      type: Schema.Types.ObjectId,
+      ref: "TimeEntry",
+    },
   },
   {
     timestamps: true,
@@ -472,6 +494,7 @@ DriverSchema.index({ onboardingStatus: 1 });
 DriverSchema.index({ isActive: 1, canAcceptJobs: 1 });
 DriverSchema.index({ "license.number": 1, "license.state": 1 });
 DriverSchema.index({ preferredAreas: 1 });
+DriverSchema.index({ isClockedIn: 1 });
 
 // Virtual for full name
 DriverSchema.virtual("fullName").get(function () {
@@ -490,7 +513,8 @@ DriverSchema.virtual("canWork").get(function () {
     this.status === "approved" &&
     this.onboardingStatus === "active" &&
     this.canAcceptJobs === true &&
-    this.isActive === true
+    this.isActive === true &&
+    this.isClockedIn === true
   );
 });
 

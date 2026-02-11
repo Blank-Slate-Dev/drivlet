@@ -67,6 +67,8 @@ export async function GET(request: Request) {
       },
       // Computed from derived logic
       insuranceEligible: allDrivers.filter(isInsuranceEligible).length,
+      // Clock status
+      clockedIn: allDrivers.filter((d) => d.isClockedIn).length,
     };
 
     return NextResponse.json({
@@ -75,6 +77,10 @@ export async function GET(request: Request) {
         _id: driver._id.toString(),
         // Compute insuranceEligible since it's a virtual and lean() doesn't include it
         insuranceEligible: driver.employmentType === "employee" && driver.onboardingStatus === "active",
+        // Clock status
+        isClockedIn: driver.isClockedIn || false,
+        lastClockIn: driver.lastClockIn || null,
+        lastClockOut: driver.lastClockOut || null,
         // Preserve the populated user data, just convert the nested _id to string
         userId: driver.userId ? {
           _id: driver.userId._id?.toString(),
