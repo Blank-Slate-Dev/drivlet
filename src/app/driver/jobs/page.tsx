@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   Briefcase,
   MapPin,
@@ -25,6 +26,7 @@ import {
   X,
   Camera,
   PhoneCall,
+  Home,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 
@@ -372,6 +374,17 @@ export default function DriverJobsPage() {
             </button>
           </div>
         )}
+
+        {/* Return to Home Button */}
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/driver/dashboard"
+            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-200 active:scale-95"
+          >
+            <Home className="h-4 w-4" />
+            Return to Home
+          </Link>
+        </div>
       </div>
 
       {/* Payment Modal */}

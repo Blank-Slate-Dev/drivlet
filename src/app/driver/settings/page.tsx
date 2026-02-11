@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Settings,
   User,
@@ -31,6 +32,7 @@ import {
   Camera,
   Upload,
   Trash2,
+  Home,
 } from "lucide-react";
 
 interface DriverSettings {
@@ -894,6 +896,17 @@ export default function DriverSettingsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Return to Home Button */}
+      <div className="mt-8 flex justify-center pb-8">
+        <Link
+          href="/driver/dashboard"
+          className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-200 active:scale-95"
+        >
+          <Home className="h-4 w-4" />
+          Return to Home
+        </Link>
       </div>
     </div>
   );

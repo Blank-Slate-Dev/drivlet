@@ -5,32 +5,18 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  Car,
-  MapPin,
-  Clock,
-  DollarSign,
-  Star,
-  Calendar,
-  ChevronRight,
-  CheckCircle,
-  TrendingUp,
-  Navigation,
-  RefreshCw,
   Briefcase,
+  DollarSign,
+  Car,
+  Clock,
   Settings,
-  Play,
-  Square,
-  Loader2,
+  Timer,
 } from "lucide-react";
 
 interface ClockStatus {
   isClockedIn: boolean;
-  lastClockIn: string | null;
-  lastClockOut: string | null;
-  currentTimeEntryId: string | null;
-  canAcceptJobs: boolean;
-  onboardingStatus: string;
   todaySummary: {
     hoursWorked: number;
     minutesWorked: number;
@@ -38,13 +24,86 @@ interface ClockStatus {
   };
 }
 
+interface AppButtonProps {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  sublabel?: string;
+  badge?: number | string;
+  variant?: "default" | "accent";
+  loading?: boolean;
+}
+
+function AppButton({
+  href,
+  icon: Icon,
+  label,
+  sublabel,
+  badge,
+  variant = "default",
+  loading = false,
+}: AppButtonProps) {
+  return (
+    <Link
+      href={href}
+      className={`group relative flex flex-col items-center justify-center rounded-2xl p-5 transition-all active:scale-95 ${
+        variant === "accent"
+          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+          : "bg-white text-slate-700 shadow-sm border border-slate-200/80 hover:shadow-md hover:border-slate-300"
+      }`}
+    >
+      {badge !== undefined && badge !== 0 && (
+        <span
+          className={`absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-bold ${
+            variant === "accent"
+              ? "bg-white text-emerald-700"
+              : "bg-emerald-600 text-white"
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+      <Icon
+        className={`h-7 w-7 mb-2 ${
+          variant === "accent" ? "text-white" : "text-emerald-600"
+        }`}
+      />
+      <span
+        className={`text-sm font-semibold ${
+          variant === "accent" ? "text-white" : "text-slate-800"
+        }`}
+      >
+        {label}
+      </span>
+      {loading ? (
+        <span
+          className={`h-3 w-12 mt-1 rounded animate-pulse ${
+            variant === "accent" ? "bg-emerald-400" : "bg-slate-200"
+          }`}
+        />
+      ) : (
+        sublabel && (
+          <span
+            className={`text-xs mt-0.5 ${
+              variant === "accent" ? "text-emerald-100" : "text-slate-400"
+            }`}
+          >
+            {sublabel}
+          </span>
+        )
+      )}
+    </Link>
+  );
+}
+
 export default function DriverDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const [clockStatus, setClockStatus] = useState<ClockStatus | null>(null);
-  const [clockLoading, setClockLoading] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [availableCount, setAvailableCount] = useState<number | null>(null);
+  const [acceptedCount, setAcceptedCount] = useState<number | null>(null);
+  const [weekEarnings, setWeekEarnings] = useState<number | null>(null);
 
   // Fetch clock status
   const fetchClockStatus = useCallback(async () => {
@@ -54,422 +113,189 @@ export default function DriverDashboardPage() {
         const data = await res.json();
         setClockStatus(data);
       }
-    } catch (error) {
-      console.error("Error fetching clock status:", error);
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  // Fetch job counts
+  const fetchJobCounts = useCallback(async () => {
+    try {
+      const [availableRes, acceptedRes] = await Promise.all([
+        fetch("/api/driver/jobs?status=available&limit=1"),
+        fetch("/api/driver/jobs?status=accepted&limit=1"),
+      ]);
+
+      if (availableRes.ok) {
+        const data = await availableRes.json();
+        setAvailableCount(data.total || 0);
+      }
+
+      if (acceptedRes.ok) {
+        const data = await acceptedRes.json();
+        setAcceptedCount(data.total || 0);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  // Fetch earnings
+  const fetchEarnings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/driver/earnings?period=week");
+      if (res.ok) {
+        const data = await res.json();
+        setWeekEarnings(data.totalEarnings || 0);
+      }
+    } catch {
+      // Silently fail — default to 0
+      setWeekEarnings(0);
     }
   }, []);
 
   useEffect(() => {
-    // Check if driver is approved by admin
     if (status === "authenticated" && !session?.user?.isApproved) {
       router.push("/driver/pending");
     }
-    // CRITICAL: Check if driver has completed onboarding
-    if (status === "authenticated" && session?.user?.onboardingStatus !== "active") {
+    if (
+      status === "authenticated" &&
+      session?.user?.onboardingStatus !== "active"
+    ) {
       router.push("/driver/onboarding");
     }
   }, [session, status, router]);
 
-  // Fetch clock status on mount
+  // Fetch data on mount
   useEffect(() => {
     if (status === "authenticated") {
       fetchClockStatus();
+      fetchJobCounts();
+      fetchEarnings();
     }
-  }, [status, fetchClockStatus]);
+  }, [status, fetchClockStatus, fetchJobCounts, fetchEarnings]);
 
-  // Live timer when clocked in
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (clockStatus?.isClockedIn && clockStatus.lastClockIn) {
-      const updateElapsed = () => {
-        const clockInTime = new Date(clockStatus.lastClockIn!).getTime();
-        const now = Date.now();
-        setElapsedTime(Math.floor((now - clockInTime) / 1000));
-      };
-
-      updateElapsed();
-      interval = setInterval(updateElapsed, 1000);
-    } else {
-      setElapsedTime(0);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [clockStatus?.isClockedIn, clockStatus?.lastClockIn]);
-
-  // Format elapsed time
-  const formatElapsedTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
   };
 
-  // Handle clock in/out
-  const handleClockAction = async () => {
-    setClockLoading(true);
-    try {
-      const action = clockStatus?.isClockedIn ? "clock_out" : "clock_in";
-      const res = await fetch("/api/driver/clock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-
-      if (res.ok) {
-        await fetchClockStatus();
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to process clock action");
-      }
-    } catch (error) {
-      console.error("Error with clock action:", error);
-      alert("Failed to process clock action");
-    } finally {
-      setClockLoading(false);
-    }
+  const formatDuration = (minutes: number): string => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h === 0) return `${m}m`;
+    return `${h}h ${m}m`;
   };
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-12 w-48 rounded-lg bg-slate-200" />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 rounded-lg bg-slate-200" />
-              ))}
-            </div>
+      <div className="relative flex min-h-[calc(100vh-52px)] flex-col items-center justify-center px-6 py-8">
+        <div className="fixed inset-0 bg-gradient-to-b from-emerald-50 via-white to-slate-50 -z-10" />
+        <div className="animate-pulse space-y-6 w-full max-w-sm">
+          <div className="h-8 w-48 bg-slate-200 rounded mx-auto" />
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-28 bg-slate-200 rounded-2xl" />
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  // Mock data - replace with actual API calls
-  const stats = {
-    todayJobs: clockStatus?.todaySummary?.jobsCompleted ?? 0,
-    weekEarnings: 420,
-    rating: 4.9,
-    completedJobs: 127,
-  };
-
-  const upcomingJobs = [
-    {
-      id: "1",
-      customerName: "John Smith",
-      pickupAddress: "123 George St, Sydney",
-      dropoffAddress: "AutoCare Plus, Parramatta",
-      pickupTime: "9:30 AM",
-      status: "confirmed",
-      payout: 28,
-    },
-    {
-      id: "2",
-      customerName: "Sarah Wilson",
-      pickupAddress: "45 Queen St, Newcastle",
-      dropoffAddress: "City Motors, Maitland",
-      pickupTime: "11:00 AM",
-      status: "pending",
-      payout: 32,
-    },
-  ];
+  const isClockedIn = clockStatus?.isClockedIn ?? false;
+  const todayMinutes =
+    (clockStatus?.todaySummary?.hoursWorked ?? 0) * 60 +
+    (clockStatus?.todaySummary?.minutesWorked ?? 0);
+  const todayJobsCompleted = clockStatus?.todaySummary?.jobsCompleted ?? 0;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Page Header with Clock Button */}
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500">Welcome back, {session?.user?.username}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Clock In/Out Button */}
-          {clockStatus && (
-            <button
-              onClick={handleClockAction}
-              disabled={clockLoading || !clockStatus.canAcceptJobs}
-              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
-                clockStatus.isClockedIn
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-emerald-600 text-white hover:bg-emerald-700"
-              } ${(!clockStatus.canAcceptJobs || clockLoading) && "opacity-50 cursor-not-allowed"}`}
-            >
-              {clockLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : clockStatus.isClockedIn ? (
-                <Square className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              {clockStatus.isClockedIn ? "Clock Out" : "Clock In"}
-            </button>
-          )}
-          <button
-            onClick={fetchClockStatus}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
-          </button>
+    <div className="relative flex min-h-[calc(100vh-52px)] flex-col items-center justify-center px-6 py-8">
+      {/* Background: subtle gradient */}
+      <div className="fixed inset-0 bg-gradient-to-b from-emerald-50 via-white to-slate-50 -z-10" />
+
+      {/* Watermark logo */}
+      <div className="fixed inset-0 flex items-center justify-center -z-[5] pointer-events-none">
+        <div className="relative h-64 w-64 opacity-[0.03]">
+          <Image src="/logo.png" alt="" fill className="object-contain" />
         </div>
       </div>
 
-      {/* Clock Status Banner */}
-      {clockStatus && (
-        <div
-          className={`mb-4 rounded-lg p-4 ${
-            clockStatus.isClockedIn
-              ? "bg-emerald-50 border border-emerald-200"
-              : "bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-full ${
-                  clockStatus.isClockedIn ? "bg-emerald-100" : "bg-slate-200"
-                }`}
-              >
-                <Clock
-                  className={`h-6 w-6 ${
-                    clockStatus.isClockedIn ? "text-emerald-600" : "text-slate-500"
-                  }`}
-                />
-              </div>
-              <div>
-                <p
-                  className={`text-sm font-medium ${
-                    clockStatus.isClockedIn ? "text-emerald-800" : "text-slate-700"
-                  }`}
-                >
-                  {clockStatus.isClockedIn ? "Currently Clocked In" : "Not Clocked In"}
-                </p>
-                {clockStatus.isClockedIn && clockStatus.lastClockIn && (
-                  <p className="text-xs text-emerald-600">
-                    Since {new Date(clockStatus.lastClockIn).toLocaleTimeString()}
-                  </p>
-                )}
-                {!clockStatus.isClockedIn && clockStatus.lastClockOut && (
-                  <p className="text-xs text-slate-500">
-                    Last clocked out: {new Date(clockStatus.lastClockOut).toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Elapsed Timer */}
-            {clockStatus.isClockedIn && (
-              <div className="text-right">
-                <p className="text-xs text-emerald-600 font-medium">Elapsed Time</p>
-                <p className="text-2xl font-mono font-bold text-emerald-700">
-                  {formatElapsedTime(elapsedTime)}
-                </p>
-              </div>
-            )}
-
-            {/* Today's Summary */}
-            <div className="flex items-center gap-6 text-sm">
-              <div className="text-center">
-                <p className="text-xs text-slate-500">Today&apos;s Hours</p>
-                <p className="font-semibold text-slate-900">
-                  {clockStatus.todaySummary.hoursWorked}h {clockStatus.todaySummary.minutesWorked}m
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-500">Jobs Completed</p>
-                <p className="font-semibold text-slate-900">
-                  {clockStatus.todaySummary.jobsCompleted}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {!clockStatus.isClockedIn && clockStatus.canAcceptJobs && (
-            <p className="mt-3 text-xs text-slate-600">
-              Clock in to start accepting jobs
-            </p>
-          )}
-
-          {!clockStatus.canAcceptJobs && (
-            <p className="mt-3 text-xs text-red-600">
-              You must complete onboarding before you can clock in
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Earnings card */}
-        <div className="rounded-lg bg-emerald-600 p-3">
-          <div className="flex items-center gap-3">
-            <DollarSign className="h-5 w-5 text-emerald-100" />
-            <div>
-              <p className="text-xs text-emerald-100">This Week</p>
-              <p className="text-xl font-bold text-white">${stats.weekEarnings}</p>
-            </div>
-          </div>
+      {/* Content */}
+      <div className="w-full max-w-sm">
+        {/* Greeting */}
+        <div className="text-center mb-8">
+          <h1 className="text-xl font-semibold text-slate-800">
+            {getGreeting()}, {session?.user?.username || "Driver"} 👋
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isClockedIn ? "You're on the clock" : "Ready to start your shift?"}
+          </p>
         </div>
 
-        {/* Today's jobs */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex items-center gap-3">
-            <Calendar className="h-5 w-5 text-slate-400" />
-            <div>
-              <p className="text-xs text-slate-500">Today&apos;s Jobs</p>
-              <p className="text-xl font-bold text-slate-900">{stats.todayJobs}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Rating */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex items-center gap-3">
-            <Star className="h-5 w-5 text-amber-400" />
-            <div>
-              <p className="text-xs text-slate-500">Rating</p>
-              <p className="text-xl font-bold text-slate-900">{stats.rating}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Completed jobs */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="h-5 w-5 text-slate-400" />
-            <div>
-              <p className="text-xs text-slate-500">Completed</p>
-              <p className="text-xl font-bold text-slate-900">{stats.completedJobs}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Links */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        <Link
-          href="/driver/jobs"
-          className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-        >
-          <Briefcase className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
-          <span className="truncate text-sm font-medium text-slate-700 group-hover:text-emerald-700">Available Jobs</span>
-          <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-        </Link>
-
-        <Link
-          href="/driver/earnings"
-          className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-        >
-          <DollarSign className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
-          <span className="truncate text-sm font-medium text-slate-700 group-hover:text-emerald-700">Earnings</span>
-          <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-        </Link>
-
-        <Link
-          href="/driver/history"
-          className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-        >
-          <Clock className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
-          <span className="truncate text-sm font-medium text-slate-700 group-hover:text-emerald-700">History</span>
-          <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-        </Link>
-
-        <Link
-          href="/driver/settings"
-          className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-        >
-          <Settings className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
-          <span className="truncate text-sm font-medium text-slate-700 group-hover:text-emerald-700">Settings</span>
-          <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-        </Link>
-      </div>
-
-      {/* Upcoming Jobs */}
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-emerald-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Upcoming Jobs</h2>
-          </div>
-          <Link
+        {/* App Button Grid */}
+        <div className="grid grid-cols-2 gap-4 w-full">
+          {/* Available Jobs - PRIMARY */}
+          <AppButton
             href="/driver/jobs"
-            className="flex items-center gap-1 text-xs font-medium text-emerald-600 transition hover:text-emerald-500"
-          >
-            View all
-            <ChevronRight className="h-3 w-3" />
-          </Link>
+            icon={Briefcase}
+            label="Available Jobs"
+            badge={availableCount ?? undefined}
+            variant="accent"
+            loading={availableCount === null}
+          />
+
+          {/* Earnings */}
+          <AppButton
+            href="/driver/earnings"
+            icon={DollarSign}
+            label="Earnings"
+            sublabel={weekEarnings !== null ? `$${weekEarnings}` : undefined}
+            loading={weekEarnings === null}
+          />
+
+          {/* My Jobs */}
+          <AppButton
+            href="/driver/jobs?tab=accepted"
+            icon={Car}
+            label="My Jobs"
+            sublabel="Accepted"
+            badge={acceptedCount ?? undefined}
+            loading={acceptedCount === null}
+          />
+
+          {/* Job History */}
+          <AppButton href="/driver/history" icon={Clock} label="Job History" />
+
+          {/* Settings */}
+          <AppButton href="/driver/settings" icon={Settings} label="Settings" />
+
+          {/* Clock History */}
+          <AppButton
+            href="/driver/history"
+            icon={Timer}
+            label="Clock History"
+          />
         </div>
 
-        {upcomingJobs.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <Car className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-500">No upcoming jobs</p>
-            <p className="text-xs text-slate-400">New jobs will appear here when assigned</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {upcomingJobs.map((job) => (
-              <div
-                key={job.id}
-                className="p-4 hover:bg-slate-50/50 transition cursor-pointer"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600">
-                        {job.customerName.charAt(0)}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-slate-900">
-                          {job.customerName}
-                        </h3>
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded ${
-                            job.status === "confirmed"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          <span className={`w-1 h-1 rounded-full ${
-                            job.status === "confirmed" ? "bg-emerald-500" : "bg-amber-500"
-                          }`} />
-                          {job.status === "confirmed" ? "Confirmed" : "Pending"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <MapPin className="h-3 w-3 text-emerald-500" />
-                        <span className="text-slate-500">From:</span>
-                        <span className="font-medium">{job.pickupAddress}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <Navigation className="h-3 w-3 text-red-500" />
-                        <span className="text-slate-500">To:</span>
-                        <span className="font-medium">{job.dropoffAddress}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="flex items-center gap-1.5 text-slate-500 bg-slate-100 px-2 py-1 rounded text-xs">
-                      <Clock className="h-3 w-3" />
-                      <span className="font-medium">{job.pickupTime}</span>
-                    </div>
-                    <div className="mt-2 text-lg font-bold text-emerald-600">
-                      ${job.payout}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Summary Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-slate-500">
+            Today:{" "}
+            <span className="font-medium text-slate-700">
+              {formatDuration(todayMinutes)}
+            </span>
+            {todayJobsCompleted > 0 && (
+              <span>
+                {" "}
+                • {todayJobsCompleted} job
+                {todayJobsCompleted !== 1 ? "s" : ""} completed
+              </span>
+            )}
+          </p>
+        </div>
       </div>
     </div>
   );
