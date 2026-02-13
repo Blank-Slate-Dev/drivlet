@@ -143,13 +143,18 @@ export default function Footer() {
             <h4 className="mb-4 font-semibold">Terms</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
               <li>
-                <a href="#" className="transition hover:text-white">
+                <a href="/policies#terms" className="transition hover:text-white">
                   Terms and Conditions
                 </a>
               </li>
               <li>
-                <a href="#" className="transition hover:text-white">
+                <a href="/policies#privacy" className="transition hover:text-white">
                   Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a href="/policies" className="transition hover:text-white">
+                  Policies
                 </a>
               </li>
             </ul>

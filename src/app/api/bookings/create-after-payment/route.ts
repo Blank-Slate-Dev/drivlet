@@ -119,7 +119,6 @@ export async function POST(request: NextRequest) {
         vehicleState: metadata.vehicleState,
         vehicleYear: metadata.vehicleYear || null,
         vehicleModel: metadata.vehicleModel || null,
-        vehicleColor: metadata.vehicleColor || null,
         serviceType: hasExisting
           ? `Existing Booking - ${metadata.garageName}`
           : (metadata.serviceType || 'Standard Service'),

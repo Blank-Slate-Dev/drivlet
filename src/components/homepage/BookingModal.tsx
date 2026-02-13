@@ -57,21 +57,6 @@ import StripePaymentForm from '@/components/StripePaymentForm';
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-const VEHICLE_COLORS = [
-  { value: 'white', label: 'White', hex: '#FFFFFF' },
-  { value: 'black', label: 'Black', hex: '#000000' },
-  { value: 'silver', label: 'Silver', hex: '#C0C0C0' },
-  { value: 'grey', label: 'Grey', hex: '#808080' },
-  { value: 'red', label: 'Red', hex: '#DC2626' },
-  { value: 'blue', label: 'Blue', hex: '#2563EB' },
-  { value: 'green', label: 'Green', hex: '#059669' },
-  { value: 'yellow', label: 'Yellow', hex: '#EAB308' },
-  { value: 'orange', label: 'Orange', hex: '#EA580C' },
-  { value: 'brown', label: 'Brown', hex: '#92400E' },
-  { value: 'beige', label: 'Beige', hex: '#D4AF37' },
-  { value: 'other', label: 'Other', hex: '#6B7280' },
-] as const;
-
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -159,8 +144,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   // Vehicle details
   const [vehicleYear, setVehicleYear] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
-  const [vehicleColor, setVehicleColor] = useState('');
-  const [customColor, setCustomColor] = useState('');
 
   // Vehicle valuation and transmission
   const [isHighValueVehicle, setIsHighValueVehicle] = useState(false);
@@ -393,8 +376,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         setIsProcessing(false);
         setVehicleYear('');
         setVehicleModel('');
-        setVehicleColor('');
-        setCustomColor('');
         setIsHighValueVehicle(false);
         setTransmissionType('automatic');
         setSelectedServices([]);
@@ -463,8 +444,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     if (year < 1900 || year > currentYear + 1) return `Please enter a year between 1900 and ${currentYear + 1}.`;
     if (!vehicleModel.trim()) return 'Please enter your vehicle make and model.';
     if (vehicleModel.trim().length < 3) return 'Vehicle make and model must be at least 3 characters.';
-    if (!vehicleColor) return 'Please select your vehicle color.';
-    if (vehicleColor === 'other' && !customColor.trim()) return 'Please enter your custom vehicle color.';
     if (!pickupAddress.trim()) return 'Please enter your pick-up address.';
     if (!serviceDate) return 'Please select a service date.';
 
@@ -520,7 +499,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           vehicleState: regoState,
           vehicleYear,
           vehicleModel: vehicleModel.trim(),
-          vehicleColor: vehicleColor === 'other' ? customColor.trim() : vehicleColor,
           pickupTimeSlot: selectedPickupSlot,
           dropoffTimeSlot: selectedDropoffSlot,
           earliestPickup: getPickupSlotLabel(selectedPickupSlot),
@@ -896,24 +874,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             Vehicle
                           </h3>
                           <div className="flex items-center justify-between">
-                            <div>
-                              <span className="text-sm font-medium text-slate-900">
-                                {vehicleYear} {vehicleModel}
-                              </span>
-                              <div className="mt-1 flex items-center gap-2">
-                                <div
-                                  className="h-4 w-4 rounded-full border border-slate-300"
-                                  style={{
-                                    backgroundColor: VEHICLE_COLORS.find(
-                                      c => c.value === vehicleColor
-                                    )?.hex || '#6B7280',
-                                  }}
-                                />
-                                <span className="text-sm capitalize text-slate-600">
-                                  {vehicleColor === 'other' ? customColor : vehicleColor}
-                                </span>
-                              </div>
-                            </div>
+                            <span className="text-sm font-medium text-slate-900">
+                              {vehicleYear} {vehicleModel}
+                            </span>
                             <RegistrationPlate plate={regoPlate} state={regoState} />
                           </div>
                           <div className="mt-2 flex justify-between border-t border-slate-200 pt-2">
@@ -1500,45 +1463,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                             <div className="mt-5 flex justify-center">
                               <RegistrationPlate plate={regoPlate} state={regoState} />
-                            </div>
-
-                            {/* Vehicle Color */}
-                            <div className="mt-5 space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Color *</label>
-                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                {VEHICLE_COLORS.map((color) => (
-                                  <button
-                                    key={color.value}
-                                    type="button"
-                                    onClick={() => setVehicleColor(color.value)}
-                                    disabled={isProcessing}
-                                    className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left transition-all ${
-                                      vehicleColor === color.value
-                                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
-                                        : 'border-slate-200 bg-white hover:border-emerald-300'
-                                    } disabled:opacity-50`}
-                                  >
-                                    <div
-                                      className="h-5 w-5 rounded-full border-2 border-slate-300 flex-shrink-0"
-                                      style={{ backgroundColor: color.hex }}
-                                    />
-                                    <span className="text-sm font-medium text-slate-900">{color.label}</span>
-                                    {vehicleColor === color.value && (
-                                      <Check className="ml-auto h-4 w-4 text-emerald-600 flex-shrink-0" />
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                              {vehicleColor === 'other' && (
-                                <input
-                                  type="text"
-                                  value={customColor}
-                                  onChange={(e) => setCustomColor(e.target.value)}
-                                  placeholder="Enter custom color"
-                                  disabled={isProcessing}
-                                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none ring-emerald-500/60 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 disabled:opacity-50"
-                                />
-                              )}
                             </div>
 
                             {/* Transmission Type */}

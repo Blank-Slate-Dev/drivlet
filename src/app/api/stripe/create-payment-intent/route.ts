@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
       estimatedServiceDuration,
       vehicleYear,
       vehicleModel,
-      vehicleColor,
       // Distance zone fields (sent from the frontend)
       distanceZone: clientZone,
       distanceSurcharge: clientSurcharge,
@@ -160,7 +159,6 @@ export async function POST(request: NextRequest) {
         estimatedServiceDuration: estimatedServiceDuration ? String(estimatedServiceDuration) : '',
         vehicleYear: vehicleYear || '',
         vehicleModel: vehicleModel || '',
-        vehicleColor: vehicleColor || '',
         // Zone metadata (server-verified values)
         distanceZone: verifiedZone,
         distanceSurcharge: String(verifiedSurcharge),

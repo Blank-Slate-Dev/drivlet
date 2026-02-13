@@ -39,12 +39,6 @@ import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/co
 import { FEATURES } from "@/lib/featureFlags";
 import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
 
-const VEHICLE_COLORS: Record<string, string> = {
-  white: '#FFFFFF', black: '#000000', silver: '#C0C0C0', grey: '#808080',
-  red: '#DC2626', blue: '#2563EB', green: '#059669', yellow: '#EAB308',
-  orange: '#EA580C', brown: '#92400E', beige: '#D4AF37',
-};
-
 const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
   { id: "driver_en_route", label: "Driver En Route", progress: 28 },
@@ -509,15 +503,6 @@ export default function AdminBookingsPage() {
                             {booking.vehicleState}
                           </p>
                         )}
-                        {booking.vehicleColor && (
-                          <div className="mt-0.5 flex items-center gap-1">
-                            <div
-                              className="h-3 w-3 rounded-full border border-slate-300"
-                              style={{ backgroundColor: VEHICLE_COLORS[booking.vehicleColor.toLowerCase()] || '#6B7280' }}
-                            />
-                            <span className="text-[10px] capitalize text-slate-400">{booking.vehicleColor}</span>
-                          </div>
-                        )}
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-700">
@@ -897,21 +882,6 @@ function ViewDetailsModal({
                 </div>
               </div>
 
-              {booking.vehicleColor && (
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Color</p>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-6 w-6 rounded-full border-2 border-slate-300 shadow-sm"
-                      style={{ backgroundColor: VEHICLE_COLORS[booking.vehicleColor.toLowerCase()] || '#6B7280' }}
-                    />
-                    <span className="font-medium capitalize text-slate-900">
-                      {booking.vehicleColor}
-                    </span>
-                  </div>
-                </div>
-              )}
-
               <div>
                 <p className="text-xs text-slate-500">Transmission</p>
                 <p className={`font-medium ${booking.isManualTransmission ? 'text-amber-600' : 'text-slate-900'}`}>
@@ -1212,7 +1182,6 @@ function EditBookingModal({
     pickupAddress: booking.pickupAddress,
     vehicleYear: booking.vehicleYear || "",
     vehicleModel: booking.vehicleModel || "",
-    vehicleColor: booking.vehicleColor || "",
     allowBackwardsProgression: false,
   });
   const [error, setError] = useState("");
@@ -1247,7 +1216,6 @@ function EditBookingModal({
         pickupAddress: formData.pickupAddress !== booking.pickupAddress ? formData.pickupAddress : undefined,
         vehicleYear: formData.vehicleYear !== (booking.vehicleYear || "") ? formData.vehicleYear : undefined,
         vehicleModel: formData.vehicleModel !== (booking.vehicleModel || "") ? formData.vehicleModel : undefined,
-        vehicleColor: formData.vehicleColor !== (booking.vehicleColor || "") ? formData.vehicleColor : undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save booking");
@@ -1462,20 +1430,6 @@ function EditBookingModal({
                   setFormData({ ...formData, vehicleModel: e.target.value })
                 }
                 placeholder="Toyota Camry"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Color
-              </label>
-              <input
-                type="text"
-                value={formData.vehicleColor}
-                onChange={(e) =>
-                  setFormData({ ...formData, vehicleColor: e.target.value })
-                }
-                placeholder="White"
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
