@@ -7,6 +7,8 @@ import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import mongoose from "mongoose";
 import { requireValidOrigin } from "@/lib/validation";
+import { sendBookingStageEmail } from "@/lib/email";
+import { sendBookingConfirmationSMS } from "@/lib/sms";
 
 // GET /api/bookings - Get user's own bookings (used by main dashboard)
 export async function GET() {
@@ -239,10 +241,35 @@ export async function POST(request: NextRequest) {
     const booking = new Booking(bookingData);
     await booking.save();
 
-    // TODO: Send confirmation email to guest
-    // if (isGuest) {
-    //   await sendGuestConfirmationEmail(data.guestEmail, booking);
-    // }
+    // Send booking confirmation email (all customers, not just guests)
+    sendBookingStageEmail({
+      customerEmail: booking.userEmail,
+      customerName: booking.userName,
+      vehicleRegistration: booking.vehicleRegistration,
+      currentStage: "booking_confirmed",
+      trackingCode: booking.trackingCode,
+      garageName: booking.garageName,
+    }).then((sent) => {
+      if (sent) console.log("📧 Booking confirmation email sent to:", booking.userEmail);
+    });
+
+    // Send confirmation SMS to guests with phone numbers
+    if (isGuest && data.guestPhone) {
+      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const trackingUrl = booking.trackingCode
+        ? `${appUrl}/track?code=${booking.trackingCode}`
+        : `${appUrl}/track`;
+
+      sendBookingConfirmationSMS(
+        data.guestPhone,
+        booking.userName,
+        booking.vehicleRegistration,
+        booking.pickupTime,
+        trackingUrl
+      ).then((sent) => {
+        if (sent) console.log("📱 Booking confirmation SMS sent to:", data.guestPhone);
+      });
+    }
 
     return NextResponse.json(
       {

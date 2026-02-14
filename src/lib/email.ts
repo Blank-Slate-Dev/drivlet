@@ -297,3 +297,251 @@ The drivlet Team
     htmlContent,
   });
 }
+
+
+// ════════════════════════════════════════════════════════════════════════
+// Booking stage update email — sent on every stage progression
+// ════════════════════════════════════════════════════════════════════════
+
+// Stage-specific content for emails
+interface StageEmailContent {
+  emoji: string;
+  heading: string;
+  subject: string;
+  message: string;
+  color: string; // hex accent color for the stage
+}
+
+const STAGE_EMAIL_CONTENT: Record<string, StageEmailContent> = {
+  booking_confirmed: {
+    emoji: "✅",
+    heading: "Booking Confirmed",
+    subject: "Your booking is confirmed",
+    message: "We've locked in your pick-up and service details. Our team will be in touch soon with next steps.",
+    color: "#059669",
+  },
+  driver_en_route: {
+    emoji: "🚗",
+    heading: "Driver On The Way",
+    subject: "Your driver is on the way",
+    message: "Your driver is heading to your location to collect your vehicle. Please have your keys ready!",
+    color: "#2563eb",
+  },
+  car_picked_up: {
+    emoji: "📦",
+    heading: "Car Picked Up",
+    subject: "Your car has been picked up",
+    message: "Your vehicle has been collected and is on its way to the service centre. We'll keep you updated on its progress.",
+    color: "#7c3aed",
+  },
+  at_garage: {
+    emoji: "📍",
+    heading: "Arrived at Garage",
+    subject: "Your car has arrived at the garage",
+    message: "Your vehicle has safely arrived at the service centre and is ready to be worked on.",
+    color: "#0891b2",
+  },
+  service_in_progress: {
+    emoji: "🔧",
+    heading: "Service In Progress",
+    subject: "Your car is being serviced",
+    message: "Our expert mechanics are working on your vehicle. We'll let you know as soon as it's ready.",
+    color: "#d97706",
+  },
+  driver_returning: {
+    emoji: "🏠",
+    heading: "On Its Way Back",
+    subject: "Your car is on its way back to you",
+    message: "Great news! Service is complete and your driver is bringing your car back to you.",
+    color: "#2563eb",
+  },
+  delivered: {
+    emoji: "🎉",
+    heading: "Delivered!",
+    subject: "Your car has been delivered",
+    message: "Your vehicle has been delivered. Thanks for choosing drivlet — we hope to see you again!",
+    color: "#059669",
+  },
+};
+
+// Progress percentages matching STAGE_PROGRESS in admin route
+const STAGE_PROGRESS: Record<string, number> = {
+  booking_confirmed: 14,
+  driver_en_route: 28,
+  car_picked_up: 42,
+  at_garage: 57,
+  service_in_progress: 72,
+  driver_returning: 86,
+  delivered: 100,
+};
+
+export interface BookingStageEmailData {
+  customerEmail: string;
+  customerName: string;
+  vehicleRegistration: string;
+  currentStage: string;
+  trackingCode?: string;
+  garageName?: string;
+  /** Optional override message (e.g. from admin custom message) */
+  customMessage?: string;
+}
+
+export async function sendBookingStageEmail(
+  data: BookingStageEmailData
+): Promise<boolean> {
+  const {
+    customerEmail,
+    customerName,
+    vehicleRegistration,
+    currentStage,
+    trackingCode,
+    garageName,
+    customMessage,
+  } = data;
+
+  const content = STAGE_EMAIL_CONTENT[currentStage];
+  if (!content) {
+    console.warn(`⚠️ No email content defined for stage: ${currentStage}`);
+    return false;
+  }
+
+  const appUrl = getAppUrl();
+  const progress = STAGE_PROGRESS[currentStage] || 0;
+  const message = customMessage || content.message;
+
+  // Build tracking URL if tracking code exists
+  const trackingUrl = trackingCode
+    ? `${appUrl}/track?code=${trackingCode}`
+    : `${appUrl}/track`;
+
+  const subject = `${content.emoji} ${content.subject} — ${vehicleRegistration}`;
+
+  // ── Plain text version ──
+  const textContent = `
+${content.heading}
+
+Hi ${customerName},
+
+${message}
+
+Vehicle: ${vehicleRegistration}
+${garageName ? `Service at: ${garageName}` : ''}
+Progress: ${progress}%
+
+Track your booking: ${trackingUrl}
+
+Questions? Reply to this email or visit drivlet.com.au
+
+---
+drivlet - Car service made simple
+Newcastle, Australia
+`.trim();
+
+  // ── HTML version ──
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, ${content.color} 0%, ${content.color}dd 100%); padding: 36px 32px 28px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 12px;">${content.emoji}</div>
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">${content.heading}</h1>
+              <p style="margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">${vehicleRegistration}</p>
+            </td>
+          </tr>
+
+          <!-- Progress Bar -->
+          <tr>
+            <td style="padding: 0;">
+              <div style="height: 6px; background-color: #e2e8f0;">
+                <div style="height: 6px; width: ${progress}%; background-color: ${content.color}; transition: width 0.3s;"></div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
+                Hi ${customerName},
+              </p>
+
+              <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
+                ${message}
+              </p>
+
+              <!-- Details Box -->
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding: 0 0 12px;">
+                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Vehicle</span>
+                      <div style="color: #1e293b; font-size: 16px; font-weight: 600; margin-top: 2px;">${vehicleRegistration}</div>
+                    </td>
+                    <td style="padding: 0 0 12px; text-align: right;">
+                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Progress</span>
+                      <div style="color: ${content.color}; font-size: 16px; font-weight: 700; margin-top: 2px;">${progress}%</div>
+                    </td>
+                  </tr>
+                  ${garageName ? `
+                  <tr>
+                    <td colspan="2" style="padding: 12px 0 0; border-top: 1px solid #e2e8f0;">
+                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Service Centre</span>
+                      <div style="color: #1e293b; font-size: 15px; margin-top: 2px;">${garageName}</div>
+                    </td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding: 0 0 8px;">
+                    <a href="${trackingUrl}" style="display: inline-block; background-color: ${content.color}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 14px 40px; border-radius: 9999px; box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.15);">
+                      Track Your Booking
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f8fafc;">
+              <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px;">
+                Questions? Reply to this email or visit <a href="https://drivlet.com.au" style="color: #059669; text-decoration: none;">drivlet.com.au</a>
+              </p>
+              <p style="margin: 0; color: #cbd5e1; font-size: 11px;">
+                &copy; ${new Date().getFullYear()} drivlet &middot; Newcastle, Australia
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  return sendEmail({
+    to: customerEmail,
+    toName: customerName,
+    subject,
+    textContent,
+    htmlContent,
+  });
+}
