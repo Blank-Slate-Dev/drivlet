@@ -77,11 +77,11 @@ export async function GET(request: NextRequest) {
       };
       legType = "pickup";
     } else if (status === "available_return") {
-      // Jobs where pickup is complete + service paid, ready for return driver
+      // Jobs where pickup has been accepted (return can be claimed early)
+      // Note: Starting the return is gated on pickup complete + payment received
       query = {
-        "pickupDriver.completedAt": { $exists: true },
+        "pickupDriver.driverId": { $exists: true },
         returnDriver: { $exists: false },
-        servicePaymentStatus: "paid",
         status: { $ne: "completed" },
         "cancellation.cancelledAt": { $exists: false },
       };
@@ -223,6 +223,22 @@ export async function GET(request: NextRequest) {
         else driverState = "assigned";
       }
 
+      // Determine if return can be started (pickup complete + payment received)
+      const canStartReturn = !!(
+        job.pickupDriver?.completedAt &&
+        job.servicePaymentStatus === "paid"
+      );
+
+      // For return jobs not yet started, provide waiting reason
+      let returnWaitingReason: string | null = null;
+      if (jobLegType === "return" && job.returnDriver && !job.returnDriver.startedAt) {
+        if (!job.pickupDriver?.completedAt) {
+          returnWaitingReason = "Waiting for pickup to complete";
+        } else if (job.servicePaymentStatus !== "paid") {
+          returnWaitingReason = "Waiting for customer payment";
+        }
+      }
+
       return {
         _id: job._id.toString(),
         customerName: job.userName,
@@ -245,6 +261,9 @@ export async function GET(request: NextRequest) {
         // Leg type info
         legType: jobLegType,
         driverState,
+        // Return leg gating
+        canStartReturn,
+        returnWaitingReason,
         // Service payment info
         servicePaymentStatus: job.servicePaymentStatus || null,
         servicePaymentAmount: job.servicePaymentAmount || null,
@@ -489,13 +508,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Atomic update - only if pickup is complete and payment received
+      // Atomic update - only requires pickup to be accepted (driverId exists)
+      // Starting the return is gated separately on pickup complete + payment
       const result = await Booking.findOneAndUpdate(
         {
           _id: bookingId,
           returnDriver: { $exists: false },
-          "pickupDriver.completedAt": { $exists: true },
-          servicePaymentStatus: "paid",
+          "pickupDriver.driverId": { $exists: true },
         },
         {
           $set: {
@@ -509,7 +528,7 @@ export async function POST(request: NextRequest) {
             updates: {
               stage: "return_driver_assigned",
               timestamp: now,
-              message: `Return driver ${driver.firstName} ${driver.lastName} accepted the job.`,
+              message: `Return driver ${driver.firstName} ${driver.lastName} claimed the return job.`,
               updatedBy: "driver",
             },
           },
@@ -519,7 +538,7 @@ export async function POST(request: NextRequest) {
 
       if (!result) {
         return NextResponse.json(
-          { error: "This return job is no longer available or requirements not met" },
+          { error: "This return job is no longer available" },
           { status: 400 }
         );
       }
@@ -532,7 +551,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "Return job accepted successfully",
+        message: "Return job claimed successfully. You'll be able to start once pickup is complete and customer has paid.",
       });
     }
 
@@ -544,6 +563,19 @@ export async function POST(request: NextRequest) {
         booking.assignedDriverId = undefined;
         booking.driverAssignedAt = undefined;
         booking.driverAcceptedAt = undefined;
+
+        // IMPORTANT: If a return driver has already claimed this job, clear them too
+        // since the return leg depends on the pickup being done
+        if (booking.returnDriver && !booking.returnDriver.startedAt) {
+          booking.returnDriver = undefined;
+          booking.updates.push({
+            stage: "return_driver_auto_cleared",
+            timestamp: now,
+            message: "Return assignment cleared because pickup driver declined.",
+            updatedBy: "system",
+          });
+        }
+
         booking.updates.push({
           stage: "pickup_driver_declined",
           timestamp: now,
@@ -580,6 +612,10 @@ export async function POST(request: NextRequest) {
         booking.assignedDriverId = undefined;
         booking.driverAssignedAt = undefined;
         booking.driverAcceptedAt = undefined;
+        // Clear return driver if not started
+        if (booking.returnDriver && !booking.returnDriver.startedAt) {
+          booking.returnDriver = undefined;
+        }
       } else if (booking.returnDriver?.driverId?.toString() === user.driverProfile.toString()) {
         booking.returnDriver = undefined;
       } else if (booking.assignedDriverId?.toString() === user.driverProfile.toString()) {
@@ -707,9 +743,26 @@ export async function POST(request: NextRequest) {
     // ========== RETURN LEG ACTIONS ==========
 
     // Start return (en route to workshop for collection)
+    // GATED: Requires pickup complete AND service payment received
     if (action === "start_return") {
       if (!isReturnDriver) {
         return NextResponse.json({ error: "You are not assigned to return" }, { status: 403 });
+      }
+
+      // Gate check: Pickup must be complete
+      if (!booking.pickupDriver?.completedAt) {
+        return NextResponse.json(
+          { error: "Cannot start return yet - pickup is not complete" },
+          { status: 400 }
+        );
+      }
+
+      // Gate check: Service payment must be received
+      if (booking.servicePaymentStatus !== "paid") {
+        return NextResponse.json(
+          { error: "Cannot start return yet - waiting for customer to pay for service" },
+          { status: 400 }
+        );
       }
 
       booking.currentStage = "driver_returning";

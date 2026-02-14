@@ -68,6 +68,9 @@ interface Job {
   // New leg-based fields
   legType?: "pickup" | "return";
   driverState?: string;
+  // Return leg gating
+  canStartReturn?: boolean;
+  returnWaitingReason?: string;
 }
 
 // Primary tab: Pickup or Return
@@ -412,8 +415,8 @@ export default function DriverJobsPage() {
           )}
           {primaryTab === "return" && secondaryTab === "available" && (
             <p>
-              <strong>Available Returns:</strong> Cars ready for return after
-              service completion and payment.
+              <strong>Available Returns:</strong> Claim return jobs early.
+              Starting is gated until pickup is complete + payment received.
             </p>
           )}
           {primaryTab === "return" && secondaryTab === "my_jobs" && (
@@ -853,6 +856,26 @@ function JobCard({
       switch (driverState) {
         case "assigned":
         case "accepted":
+          // Check if return can be started (pickup complete + payment received)
+          if (!job.canStartReturn) {
+            return (
+              <>
+                <button
+                  onClick={() => onAction(job._id, "decline_return")}
+                  disabled={isLoading}
+                  className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <div className="flex items-center gap-2 rounded-lg bg-amber-100 px-4 py-2 text-sm text-amber-800">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {job.returnWaitingReason || "Waiting to start..."}
+                  </span>
+                </div>
+              </>
+            );
+          }
           return (
             <>
               <button
