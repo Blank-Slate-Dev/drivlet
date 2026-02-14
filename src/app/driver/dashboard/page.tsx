@@ -1,7 +1,7 @@
 // src/app/driver/dashboard/page.tsx
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import {
   Clock,
   Settings,
   Timer,
+  LogOut,
 } from "lucide-react";
 
 interface ClockStatus {
@@ -295,6 +296,17 @@ export default function DriverDashboardPage() {
               </span>
             )}
           </p>
+        </div>
+
+        {/* Sign Out Button */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => signOut({ callbackUrl: "/driver/login" })}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 active:scale-95"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
         </div>
       </div>
     </div>
