@@ -27,6 +27,10 @@ import {
   Camera,
   PhoneCall,
   Home,
+  ArrowRight,
+  ArrowLeft,
+  Package,
+  Truck,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 
@@ -61,13 +65,20 @@ interface Job {
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
   checkpointStatus?: CheckpointStatus;
+  // New leg-based fields
+  legType?: "pickup" | "return";
+  driverState?: string;
 }
 
-type TabType = "available" | "accepted" | "in_progress" | "awaiting_payment" | "ready_for_return";
+// Primary tab: Pickup or Return
+type PrimaryTab = "pickup" | "return";
+// Secondary tab within each primary tab
+type SecondaryTab = "available" | "my_jobs";
 
 export default function DriverJobsPage() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<TabType>("available");
+  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>("pickup");
+  const [secondaryTab, setSecondaryTab] = useState<SecondaryTab>("available");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -100,14 +111,24 @@ export default function DriverJobsPage() {
   const closePhotoModal = () => {
     setShowPhotoModal(false);
     setPhotoJob(null);
-    fetchJobs(); // Refresh to get updated checkpoint status
+    fetchJobs();
   };
+
+  // Map primary/secondary tabs to API status
+  const getApiStatus = useCallback(() => {
+    if (primaryTab === "pickup") {
+      return secondaryTab === "available" ? "available_pickup" : "my_pickup";
+    } else {
+      return secondaryTab === "available" ? "available_return" : "my_return";
+    }
+  }, [primaryTab, secondaryTab]);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/driver/jobs?status=${activeTab}&page=${page}`);
+      const status = getApiStatus();
+      const res = await fetch(`/api/driver/jobs?status=${status}&page=${page}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -121,23 +142,39 @@ export default function DriverJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, page]);
+  }, [getApiStatus, page]);
 
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
 
-  // Poll for payment status when in awaiting_payment tab
+  // Poll for updates when viewing my jobs
   useEffect(() => {
-    if (activeTab === "awaiting_payment") {
-      const interval = setInterval(fetchJobs, 10000); // Poll every 10 seconds
+    if (secondaryTab === "my_jobs") {
+      const interval = setInterval(fetchJobs, 15000);
       return () => clearInterval(interval);
     }
-  }, [activeTab, fetchJobs]);
+  }, [secondaryTab, fetchJobs]);
+
+  // Type for all possible actions
+  type JobAction =
+    | "accept_pickup"
+    | "decline_pickup"
+    | "start_pickup"
+    | "arrived_pickup"
+    | "collected"
+    | "dropped_at_workshop"
+    | "accept_return"
+    | "decline_return"
+    | "start_return"
+    | "collected_from_workshop"
+    | "delivering"
+    | "delivered"
+    | "generate_payment";
 
   const handleJobAction = async (
     jobId: string,
-    action: "accept" | "decline" | "start" | "picked_up" | "at_garage" | "complete",
+    action: JobAction,
     extraData?: Record<string, unknown>
   ) => {
     setActionLoading(jobId);
@@ -185,10 +222,8 @@ export default function DriverJobsPage() {
         throw new Error(data.error || "Failed to initiate call");
       }
 
-      // Show success message
       setCallSuccess(job._id);
       setTimeout(() => setCallSuccess(null), 5000);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to call customer");
     } finally {
@@ -198,7 +233,9 @@ export default function DriverJobsPage() {
 
   const openPaymentModal = (job: Job) => {
     setSelectedJob(job);
-    setServiceAmount(job.servicePaymentAmount ? (job.servicePaymentAmount / 100).toString() : "");
+    setServiceAmount(
+      job.servicePaymentAmount ? (job.servicePaymentAmount / 100).toString() : ""
+    );
     setGeneratedLink(job.servicePaymentUrl || "");
     setPaymentError("");
     setShowPaymentModal(true);
@@ -223,7 +260,7 @@ export default function DriverJobsPage() {
         body: JSON.stringify({
           bookingId: selectedJob._id,
           action: "generate_payment",
-          serviceAmount: Math.round(amountDollars * 100), // Convert to cents
+          serviceAmount: Math.round(amountDollars * 100),
         }),
       });
 
@@ -236,7 +273,9 @@ export default function DriverJobsPage() {
       setGeneratedLink(data.paymentLink);
       fetchJobs();
     } catch (err) {
-      setPaymentError(err instanceof Error ? err.message : "Failed to generate link");
+      setPaymentError(
+        err instanceof Error ? err.message : "Failed to generate link"
+      );
     } finally {
       setGeneratingPayment(false);
     }
@@ -258,14 +297,6 @@ export default function DriverJobsPage() {
     setGeneratedLink("");
   };
 
-  const tabs: { key: TabType; label: string }[] = [
-    { key: "available", label: "Available" },
-    { key: "accepted", label: "Accepted" },
-    { key: "in_progress", label: "In Progress" },
-    { key: "awaiting_payment", label: "Awaiting Payment" },
-    { key: "ready_for_return", label: "Ready to Return" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <div className="mx-auto max-w-2xl px-4 py-6">
@@ -273,7 +304,9 @@ export default function DriverJobsPage() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Jobs</h1>
-            <p className="text-sm text-slate-500">Find and manage your pickups</p>
+            <p className="text-sm text-slate-500">
+              Manage your pickup and return jobs
+            </p>
           </div>
           <button
             onClick={() => fetchJobs()}
@@ -295,24 +328,100 @@ export default function DriverJobsPage() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                setActiveTab(tab.key);
-                setPage(1);
-              }}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
-                activeTab === tab.key
-                  ? "bg-emerald-600 text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Primary Tabs - Pickup / Return */}
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => {
+              setPrimaryTab("pickup");
+              setSecondaryTab("available");
+              setPage(1);
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+              primaryTab === "pickup"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/25"
+                : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <ArrowRight className="h-4 w-4" />
+            Pickup Jobs
+          </button>
+          <button
+            onClick={() => {
+              setPrimaryTab("return");
+              setSecondaryTab("available");
+              setPage(1);
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+              primaryTab === "return"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Return Jobs
+          </button>
+        </div>
+
+        {/* Secondary Tabs - Available / My Jobs */}
+        <div className="mb-6 flex gap-2">
+          <button
+            onClick={() => {
+              setSecondaryTab("available");
+              setPage(1);
+            }}
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+              secondaryTab === "available"
+                ? primaryTab === "pickup"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-blue-100 text-blue-800"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Available
+          </button>
+          <button
+            onClick={() => {
+              setSecondaryTab("my_jobs");
+              setPage(1);
+            }}
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+              secondaryTab === "my_jobs"
+                ? primaryTab === "pickup"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-blue-100 text-blue-800"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            My Jobs
+          </button>
+        </div>
+
+        {/* Tab Description */}
+        <div className="mb-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600">
+          {primaryTab === "pickup" && secondaryTab === "available" && (
+            <p>
+              <strong>Available Pickups:</strong> New jobs waiting to be picked
+              up from customers and taken to the workshop.
+            </p>
+          )}
+          {primaryTab === "pickup" && secondaryTab === "my_jobs" && (
+            <p>
+              <strong>My Pickups:</strong> Jobs you've accepted for the pickup
+              leg (customer → workshop).
+            </p>
+          )}
+          {primaryTab === "return" && secondaryTab === "available" && (
+            <p>
+              <strong>Available Returns:</strong> Cars ready for return after
+              service completion and payment.
+            </p>
+          )}
+          {primaryTab === "return" && secondaryTab === "my_jobs" && (
+            <p>
+              <strong>My Returns:</strong> Return jobs you've accepted (workshop
+              → customer).
+            </p>
+          )}
         </div>
 
         {/* Jobs List */}
@@ -326,9 +435,9 @@ export default function DriverJobsPage() {
             <Briefcase className="mx-auto h-12 w-12 text-slate-300" />
             <h3 className="mt-4 text-lg font-medium text-slate-900">No jobs</h3>
             <p className="mt-2 text-sm text-slate-500">
-              {activeTab === "available"
+              {secondaryTab === "available"
                 ? "Check back soon for new opportunities"
-                : `No ${activeTab.replace("_", " ")} jobs`}
+                : `No active ${primaryTab} jobs`}
             </p>
           </div>
         ) : (
@@ -338,7 +447,8 @@ export default function DriverJobsPage() {
                 <JobCard
                   key={job._id}
                   job={job}
-                  activeTab={activeTab}
+                  primaryTab={primaryTab}
+                  secondaryTab={secondaryTab}
                   actionLoading={actionLoading}
                   onAction={handleJobAction}
                   onOpenPayment={openPaymentModal}
@@ -397,8 +507,12 @@ export default function DriverJobsPage() {
                   <DollarSign className="h-5 w-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-slate-900">Service Payment</h2>
-                  <p className="text-sm text-slate-500">{selectedJob.vehicleRegistration}</p>
+                  <h2 className="font-semibold text-slate-900">
+                    Service Payment
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    {selectedJob.vehicleRegistration}
+                  </p>
                 </div>
               </div>
               <button
@@ -409,7 +523,7 @@ export default function DriverJobsPage() {
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="space-y-4 p-4">
               {paymentError && (
                 <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-red-700">
                   <AlertTriangle className="h-5 w-5" />
@@ -419,34 +533,41 @@ export default function DriverJobsPage() {
 
               {generatedLink ? (
                 <>
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
                       <CheckCircle className="h-5 w-5 text-emerald-600" />
-                      <span className="font-medium text-emerald-800">Payment Link Ready</span>
+                      <span className="font-medium text-emerald-800">
+                        Payment Link Ready
+                      </span>
                     </div>
-                    <p className="text-sm text-emerald-700 mb-3">
-                      Send this to the customer. Once they pay, you can complete the delivery.
+                    <p className="mb-3 text-sm text-emerald-700">
+                      Send this to the customer. Once they pay, return leg
+                      becomes available.
                     </p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedLink}
                         readOnly
-                        className="flex-1 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm truncate"
+                        className="flex-1 truncate rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm"
                       />
                       <button
                         onClick={copyLink}
                         className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
                       >
-                        {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {linkCopied ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
 
                   {selectedJob.customerPhone && (
                     <a
-                      href={`sms:${selectedJob.customerPhone}?body=Your car service is complete! Please pay here to receive your car: ${generatedLink}`}
-                      className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500 w-full"
+                      href={`sms:${selectedJob.customerPhone}?body=Your car service is complete! Please pay here: ${generatedLink}`}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500"
                     >
                       <Phone className="h-4 w-4" />
                       Send via SMS
@@ -463,11 +584,13 @@ export default function DriverJobsPage() {
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Service Total from Garage (AUD)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                        $
+                      </span>
                       <input
                         type="number"
                         step="0.01"
@@ -476,11 +599,11 @@ export default function DriverJobsPage() {
                         onChange={(e) => setServiceAmount(e.target.value)}
                         placeholder="0.00"
                         disabled={generatingPayment}
-                        className="w-full rounded-lg border border-slate-300 pl-8 pr-4 py-3 text-lg text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        className="w-full rounded-lg border border-slate-300 py-3 pl-8 pr-4 text-lg text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      Enter the exact amount the garage charged ($150 - $800)
+                      Enter the exact amount the garage charged
                     </p>
                   </div>
 
@@ -495,7 +618,7 @@ export default function DriverJobsPage() {
                     <button
                       onClick={generatePaymentLink}
                       disabled={generatingPayment || !serviceAmount}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                     >
                       {generatingPayment ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -530,7 +653,8 @@ export default function DriverJobsPage() {
 
 function JobCard({
   job,
-  activeTab,
+  primaryTab,
+  secondaryTab,
   actionLoading,
   onAction,
   onOpenPayment,
@@ -540,9 +664,26 @@ function JobCard({
   callSuccess,
 }: {
   job: Job;
-  activeTab: TabType;
+  primaryTab: PrimaryTab;
+  secondaryTab: SecondaryTab;
   actionLoading: string | null;
-  onAction: (jobId: string, action: "accept" | "decline" | "start" | "picked_up" | "at_garage" | "complete") => void;
+  onAction: (
+    jobId: string,
+    action:
+      | "accept_pickup"
+      | "decline_pickup"
+      | "start_pickup"
+      | "arrived_pickup"
+      | "collected"
+      | "dropped_at_workshop"
+      | "accept_return"
+      | "decline_return"
+      | "start_return"
+      | "collected_from_workshop"
+      | "delivering"
+      | "delivered"
+      | "generate_payment"
+  ) => void;
   onOpenPayment: (job: Job) => void;
   onOpenPhotos: (job: Job) => void;
   onCallCustomer: (job: Job) => void;
@@ -552,6 +693,7 @@ function JobCard({
   const isLoading = actionLoading === job._id;
   const isCalling = callingCustomer === job._id;
   const isCallSuccess = callSuccess === job._id;
+  const isPickupLeg = primaryTab === "pickup";
 
   // Calculate photo progress
   const photoCount = job.checkpointStatus
@@ -570,24 +712,297 @@ function JobCard({
       ].filter(Boolean).length
     : 0;
 
+  // Determine the current driver state for this leg
+  const driverState = job.driverState || "assigned";
+
+  // Get appropriate actions based on driver state
+  const renderActions = () => {
+    // Available jobs - can accept or decline
+    if (secondaryTab === "available") {
+      const acceptAction = isPickupLeg ? "accept_pickup" : "accept_return";
+      const declineAction = isPickupLeg ? "decline_pickup" : "decline_return";
+
+      return (
+        <>
+          <button
+            onClick={() => onAction(job._id, declineAction)}
+            disabled={isLoading}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Skip
+          </button>
+          <button
+            onClick={() => onAction(job._id, acceptAction)}
+            disabled={isLoading}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+              isPickupLeg
+                ? "bg-emerald-600 hover:bg-emerald-500"
+                : "bg-blue-600 hover:bg-blue-500"
+            }`}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            Accept
+          </button>
+        </>
+      );
+    }
+
+    // My jobs - show progress actions based on current state
+    if (isPickupLeg) {
+      // Pickup leg states: assigned → started → arrived → collected → completed
+      switch (driverState) {
+        case "assigned":
+        case "accepted":
+          return (
+            <>
+              <button
+                onClick={() => onAction(job._id, "decline_pickup")}
+                disabled={isLoading}
+                className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => onAction(job._id, "start_pickup")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Start Pickup
+              </button>
+            </>
+          );
+        case "started":
+          return (
+            <button
+              onClick={() => onAction(job._id, "arrived_pickup")}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MapPin className="h-4 w-4" />
+              )}
+              Arrived at Customer
+            </button>
+          );
+        case "arrived":
+          return (
+            <button
+              onClick={() => onAction(job._id, "collected")}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Car className="h-4 w-4" />
+              )}
+              Car Collected
+            </button>
+          );
+        case "collected":
+          return (
+            <>
+              <button
+                onClick={() => onAction(job._id, "dropped_at_workshop")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Navigation className="h-4 w-4" />
+                )}
+                Dropped at Workshop
+              </button>
+              {/* Also show payment button if at workshop stage */}
+              {!job.servicePaymentUrl && (
+                <button
+                  onClick={() => onOpenPayment(job)}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Generate Payment Link
+                </button>
+              )}
+            </>
+          );
+        case "completed":
+          return (
+            <div className="flex items-center gap-2 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">Pickup Complete</span>
+            </div>
+          );
+        default:
+          return null;
+      }
+    } else {
+      // Return leg states: assigned → started → collected → delivering → completed
+      switch (driverState) {
+        case "assigned":
+        case "accepted":
+          return (
+            <>
+              <button
+                onClick={() => onAction(job._id, "decline_return")}
+                disabled={isLoading}
+                className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => onAction(job._id, "start_return")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Start Return
+              </button>
+            </>
+          );
+        case "started":
+          return (
+            <button
+              onClick={() => onAction(job._id, "collected_from_workshop")}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Package className="h-4 w-4" />
+              )}
+              Collected from Workshop
+            </button>
+          );
+        case "collected":
+          return (
+            <button
+              onClick={() => onAction(job._id, "delivering")}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Truck className="h-4 w-4" />
+              )}
+              En Route to Customer
+            </button>
+          );
+        case "delivering":
+          return (
+            <button
+              onClick={() => onAction(job._id, "delivered")}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              Delivered to Customer
+            </button>
+          );
+        case "completed":
+          return (
+            <div className="flex items-center gap-2 text-blue-600">
+              <CheckCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">Delivery Complete</span>
+            </div>
+          );
+        default:
+          return null;
+      }
+    }
+  };
+
+  // Get state label for display
+  const getStateLabel = () => {
+    if (secondaryTab === "available") return null;
+
+    const stateLabels: Record<string, { label: string; color: string }> = {
+      assigned: { label: "Assigned", color: "bg-slate-100 text-slate-700" },
+      accepted: { label: "Accepted", color: "bg-amber-100 text-amber-700" },
+      started: { label: "En Route", color: "bg-blue-100 text-blue-700" },
+      arrived: { label: "Arrived", color: "bg-purple-100 text-purple-700" },
+      collected: { label: "Car Collected", color: "bg-emerald-100 text-emerald-700" },
+      delivering: { label: "Delivering", color: "bg-blue-100 text-blue-700" },
+      completed: { label: "Complete", color: "bg-green-100 text-green-700" },
+    };
+
+    const state = stateLabels[driverState] || stateLabels.assigned;
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${state.color}`}>
+        {state.label}
+      </span>
+    );
+  };
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`rounded-xl border bg-white overflow-hidden transition-shadow hover:shadow-md ${
-        job.isPreferredArea ? "border-emerald-300 ring-1 ring-emerald-100" : "border-slate-200"
+      className={`overflow-hidden rounded-xl border bg-white transition-shadow hover:shadow-md ${
+        job.isPreferredArea
+          ? "border-emerald-300 ring-1 ring-emerald-100"
+          : "border-slate-200"
       }`}
     >
       {/* Header */}
       <div className="p-4">
-        {job.isPreferredArea && (
-          <div className="mb-2 flex items-center gap-1 text-xs text-emerald-600">
-            <Star className="h-3 w-3 fill-emerald-500" />
-            Your area
-          </div>
-        )}
+        <div className="mb-2 flex items-center gap-2">
+          {/* Leg Type Badge */}
+          <span
+            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+              isPickupLeg
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-blue-100 text-blue-700"
+            }`}
+          >
+            {isPickupLeg ? (
+              <>
+                <ArrowRight className="h-3 w-3" />
+                Pickup
+              </>
+            ) : (
+              <>
+                <ArrowLeft className="h-3 w-3" />
+                Return
+              </>
+            )}
+          </span>
+
+          {/* State Label */}
+          {getStateLabel()}
+
+          {/* Preferred Area Badge */}
+          {job.isPreferredArea && (
+            <span className="flex items-center gap-1 text-xs text-emerald-600">
+              <Star className="h-3 w-3 fill-emerald-500" />
+              Your area
+            </span>
+          )}
+        </div>
 
         <div className="flex items-start justify-between">
           <div>
@@ -597,7 +1012,9 @@ function JobCard({
             <p className="text-sm text-slate-500">{job.serviceType}</p>
           </div>
           <div className="text-right">
-            <span className="text-lg font-bold text-emerald-600">${job.payout}</span>
+            <span className="text-lg font-bold text-emerald-600">
+              ${job.payout}
+            </span>
             <p className="text-xs text-slate-500">payout</p>
           </div>
         </div>
@@ -605,18 +1022,22 @@ function JobCard({
         {/* Details */}
         <div className="mt-3 space-y-1.5 text-sm text-slate-600">
           <div className="flex items-start gap-2">
-            <MapPin className="h-4 w-4 mt-0.5 text-slate-400 flex-shrink-0" />
-            <span>{job.pickupAddress}</span>
+            <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span>
+              {isPickupLeg ? job.pickupAddress : `Return to: ${job.pickupAddress}`}
+            </span>
           </div>
           {job.garageName && (
             <div className="flex items-start gap-2">
-              <Navigation className="h-4 w-4 mt-0.5 text-slate-400 flex-shrink-0" />
+              <Navigation className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
               <span>{job.garageName}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-slate-400" />
-            <span>Pickup: {job.pickupTime}</span>
+            <span>
+              {isPickupLeg ? `Pickup: ${job.pickupTime}` : `Return: ${job.dropoffTime}`}
+            </span>
           </div>
         </div>
 
@@ -630,22 +1051,26 @@ function JobCard({
           </div>
         )}
 
-        {/* Call Customer Button - Show for active jobs with phone number */}
-        {activeTab !== "available" && job.customerPhone && (
+        {/* Call Customer Button */}
+        {secondaryTab === "my_jobs" && job.customerPhone && (
           <div className="mt-3">
             {isCallSuccess ? (
-              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                 <CheckCircle className="h-5 w-5 text-emerald-600" />
                 <div>
-                  <span className="text-sm font-medium text-emerald-800">Call initiated!</span>
-                  <p className="text-xs text-emerald-600">Your phone will ring shortly.</p>
+                  <span className="text-sm font-medium text-emerald-800">
+                    Call initiated!
+                  </span>
+                  <p className="text-xs text-emerald-600">
+                    Your phone will ring shortly.
+                  </p>
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => onCallCustomer(job)}
                 disabled={isCalling}
-                className="flex items-center justify-center gap-2 w-full rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 px-4 py-3 text-sm font-semibold text-white transition"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:bg-blue-400"
               >
                 {isCalling ? (
                   <>
@@ -660,32 +1085,34 @@ function JobCard({
                 )}
               </button>
             )}
-            <p className="mt-1 text-xs text-slate-500 text-center">
+            <p className="mt-1 text-center text-xs text-slate-500">
               Your number stays private - customer sees business number
             </p>
           </div>
         )}
 
-        {/* Photo Progress Indicator - show for active jobs */}
-        {activeTab !== "available" && (
+        {/* Photo Progress - show for my_jobs */}
+        {secondaryTab === "my_jobs" && (
           <div className="mt-3">
             <button
               onClick={() => onOpenPhotos(job)}
-              className="w-full rounded-lg bg-slate-100 hover:bg-slate-200 p-3 transition"
+              className="w-full rounded-lg bg-slate-100 p-3 transition hover:bg-slate-200"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="mb-1.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Camera className="h-4 w-4 text-slate-500" />
-                  <span className="text-sm font-medium text-slate-700">Vehicle Photos</span>
+                  <span className="text-sm font-medium text-slate-700">
+                    Vehicle Photos
+                  </span>
                 </div>
                 <span className="text-sm font-bold text-emerald-600">
                   {photoCount}/20
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
                     style={{ width: `${photoProgress}%` }}
                   />
                 </div>
@@ -704,33 +1131,14 @@ function JobCard({
           </div>
         )}
 
-        {/* Payment status for awaiting_payment tab */}
-        {activeTab === "awaiting_payment" && job.servicePaymentUrl && (
-          <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-amber-600" />
-                <span className="text-sm font-medium text-amber-800">
-                  ${((job.servicePaymentAmount || 0) / 100).toFixed(2)} pending
-                </span>
-              </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(job.servicePaymentUrl || "")}
-                className="text-xs text-amber-600 hover:underline"
-              >
-                Copy link
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Payment received for ready_for_return tab */}
-        {activeTab === "ready_for_return" && (
-          <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+        {/* Payment info for return jobs */}
+        {!isPickupLeg && job.servicePaymentStatus === "paid" && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-800">
-                Payment received - ${((job.servicePaymentAmount || 0) / 100).toFixed(2)}
+                Payment received - $
+                {((job.servicePaymentAmount || 0) / 100).toFixed(2)}
               </span>
             </div>
           </div>
@@ -738,111 +1146,14 @@ function JobCard({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
-        {activeTab === "available" && (
-          <>
-            <button
-              onClick={() => onAction(job._id, "decline")}
-              disabled={isLoading}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Skip
-            </button>
-            <button
-              onClick={() => onAction(job._id, "accept")}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-              Accept
-            </button>
-          </>
-        )}
-
-        {activeTab === "accepted" && (
-          <>
-            <button
-              onClick={() => onAction(job._id, "decline")}
-              disabled={isLoading}
-              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => onAction(job._id, "start")}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Start Pickup
-            </button>
-          </>
-        )}
-
-        {activeTab === "in_progress" && (
-          <>
-            {job.currentStage === "driver_en_route" && (
-              <button
-                onClick={() => onAction(job._id, "picked_up")}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Car className="h-4 w-4" />}
-                Picked Up
-              </button>
-            )}
-            {job.currentStage === "car_picked_up" && (
-              <button
-                onClick={() => onAction(job._id, "at_garage")}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-                At Garage
-              </button>
-            )}
-            {/* Show payment button if no payment link yet - available at garage or returning */}
-            {!job.servicePaymentUrl && ["at_garage", "service_in_progress", "driver_returning", "awaiting_payment"].includes(job.currentStage || "") && (
-              <button
-                onClick={() => onOpenPayment(job)}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <DollarSign className="h-4 w-4" />
-                Service Done - Get Payment
-              </button>
-            )}
-            {/* Show payment link status if already generated */}
-            {job.servicePaymentUrl && job.servicePaymentStatus === "pending" && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-amber-600">Payment link sent</span>
-                <button
-                  onClick={() => onOpenPayment(job)}
-                  className="text-xs text-emerald-600 hover:underline"
-                >
-                  View link
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === "awaiting_payment" && (
-          <div className="text-sm text-amber-600">
-            Waiting for customer to pay...
-          </div>
-        )}
-
-        {activeTab === "ready_for_return" && (
-          <button
-            onClick={() => onAction(job._id, "complete")}
-            disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-            Complete Delivery
-          </button>
-        )}
+      <div
+        className={`flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3 ${
+          isPickupLeg
+            ? "border-emerald-100 bg-emerald-50"
+            : "border-blue-100 bg-blue-50"
+        }`}
+      >
+        {renderActions()}
       </div>
     </motion.div>
   );

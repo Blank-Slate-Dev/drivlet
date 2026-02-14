@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 
@@ -48,7 +49,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     await connectDB();
     const { id } = await params;
 
-    const booking = await Booking.findById(id).lean();
+    const booking = await Booking.findById(id)
+      .populate("userId", "mobile")
+      .lean();
 
     if (!booking) {
       return NextResponse.json(
@@ -57,7 +60,67 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json(booking);
+    // Collect driver IDs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const b = booking as any;
+    const driverIds: string[] = [];
+    if (b.pickupDriver?.driverId) {
+      driverIds.push(b.pickupDriver.driverId.toString());
+    }
+    if (b.returnDriver?.driverId) {
+      driverIds.push(b.returnDriver.driverId.toString());
+    }
+    if (b.assignedDriverId) {
+      driverIds.push(b.assignedDriverId.toString());
+    }
+
+    // Fetch drivers
+    const driverMap = new Map<string, { firstName: string; lastName: string }>();
+    if (driverIds.length > 0) {
+      const drivers = await Driver.find({ _id: { $in: driverIds } })
+        .select("firstName lastName")
+        .lean();
+      drivers.forEach((driver) => {
+        driverMap.set(driver._id.toString(), {
+          firstName: driver.firstName,
+          lastName: driver.lastName,
+        });
+      });
+    }
+
+    // Get driver names
+    const pickupDriverId = b.pickupDriver?.driverId?.toString();
+    const returnDriverId = b.returnDriver?.driverId?.toString();
+    const legacyDriverId = b.assignedDriverId?.toString();
+
+    const pickupDriverInfo = pickupDriverId ? driverMap.get(pickupDriverId) : null;
+    const returnDriverInfo = returnDriverId ? driverMap.get(returnDriverId) : null;
+    const legacyDriverInfo = legacyDriverId ? driverMap.get(legacyDriverId) : null;
+
+    // Transform user info
+    const userDoc = b.userId;
+    const isPopulated = userDoc && typeof userDoc === "object" && "_id" in userDoc;
+    const userMobile = isPopulated ? userDoc.mobile : undefined;
+    const userId = isPopulated
+      ? userDoc._id?.toString()
+      : userDoc?.toString() || null;
+
+    return NextResponse.json({
+      ...booking,
+      userId,
+      userMobile,
+      pickupDriverName: pickupDriverInfo
+        ? `${pickupDriverInfo.firstName} ${pickupDriverInfo.lastName}`
+        : null,
+      returnDriverName: returnDriverInfo
+        ? `${returnDriverInfo.firstName} ${returnDriverInfo.lastName}`
+        : null,
+      assignedDriverName: legacyDriverInfo
+        ? `${legacyDriverInfo.firstName} ${legacyDriverInfo.lastName}`
+        : pickupDriverInfo
+        ? `${pickupDriverInfo.firstName} ${pickupDriverInfo.lastName}`
+        : null,
+    });
   } catch (error) {
     console.error("Error fetching booking:", error);
     return NextResponse.json(

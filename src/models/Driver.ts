@@ -90,6 +90,7 @@ export interface IDriver extends Document {
   availability: Availability;
   maxJobsPerDay: number;
   preferredAreas: string[]; // Suburbs/postcodes they prefer to work in
+  shiftPreference: "am" | "pm" | "full_day"; // AM=pickups, PM=returns, full_day=both
 
   // Employment Details - ENFORCED EMPLOYEE STATUS
   employmentType: EmploymentType; // Always "employee"
@@ -328,6 +329,11 @@ const DriverSchema = new Schema<IDriver>(
     preferredAreas: {
       type: [String],
       default: [],
+    },
+    shiftPreference: {
+      type: String,
+      enum: ["am", "pm", "full_day"],
+      default: "full_day",
     },
 
     // Employment Details - ENFORCED EMPLOYEE STATUS

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
 
 // GET /api/admin/bookings - Get all bookings with filtering and pagination
@@ -55,24 +56,80 @@ export async function GET(request: NextRequest) {
       Booking.countDocuments(query),
     ]);
 
-    // Transform bookings to include userMobile for registered users
-    const bookingsWithUserMobile = bookings.map((booking) => {
+    // Collect all unique driver IDs from pickupDriver and returnDriver
+    const driverIds = new Set<string>();
+    bookings.forEach((booking) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const userDoc = booking.userId as any;
+      const b = booking as any;
+      if (b.pickupDriver?.driverId) {
+        driverIds.add(b.pickupDriver.driverId.toString());
+      }
+      if (b.returnDriver?.driverId) {
+        driverIds.add(b.returnDriver.driverId.toString());
+      }
+      // Also check legacy assignedDriverId
+      if (b.assignedDriverId) {
+        driverIds.add(b.assignedDriverId.toString());
+      }
+    });
+
+    // Fetch all drivers in a single query
+    const driverMap = new Map<string, { firstName: string; lastName: string }>();
+    if (driverIds.size > 0) {
+      const drivers = await Driver.find({ _id: { $in: Array.from(driverIds) } })
+        .select("firstName lastName")
+        .lean();
+      drivers.forEach((driver) => {
+        driverMap.set(driver._id.toString(), {
+          firstName: driver.firstName,
+          lastName: driver.lastName,
+        });
+      });
+    }
+
+    // Transform bookings to include userMobile and driver names
+    const bookingsWithDetails = bookings.map((booking) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b = booking as any;
+      const userDoc = b.userId;
       const isPopulated = userDoc && typeof userDoc === "object" && "_id" in userDoc;
       const userMobile = isPopulated ? userDoc.mobile : undefined;
       const userId = isPopulated
         ? userDoc._id?.toString()
         : userDoc?.toString() || null;
+
+      // Get driver names
+      const pickupDriverId = b.pickupDriver?.driverId?.toString();
+      const returnDriverId = b.returnDriver?.driverId?.toString();
+      const legacyDriverId = b.assignedDriverId?.toString();
+
+      const pickupDriverInfo = pickupDriverId ? driverMap.get(pickupDriverId) : null;
+      const returnDriverInfo = returnDriverId ? driverMap.get(returnDriverId) : null;
+      const legacyDriverInfo = legacyDriverId ? driverMap.get(legacyDriverId) : null;
+
       return {
         ...booking,
         userId,
-        userMobile, // Add userMobile field for registered users
+        userMobile,
+        // Pickup driver details
+        pickupDriverName: pickupDriverInfo
+          ? `${pickupDriverInfo.firstName} ${pickupDriverInfo.lastName}`
+          : null,
+        // Return driver details
+        returnDriverName: returnDriverInfo
+          ? `${returnDriverInfo.firstName} ${returnDriverInfo.lastName}`
+          : null,
+        // Legacy driver name (for backwards compatibility)
+        assignedDriverName: legacyDriverInfo
+          ? `${legacyDriverInfo.firstName} ${legacyDriverInfo.lastName}`
+          : pickupDriverInfo
+          ? `${pickupDriverInfo.firstName} ${pickupDriverInfo.lastName}`
+          : null,
       };
     });
 
     return NextResponse.json({
-      bookings: bookingsWithUserMobile,
+      bookings: bookingsWithDetails,
       pagination: {
         page,
         limit,

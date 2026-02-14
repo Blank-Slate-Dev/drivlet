@@ -33,6 +33,10 @@ import {
   Calendar,
   Copy,
   QrCode,
+  Truck,
+  UserPlus,
+  UserMinus,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
@@ -65,6 +69,17 @@ interface SignedFormRef {
 interface SelectedService {
   category: string;
   services: string[];
+}
+
+interface DriverLeg {
+  driverId: string;
+  driverName?: string;
+  assignedAt: string;
+  acceptedAt?: string;
+  startedAt?: string;
+  arrivedAt?: string;
+  collectedAt?: string;
+  completedAt?: string;
 }
 
 interface Booking {
@@ -109,6 +124,22 @@ interface Booking {
   updates: Update[];
   createdAt: string;
   updatedAt: string;
+  // Two-phase driver assignment
+  pickupDriver?: DriverLeg;
+  returnDriver?: DriverLeg;
+  pickupDriverName?: string;
+  returnDriverName?: string;
+  // Legacy driver fields
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+}
+
+interface DriverOption {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  canAcceptJobs: boolean;
+  shiftPreference: "am" | "pm" | "full_day";
 }
 
 export default function AdminBookingsPage() {
@@ -658,6 +689,12 @@ export default function AdminBookingsPage() {
             formatCurrency={formatCurrency}
             getTrackingLink={getTrackingLink}
             copyToClipboard={copyToClipboard}
+            onBookingUpdated={(updated) => {
+              setBookings((prev) =>
+                prev.map((b) => (b._id === updated._id ? updated : b))
+              );
+              setSelectedBooking(updated);
+            }}
           />
         )}
 
@@ -684,6 +721,7 @@ function ViewDetailsModal({
   formatCurrency,
   getTrackingLink,
   copyToClipboard,
+  onBookingUpdated,
 }: {
   booking: Booking;
   onClose: () => void;
@@ -694,7 +732,101 @@ function ViewDetailsModal({
   formatCurrency: (cents: number) => string;
   getTrackingLink: (booking: Booking) => string;
   copyToClipboard: (text: string, label: string) => void;
+  onBookingUpdated: (booking: Booking) => void;
 }) {
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [assigningDriver, setAssigningDriver] = useState<"pickup" | "return" | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
+  const [driverActionLoading, setDriverActionLoading] = useState(false);
+  const [driverError, setDriverError] = useState("");
+
+  // Fetch available drivers
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      setLoadingDrivers(true);
+      try {
+        const response = await fetch("/api/admin/drivers?status=active&canAcceptJobs=true");
+        if (response.ok) {
+          const data = await response.json();
+          setDrivers(data.drivers || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch drivers:", error);
+      } finally {
+        setLoadingDrivers(false);
+      }
+    };
+    fetchDrivers();
+  }, []);
+
+  const handleAssignDriver = async (leg: "pickup" | "return") => {
+    if (!selectedDriverId) return;
+    setDriverActionLoading(true);
+    setDriverError("");
+
+    try {
+      const response = await fetch(`/api/admin/bookings/${booking._id}/assign-driver`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId: selectedDriverId, leg }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to assign driver");
+      }
+
+      // Refresh booking data
+      const bookingResponse = await fetch(`/api/admin/bookings/${booking._id}`);
+      if (bookingResponse.ok) {
+        const updatedBooking = await bookingResponse.json();
+        onBookingUpdated(updatedBooking);
+      }
+
+      setAssigningDriver(null);
+      setSelectedDriverId("");
+    } catch (error) {
+      setDriverError(error instanceof Error ? error.message : "Failed to assign driver");
+    } finally {
+      setDriverActionLoading(false);
+    }
+  };
+
+  const handleUnassignDriver = async (leg: "pickup" | "return") => {
+    if (!confirm(`Are you sure you want to unassign the ${leg} driver?`)) return;
+    setDriverActionLoading(true);
+    setDriverError("");
+
+    try {
+      const response = await fetch(`/api/admin/bookings/${booking._id}/assign-driver`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leg }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to unassign driver");
+      }
+
+      // Refresh booking data
+      const bookingResponse = await fetch(`/api/admin/bookings/${booking._id}`);
+      if (bookingResponse.ok) {
+        const updatedBooking = await bookingResponse.json();
+        onBookingUpdated(updatedBooking);
+      }
+    } catch (error) {
+      setDriverError(error instanceof Error ? error.message : "Failed to unassign driver");
+    } finally {
+      setDriverActionLoading(false);
+    }
+  };
+
+  // Check if return driver assignment is allowed
+  const canAssignReturnDriver = booking.pickupDriver?.completedAt;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
@@ -1050,6 +1182,247 @@ function ViewDetailsModal({
                 {getStageLabel(booking.currentStage)}
               </span>
             </p>
+          </div>
+
+          {/* Driver Assignments - Two-Slot Layout */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-4">
+              <Truck className="h-4 w-4 text-emerald-600" />
+              Driver Assignments
+            </div>
+
+            {driverError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {driverError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Pickup Driver Slot */}
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    Pickup Driver
+                  </span>
+                  <span className="text-xs text-slate-400">Customer → Workshop</span>
+                </div>
+
+                {booking.pickupDriver ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {booking.pickupDriverName || "Unknown Driver"}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          {booking.pickupDriver.completedAt ? (
+                            <span className="flex items-center gap-1 text-green-600">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Completed
+                            </span>
+                          ) : booking.pickupDriver.startedAt ? (
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <Clock className="h-3 w-3" />
+                              In Progress
+                            </span>
+                          ) : booking.pickupDriver.acceptedAt ? (
+                            <span className="flex items-center gap-1 text-emerald-600">
+                              <Check className="h-3 w-3" />
+                              Accepted
+                            </span>
+                          ) : (
+                            <span className="text-amber-600">Assigned</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {!booking.pickupDriver.startedAt && (
+                      <button
+                        onClick={() => handleUnassignDriver("pickup")}
+                        disabled={driverActionLoading}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        title="Unassign Driver"
+                      >
+                        {driverActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserMinus className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : assigningDriver === "pickup" ? (
+                  <div className="space-y-3">
+                    <select
+                      value={selectedDriverId}
+                      onChange={(e) => setSelectedDriverId(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="">Select a driver...</option>
+                      {drivers.map((driver) => (
+                        <option key={driver._id} value={driver._id}>
+                          {driver.firstName} {driver.lastName}
+                          {driver.shiftPreference !== "full_day" && ` (${driver.shiftPreference.toUpperCase()})`}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAssignDriver("pickup")}
+                        disabled={!selectedDriverId || driverActionLoading}
+                        className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {driverActionLoading ? "Assigning..." : "Assign"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAssigningDriver(null);
+                          setSelectedDriverId("");
+                        }}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAssigningDriver("pickup")}
+                    disabled={loadingDrivers}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600"
+                  >
+                    {loadingDrivers ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4" />
+                        Assign Pickup Driver
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Return Driver Slot */}
+              <div className={`rounded-lg border p-3 ${canAssignReturnDriver ? "border-slate-200" : "border-slate-100 bg-slate-50"}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    Return Driver
+                  </span>
+                  <span className="text-xs text-slate-400">Workshop → Customer</span>
+                </div>
+
+                {!canAssignReturnDriver && !booking.returnDriver && (
+                  <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <AlertTriangle className="h-4 w-4" />
+                    Available after pickup is completed
+                  </div>
+                )}
+
+                {booking.returnDriver ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {booking.returnDriverName || "Unknown Driver"}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          {booking.returnDriver.completedAt ? (
+                            <span className="flex items-center gap-1 text-green-600">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Completed
+                            </span>
+                          ) : booking.returnDriver.startedAt ? (
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <Clock className="h-3 w-3" />
+                              In Progress
+                            </span>
+                          ) : booking.returnDriver.acceptedAt ? (
+                            <span className="flex items-center gap-1 text-emerald-600">
+                              <Check className="h-3 w-3" />
+                              Accepted
+                            </span>
+                          ) : (
+                            <span className="text-amber-600">Assigned</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {!booking.returnDriver.startedAt && (
+                      <button
+                        onClick={() => handleUnassignDriver("return")}
+                        disabled={driverActionLoading}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        title="Unassign Driver"
+                      >
+                        {driverActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserMinus className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : canAssignReturnDriver && (
+                  assigningDriver === "return" ? (
+                    <div className="space-y-3">
+                      <select
+                        value={selectedDriverId}
+                        onChange={(e) => setSelectedDriverId(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="">Select a driver...</option>
+                        {drivers.map((driver) => (
+                          <option key={driver._id} value={driver._id}>
+                            {driver.firstName} {driver.lastName}
+                            {driver.shiftPreference !== "full_day" && ` (${driver.shiftPreference.toUpperCase()})`}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAssignDriver("return")}
+                          disabled={!selectedDriverId || driverActionLoading}
+                          className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+                        >
+                          {driverActionLoading ? "Assigning..." : "Assign"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAssigningDriver(null);
+                            setSelectedDriverId("");
+                          }}
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAssigningDriver("return")}
+                      disabled={loadingDrivers}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 transition hover:border-blue-400 hover:text-blue-600"
+                    >
+                      {loadingDrivers ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4" />
+                          Assign Return Driver
+                        </>
+                      )}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Signed Forms */}

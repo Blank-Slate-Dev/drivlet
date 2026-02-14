@@ -44,6 +44,17 @@ export interface ISignedFormRef {
   submittedAt: Date;
 }
 
+// Driver leg assignment for pickup and return phases
+export interface IDriverLeg {
+  driverId: Types.ObjectId;
+  assignedAt: Date;
+  acceptedAt?: Date;
+  startedAt?: Date;       // marked en route
+  arrivedAt?: Date;       // arrived at location
+  collectedAt?: Date;     // vehicle collected
+  completedAt?: Date;     // leg completed (dropped off)
+}
+
 export interface IBooking extends Document {
   // User info (userId is optional for guests)
   userId: Types.ObjectId | null;
@@ -96,12 +107,16 @@ export interface IBooking extends Document {
   garageCompletedAt?: Date;
   garageResponse?: IGarageResponse;
 
-  // Driver assignment
+  // Driver assignment (legacy fields - kept for backwards compatibility)
   assignedDriverId?: Types.ObjectId;
   driverAssignedAt?: Date;
   driverAcceptedAt?: Date;
   driverStartedAt?: Date;
   driverCompletedAt?: Date;
+
+  // Two-phase driver assignment (new system)
+  pickupDriver?: IDriverLeg;
+  returnDriver?: IDriverLeg;
 
   // Drivlet fee payment information (paid at booking)
   paymentId?: string;
@@ -206,6 +221,20 @@ const SignedFormRefSchema = new Schema<ISignedFormRef>(
       required: true,
     },
     submittedAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
+// Driver leg schema for pickup and return phases
+const DriverLegSchema = new Schema<IDriverLeg>(
+  {
+    driverId: { type: Schema.Types.ObjectId, ref: "Driver", required: true },
+    assignedAt: { type: Date, required: true },
+    acceptedAt: { type: Date },
+    startedAt: { type: Date },
+    arrivedAt: { type: Date },
+    collectedAt: { type: Date },
+    completedAt: { type: Date },
   },
   { _id: false }
 );
@@ -401,7 +430,7 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
 
-    // Driver assignment
+    // Driver assignment (legacy fields - kept for backwards compatibility)
     assignedDriverId: {
       type: Schema.Types.ObjectId,
       ref: "Driver",
@@ -422,6 +451,16 @@ const BookingSchema = new Schema<IBooking>(
     },
     driverCompletedAt: {
       type: Date,
+      required: false,
+    },
+
+    // Two-phase driver assignment (new system)
+    pickupDriver: {
+      type: DriverLegSchema,
+      required: false,
+    },
+    returnDriver: {
+      type: DriverLegSchema,
       required: false,
     },
 
@@ -575,6 +614,9 @@ BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
 BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 });
 BookingSchema.index({ assignedDriverId: 1, status: 1 });
+BookingSchema.index({ "pickupDriver.driverId": 1 });
+BookingSchema.index({ "returnDriver.driverId": 1 });
+BookingSchema.index({ "pickupDriver.completedAt": 1, servicePaymentStatus: 1 });
 BookingSchema.index({ paymentId: 1 });
 BookingSchema.index({ stripeSessionId: 1 });
 BookingSchema.index({ servicePaymentId: 1 });

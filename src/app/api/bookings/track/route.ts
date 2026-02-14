@@ -110,10 +110,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get driver info if assigned
+    // Get driver info based on current stage
+    // Determine which driver to show based on the booking stage
+    let activeDriverId = null;
+    const stage = booking.currentStage;
+
+    // Pickup-related stages show pickup driver
+    if (['driver_en_route', 'car_picked_up', 'at_garage', 'service_in_progress'].includes(stage)) {
+      activeDriverId = booking.pickupDriver?.driverId;
+    }
+    // Return-related stages show return driver
+    else if (['driver_returning', 'delivered'].includes(stage)) {
+      activeDriverId = booking.returnDriver?.driverId;
+    }
+    // Fallback to legacy field or pickup driver
+    activeDriverId = activeDriverId || booking.assignedDriverId || booking.pickupDriver?.driverId;
+
     let driverInfo = null;
-    if (booking.assignedDriverId) {
-      const driver = await Driver.findById(booking.assignedDriverId).lean();
+    if (activeDriverId) {
+      const driver = await Driver.findById(activeDriverId).lean();
       if (driver) {
         driverInfo = {
           firstName: driver.firstName,
