@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { stripe } from '@/lib/stripe';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
+import { sendBookingStageEmail } from '@/lib/email';
+import { sendBookingConfirmationSMS } from '@/lib/sms';
 
 export async function POST(request: NextRequest) {
   console.log('📥 Create booking after payment request received');
@@ -190,6 +192,40 @@ export async function POST(request: NextRequest) {
 
       console.log('✅✅✅ BOOKING CREATED SUCCESSFULLY!');
       console.log('🆔 Booking ID:', booking?._id);
+
+      // Send booking confirmation email (async, non-blocking)
+      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const trackingUrl = trackingCode
+        ? `${appUrl}/track?code=${trackingCode}`
+        : `${appUrl}/track`;
+
+      sendBookingStageEmail({
+        customerEmail: bookingData.userEmail,
+        customerName: bookingData.userName,
+        vehicleRegistration: bookingData.vehicleRegistration,
+        currentStage: "booking_confirmed",
+        trackingCode,
+        garageName: bookingData.garageName || undefined,
+      }).then((sent) => {
+        if (sent) console.log("📧 Booking confirmation email sent to:", bookingData.userEmail);
+      }).catch((err) => {
+        console.error("❌ Failed to send confirmation email:", err);
+      });
+
+      // Send confirmation SMS to guests with phone numbers (async, non-blocking)
+      if (bookingData.guestPhone) {
+        sendBookingConfirmationSMS(
+          bookingData.guestPhone,
+          bookingData.userName,
+          bookingData.vehicleRegistration,
+          bookingData.pickupTime,
+          trackingUrl
+        ).then((sent) => {
+          if (sent) console.log("📱 Booking confirmation SMS sent to:", bookingData.guestPhone);
+        }).catch((err) => {
+          console.error("❌ Failed to send confirmation SMS:", err);
+        });
+      }
 
       return NextResponse.json({
         success: true,
