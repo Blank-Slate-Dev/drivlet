@@ -193,38 +193,46 @@ export async function POST(request: NextRequest) {
       console.log('✅✅✅ BOOKING CREATED SUCCESSFULLY!');
       console.log('🆔 Booking ID:', booking?._id);
 
-      // Send booking confirmation email (async, non-blocking)
-      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      const trackingUrl = trackingCode
-        ? `${appUrl}/track?code=${trackingCode}`
-        : `${appUrl}/track`;
-
-      sendBookingStageEmail({
-        customerEmail: bookingData.userEmail,
-        customerName: bookingData.userName,
-        vehicleRegistration: bookingData.vehicleRegistration,
-        currentStage: "booking_confirmed",
-        trackingCode,
-        garageName: bookingData.garageName || undefined,
-      }).then((sent) => {
-        if (sent) console.log("📧 Booking confirmation email sent to:", bookingData.userEmail);
-      }).catch((err) => {
-        console.error("❌ Failed to send confirmation email:", err);
-      });
-
-      // Send confirmation SMS to guests with phone numbers (async, non-blocking)
-      if (bookingData.guestPhone) {
-        sendBookingConfirmationSMS(
-          bookingData.guestPhone,
-          bookingData.userName,
-          bookingData.vehicleRegistration,
-          bookingData.pickupTime,
-          trackingUrl
-        ).then((sent) => {
-          if (sent) console.log("📱 Booking confirmation SMS sent to:", bookingData.guestPhone);
-        }).catch((err) => {
-          console.error("❌ Failed to send confirmation SMS:", err);
+      // Send booking confirmation email (awaited so Vercel doesn't kill the function early)
+      try {
+        const emailSent = await sendBookingStageEmail({
+          customerEmail: bookingData.userEmail,
+          customerName: bookingData.userName,
+          vehicleRegistration: bookingData.vehicleRegistration,
+          currentStage: "booking_confirmed",
+          trackingCode,
+          garageName: bookingData.garageName || undefined,
         });
+        if (emailSent) {
+          console.log("📧 Booking confirmation email sent to:", bookingData.userEmail);
+        } else {
+          console.warn("⚠️ Email not sent (Mailjet may not be configured)");
+        }
+      } catch (emailErr) {
+        console.error("❌ Failed to send confirmation email:", emailErr);
+      }
+
+      // Send confirmation SMS to guests with phone numbers
+      if (bookingData.guestPhone) {
+        try {
+          const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          const trackingUrl = trackingCode
+            ? `${appUrl}/track?code=${trackingCode}`
+            : `${appUrl}/track`;
+
+          const smsSent = await sendBookingConfirmationSMS(
+            bookingData.guestPhone,
+            bookingData.userName,
+            bookingData.vehicleRegistration,
+            bookingData.pickupTime,
+            trackingUrl
+          );
+          if (smsSent) {
+            console.log("📱 Booking confirmation SMS sent to:", bookingData.guestPhone);
+          }
+        } catch (smsErr) {
+          console.error("❌ Failed to send confirmation SMS:", smsErr);
+        }
       }
 
       return NextResponse.json({
