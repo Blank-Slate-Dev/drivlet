@@ -107,14 +107,15 @@ export interface IBooking extends Document {
   garageCompletedAt?: Date;
   garageResponse?: IGarageResponse;
 
-  // Driver assignment (legacy fields - kept for backwards compatibility)
-  assignedDriverId?: Types.ObjectId;
+  // Driver assignment
+  assignedDriverId?: Types.ObjectId;   // Pickup driver (set by admin dispatch)
+  returnDriverId?: Types.ObjectId;     // Return driver (set by admin dispatch)
   driverAssignedAt?: Date;
   driverAcceptedAt?: Date;
   driverStartedAt?: Date;
   driverCompletedAt?: Date;
 
-  // Two-phase driver assignment (new system)
+  // Driver leg state tracking (timestamps for pickup/return progress)
   pickupDriver?: IDriverLeg;
   returnDriver?: IDriverLeg;
 
@@ -430,8 +431,14 @@ const BookingSchema = new Schema<IBooking>(
       required: false,
     },
 
-    // Driver assignment (legacy fields - kept for backwards compatibility)
+    // Driver assignment (set by admin dispatch)
     assignedDriverId: {
+      type: Schema.Types.ObjectId,
+      ref: "Driver",
+      required: false,
+      index: true,
+    },
+    returnDriverId: {
       type: Schema.Types.ObjectId,
       ref: "Driver",
       required: false,
@@ -614,6 +621,7 @@ BookingSchema.index({ assignedGarageId: 1, garageStatus: 1 });
 BookingSchema.index({ garageStatus: 1 });
 BookingSchema.index({ garagePlaceId: 1, garageStatus: 1 });
 BookingSchema.index({ assignedDriverId: 1, status: 1 });
+BookingSchema.index({ returnDriverId: 1, status: 1 });
 BookingSchema.index({ "pickupDriver.driverId": 1 });
 BookingSchema.index({ "returnDriver.driverId": 1 });
 BookingSchema.index({ "pickupDriver.completedAt": 1, servicePaymentStatus: 1 });

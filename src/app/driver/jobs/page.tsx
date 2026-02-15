@@ -29,7 +29,6 @@ import {
   ArrowLeft,
   Package,
   Truck,
-  Lock,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 
@@ -71,25 +70,15 @@ interface Job {
   returnDriverState?: string | null;
   pickupClaimedByMe?: boolean;
   returnClaimedByMe?: boolean;
-  hasReturnDriver?: boolean;
   canStartReturn?: boolean;
   returnWaitingReason?: string | null;
-  // Legacy fields kept for compatibility
-  legType?: "pickup" | "return";
-  driverState?: string;
 }
 
-interface JobSections {
-  myJobs: {
-    accepted: Job[];
-    in_progress: Job[];
-    awaiting_payment: Job[];
-    ready_for_return: Job[];
-  };
-  available: {
-    pickups: Job[];
-    returns: Job[];
-  };
+interface MyJobs {
+  accepted: Job[];
+  in_progress: Job[];
+  awaiting_payment: Job[];
+  ready_for_return: Job[];
 }
 
 // ─── Tailwind class maps (avoid dynamic class purging) ─────────
@@ -108,7 +97,6 @@ const statusColorMap: Record<string, { bg: string; text: string }> = {
 
 function getPickupStateInfo(state: string | null | undefined) {
   switch (state) {
-    case "accepted":
     case "assigned":
       return { label: "Upcoming", colorKey: "blue" };
     case "started":
@@ -129,9 +117,8 @@ function getReturnStateInfo(
   canStart: boolean,
   hasReturn: boolean
 ) {
-  if (!hasReturn) return { label: "Not Claimed", colorKey: "slate" };
+  if (!hasReturn) return { label: "Not Assigned", colorKey: "slate" };
   switch (state) {
-    case "accepted":
     case "assigned":
       if (canStart) return { label: "Ready", colorKey: "emerald" };
       return { label: "Waiting", colorKey: "amber" };
@@ -162,14 +149,10 @@ function StatusBadge({ colorKey, label }: { colorKey: string; label: string }) {
 // ─── Action types ──────────────────────────────────────────────
 
 type JobAction =
-  | "accept_pickup"
-  | "decline_pickup"
   | "start_pickup"
   | "arrived_pickup"
   | "collected"
   | "dropped_at_workshop"
-  | "accept_return"
-  | "decline_return"
   | "start_return"
   | "collected_from_workshop"
   | "delivering"
@@ -181,22 +164,15 @@ type JobAction =
 export default function DriverJobsPage() {
   useSession();
 
-  const [sections, setSections] = useState<JobSections>({
-    myJobs: {
-      accepted: [],
-      in_progress: [],
-      awaiting_payment: [],
-      ready_for_return: [],
-    },
-    available: { pickups: [], returns: [] },
+  const [myJobs, setMyJobs] = useState<MyJobs>({
+    accepted: [],
+    in_progress: [],
+    awaiting_payment: [],
+    ready_for_return: [],
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
-
-  // Return offer modal state
-  const [returnOffer, setReturnOffer] = useState<Job | null>(null);
-  const [claimingReturn, setClaimingReturn] = useState(false);
 
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -224,10 +200,7 @@ export default function DriverJobsPage() {
       const res = await fetch("/api/driver/jobs?status=all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch jobs");
-      setSections({
-        myJobs: data.myJobs,
-        available: data.available,
-      });
+      setMyJobs(data.myJobs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch jobs");
     } finally {
@@ -257,45 +230,11 @@ export default function DriverJobsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Action failed");
-
-      // If we just accepted a pickup, show the return offer modal
-      if (action === "accept_pickup") {
-        const acceptedJob = sections.available.pickups.find(
-          (j) => j._id === jobId
-        );
-        if (acceptedJob) {
-          setReturnOffer(acceptedJob);
-        }
-      }
-
       await fetchJobs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleClaimReturn = async () => {
-    if (!returnOffer) return;
-    setClaimingReturn(true);
-    try {
-      const res = await fetch("/api/driver/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId: returnOffer._id,
-          action: "accept_return",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to claim return");
-      await fetchJobs();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to claim return");
-    } finally {
-      setClaimingReturn(false);
-      setReturnOffer(null);
     }
   };
 
@@ -403,10 +342,7 @@ export default function DriverJobsPage() {
 
   // ─── Computed ─────────────────────────────────────────────
 
-  const myJobsCount = Object.values(sections.myJobs).flat().length;
-  const availableCount =
-    sections.available.pickups.length + sections.available.returns.length;
-  const totalJobs = myJobsCount + availableCount;
+  const totalJobs = Object.values(myJobs).flat().length;
 
   // ─── Render ───────────────────────────────────────────────
 
@@ -416,9 +352,9 @@ export default function DriverJobsPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Jobs</h1>
+            <h1 className="text-2xl font-bold text-slate-900">My Jobs</h1>
             <p className="text-sm text-slate-500">
-              Manage your pickups &amp; returns
+              Your assigned pickups &amp; returns
             </p>
           </div>
           <button
@@ -451,137 +387,84 @@ export default function DriverJobsPage() {
           </div>
         ) : (
           <>
-            {/* Global Empty State */}
+            {/* Empty State */}
             {!loading && totalJobs === 0 && (
               <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
                 <Briefcase className="mx-auto h-12 w-12 text-slate-300" />
                 <h3 className="mt-4 text-lg font-medium text-slate-900">
-                  No jobs right now
+                  No jobs assigned
                 </h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Check back soon for new opportunities
+                  Jobs will appear here when dispatch assigns them to you
                 </p>
               </div>
             )}
 
-            {/* ═══ MY JOBS SECTION ═══ */}
-            {myJobsCount > 0 && (
-              <>
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                    My Jobs
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
+            {/* ═══ MY JOBS ═══ */}
+            {totalJobs > 0 && (
+              <div className="space-y-3">
+                <AnimatePresence mode="popLayout">
+                  {/* In Progress — highest priority */}
+                  {myJobs.in_progress.map((job) => (
+                    <MyJobCard
+                      key={`ip-${job._id}`}
+                      job={job}
+                      actionLoading={actionLoading}
+                      onAction={handleJobAction}
+                      onOpenPayment={openPaymentModal}
+                      onOpenPhotos={openPhotoModal}
+                      onCallCustomer={handleCallCustomer}
+                      callingCustomer={callingCustomer}
+                      callSuccess={callSuccess}
+                    />
+                  ))}
 
-                <div className="space-y-3">
-                  <AnimatePresence mode="popLayout">
-                    {/* In Progress — highest priority */}
-                    {sections.myJobs.in_progress.map((job) => (
-                      <MyJobCard
-                        key={`ip-${job._id}`}
-                        job={job}
-                        actionLoading={actionLoading}
-                        onAction={handleJobAction}
-                        onOpenPayment={openPaymentModal}
-                        onOpenPhotos={openPhotoModal}
-                        onCallCustomer={handleCallCustomer}
-                        callingCustomer={callingCustomer}
-                        callSuccess={callSuccess}
-                      />
-                    ))}
+                  {/* Awaiting Payment */}
+                  {myJobs.awaiting_payment.map((job) => (
+                    <MyJobCard
+                      key={`ap-${job._id}`}
+                      job={job}
+                      actionLoading={actionLoading}
+                      onAction={handleJobAction}
+                      onOpenPayment={openPaymentModal}
+                      onOpenPhotos={openPhotoModal}
+                      onCallCustomer={handleCallCustomer}
+                      callingCustomer={callingCustomer}
+                      callSuccess={callSuccess}
+                    />
+                  ))}
 
-                    {/* Awaiting Payment */}
-                    {sections.myJobs.awaiting_payment.map((job) => (
-                      <MyJobCard
-                        key={`ap-${job._id}`}
-                        job={job}
-                        actionLoading={actionLoading}
-                        onAction={handleJobAction}
-                        onOpenPayment={openPaymentModal}
-                        onOpenPhotos={openPhotoModal}
-                        onCallCustomer={handleCallCustomer}
-                        callingCustomer={callingCustomer}
-                        callSuccess={callSuccess}
-                      />
-                    ))}
+                  {/* Ready for Return */}
+                  {myJobs.ready_for_return.map((job) => (
+                    <MyJobCard
+                      key={`rr-${job._id}`}
+                      job={job}
+                      actionLoading={actionLoading}
+                      onAction={handleJobAction}
+                      onOpenPayment={openPaymentModal}
+                      onOpenPhotos={openPhotoModal}
+                      onCallCustomer={handleCallCustomer}
+                      callingCustomer={callingCustomer}
+                      callSuccess={callSuccess}
+                    />
+                  ))}
 
-                    {/* Ready for Return */}
-                    {sections.myJobs.ready_for_return.map((job) => (
-                      <MyJobCard
-                        key={`rr-${job._id}`}
-                        job={job}
-                        actionLoading={actionLoading}
-                        onAction={handleJobAction}
-                        onOpenPayment={openPaymentModal}
-                        onOpenPhotos={openPhotoModal}
-                        onCallCustomer={handleCallCustomer}
-                        callingCustomer={callingCustomer}
-                        callSuccess={callSuccess}
-                      />
-                    ))}
-
-                    {/* Accepted / Upcoming */}
-                    {sections.myJobs.accepted.map((job) => (
-                      <MyJobCard
-                        key={`ac-${job._id}`}
-                        job={job}
-                        actionLoading={actionLoading}
-                        onAction={handleJobAction}
-                        onOpenPayment={openPaymentModal}
-                        onOpenPhotos={openPhotoModal}
-                        onCallCustomer={handleCallCustomer}
-                        callingCustomer={callingCustomer}
-                        callSuccess={callSuccess}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </>
-            )}
-
-            {/* ═══ AVAILABLE SECTION ═══ */}
-            {availableCount > 0 && (
-              <>
-                <div className="my-6 flex items-center gap-2">
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                    Available
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
-
-                <div className="space-y-3">
-                  <AnimatePresence mode="popLayout">
-                    {/* Available Pickups */}
-                    {sections.available.pickups.map((job) => (
-                      <AvailableJobCard
-                        key={`avp-${job._id}`}
-                        job={job}
-                        type="pickup"
-                        actionLoading={actionLoading}
-                        onAccept={() =>
-                          handleJobAction(job._id, "accept_pickup")
-                        }
-                      />
-                    ))}
-
-                    {/* Available Returns */}
-                    {sections.available.returns.map((job) => (
-                      <AvailableJobCard
-                        key={`avr-${job._id}`}
-                        job={job}
-                        type="return"
-                        actionLoading={actionLoading}
-                        onAccept={() =>
-                          handleJobAction(job._id, "accept_return")
-                        }
-                      />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </>
+                  {/* Accepted / Upcoming */}
+                  {myJobs.accepted.map((job) => (
+                    <MyJobCard
+                      key={`ac-${job._id}`}
+                      job={job}
+                      actionLoading={actionLoading}
+                      onAction={handleJobAction}
+                      onOpenPayment={openPaymentModal}
+                      onOpenPhotos={openPhotoModal}
+                      onCallCustomer={handleCallCustomer}
+                      callingCustomer={callingCustomer}
+                      callSuccess={callSuccess}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
             )}
           </>
         )}
@@ -737,54 +620,6 @@ export default function DriverJobsPage() {
           currentStage={photoJob.currentStage}
         />
       )}
-
-      {/* ═══ RETURN OFFER MODAL ═══ */}
-      {returnOffer && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle className="h-6 w-6 text-emerald-600" />
-            </div>
-
-            <h3 className="text-lg font-bold text-slate-900">
-              Pickup Accepted!
-            </h3>
-            <p className="mt-1 text-sm text-slate-600">
-              Would you also like to claim the return leg for this booking?
-            </p>
-
-            <div className="mt-4 rounded-lg bg-slate-50 p-3">
-              <div className="flex items-center gap-2 text-sm">
-                <ArrowLeft className="h-4 w-4 text-blue-600" />
-                <span className="font-medium text-slate-700">Return Leg</span>
-              </div>
-              <p className="mt-1 text-sm text-slate-600">
-                {returnOffer.garageName} &rarr; {returnOffer.pickupAddress}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Payout: ${returnOffer.payout} &middot; Unlocks after pickup +
-                payment
-              </p>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setReturnOffer(null)}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Skip for now
-              </button>
-              <button
-                onClick={handleClaimReturn}
-                disabled={claimingReturn}
-                className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {claimingReturn ? "Claiming..." : "Claim Return"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -821,7 +656,7 @@ function MyJobCard({
 
   const isMyPickup = job.pickupClaimedByMe;
   const isMyReturn = job.returnClaimedByMe;
-  const hasReturn = !!job.returnClaimedByMe || !!job.hasReturnDriver;
+  const hasReturn = !!job.returnClaimedByMe;
 
   const pickupState = job.pickupDriverState;
   const returnState = job.returnDriverState;
@@ -855,8 +690,7 @@ function MyJobCard({
     (isMyReturn &&
       returnState &&
       returnState !== "completed" &&
-      returnState !== "assigned" &&
-      returnState !== "accepted");
+      returnState !== "assigned");
 
   return (
     <motion.div
@@ -886,53 +720,46 @@ function MyJobCard({
       </div>
 
       {/* ─── Pickup Leg ─── */}
-      <div className="border-b border-slate-50 px-4 py-3">
-        <div className="mb-2 flex items-center gap-2">
-          <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-            Pickup
-          </span>
-          <StatusBadge
-            colorKey={pickupInfo.colorKey}
-            label={pickupInfo.label}
-          />
-          {job.isPreferredArea && (
-            <span className="flex items-center gap-0.5 text-xs text-amber-500">
-              <Star className="h-3 w-3 fill-amber-400" />
-              Your area
+      {isMyPickup && (
+        <div className="border-b border-slate-50 px-4 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Pickup
             </span>
-          )}
-        </div>
-
-        <div className="space-y-1 text-sm text-slate-600">
-          <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
-            <span>{job.pickupAddress}</span>
+            <StatusBadge
+              colorKey={pickupInfo.colorKey}
+              label={pickupInfo.label}
+            />
+            {job.isPreferredArea && (
+              <span className="flex items-center gap-0.5 text-xs text-amber-500">
+                <Star className="h-3 w-3 fill-amber-400" />
+                Your area
+              </span>
+            )}
           </div>
-          {job.garageName && (
+
+          <div className="space-y-1 text-sm text-slate-600">
             <div className="flex items-start gap-2">
-              <Navigation className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
-              <span>{job.garageName}</span>
+              <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+              <span>{job.pickupAddress}</span>
             </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-slate-400" />
-            <span>Pickup: {job.pickupTime}</span>
+            {job.garageName && (
+              <div className="flex items-start gap-2">
+                <Navigation className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                <span>{job.garageName}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-slate-400" />
+              <span>Pickup: {job.pickupTime}</span>
+            </div>
           </div>
-        </div>
 
-        {/* Pickup Actions */}
-        {isMyPickup && !pickupComplete && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(pickupState === "assigned" || pickupState === "accepted") && (
-              <>
-                <button
-                  onClick={() => onAction(job._id, "decline_pickup")}
-                  disabled={isLoading}
-                  className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
+          {/* Pickup Actions */}
+          {!pickupComplete && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {pickupState === "assigned" && (
                 <button
                   onClick={() => onAction(job._id, "start_pickup")}
                   disabled={isLoading}
@@ -945,118 +772,103 @@ function MyJobCard({
                   )}
                   Start Pickup
                 </button>
-              </>
-            )}
-            {pickupState === "started" && (
-              <button
-                onClick={() => onAction(job._id, "arrived_pickup")}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MapPin className="h-4 w-4" />
-                )}
-                Arrived at Customer
-              </button>
-            )}
-            {pickupState === "arrived" && (
-              <button
-                onClick={() => onAction(job._id, "collected")}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Car className="h-4 w-4" />
-                )}
-                Car Collected
-              </button>
-            )}
-            {pickupState === "collected" && (
-              <>
+              )}
+              {pickupState === "started" && (
                 <button
-                  onClick={() => onAction(job._id, "dropped_at_workshop")}
+                  onClick={() => onAction(job._id, "arrived_pickup")}
                   disabled={isLoading}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Navigation className="h-4 w-4" />
+                    <MapPin className="h-4 w-4" />
                   )}
-                  Dropped at Workshop
+                  Arrived at Customer
                 </button>
-                {!job.servicePaymentUrl && (
+              )}
+              {pickupState === "arrived" && (
+                <button
+                  onClick={() => onAction(job._id, "collected")}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Car className="h-4 w-4" />
+                  )}
+                  Car Collected
+                </button>
+              )}
+              {pickupState === "collected" && (
+                <>
                   <button
-                    onClick={() => onOpenPayment(job)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                    onClick={() => onAction(job._id, "dropped_at_workshop")}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
-                    <DollarSign className="h-4 w-4" />
-                    Generate Payment
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Navigation className="h-4 w-4" />
+                    )}
+                    Dropped at Workshop
                   </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                  {!job.servicePaymentUrl && (
+                    <button
+                      onClick={() => onOpenPayment(job)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      Generate Payment
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
-        {pickupComplete && (
-          <div className="mt-2 flex items-center gap-1.5 text-emerald-600">
-            <CheckCircle className="h-4 w-4" />
-            <span className="text-xs font-medium">
-              Dropped off at {job.garageName || "workshop"}
-            </span>
-          </div>
-        )}
-      </div>
+          {pickupComplete && (
+            <div className="mt-2 flex items-center gap-1.5 text-emerald-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-xs font-medium">
+                Dropped off at {job.garageName || "workshop"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Return Leg ─── */}
-      <div className="px-4 py-3">
-        <div className="mb-2 flex items-center gap-2">
-          <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-            Return
-          </span>
-          <StatusBadge
-            colorKey={returnInfo.colorKey}
-            label={returnInfo.label}
-          />
-        </div>
-
-        <p className="text-sm text-slate-600">
-          {job.garageName || "Workshop"} &rarr; {job.pickupAddress}
-        </p>
-        {job.dropoffTime && (
-          <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-            <Clock className="h-3.5 w-3.5" />
-            <span>Return: {job.dropoffTime}</span>
+      {isMyReturn && (
+        <div className="px-4 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Return
+            </span>
+            <StatusBadge
+              colorKey={returnInfo.colorKey}
+              label={returnInfo.label}
+            />
           </div>
-        )}
 
-        {/* Return Actions — not claimed */}
-        {!hasReturn && (
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
-            <Lock className="h-3.5 w-3.5" />
-            Unlocks after pickup complete + customer payment
+          <p className="text-sm text-slate-600">
+            {job.garageName || "Workshop"} &rarr; {job.pickupAddress}
           </p>
-        )}
+          {job.dropoffTime && (
+            <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Return: {job.dropoffTime}</span>
+            </div>
+          )}
 
-        {/* Return Actions — claimed by me, not started */}
-        {isMyReturn &&
-          (returnState === "assigned" || returnState === "accepted") && (
+          {/* Return Actions — not started */}
+          {(returnState === "assigned") && (
             <>
               {job.canStartReturn ? (
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => onAction(job._id, "decline_return")}
-                    disabled={isLoading}
-                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
+                <div className="mt-3">
                   <button
                     onClick={() => onAction(job._id, "start_return")}
                     disabled={isLoading}
@@ -1081,110 +893,129 @@ function MyJobCard({
             </>
           )}
 
-        {/* Return Actions — in progress */}
-        {isMyReturn && returnState === "started" && (
-          <div className="mt-3">
-            <button
-              onClick={() => onAction(job._id, "collected_from_workshop")}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Package className="h-4 w-4" />
-              )}
-              Collected from Workshop
-            </button>
-          </div>
-        )}
-        {isMyReturn && returnState === "collected" && (
-          <div className="mt-3">
-            <button
-              onClick={() => onAction(job._id, "delivering")}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Truck className="h-4 w-4" />
-              )}
-              En Route to Customer
-            </button>
-          </div>
-        )}
-        {isMyReturn && returnState === "delivering" && (
-          <div className="mt-3">
-            <button
-              onClick={() => onAction(job._id, "delivered")}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle className="h-4 w-4" />
-              )}
-              Delivered to Customer
-            </button>
-          </div>
-        )}
-        {isMyReturn && returnState === "completed" && (
-          <div className="mt-2 flex items-center gap-1.5 text-blue-600">
-            <CheckCircle className="h-4 w-4" />
-            <span className="text-xs font-medium">Delivery Complete</span>
-          </div>
-        )}
-
-        {/* Payment info for awaiting_payment stage */}
-        {job.servicePaymentStatus === "pending" && job.servicePaymentUrl && (
-          <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
-            <div className="flex items-center gap-2 text-sm text-orange-800">
-              <CreditCard className="h-4 w-4" />
-              <span className="font-medium">Awaiting customer payment</span>
-            </div>
-            <p className="mt-1 text-xs text-orange-600">
-              $
-              {job.servicePaymentAmount
-                ? (job.servicePaymentAmount / 100).toFixed(2)
-                : "0.00"}{" "}
-              &middot; Payment link sent
-            </p>
-          </div>
-        )}
-
-        {/* Payment received badge */}
-        {job.servicePaymentStatus === "paid" && (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <div className="flex items-center gap-2 text-sm text-emerald-800">
-              <CheckCircle className="h-4 w-4" />
-              <span className="font-medium">
-                Payment received &mdash; $
-                {job.servicePaymentAmount
-                  ? (job.servicePaymentAmount / 100).toFixed(2)
-                  : "0.00"}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Generate payment if pickup complete but no link yet */}
-        {isMyPickup &&
-          pickupComplete &&
-          !job.servicePaymentUrl &&
-          job.servicePaymentStatus !== "paid" && (
+          {/* Return Actions — in progress */}
+          {returnState === "started" && (
             <div className="mt-3">
               <button
-                onClick={() => onOpenPayment(job)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200"
+                onClick={() => onAction(job._id, "collected_from_workshop")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
               >
-                <DollarSign className="h-4 w-4" />
-                Generate Payment Link
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Package className="h-4 w-4" />
+                )}
+                Collected from Workshop
               </button>
             </div>
           )}
-      </div>
+          {returnState === "collected" && (
+            <div className="mt-3">
+              <button
+                onClick={() => onAction(job._id, "delivering")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Truck className="h-4 w-4" />
+                )}
+                En Route to Customer
+              </button>
+            </div>
+          )}
+          {returnState === "delivering" && (
+            <div className="mt-3">
+              <button
+                onClick={() => onAction(job._id, "delivered")}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                Delivered to Customer
+              </button>
+            </div>
+          )}
+          {returnState === "completed" && (
+            <div className="mt-2 flex items-center gap-1.5 text-blue-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-xs font-medium">Delivery Complete</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Info sections when not assigned to specific legs ─── */}
+      {!isMyPickup && !isMyReturn && (
+        <div className="px-4 py-3">
+          <div className="space-y-1 text-sm text-slate-600">
+            <div className="flex items-start gap-2">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+              <span>{job.pickupAddress}</span>
+            </div>
+            {job.garageName && (
+              <div className="flex items-start gap-2">
+                <Navigation className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                <span>{job.garageName}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment info for awaiting_payment stage */}
+      {job.servicePaymentStatus === "pending" && job.servicePaymentUrl && (
+        <div className="mx-4 mb-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
+          <div className="flex items-center gap-2 text-sm text-orange-800">
+            <CreditCard className="h-4 w-4" />
+            <span className="font-medium">Awaiting customer payment</span>
+          </div>
+          <p className="mt-1 text-xs text-orange-600">
+            $
+            {job.servicePaymentAmount
+              ? (job.servicePaymentAmount / 100).toFixed(2)
+              : "0.00"}{" "}
+            &middot; Payment link sent
+          </p>
+        </div>
+      )}
+
+      {/* Payment received badge */}
+      {job.servicePaymentStatus === "paid" && (
+        <div className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <div className="flex items-center gap-2 text-sm text-emerald-800">
+            <CheckCircle className="h-4 w-4" />
+            <span className="font-medium">
+              Payment received &mdash; $
+              {job.servicePaymentAmount
+                ? (job.servicePaymentAmount / 100).toFixed(2)
+                : "0.00"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Generate payment if pickup complete but no link yet */}
+      {isMyPickup &&
+        pickupComplete &&
+        !job.servicePaymentUrl &&
+        job.servicePaymentStatus !== "paid" && (
+          <div className="mx-4 mb-3">
+            <button
+              onClick={() => onOpenPayment(job)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200"
+            >
+              <DollarSign className="h-4 w-4" />
+              Generate Payment Link
+            </button>
+          </div>
+        )}
 
       {/* ─── Footer: Photos + Call ─── */}
       {hasActiveLeg && (
@@ -1268,116 +1099,6 @@ function MyJobCard({
           )}
         </div>
       )}
-    </motion.div>
-  );
-}
-
-// ─── AvailableJobCard Component ────────────────────────────────
-// Simpler card for unclaimed jobs in the Available section
-
-function AvailableJobCard({
-  job,
-  type,
-  actionLoading,
-  onAccept,
-}: {
-  job: Job;
-  type: "pickup" | "return";
-  actionLoading: string | null;
-  onAccept: () => void;
-}) {
-  const isLoading = actionLoading === job._id;
-  const isPickup = type === "pickup";
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className={`rounded-xl border bg-white p-4 ${
-        job.isPreferredArea
-          ? "border-emerald-300 ring-1 ring-emerald-100"
-          : "border-slate-200"
-      }`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {isPickup ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                <ArrowRight className="h-3 w-3" />
-                PICKUP
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                <ArrowLeft className="h-3 w-3" />
-                RETURN
-              </span>
-            )}
-            {job.isPreferredArea && (
-              <span className="flex items-center gap-0.5 text-xs text-amber-500">
-                <Star className="h-3 w-3 fill-amber-400" />
-                Your area
-              </span>
-            )}
-          </div>
-
-          <p className="mt-2 font-semibold text-slate-900">
-            {job.vehicleRegistration} ({job.vehicleState})
-          </p>
-
-          <div className="mt-1 space-y-0.5 text-sm text-slate-600">
-            {isPickup ? (
-              <p>
-                {job.pickupAddress} &rarr; {job.garageName || "Workshop"}
-              </p>
-            ) : (
-              <p>
-                {job.garageName || "Workshop"} &rarr; {job.pickupAddress}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {isPickup ? job.pickupTime : job.dropoffTime}
-            </span>
-            {job.isManualTransmission && (
-              <span className="font-medium text-amber-600">Manual</span>
-            )}
-          </div>
-        </div>
-
-        <div className="ml-3 text-right">
-          <span className="text-lg font-bold text-emerald-600">
-            ${job.payout}
-          </span>
-          <p className="text-xs text-slate-400">payout</p>
-        </div>
-      </div>
-
-      <button
-        onClick={onAccept}
-        disabled={isLoading}
-        className={`mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
-          isPickup
-            ? "bg-emerald-600 hover:bg-emerald-500"
-            : "bg-blue-600 hover:bg-blue-500"
-        }`}
-      >
-        {isLoading ? (
-          <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Accepting...
-          </span>
-        ) : isPickup ? (
-          "Accept Pickup"
-        ) : (
-          "Accept Return"
-        )}
-      </button>
     </motion.div>
   );
 }
