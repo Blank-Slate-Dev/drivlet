@@ -62,6 +62,226 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
+    // ========== STATUS=ALL: Unified fetch for all categories ==========
+    if (status === "all") {
+      const baseFilter: Record<string, unknown> = { "cancellation.cancelledAt": { $exists: false } };
+      const driverProfileId = user.driverProfile;
+
+      const [
+        availablePickups,
+        availableReturns,
+        myInProgress,
+        myAwaitingPayment,
+        myReadyForReturn,
+        myAccepted,
+      ] = await Promise.all([
+        // Available pickups: pending, no driver assigned
+        Booking.find({
+          ...baseFilter,
+          status: "pending",
+          pickupDriver: { $exists: false },
+          assignedDriverId: { $exists: false },
+        }).sort({ pickupTime: 1, createdAt: -1 }).limit(30).lean(),
+
+        // Available returns: pickup accepted, no return driver
+        Booking.find({
+          ...baseFilter,
+          "pickupDriver.driverId": { $exists: true },
+          returnDriver: { $exists: false },
+          status: { $ne: "completed" },
+        }).sort({ updatedAt: -1 }).limit(30).lean(),
+
+        // My in-progress: pickup or return started but not completed
+        Booking.find({
+          ...baseFilter,
+          $or: [
+            {
+              "pickupDriver.driverId": driverProfileId,
+              "pickupDriver.startedAt": { $exists: true },
+              "pickupDriver.completedAt": { $exists: false },
+            },
+            {
+              "returnDriver.driverId": driverProfileId,
+              "returnDriver.startedAt": { $exists: true },
+              "returnDriver.completedAt": { $exists: false },
+            },
+          ],
+        }).sort({ pickupTime: 1 }).limit(30).lean(),
+
+        // My awaiting payment: pickup complete, not yet paid
+        Booking.find({
+          ...baseFilter,
+          "pickupDriver.completedAt": { $exists: true },
+          servicePaymentStatus: { $ne: "paid" },
+          status: { $ne: "completed" },
+          $or: [
+            { "pickupDriver.driverId": driverProfileId },
+            { assignedDriverId: driverProfileId },
+          ],
+        }).sort({ updatedAt: -1 }).limit(30).lean(),
+
+        // My ready for return: return claimed by me, pickup complete, paid, not started
+        Booking.find({
+          ...baseFilter,
+          "returnDriver.driverId": driverProfileId,
+          "returnDriver.startedAt": { $exists: false },
+          "pickupDriver.completedAt": { $exists: true },
+          servicePaymentStatus: "paid",
+          status: { $ne: "completed" },
+        }).sort({ updatedAt: -1 }).limit(30).lean(),
+
+        // My accepted: pickup or return accepted but not started
+        Booking.find({
+          ...baseFilter,
+          $or: [
+            {
+              "pickupDriver.driverId": driverProfileId,
+              "pickupDriver.startedAt": { $exists: false },
+              "pickupDriver.completedAt": { $exists: false },
+            },
+            {
+              "returnDriver.driverId": driverProfileId,
+              "returnDriver.startedAt": { $exists: false },
+              "returnDriver.completedAt": { $exists: false },
+            },
+          ],
+        }).sort({ pickupTime: 1 }).limit(30).lean(),
+      ]);
+
+      // Format helper for status=all response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formatJobAll = (job: any) => {
+        let payout = 25;
+        if (job.isManualTransmission) payout += 5;
+        const pickupHour = parseInt(job.pickupTime?.split(":")[0] || "9");
+        if (pickupHour < 7 || pickupHour > 18) payout += 10;
+
+        const driverProfileStr = driverProfileId?.toString();
+
+        // Pickup driver state
+        let pickupDriverState: string | null = null;
+        if (job.pickupDriver) {
+          if (job.pickupDriver.completedAt) pickupDriverState = "completed";
+          else if (job.pickupDriver.collectedAt) pickupDriverState = "collected";
+          else if (job.pickupDriver.arrivedAt) pickupDriverState = "arrived";
+          else if (job.pickupDriver.startedAt) pickupDriverState = "started";
+          else if (job.pickupDriver.acceptedAt) pickupDriverState = "accepted";
+          else pickupDriverState = "assigned";
+        }
+
+        // Return driver state (arrivedAt = delivering for return leg)
+        let returnDriverState: string | null = null;
+        if (job.returnDriver) {
+          if (job.returnDriver.completedAt) returnDriverState = "completed";
+          else if (job.returnDriver.arrivedAt) returnDriverState = "delivering";
+          else if (job.returnDriver.collectedAt) returnDriverState = "collected";
+          else if (job.returnDriver.startedAt) returnDriverState = "started";
+          else if (job.returnDriver.acceptedAt) returnDriverState = "accepted";
+          else returnDriverState = "assigned";
+        }
+
+        const canStartReturn = !!(
+          job.pickupDriver?.completedAt &&
+          job.servicePaymentStatus === "paid"
+        );
+
+        let returnWaitingReason: string | null = null;
+        if (job.returnDriver && !job.returnDriver.startedAt) {
+          if (!job.pickupDriver?.completedAt) {
+            returnWaitingReason = "Waiting for pickup to complete";
+          } else if (job.servicePaymentStatus !== "paid") {
+            returnWaitingReason = "Waiting for customer payment";
+          }
+        }
+
+        return {
+          _id: job._id.toString(),
+          customerName: job.userName,
+          customerEmail: job.userEmail,
+          customerPhone: job.guestPhone,
+          vehicleRegistration: job.vehicleRegistration,
+          vehicleState: job.vehicleState,
+          serviceType: job.serviceType,
+          pickupAddress: job.pickupAddress,
+          garageName: job.garageName,
+          garageAddress: job.garageAddress,
+          pickupTime: job.pickupTime,
+          dropoffTime: job.dropoffTime,
+          isManualTransmission: job.isManualTransmission || false,
+          hasExistingBooking: job.hasExistingBooking,
+          status: job.status,
+          currentStage: job.currentStage,
+          createdAt: job.createdAt,
+          payout,
+          servicePaymentStatus: job.servicePaymentStatus || null,
+          servicePaymentAmount: job.servicePaymentAmount || null,
+          servicePaymentUrl: job.servicePaymentUrl || null,
+          checkpointStatus: job.checkpointStatus || {
+            pre_pickup: 0, service_dropoff: 0, service_pickup: 0, final_delivery: 0,
+          },
+          isPreferredArea: driver.preferredAreas?.some((area: string) =>
+            job.pickupAddress?.toLowerCase().includes(area.toLowerCase())
+          ) || false,
+          pickupDriverState,
+          returnDriverState,
+          pickupClaimedByMe: job.pickupDriver?.driverId?.toString() === driverProfileStr,
+          returnClaimedByMe: job.returnDriver?.driverId?.toString() === driverProfileStr,
+          canStartReturn,
+          returnWaitingReason,
+        };
+      };
+
+      // Deduplicate: a booking appears only in its highest-priority category
+      // Priority: in_progress > awaiting_payment > ready_for_return > accepted
+      const seenIds = new Set<string>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dedupAndFormat = (jobs: any[]) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result: any[] = [];
+        for (const job of jobs) {
+          const id = job._id.toString();
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            result.push(formatJobAll(job));
+          }
+        }
+        return result;
+      };
+
+      const myInProgressFormatted = dedupAndFormat(myInProgress);
+      const myAwaitingPaymentFormatted = dedupAndFormat(myAwaitingPayment);
+      const myReadyForReturnFormatted = dedupAndFormat(myReadyForReturn);
+      const myAcceptedFormatted = dedupAndFormat(myAccepted);
+
+      // Available: exclude jobs already in my jobs
+      const availablePickupsFormatted = availablePickups
+        .filter(j => !seenIds.has(j._id.toString()))
+        .map(formatJobAll)
+        .sort((a, b) => {
+          if (a.isPreferredArea && !b.isPreferredArea) return -1;
+          if (!a.isPreferredArea && b.isPreferredArea) return 1;
+          return 0;
+        });
+
+      const availableReturnsFormatted = availableReturns
+        .filter(j => !seenIds.has(j._id.toString()))
+        .map(formatJobAll);
+
+      return NextResponse.json({
+        myJobs: {
+          accepted: myAcceptedFormatted,
+          in_progress: myInProgressFormatted,
+          awaiting_payment: myAwaitingPaymentFormatted,
+          ready_for_return: myReadyForReturnFormatted,
+        },
+        available: {
+          pickups: availablePickupsFormatted,
+          returns: availableReturnsFormatted,
+        },
+        canAcceptJobs: driver.canAcceptJobs,
+      });
+    }
+
     let query: Record<string, unknown> = {};
     let legType: "pickup" | "return" | null = null;
 
@@ -216,8 +436,8 @@ export async function GET(request: NextRequest) {
         else driverState = "assigned";
       } else if (jobLegType === "return" && job.returnDriver) {
         if (job.returnDriver.completedAt) driverState = "completed";
+        else if (job.returnDriver.arrivedAt) driverState = "delivering";
         else if (job.returnDriver.collectedAt) driverState = "collected";
-        else if (job.returnDriver.arrivedAt) driverState = "arrived";
         else if (job.returnDriver.startedAt) driverState = "started";
         else if (job.returnDriver.acceptedAt) driverState = "accepted";
         else driverState = "assigned";
@@ -810,6 +1030,10 @@ export async function POST(request: NextRequest) {
     if (action === "delivering") {
       if (!isReturnDriver) {
         return NextResponse.json({ error: "You are not assigned to return" }, { status: 403 });
+      }
+
+      if (booking.returnDriver) {
+        booking.returnDriver.arrivedAt = now;
       }
 
       booking.updates.push({
