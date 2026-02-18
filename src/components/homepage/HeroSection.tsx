@@ -2,14 +2,11 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ShieldCheck, ArrowRight, CheckCircle2, Star } from 'lucide-react';
 
-interface HeroSectionProps {
-  onBookingClick: () => void;
-}
-
-export default function HeroSection({ onBookingClick }: HeroSectionProps) {
+export default function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700">
       {/* Subtle pattern overlay */}
@@ -53,14 +50,13 @@ export default function HeroSection({ onBookingClick }: HeroSectionProps) {
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
-              <button
-                type="button"
-                onClick={onBookingClick}
+              <Link
+                href="/booking"
                 className="group inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
               >
                 Book Now
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </button>
+              </Link>
             </div>
 
             {/* Trust indicators */}
