@@ -16,9 +16,6 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Wrench,
-  Users,
-  TrendingUp,
 } from "lucide-react";
 
 export default function GarageLoginPage() {
@@ -102,49 +99,9 @@ export default function GarageLoginPage() {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content — centered */}
       <div className="relative z-10 flex min-h-[calc(100vh-73px)] items-center justify-center px-4 py-12">
-        <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-center">
-          {/* Left side - Benefits */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="hidden lg:block"
-          >
-            <h1 className="text-4xl font-bold text-white mb-4">
-              Garage <span className="text-emerald-300">Partner Portal</span>
-            </h1>
-            <p className="text-lg text-emerald-100 mb-8">
-              Access your dashboard to manage bookings, track revenue, and grow your business with drivlet.
-            </p>
-
-            <div className="space-y-4">
-              {[
-                { icon: Users, title: "New customers", desc: "Receive bookings from local car owners" },
-                { icon: TrendingUp, title: "Grow your business", desc: "Increase revenue with steady referrals" },
-                { icon: Wrench, title: "Easy management", desc: "Track jobs and payments in one place" },
-              ].map((item, index) => (
-                <motion.div
-                  key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
-                  className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20">
-                    <item.icon className="h-6 w-6 text-emerald-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-white">{item.title}</h3>
-                    <p className="text-sm text-emerald-200/70">{item.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Right side - Login Form */}
+        <div className="w-full max-w-md">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

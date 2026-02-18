@@ -41,7 +41,8 @@ export default function GarageLayout({ children }: { children: React.ReactNode }
   const isAuthPage =
     pathname === "/garage/login" ||
     pathname === "/garage/register" ||
-    pathname === "/garage/pending";
+    pathname === "/garage/pending" ||
+    pathname === "/garage/join";
 
   // Close menus when route changes
   useEffect(() => {

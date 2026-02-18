@@ -370,21 +370,21 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Partner sign-up buttons (same styling as "Create an account") */}
+            {/* Partner sign-up buttons */}
             <div className="mt-6 pt-6 border-t border-slate-200">
               <p className="text-center text-slate-600 text-sm mb-4">
                 Want to join as a partner?
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Link href="/driver/register" className={secondaryButtonClass}>
+                <Link href="/driver/join" className={secondaryButtonClass}>
                   <Car className="h-4 w-4" />
-                  Driver sign up
+                  Become a driver
                 </Link>
 
-                <Link href="/garage/register" className={secondaryButtonClass}>
+                <Link href="/garage/join" className={secondaryButtonClass}>
                   <Wrench className="h-4 w-4" />
-                  Garage sign up
+                  Register a garage
                 </Link>
               </div>
             </div>

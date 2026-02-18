@@ -41,6 +41,14 @@ export default function DriverLayout({
   const [clockLoading, setClockLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Don't apply layout to login, register, pending, join, or onboarding pages
+  const isAuthPage =
+    pathname === "/driver/login" ||
+    pathname === "/driver/register" ||
+    pathname === "/driver/pending" ||
+    pathname === "/driver/onboarding" ||
+    pathname === "/driver/join";
+
   // Fetch clock status
   const fetchClockStatus = useCallback(async () => {
     try {
@@ -56,6 +64,7 @@ export default function DriverLayout({
 
   useEffect(() => {
     if (status === "loading") return;
+    if (isAuthPage) return; // Don't redirect on auth/public pages
 
     if (!session?.user) {
       router.push("/driver/login");
@@ -65,7 +74,7 @@ export default function DriverLayout({
     if (session.user.role !== "driver") {
       router.push("/");
     }
-  }, [session, status, router]);
+  }, [session, status, router, isAuthPage]);
 
   // Fetch clock status on mount
   useEffect(() => {
@@ -128,13 +137,6 @@ export default function DriverLayout({
   };
 
   const isActive = (path: string) => pathname === path;
-
-  // Don't apply layout to login, register, pending, or onboarding pages
-  const isAuthPage =
-    pathname === "/driver/login" ||
-    pathname === "/driver/register" ||
-    pathname === "/driver/pending" ||
-    pathname === "/driver/onboarding";
 
   if (isAuthPage) {
     return <>{children}</>;
