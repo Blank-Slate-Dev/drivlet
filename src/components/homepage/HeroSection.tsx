@@ -63,13 +63,22 @@ export default function HeroSection() {
             <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-emerald-200 lg:justify-start">
               <div className="flex items-center gap-2">
                 <div className="flex">
-                  {[...Array(5)].map((_, i) => (
+                  {/* 4 full stars */}
+                  {[...Array(4)].map((_, i) => (
                     <Star
                       key={i}
                       className="h-4 w-4 fill-amber-400 text-amber-400"
                     />
                   ))}
+                  {/* 3/4 filled star */}
+                  <div className="relative h-4 w-4">
+                    <Star className="absolute inset-0 h-4 w-4 text-amber-400/30" />
+                    <div className="absolute inset-0 overflow-hidden" style={{ width: '75%' }}>
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    </div>
+                  </div>
                 </div>
+                <span className="text-emerald-100 font-medium">4.8 out of 5 · 200+ rides</span>
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-emerald-300" />
