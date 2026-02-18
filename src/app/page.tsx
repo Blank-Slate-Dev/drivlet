@@ -44,7 +44,7 @@ export default function Home() {
       <Header onBookingClick={openBookingModal} />
 
       {/* Hero Section - above the fold, load immediately */}
-      <HeroSection onBookingClick={openBookingModal} />
+      <HeroSection />
 
       {/* Value Props - critical content */}
       <ValuePropsSection />
