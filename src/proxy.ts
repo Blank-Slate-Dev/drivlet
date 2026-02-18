@@ -53,7 +53,7 @@ export default withAuth(
     if (
       pathname.startsWith("/driver/dashboard") ||
       pathname.startsWith("/driver/jobs") ||
-      pathname.startsWith("/driver/earnings") ||
+      pathname.startsWith("/driver/payments") ||
       pathname.startsWith("/driver/settings")
     ) {
       // Not a driver? Go to driver login
@@ -153,7 +153,7 @@ export const config = {
     "/garage/pending",
     "/driver/dashboard/:path*",
     "/driver/jobs/:path*",
-    "/driver/earnings/:path*",
+    "/driver/payments/:path*",
     "/driver/settings/:path*",
     "/driver/pending",
     "/driver/onboarding/:path*",

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "week"; // today, week, month, year, all
+    const period = searchParams.get("period") || "week"; // today, week, fortnight, month, year, all
 
     await connectDB();
 
@@ -66,6 +66,10 @@ export async function GET(request: NextRequest) {
     weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
     weekStart.setHours(0, 0, 0, 0);
 
+    const fortnightStart = new Date(now);
+    fortnightStart.setDate(fortnightStart.getDate() - 14);
+    fortnightStart.setHours(0, 0, 0, 0);
+
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
@@ -77,6 +81,9 @@ export async function GET(request: NextRequest) {
         break;
       case "week":
         dateFilter = { $gte: weekStart };
+        break;
+      case "fortnight":
+        dateFilter = { $gte: fortnightStart };
         break;
       case "month":
         dateFilter = { $gte: monthStart };
@@ -119,7 +126,7 @@ export async function GET(request: NextRequest) {
     const totalJobs = earnings.length;
 
     // Get earnings by period for comparison
-    const [todayEarnings, weekEarnings, monthEarnings] = await Promise.all([
+    const [todayEarnings, weekEarnings, fortnightEarnings, monthEarnings] = await Promise.all([
       Booking.find({
         assignedDriverId: user.driverProfile,
         status: "completed",
@@ -129,6 +136,11 @@ export async function GET(request: NextRequest) {
         assignedDriverId: user.driverProfile,
         status: "completed",
         updatedAt: { $gte: weekStart },
+      }).lean(),
+      Booking.find({
+        assignedDriverId: user.driverProfile,
+        status: "completed",
+        updatedAt: { $gte: fortnightStart },
       }).lean(),
       Booking.find({
         assignedDriverId: user.driverProfile,
@@ -145,6 +157,10 @@ export async function GET(request: NextRequest) {
       week: {
         jobs: weekEarnings.length,
         earnings: weekEarnings.reduce((sum, j) => sum + calculatePayout(j), 0),
+      },
+      fortnight: {
+        jobs: fortnightEarnings.length,
+        earnings: fortnightEarnings.reduce((sum, j) => sum + calculatePayout(j), 0),
       },
       month: {
         jobs: monthEarnings.length,

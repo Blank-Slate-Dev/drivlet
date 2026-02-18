@@ -11,6 +11,7 @@ import {
   Loader2,
   Home,
   Briefcase,
+  Clock,
   DollarSign,
   Settings,
 } from "lucide-react";
@@ -252,14 +253,24 @@ export default function DriverLayout({
                 Jobs
               </Link>
               <Link
-                href="/driver/earnings"
+                href="/driver/payments"
                 className={`text-sm transition ${
-                  isActive("/driver/earnings")
+                  isActive("/driver/payments")
                     ? "text-emerald-700 font-medium"
                     : "text-slate-600 hover:text-emerald-600"
                 }`}
               >
-                Earnings
+                Payments
+              </Link>
+              <Link
+                href="/driver/history"
+                className={`text-sm transition ${
+                  isActive("/driver/history")
+                    ? "text-emerald-700 font-medium"
+                    : "text-slate-600 hover:text-emerald-600"
+                }`}
+              >
+                History
               </Link>
               <Link
                 href="/driver/settings"
@@ -308,13 +319,22 @@ export default function DriverLayout({
           <span className="text-[10px] font-medium">Jobs</span>
         </Link>
         <Link
-          href="/driver/earnings"
+          href="/driver/payments"
           className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${
-            isActive("/driver/earnings") ? "text-emerald-600" : "text-slate-400"
+            isActive("/driver/payments") ? "text-emerald-600" : "text-slate-400"
           }`}
         >
           <DollarSign className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Earn</span>
+          <span className="text-[10px] font-medium">Payments</span>
+        </Link>
+        <Link
+          href="/driver/history"
+          className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${
+            isActive("/driver/history") ? "text-emerald-600" : "text-slate-400"
+          }`}
+        >
+          <Clock className="h-5 w-5" />
+          <span className="text-[10px] font-medium">History</span>
         </Link>
         <Link
           href="/driver/settings"
