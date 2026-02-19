@@ -171,6 +171,11 @@ export interface IBooking extends Document {
 
   // Signed forms (lightweight references to SignedForm collection)
   signedForms: ISignedFormRef[];
+
+  // Incident tracking
+  incidents: Types.ObjectId[];
+  hasActiveIncident: boolean;
+  incidentExceptionState: "none" | "continue" | "hold" | "stop";
 }
 
 const UpdateSchema = new Schema<IUpdate>(
@@ -602,6 +607,21 @@ const BookingSchema = new Schema<IBooking>(
     signedForms: {
       type: [SignedFormRefSchema],
       default: [],
+    },
+
+    // Incident tracking
+    incidents: [{
+      type: Schema.Types.ObjectId,
+      ref: "Incident",
+    }],
+    hasActiveIncident: {
+      type: Boolean,
+      default: false,
+    },
+    incidentExceptionState: {
+      type: String,
+      enum: ["none", "continue", "hold", "stop"],
+      default: "none",
     },
   },
   {

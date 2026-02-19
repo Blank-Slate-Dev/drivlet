@@ -207,6 +207,8 @@ export async function GET(request: NextRequest) {
           returnClaimedByMe: job.returnDriverId?.toString() === driverProfileStr,
           canStartReturn,
           returnWaitingReason,
+          hasActiveIncident: job.hasActiveIncident || false,
+          incidentExceptionState: job.incidentExceptionState || null,
         };
       };
 

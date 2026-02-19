@@ -21,6 +21,7 @@ import {
   X,
   Truck,
   AlertTriangle,
+  Shield,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -46,12 +47,13 @@ export default function AdminLayout({
     }
   }, [session, status, router]);
 
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
   const navItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
     { href: "/admin/dispatch", label: "Dispatch", icon: Truck },
+    { href: "/admin/incidents", label: "Incidents", icon: Shield },
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/drivers", label: "Drivers", icon: Car },
     { href: "/admin/garages", label: "Garages", icon: Building2 },
