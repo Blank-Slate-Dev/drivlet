@@ -4,6 +4,7 @@ export const PICKUP_SLOTS = [
   { value: '8am-9am', label: '8:00 AM - 9:00 AM', hour: 8 },
   { value: '9am-10am', label: '9:00 AM - 10:00 AM', hour: 9 },
   { value: '10am-11am', label: '10:00 AM - 11:00 AM', hour: 10 },
+  { value: '11am-12pm', label: '11:00 AM - 12:00 PM', hour: 11 },
 ] as const;
 
 export const DROPOFF_SLOTS = [

@@ -46,7 +46,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'logbook-service',
     title: 'Logbook Service',
-    price: 'From $89 pick-up fee',
+    price: 'From $119 pick-up fee',
     color: 'bg-blue-500',
     icon: BookOpen,
     category: 'general',
@@ -54,7 +54,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'minor-service',
     title: 'Minor Service',
-    price: 'From $89 pick-up fee',
+    price: 'From $119 pick-up fee',
     color: 'bg-sky-500',
     icon: Settings,
     category: 'general',
@@ -62,7 +62,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'major-service',
     title: 'Major Service',
-    price: 'From $139 pick-up fee',
+    price: 'From $119 pick-up fee',
     color: 'bg-emerald-500',
     icon: Wrench,
     category: 'general',
@@ -70,7 +70,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'pre-purchase-inspection',
     title: 'Pre-Purchase Inspection',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-teal-500',
     icon: ClipboardCheck,
     category: 'general',
@@ -78,7 +78,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'roadworthy-inspection',
     title: 'Roadworthy Inspection',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-cyan-500',
     icon: FileCheck,
     category: 'general',
@@ -88,7 +88,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'engine-diagnostics',
     title: 'Engine Diagnostics',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-purple-500',
     icon: Zap,
     category: 'engine',
@@ -96,7 +96,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'timing-belt-replacement',
     title: 'Timing Belt Replacement',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-violet-500',
     icon: RefreshCw,
     category: 'engine',
@@ -104,7 +104,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'transmission-service',
     title: 'Transmission Service',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-indigo-500',
     icon: Cog,
     category: 'engine',
@@ -112,7 +112,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'clutch-replacement',
     title: 'Clutch Replacement',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-fuchsia-500',
     icon: Circle,
     category: 'engine',
@@ -122,7 +122,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'brake-service',
     title: 'Brake Service',
-    price: 'From $99 pick-up fee',
+    price: 'From $119 pick-up fee',
     color: 'bg-red-500',
     icon: Disc,
     category: 'brakes',
@@ -130,7 +130,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'suspension-repairs',
     title: 'Suspension Repairs',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-rose-500',
     icon: ArrowUpDown,
     category: 'brakes',
@@ -138,7 +138,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'wheel-alignment',
     title: 'Wheel Alignment',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-pink-500',
     icon: Target,
     category: 'brakes',
@@ -148,7 +148,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'new-tyres',
     title: 'New Tyres',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-slate-600',
     icon: CircleDot,
     category: 'tyres',
@@ -156,7 +156,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'wheel-balancing',
     title: 'Wheel Balancing',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-gray-500',
     icon: Scale,
     category: 'tyres',
@@ -166,7 +166,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'air-con-regas',
     title: 'Air Con Regas',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-cyan-500',
     icon: Snowflake,
     category: 'cooling',
@@ -174,7 +174,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'cooling-system-repair',
     title: 'Cooling System Repair',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-blue-400',
     icon: Thermometer,
     category: 'cooling',
@@ -184,7 +184,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'battery-replacement',
     title: 'Battery Replacement',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-yellow-500',
     icon: Battery,
     category: 'electrical',
@@ -192,7 +192,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'auto-electrical',
     title: 'Auto Electrical',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-amber-500',
     icon: Plug,
     category: 'electrical',
@@ -200,7 +200,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'computer-diagnostics',
     title: 'Computer Diagnostics',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-orange-500',
     icon: Cpu,
     category: 'electrical',
@@ -210,7 +210,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'detailing',
     title: 'Detailing',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-amber-400',
     icon: Sparkles,
     category: 'body',
@@ -218,7 +218,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'paint-repairs',
     title: 'Paint Repairs',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-lime-500',
     icon: Paintbrush,
     category: 'body',
@@ -226,7 +226,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'dent-removal',
     title: 'Dent Removal',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-green-500',
     icon: Hammer,
     category: 'body',
@@ -234,7 +234,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'windscreen-replacement',
     title: 'Windscreen Replacement',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-teal-400',
     icon: Square,
     category: 'body',
@@ -244,7 +244,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'hybrid-servicing',
     title: 'Hybrid Servicing',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-green-600',
     icon: Leaf,
     category: 'specialty',
@@ -252,7 +252,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'ev-servicing',
     title: 'EV Servicing',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-emerald-400',
     icon: BatteryCharging,
     category: 'specialty',
@@ -260,7 +260,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: '4x4-upgrades',
     title: '4x4 Upgrades',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-orange-600',
     icon: Mountain,
     category: 'specialty',
@@ -268,7 +268,7 @@ export const ALL_SERVICES: ServiceItem[] = [
   {
     id: 'tow-bar-installation',
     title: 'Tow Bar Installation',
-    price: 'Get a quote',
+    price: 'From $119 pick-up fee',
     color: 'bg-stone-500',
     icon: Link,
     category: 'specialty',

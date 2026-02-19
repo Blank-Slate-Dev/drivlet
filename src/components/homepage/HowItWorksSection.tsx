@@ -104,16 +104,18 @@ export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
-  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
+  const [isDesktop, setIsDesktop] = useState(true); // Default to desktop to avoid skeleton flash
+  const [hasMounted, setHasMounted] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Detect screen size after mount
+  // Detect screen size after mount — no skeleton, just a layout swap if needed
   useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
+    setIsDesktop(window.innerWidth >= 1024);
+    setHasMounted(true);
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const goToSlide = useCallback(
@@ -148,27 +150,6 @@ export default function HowItWorksSection() {
   };
 
   const currentStep = steps[currentIndex];
-
-  // Loading state
-  if (isDesktop === null) {
-    return (
-      <section
-        id="how-it-works"
-        className="relative border-b border-slate-200 bg-white py-16 sm:py-20"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              How it works
-            </h2>
-          </div>
-          <div className="flex justify-center">
-            <div className="h-[380px] w-[300px] animate-pulse rounded-3xl bg-slate-100" />
-          </div>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section
@@ -227,11 +208,11 @@ export default function HowItWorksSection() {
 
           {/* Main Content */}
           <div className="px-16 lg:px-24">
-            {/* Desktop Layout - with framer-motion */}
-            {isDesktop && (
-              <div className="flex items-center justify-center gap-12">
-                {/* Left: Current Step Text */}
-                <div className="w-56 flex-shrink-0">
+            {/* Desktop Layout */}
+            <div className={`${isDesktop ? 'flex' : 'hidden'} items-center justify-center gap-12`}>
+              {/* Left: Current Step Text */}
+              <div className="w-56 flex-shrink-0">
+                {hasMounted ? (
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={`text-${currentIndex}`}
@@ -252,10 +233,24 @@ export default function HowItWorksSection() {
                       </p>
                     </motion.div>
                   </AnimatePresence>
-                </div>
+                ) : (
+                  <div className="text-left">
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-500">
+                      {currentStep.step}
+                    </div>
+                    <h3 className="mb-3 text-xl font-bold text-slate-900">
+                      {currentStep.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      {currentStep.description}
+                    </p>
+                  </div>
+                )}
+              </div>
 
-                {/* Center: Phone with Gradient Pill */}
-                <div className="relative flex-shrink-0">
+              {/* Center: Phone with Gradient Pill */}
+              <div className="relative flex-shrink-0">
+                {hasMounted ? (
                   <AnimatePresence mode="wait" initial={false} custom={direction}>
                     <motion.div
                       key={`phone-${currentIndex}`}
@@ -290,62 +285,80 @@ export default function HowItWorksSection() {
                       </div>
                     </motion.div>
                   </AnimatePresence>
-                </div>
+                ) : (
+                  <div className="relative flex h-[380px] w-[300px] items-end justify-center pb-[20px]">
+                    <div
+                      className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
+                    />
+                    <div className="relative z-10 w-[220px]">
+                      <Image
+                        src={currentStep.image}
+                        alt={currentStep.title}
+                        width={600}
+                        height={951}
+                        className="h-auto w-[220px]"
+                        priority
+                        onLoad={() => handleImageLoad(0)}
+                      />
+                      <div
+                        className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Mobile Layout - CSS transitions */}
-            {!isDesktop && (
-              <div className="flex flex-col items-center">
-                <div className="relative h-[380px] w-[300px] overflow-hidden">
-                  {steps.map((step, index) => (
+            <div className={`${isDesktop ? 'hidden' : 'flex'} flex-col items-center`}>
+              <div className="relative h-[380px] w-[300px] overflow-hidden">
+                {steps.map((step, index) => (
+                  <div
+                    key={step.step}
+                    className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
+                    style={{
+                      transform: `translateX(${
+                        index === currentIndex
+                          ? '0%'
+                          : index < currentIndex
+                            ? '-100%'
+                            : '100%'
+                      })`,
+                      opacity: index === currentIndex ? 1 : 0,
+                    }}
+                  >
                     <div
-                      key={step.step}
-                      className="absolute inset-0 flex items-end justify-center pb-[20px] transition-all duration-300 ease-in-out"
-                      style={{
-                        transform: `translateX(${
-                          index === currentIndex
-                            ? '0%'
-                            : index < currentIndex
-                              ? '-100%'
-                              : '100%'
-                        })`,
-                        opacity: index === currentIndex ? 1 : 0,
-                      }}
-                    >
-                      <div
-                        className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                      className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${step.gradient}`}
+                    />
+                    <div className="relative z-10 w-[220px]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={step.image}
+                        alt={step.title}
+                        className="h-auto w-[220px]"
+                        loading={index === 0 ? 'eager' : 'lazy'}
                       />
-                      <div className="relative z-10 w-[220px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={step.image}
-                          alt={step.title}
-                          className="h-auto w-[220px]"
-                          loading={index === 0 ? 'eager' : 'lazy'}
-                        />
-                        <div
-                          className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
-                        />
-                      </div>
+                      <div
+                        className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${step.overlayColor}`}
+                      />
                     </div>
-                  ))}
-                </div>
-
-                {/* Text below */}
-                <div className="mt-6 text-center">
-                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
-                    {currentStep.step}
                   </div>
-                  <h3 className="mb-2 text-lg font-bold text-slate-900">
-                    {currentStep.title}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-slate-600">
-                    {currentStep.description}
-                  </p>
-                </div>
+                ))}
               </div>
-            )}
+
+              {/* Text below */}
+              <div className="mt-6 text-center">
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-slate-300 bg-white text-lg font-bold text-slate-500">
+                  {currentStep.step}
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-slate-900">
+                  {currentStep.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  {currentStep.description}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Dot indicators */}
