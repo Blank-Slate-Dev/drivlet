@@ -111,8 +111,21 @@ export default function HowItWorksSection() {
 
   // Detect screen size after mount — no skeleton, just a layout swap if needed
   useEffect(() => {
-    setIsDesktop(window.innerWidth >= 1024);
+    const width = window.innerWidth;
+    setIsDesktop(width >= 1024);
     setHasMounted(true);
+
+    // Preload all phone images on desktop so there's no skeleton on navigate
+    if (width >= 1024) {
+      steps.forEach((step, index) => {
+        const img = new window.Image();
+        img.src = step.image;
+        img.onload = () => {
+          setLoadedImages((prev) => new Set([...prev, index]));
+        };
+      });
+    }
+
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
