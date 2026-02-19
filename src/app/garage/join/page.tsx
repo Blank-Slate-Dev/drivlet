@@ -11,55 +11,30 @@ import {
   Shield,
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
   Zap,
   BarChart3,
   Handshake,
 } from "lucide-react";
 
 const benefits = [
-  {
-    icon: Users,
-    title: "New customers delivered to you",
-    description: "Car owners in your area book through drivlet. We pick up their vehicle and bring it straight to your workshop — no marketing needed.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Grow your revenue",
-    description: "Fill empty bays with a steady stream of bookings. More cars through your doors means more revenue without extra overheads.",
-  },
-  {
-    icon: Zap,
-    title: "Zero disruption",
-    description: "Our drivers handle all pick-ups and drop-offs. You focus on what you do best — servicing vehicles.",
-  },
-  {
-    icon: BarChart3,
-    title: "Dashboard & analytics",
-    description: "Track incoming bookings, manage your schedule, view revenue analytics, and respond to customer reviews — all in one place.",
-  },
-  {
-    icon: Shield,
-    title: "Fully insured transport",
-    description: "Every vehicle is covered by our commercial insurance during transport. Your customers' cars are in safe hands.",
-  },
-  {
-    icon: Handshake,
-    title: "Simple partnership",
-    description: "No lock-in contracts. No upfront fees. We only succeed when you do. Join the network and start receiving bookings.",
-  },
+  { icon: Users, title: "Customers delivered to you", desc: "Car owners book through drivlet. We bring their vehicle straight to your workshop." },
+  { icon: TrendingUp, title: "Grow your revenue", desc: "Fill empty bays with a steady stream of bookings. No extra overheads." },
+  { icon: Zap, title: "Zero disruption", desc: "Our drivers handle all pick-ups and drop-offs. You focus on servicing." },
+  { icon: BarChart3, title: "Dashboard & analytics", desc: "Track bookings, manage your schedule, and view revenue — all in one place." },
+  { icon: Shield, title: "Fully insured transport", desc: "Every vehicle is covered by commercial insurance during transport." },
+  { icon: Handshake, title: "Simple partnership", desc: "No lock-in contracts. No upfront fees. We only succeed when you do." },
 ];
 
-const howItWorks = [
-  { step: "1", title: "Customer books", description: "A car owner near you books a service through drivlet and selects your workshop." },
-  { step: "2", title: "We pick up", description: "Our insured driver picks up the vehicle from the customer and delivers it to you." },
-  { step: "3", title: "You service it", description: "Complete the service as normal. The customer pays you directly for your work." },
-  { step: "4", title: "We return it", description: "Once you're done, our driver brings the vehicle back to the customer." },
+const steps = [
+  { num: "1", text: "Customer books a service through drivlet" },
+  { num: "2", text: "Our driver picks up and delivers the vehicle to you" },
+  { num: "3", text: "You complete the service — customer pays you directly" },
+  { num: "4", text: "Our driver returns the vehicle to the customer" },
 ];
 
 export default function GarageJoinPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+    <main className="h-screen overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative flex flex-col">
       {/* Pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
@@ -71,7 +46,7 @@ export default function GarageJoinPage() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50">
+      <header className="relative z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="relative h-12 w-40 sm:h-14 sm:w-48">
@@ -91,116 +66,88 @@ export default function GarageJoinPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="relative z-10">
-        <div className="mx-auto max-w-4xl px-4 pt-12 pb-8 text-center">
+      {/* Content - fills remaining viewport */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center">
+        <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+          {/* Hero text */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="text-center mb-6"
           >
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20 mb-6">
-              <span className="text-sm font-medium text-emerald-200">Partnering with workshops in Newcastle</span>
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-              More cars through your doors.<br />
-              <span className="text-emerald-300">Zero extra effort.</span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
+              More cars through your doors. <span className="text-emerald-300">Zero extra effort.</span>
             </h1>
-            <p className="mt-4 text-lg text-emerald-100 max-w-2xl mx-auto">
+            <p className="mt-3 text-base text-emerald-100 max-w-xl mx-auto">
               Join the drivlet partner network and receive a steady stream of customers. We handle pick-up and delivery — you handle the servicing.
             </p>
           </motion.div>
-        </div>
 
-        {/* How it works */}
-        <div className="mx-auto max-w-4xl px-4 py-10">
-          <motion.h2
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-2xl font-bold text-white text-center mb-10"
-          >
-            How it works
-          </motion.h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {howItWorks.map((item, index) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 + index * 0.1 }}
-                className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 p-5 text-center"
-              >
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/30 text-lg font-bold text-emerald-300 mb-3">
-                  {item.step}
-                </div>
-                <h3 className="text-base font-semibold text-white mb-1">{item.title}</h3>
-                <p className="text-sm text-emerald-100/80 leading-relaxed">{item.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Benefits */}
-        <div className="mx-auto max-w-5xl px-4 py-12">
-          <motion.h2
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-2xl font-bold text-white text-center mb-10"
-          >
-            Why partner with drivlet?
-          </motion.h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={benefit.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 + index * 0.08 }}
-                className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 p-6 hover:bg-white/15 transition"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 mb-4">
-                  <benefit.icon className="h-5 w-5 text-emerald-300" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
-                <p className="text-sm text-emerald-100/80 leading-relaxed">{benefit.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* CTA */}
-        <div className="mx-auto max-w-md px-4 py-12 text-center">
+          {/* How it works - compact inline */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="flex items-center justify-center gap-2 mb-7 flex-wrap"
+          >
+            {steps.map((step, i) => (
+              <div key={step.num} className="flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/10 px-3 py-1.5">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
+                    {step.num}
+                  </span>
+                  <span className="text-xs text-emerald-100 whitespace-nowrap">{step.text}</span>
+                </div>
+                {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-white/30 flex-shrink-0 hidden lg:block" />}
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Benefits grid - compact */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8"
+          >
+            {benefits.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 p-4 flex items-start gap-3"
+              >
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
+                  <item.icon className="h-4 w-4 text-emerald-300" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                  <p className="text-xs text-emerald-100/70 leading-relaxed mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="text-center"
           >
             <Link
               href="/garage/register"
-              className="group w-full inline-flex items-center justify-center gap-3 py-4 px-8 bg-white text-emerald-700 font-bold text-lg rounded-2xl shadow-xl shadow-black/10 transition hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98]"
+              className="group inline-flex items-center justify-center gap-3 py-3.5 px-8 bg-white text-emerald-700 font-bold text-base rounded-2xl shadow-xl shadow-black/10 transition hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98]"
             >
               Register your garage
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Link>
-            <p className="mt-4 text-sm text-emerald-200">
-              Free to join. No lock-in contracts. Takes about 5 minutes.
-            </p>
-
-            <div className="mt-8 flex flex-col items-center gap-3">
-              <p className="text-emerald-100 text-sm">
-                Already a partner?{" "}
-                <Link href="/garage/login" className="font-semibold text-white hover:text-emerald-200 transition">
-                  Sign in
-                </Link>
-              </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to home
+            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+              <Link href="/garage/login" className="font-medium text-white hover:text-emerald-200 transition">
+                Already a partner? Sign in
+              </Link>
+              <span className="text-white/30">·</span>
+              <Link href="/" className="inline-flex items-center gap-1 text-white/60 hover:text-white transition">
+                <ArrowLeft className="h-3.5 w-3.5" /> Home
               </Link>
             </div>
           </motion.div>

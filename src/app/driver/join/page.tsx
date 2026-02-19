@@ -12,55 +12,21 @@ import {
   MapPin,
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
-  Calendar,
   Smartphone,
 } from "lucide-react";
 
-const benefits = [
-  {
-    icon: DollarSign,
-    title: "Competitive pay",
-    description: "Earn $25–35 per vehicle delivery with transparent, upfront pricing. No hidden fees or commission traps.",
-  },
-  {
-    icon: Clock,
-    title: "Flexible hours",
-    description: "Choose when you work. Clock in and out on your terms — mornings, afternoons, or full days.",
-  },
-  {
-    icon: Shield,
-    title: "Fully insured",
-    description: "Every vehicle you transport is covered by our commercial insurance. Drive with confidence.",
-  },
-  {
-    icon: MapPin,
-    title: "Local routes",
-    description: "All jobs are within the Newcastle and Lake Macquarie area. Short drives, no long-haul trips.",
-  },
-  {
-    icon: Smartphone,
-    title: "Easy-to-use app",
-    description: "Accept jobs, navigate to pickups, upload condition photos, and track your earnings — all from your phone.",
-  },
-  {
-    icon: Calendar,
-    title: "Quick onboarding",
-    description: "Sign up in minutes. Once approved, you can start accepting jobs within 1–2 business days.",
-  },
-];
-
-const requirements = [
-  "Valid Australian driver's licence (full, no P-plates)",
-  "Clean driving record (no major infringements in 3 years)",
-  "Smartphone with a working camera",
-  "Ability to drive both automatic and manual vehicles (preferred)",
-  "Reliable and punctual with great communication skills",
+const highlights = [
+  { icon: DollarSign, title: "Competitive pay", desc: "Earn $35+/hour with transparent, upfront pricing." },
+  { icon: Clock, title: "Flexible hours", desc: "Choose when you work. Clock in and out on your terms." },
+  { icon: Shield, title: "Fully insured", desc: "Every vehicle is covered by our commercial insurance." },
+  { icon: MapPin, title: "Local routes", desc: "Short drives within plenty of areas in Australia." },
+  { icon: Smartphone, title: "Easy-to-use app", desc: "Accept jobs, upload photos, and track earnings from your phone." },
+  { icon: Car, title: "Quick onboarding", desc: "Sign up in minutes. Start accepting jobs within 1–2 days." },
 ];
 
 export default function DriverJoinPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
+    <main className="h-screen overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative flex flex-col">
       {/* Pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
@@ -72,7 +38,7 @@ export default function DriverJoinPage() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50">
+      <header className="relative z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="relative h-12 w-40 sm:h-14 sm:w-48">
@@ -92,125 +58,83 @@ export default function DriverJoinPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="relative z-10">
-        <div className="mx-auto max-w-4xl px-4 pt-12 pb-8 text-center">
+      {/* Content - fills remaining viewport */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center">
+        <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+          {/* Hero text */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="text-center mb-8"
           >
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-4 py-2 border border-white/20 mb-6">
-              <span className="text-sm font-medium text-emerald-200">Now accepting drivers in Newcastle</span>
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-              Drive cars.<br />
-              <span className="text-emerald-300">Earn money.</span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
+              Drive cars. <span className="text-emerald-300">Earn money.</span>
             </h1>
-            <p className="mt-4 text-lg text-emerald-100 max-w-2xl mx-auto">
-              Join drivlet as a driver and get paid to pick up and deliver vehicles to local workshops. Flexible hours, competitive pay, and fully insured.
+            <p className="mt-3 text-base text-emerald-100 max-w-xl mx-auto">
+              Join drivlet and get paid to pick up and deliver vehicles to local workshops. Flexible hours, fully insured.
             </p>
 
             {/* Pay highlight */}
-            <div className="mt-8 inline-flex items-center gap-6 rounded-2xl bg-white/10 backdrop-blur-sm px-8 py-4 border border-white/20">
+            <div className="mt-5 inline-flex items-center gap-6 rounded-2xl bg-white/10 backdrop-blur-sm px-6 py-3 border border-white/20">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white">$25–35</div>
-                <div className="text-sm text-emerald-200">per delivery</div>
+                <div className="text-2xl font-bold text-white">$35+<span className="text-lg text-emerald-200">/hr</span></div>
               </div>
-              <div className="w-px h-10 bg-white/20" />
+              <div className="w-px h-8 bg-white/20" />
               <div className="text-center">
-                <div className="text-3xl font-bold text-white">Flexible</div>
-                <div className="text-sm text-emerald-200">set your hours</div>
+                <div className="text-lg font-bold text-white">Flexible hours</div>
               </div>
-              <div className="w-px h-10 bg-white/20 hidden sm:block" />
+              <div className="w-px h-8 bg-white/20 hidden sm:block" />
               <div className="text-center hidden sm:block">
-                <div className="text-3xl font-bold text-white">Local</div>
-                <div className="text-sm text-emerald-200">Newcastle area</div>
+                <div className="text-lg font-bold text-white">Australia based</div>
               </div>
             </div>
           </motion.div>
-        </div>
 
-        {/* Benefits */}
-        <div className="mx-auto max-w-5xl px-4 py-12">
-          <motion.h2
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-2xl font-bold text-white text-center mb-10"
+          {/* Benefits grid - compact */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8"
           >
-            Why drive with drivlet?
-          </motion.h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={benefit.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 + index * 0.08 }}
-                className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 p-6 hover:bg-white/15 transition"
+            {highlights.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 p-4 flex items-start gap-3"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 mb-4">
-                  <benefit.icon className="h-5 w-5 text-emerald-300" />
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
+                  <item.icon className="h-4 w-4 text-emerald-300" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
-                <p className="text-sm text-emerald-100/80 leading-relaxed">{benefit.description}</p>
-              </motion.div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                  <p className="text-xs text-emerald-100/70 leading-relaxed mt-0.5">{item.desc}</p>
+                </div>
+              </div>
             ))}
-          </div>
-        </div>
-
-        {/* Requirements */}
-        <div className="mx-auto max-w-3xl px-4 py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 p-8"
-          >
-            <h3 className="text-xl font-bold text-white mb-5">What you need</h3>
-            <ul className="space-y-3">
-              {requirements.map((req) => (
-                <li key={req} className="flex items-start gap-3 text-emerald-100">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">{req}</span>
-                </li>
-              ))}
-            </ul>
           </motion.div>
-        </div>
 
-        {/* CTA */}
-        <div className="mx-auto max-w-md px-4 py-12 text-center">
+          {/* CTA */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.3 }}
+            className="text-center"
           >
             <Link
               href="/driver/register"
-              className="group w-full inline-flex items-center justify-center gap-3 py-4 px-8 bg-white text-emerald-700 font-bold text-lg rounded-2xl shadow-xl shadow-black/10 transition hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98]"
+              className="group inline-flex items-center justify-center gap-3 py-3.5 px-8 bg-white text-emerald-700 font-bold text-base rounded-2xl shadow-xl shadow-black/10 transition hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98]"
             >
               Continue to sign up
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Link>
-            <p className="mt-4 text-sm text-emerald-200">
-              Takes less than 5 minutes. You&apos;ll need your licence details and bank account info.
-            </p>
-
-            <div className="mt-8 flex flex-col items-center gap-3">
-              <p className="text-emerald-100 text-sm">
-                Already have an account?{" "}
-                <Link href="/driver/login" className="font-semibold text-white hover:text-emerald-200 transition">
-                  Sign in
-                </Link>
-              </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to home
+            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+              <Link href="/driver/login" className="font-medium text-white hover:text-emerald-200 transition">
+                Already have an account? Sign in
+              </Link>
+              <span className="text-white/30">·</span>
+              <Link href="/" className="inline-flex items-center gap-1 text-white/60 hover:text-white transition">
+                <ArrowLeft className="h-3.5 w-3.5" /> Home
               </Link>
             </div>
           </motion.div>

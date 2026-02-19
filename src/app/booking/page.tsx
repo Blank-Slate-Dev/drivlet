@@ -340,61 +340,109 @@ export default function BookingPage() {
         <div className="h-full w-full" style={{ backgroundImage: BG_PATTERN }} />
       </div>
 
-      {/* ─── HEADER (exact match to login page) ─── */}
+      {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50">
-        <div className="relative mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo — identical to login */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-              <Image
-                src="/logo.png"
-                alt="drivlet"
-                fill
-                className="object-contain brightness-0 invert"
-                priority
-              />
-            </div>
-          </Link>
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+          {/* Top row: Logo + steps side by side on desktop, logo only on mobile */}
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+                <Image
+                  src="/logo.png"
+                  alt="drivlet"
+                  fill
+                  className="object-contain brightness-0 invert"
+                  priority
+                />
+              </div>
+            </Link>
 
-          {/* Booking steps — centered */}
+            {/* Steps — desktop only (centered via flex-1) */}
+            {currentStep !== 'success' && (
+              <div className="hidden sm:flex flex-1 justify-center">
+                <div className="flex items-center">
+                  {STEPS.map((step, index) => {
+                    const isActive = currentStep === step.key;
+                    const isComplete = stepIndex > index;
+                    const StepIcon = step.icon;
+                    return (
+                      <div key={step.key} className="flex items-center">
+                        {index > 0 && (
+                          <div className="w-14 h-0.5 rounded-full bg-white/15 overflow-hidden mx-1">
+                            <div
+                              className="h-full bg-emerald-400 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: isComplete || isActive ? '100%' : '0%' }}
+                            />
+                          </div>
+                        )}
+                        <div className="flex flex-col items-center">
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
+                            isActive
+                              ? 'bg-white text-emerald-700 shadow-lg shadow-emerald-500/20'
+                              : isComplete
+                                ? 'bg-emerald-400 text-white'
+                                : 'bg-white/10 text-white/30'
+                          }`}>
+                            {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                          </div>
+                          <span className={`mt-1 text-[10px] font-medium leading-none transition-colors duration-300 ${
+                            isActive ? 'text-white' : isComplete ? 'text-emerald-300' : 'text-white/25'
+                          }`}>
+                            {step.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Spacer to balance logo on desktop */}
+            <div className="hidden sm:block w-40 sm:w-48" />
+          </div>
+
+          {/* Steps — mobile only (below logo) */}
           {currentStep !== 'success' && (
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center">
-              {STEPS.map((step, index) => {
-                const isActive = currentStep === step.key;
-                const isComplete = stepIndex > index;
-                const StepIcon = step.icon;
-                return (
-                  <div key={step.key} className="flex items-center">
-                    {index > 0 && (
-                      <div className="w-8 sm:w-14 h-0.5 rounded-full bg-white/15 overflow-hidden mx-1">
-                        <div
-                          className="h-full bg-emerald-400 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: isComplete || isActive ? '100%' : '0%' }}
-                        />
+            <div className="flex sm:hidden justify-center mt-3">
+              <div className="flex items-center">
+                {STEPS.map((step, index) => {
+                  const isActive = currentStep === step.key;
+                  const isComplete = stepIndex > index;
+                  const StepIcon = step.icon;
+                  return (
+                    <div key={step.key} className="flex items-center">
+                      {index > 0 && (
+                        <div className="w-8 h-0.5 rounded-full bg-white/15 overflow-hidden mx-1">
+                          <div
+                            className="h-full bg-emerald-400 rounded-full transition-all duration-500 ease-out"
+                            style={{ width: isComplete || isActive ? '100%' : '0%' }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex flex-col items-center">
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300 ${
+                          isActive
+                            ? 'bg-white text-emerald-700 shadow-lg shadow-emerald-500/20'
+                            : isComplete
+                              ? 'bg-emerald-400 text-white'
+                              : 'bg-white/10 text-white/30'
+                        }`}>
+                          {isComplete ? <Check className="h-3.5 w-3.5" /> : <StepIcon className="h-3.5 w-3.5" />}
+                        </div>
+                        <span className={`mt-1 text-[9px] font-medium leading-none transition-colors duration-300 ${
+                          isActive ? 'text-white' : isComplete ? 'text-emerald-300' : 'text-white/25'
+                        }`}>
+                          {step.label}
+                        </span>
                       </div>
-                    )}
-                    <div className="flex flex-col items-center">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
-                        isActive
-                          ? 'bg-white text-emerald-700 shadow-lg shadow-emerald-500/20'
-                          : isComplete
-                            ? 'bg-emerald-400 text-white'
-                            : 'bg-white/10 text-white/30'
-                      }`}>
-                        {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
-                      </div>
-                      <span className={`mt-1 text-[10px] font-medium leading-none transition-colors duration-300 ${
-                        isActive ? 'text-white' : isComplete ? 'text-emerald-300' : 'text-white/25'
-                      }`}>
-                        {step.label}
-                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
-
         </div>
       </header>
 
