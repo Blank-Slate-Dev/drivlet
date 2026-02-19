@@ -10,8 +10,8 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // Fixed base price for Drivlet transport service (Phase 1 - Transport Only)
-export const DRIVLET_PRICE = 100; // $119.00 in cents
-export const DRIVLET_PRICE_DISPLAY = '$1.00';
+export const DRIVLET_PRICE = 11900; // $119.00 in cents
+export const DRIVLET_PRICE_DISPLAY = '$119.00';
 
 // Distance-zone surcharges in cents (server-side source of truth)
 // Keep in sync with ZONE_SURCHARGE_CENTS in src/lib/distanceZones.ts

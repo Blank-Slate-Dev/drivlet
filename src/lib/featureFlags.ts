@@ -21,5 +21,5 @@ export const isMarketplaceEnabled = () => {
 };
 
 // Transport-only price
-export const TRANSPORT_PRICE = 100; // $119.00 AUD in cents
-export const TRANSPORT_PRICE_DISPLAY = '$1.00';
+export const TRANSPORT_PRICE = 11900; // $119.00 AUD in cents
+export const TRANSPORT_PRICE_DISPLAY = '$119.00';
