@@ -31,6 +31,10 @@ import {
   Truck,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
+import IncidentReportButton from "@/components/driver/IncidentReportButton";
+import IncidentReportForm, {
+  IncidentSubmittedModal,
+} from "@/components/driver/IncidentReportForm";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -72,6 +76,8 @@ interface Job {
   returnClaimedByMe?: boolean;
   canStartReturn?: boolean;
   returnWaitingReason?: string | null;
+  hasActiveIncident?: boolean;
+  incidentExceptionState?: string | null;
 }
 
 interface MyJobs {
@@ -190,6 +196,11 @@ export default function DriverJobsPage() {
   // Call customer state
   const [callingCustomer, setCallingCustomer] = useState<string | null>(null);
   const [callSuccess, setCallSuccess] = useState<string | null>(null);
+
+  // Incident report state
+  const [showIncidentForm, setShowIncidentForm] = useState(false);
+  const [incidentBookingId, setIncidentBookingId] = useState<string | null>(null);
+  const [incidentSubmittedState, setIncidentSubmittedState] = useState<string | null>(null);
 
   // ─── Fetch ─────────────────────────────────────────────────
 
@@ -416,6 +427,10 @@ export default function DriverJobsPage() {
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
+                      onReportIncident={(id) => {
+                        setIncidentBookingId(id);
+                        setShowIncidentForm(true);
+                      }}
                     />
                   ))}
 
@@ -431,6 +446,10 @@ export default function DriverJobsPage() {
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
+                      onReportIncident={(id) => {
+                        setIncidentBookingId(id);
+                        setShowIncidentForm(true);
+                      }}
                     />
                   ))}
 
@@ -446,6 +465,10 @@ export default function DriverJobsPage() {
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
+                      onReportIncident={(id) => {
+                        setIncidentBookingId(id);
+                        setShowIncidentForm(true);
+                      }}
                     />
                   ))}
 
@@ -461,6 +484,10 @@ export default function DriverJobsPage() {
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
+                      onReportIncident={(id) => {
+                        setIncidentBookingId(id);
+                        setShowIncidentForm(true);
+                      }}
                     />
                   ))}
                 </AnimatePresence>
@@ -620,6 +647,31 @@ export default function DriverJobsPage() {
           currentStage={photoJob.currentStage}
         />
       )}
+
+      {/* ═══ INCIDENT REPORT FORM ═══ */}
+      {showIncidentForm && incidentBookingId && (
+        <IncidentReportForm
+          bookingId={incidentBookingId}
+          onClose={() => {
+            setShowIncidentForm(false);
+            setIncidentBookingId(null);
+          }}
+          onSubmitted={(exceptionState) => {
+            setShowIncidentForm(false);
+            setIncidentBookingId(null);
+            setIncidentSubmittedState(exceptionState);
+            fetchJobs();
+          }}
+        />
+      )}
+
+      {/* ═══ INCIDENT SUBMITTED CONFIRMATION ═══ */}
+      {incidentSubmittedState && (
+        <IncidentSubmittedModal
+          exceptionState={incidentSubmittedState}
+          onClose={() => setIncidentSubmittedState(null)}
+        />
+      )}
     </div>
   );
 }
@@ -636,6 +688,7 @@ function MyJobCard({
   onCallCustomer,
   callingCustomer,
   callSuccess,
+  onReportIncident,
 }: {
   job: Job;
   actionLoading: string | null;
@@ -649,6 +702,7 @@ function MyJobCard({
   onCallCustomer: (job: Job) => void;
   callingCustomer: string | null;
   callSuccess: string | null;
+  onReportIncident: (bookingId: string) => void;
 }) {
   const isLoading = actionLoading === job._id;
   const isCalling = callingCustomer === job._id;
@@ -718,6 +772,24 @@ function MyJobCard({
           ${job.payout}
         </span>
       </div>
+
+      {/* ─── Exception State Banner ─── */}
+      {job.hasActiveIncident && job.incidentExceptionState === "hold" && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+          <span className="text-xs font-semibold text-amber-800">
+            Job on hold — Waiting for Ops instructions
+          </span>
+        </div>
+      )}
+      {job.hasActiveIncident && job.incidentExceptionState === "stop" && (
+        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-600" />
+          <span className="text-xs font-semibold text-red-800">
+            Job stopped — Do not proceed. Ops will contact you.
+          </span>
+        </div>
+      )}
 
       {/* ─── Pickup Leg ─── */}
       {isMyPickup && (
@@ -1017,7 +1089,7 @@ function MyJobCard({
           </div>
         )}
 
-      {/* ─── Footer: Photos + Call ─── */}
+      {/* ─── Footer: Photos + Call + Incident ─── */}
       {hasActiveLeg && (
         <div className="space-y-2 border-t border-slate-100 px-4 py-3">
           {/* Photo Progress */}
@@ -1097,6 +1169,9 @@ function MyJobCard({
               </p>
             </div>
           )}
+
+          {/* Report Incident */}
+          <IncidentReportButton onClick={() => onReportIncident(job._id)} />
         </div>
       )}
     </motion.div>
