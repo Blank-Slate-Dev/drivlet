@@ -128,7 +128,7 @@ export default async function Image() {
             Newcastle &amp; Canberra
           </span>
           <span style={{ fontSize: '20px', color: '#6ee7b7' }}>
-            ★ 4.8/5 rating
+            4.8/5 rating
           </span>
         </div>
       </div>
