@@ -11,19 +11,18 @@ export default function Footer() {
   const { data: session, status } = useSession();
 
   // Don't show garage/driver links if user is logged in OR if we're still loading
-  // This prevents the flash of content while session is being determined
   const showPartnerLinks = status === 'unauthenticated';
 
   return (
     <footer className="bg-emerald-900 text-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand column */}
-          <div>
+          <div className="lg:col-span-1">
             <div className="relative mb-4 h-10 w-32">
               <Image
                 src="/logo.png"
-                alt="drivlet"
+                alt="Drivlet – car service pickup and delivery"
                 fill
                 className="object-contain brightness-0 invert"
               />
@@ -46,7 +45,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-1 text-xs text-emerald-300">
                 <MapPin className="h-3.5 w-3.5" />
-                Based in Newcastle, NSW
+                Newcastle &amp; Canberra
               </div>
             </div>
           </div>
@@ -56,15 +55,7 @@ export default function Footer() {
             <h4 className="mb-4 font-semibold">Meet drivlet</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
               <li>
-                <a href="#" className="transition hover:text-white">
-                  About Us
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#how-it-works"
-                  className="transition hover:text-white"
-                >
+                <a href="#how-it-works" className="transition hover:text-white">
                   How it works
                 </a>
               </li>
@@ -78,69 +69,95 @@ export default function Footer() {
                   Contact
                 </Link>
               </li>
+              <li>
+                <Link href="/booking" className="transition hover:text-white">
+                  Book Now
+                </Link>
+              </li>
+              <li>
+                <Link href="/track" className="transition hover:text-white">
+                  Track Your Vehicle
+                </Link>
+              </li>
             </ul>
           </div>
 
-          {/* Popular Services - Hidden in Phase 1 (Transport Only) */}
-          {FEATURES.SERVICE_SELECTION ? (
-            <div>
-              <h4 className="mb-4 font-semibold">Popular Services</h4>
-              <ul className="space-y-2 text-sm text-emerald-200">
-                <li>
-                  <a href="#services" className="transition hover:text-white">
-                    Standard service
-                  </a>
-                </li>
-                <li>
-                  <a href="#services" className="transition hover:text-white">
-                    Major service
-                  </a>
-                </li>
-                <li>
-                  <a href="#services" className="transition hover:text-white">
-                    Logbook service
-                  </a>
-                </li>
-                <li>
-                  <a href="#services" className="transition hover:text-white">
-                    Car diagnostic
-                  </a>
-                </li>
-              </ul>
-            </div>
-          ) : (
-            <div>
-              <h4 className="mb-4 font-semibold">Our Service</h4>
-              <ul className="space-y-2 text-sm text-emerald-200">
-                <li>
-                  <a href="#how-it-works" className="transition hover:text-white">
-                    Vehicle Transport
-                  </a>
-                </li>
-                {/* HIDDEN FOR PHASE 1 - Only one service now
-                <li>
-                  <a href="#pricing" className="transition hover:text-white">
-                    Flat Rate Pricing
-                  </a>
-                </li>
-                */}
-                <li>
-                  <a href="/track" className="transition hover:text-white">
-                    Track Your Vehicle
-                  </a>
-                </li>
-                <li>
-                  <a href="#faq" className="transition hover:text-white">
-                    FAQs
-                  </a>
-                </li>
-              </ul>
-            </div>
-          )}
+          {/* Service Areas — critical for SEO internal linking */}
+          <div>
+            <h4 className="mb-4 font-semibold">Newcastle</h4>
+            <ul className="space-y-2 text-sm text-emerald-200">
+              <li>
+                <Link href="/newcastle" className="transition hover:text-white">
+                  Newcastle
+                </Link>
+              </li>
+              <li>
+                <Link href="/newcastle/charlestown" className="transition hover:text-white">
+                  Charlestown
+                </Link>
+              </li>
+              <li>
+                <Link href="/newcastle/merewether" className="transition hover:text-white">
+                  Merewether
+                </Link>
+              </li>
+              <li>
+                <Link href="/newcastle/lambton" className="transition hover:text-white">
+                  Lambton
+                </Link>
+              </li>
+              <li>
+                <Link href="/newcastle/jesmond" className="transition hover:text-white">
+                  Jesmond
+                </Link>
+              </li>
+              <li>
+                <Link href="/newcastle/wallsend" className="transition hover:text-white">
+                  Wallsend
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="mb-4 font-semibold">Canberra</h4>
+            <ul className="space-y-2 text-sm text-emerald-200">
+              <li>
+                <Link href="/canberra" className="transition hover:text-white">
+                  Canberra
+                </Link>
+              </li>
+              <li>
+                <Link href="/canberra/belconnen" className="transition hover:text-white">
+                  Belconnen
+                </Link>
+              </li>
+              <li>
+                <Link href="/canberra/woden" className="transition hover:text-white">
+                  Woden
+                </Link>
+              </li>
+              <li>
+                <Link href="/canberra/gungahlin" className="transition hover:text-white">
+                  Gungahlin
+                </Link>
+              </li>
+              <li>
+                <Link href="/canberra/tuggeranong" className="transition hover:text-white">
+                  Tuggeranong
+                </Link>
+              </li>
+              <li>
+                <Link href="/canberra/braddon" className="transition hover:text-white">
+                  Braddon
+                </Link>
+              </li>
+            </ul>
+          </div>
 
           {/* Terms & Partner Links */}
           <div>
-            <h4 className="mb-4 font-semibold">Terms</h4>
+            <h4 className="mb-4 font-semibold">Legal</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
               <li>
                 <a href="/policies#terms" className="transition hover:text-white">
@@ -154,48 +171,28 @@ export default function Footer() {
               </li>
               <li>
                 <a href="/policies" className="transition hover:text-white">
-                  Policies
+                  All Policies
                 </a>
               </li>
             </ul>
 
             {showPartnerLinks && (
               <>
-                {/* Garage Links */}
                 <div className="mt-6">
-                  <h4 className="mb-2 font-semibold">For Garages</h4>
+                  <h4 className="mb-2 font-semibold">Partners</h4>
                   <div className="space-y-2">
-                    <a
-                      href="/garage/login"
+                    <Link
+                      href="/garage/join"
                       className="block text-sm text-emerald-200 transition hover:text-white"
                     >
-                      Garage Login →
-                    </a>
-                    <a
-                      href="/garage/register"
-                      className="block text-sm text-emerald-200 transition hover:text-white"
-                    >
-                      Garage Sign Up →
-                    </a>
-                  </div>
-                </div>
-
-                {/* Driver Links */}
-                <div className="mt-6">
-                  <h4 className="mb-2 font-semibold">For Drivers</h4>
-                  <div className="space-y-2">
-                    <a
-                      href="/driver/login"
-                      className="block text-sm text-emerald-200 transition hover:text-white"
-                    >
-                      Driver Login →
-                    </a>
-                    <a
-                      href="/driver/register"
+                      Join as a Garage →
+                    </Link>
+                    <Link
+                      href="/driver/join"
                       className="block text-sm text-emerald-200 transition hover:text-white"
                     >
                       Become a Driver →
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </>
@@ -204,7 +201,8 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 border-t border-emerald-800 pt-6 text-center text-xs text-emerald-300">
-          © {new Date().getFullYear()} drivlet. All rights reserved.
+          <p>© {new Date().getFullYear()} Commuto Group Pty Ltd (ABN 73 687 063 618) trading as drivlet. All rights reserved.</p>
+          <p className="mt-1">Car service pickup &amp; delivery in Newcastle, NSW and Canberra, ACT.</p>
         </div>
       </div>
     </footer>

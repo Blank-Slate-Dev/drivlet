@@ -23,7 +23,7 @@ export default function HeroSection() {
       <div className="pointer-events-none absolute left-0 -top-10 z-0">
         <Image
           src="/road_image.png"
-          alt="Road background"
+          alt="Car being picked up for service delivery by Drivlet"
           width={800}
           height={800}
           className="origin-top-left scale-75 object-contain"
@@ -46,7 +46,7 @@ export default function HeroSection() {
               <span className="text-emerald-300">without the hassle</span>
             </h1>
             <p className="mt-5 text-lg text-emerald-100 sm:text-xl">
-              We pick up your car, deliver it to your service centre, and return it — so you can get on with your day
+              We pick up your car, deliver it to your service centre, and return it — so you can get on with your day. Serving Newcastle and Canberra.
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
@@ -97,7 +97,7 @@ export default function HeroSection() {
             <div className="relative">
               <Image
                 src="/lamborghini_ariel_view.png"
-                alt="drivlet branded car"
+                alt="Drivlet car service pickup and delivery — we collect and return your car"
                 width={700}
                 height={400}
                 className="mx-auto w-[60%] object-contain drop-shadow-2xl"

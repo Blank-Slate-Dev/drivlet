@@ -44,6 +44,27 @@ const nextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      // Prevent indexing of admin, dashboard, auth pages via HTTP header
+      {
+        source: "/admin/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/dashboard/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/driver/:path(dashboard|jobs|payments|settings|history|onboarding|pending|login|register)/:rest*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/garage/:path(dashboard|bookings|analytics|settings|notifications|quotes|reviews|services|subscription|location|pending|login|register)/:rest*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/api/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
     ];
   },
   images: {
