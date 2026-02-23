@@ -104,27 +104,13 @@ export default function HowItWorksSection() {
   const steps = FEATURES.SERVICE_SELECTION ? marketplaceSteps : transportSteps;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
-  const [isDesktop, setIsDesktop] = useState(true); // Default to desktop to avoid skeleton flash
+  const [isDesktop, setIsDesktop] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
-  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set([0]));
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Detect screen size after mount — no skeleton, just a layout swap if needed
   useEffect(() => {
-    const width = window.innerWidth;
-    setIsDesktop(width >= 1024);
+    setIsDesktop(window.innerWidth >= 1024);
     setHasMounted(true);
-
-    // Preload all phone images on desktop so there's no skeleton on navigate
-    if (width >= 1024) {
-      steps.forEach((step, index) => {
-        const img = new window.Image();
-        img.src = step.image;
-        img.onload = () => {
-          setLoadedImages((prev) => new Set([...prev, index]));
-        };
-      });
-    }
 
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener('resize', handleResize);
@@ -158,10 +144,6 @@ export default function HowItWorksSection() {
     setTimeout(() => setIsAnimating(false), 500);
   }, [steps.length, isAnimating]);
 
-  const handleImageLoad = (index: number) => {
-    setLoadedImages((prev) => new Set([...prev, index]));
-  };
-
   const currentStep = steps[currentIndex];
 
   return (
@@ -169,6 +151,20 @@ export default function HowItWorksSection() {
       id="how-it-works"
       className="relative overflow-hidden border-b border-slate-200 bg-white py-16 sm:py-20"
     >
+      {/* Preload all phone images off-screen so they're instant when navigating */}
+      <div className="sr-only" aria-hidden="true">
+        {steps.map((step, index) => (
+          <Image
+            key={`preload-${index}`}
+            src={step.image}
+            alt=""
+            width={600}
+            height={951}
+            priority
+          />
+        ))}
+      </div>
+
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Header */}
         <div className="mb-12 text-center">
@@ -278,18 +274,14 @@ export default function HowItWorksSection() {
                         <div
                           className={`absolute bottom-0 h-[245px] w-[270px] rounded-[2.5rem] bg-gradient-to-br shadow-lg ${currentStep.gradient}`}
                         />
-                        {!loadedImages.has(currentIndex) && (
-                          <div className="absolute z-10 h-[349px] w-[220px] animate-pulse rounded-[2.5rem] bg-slate-200/60" />
-                        )}
                         <div className="relative z-10 w-[220px]">
                           <Image
                             src={currentStep.image}
                             alt={currentStep.title}
                             width={600}
                             height={951}
-                            className={`h-auto w-[220px] ${!loadedImages.has(currentIndex) ? 'opacity-0' : ''}`}
-                            priority={currentIndex === 0}
-                            onLoad={() => handleImageLoad(currentIndex)}
+                            className="h-auto w-[220px]"
+                            priority
                           />
                           <div
                             className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
@@ -311,7 +303,6 @@ export default function HowItWorksSection() {
                         height={951}
                         className="h-auto w-[220px]"
                         priority
-                        onLoad={() => handleImageLoad(0)}
                       />
                       <div
                         className={`pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-b from-transparent ${currentStep.overlayColor}`}
