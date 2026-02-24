@@ -125,7 +125,7 @@ export default async function CityPage({
         </header>
 
         {/* ─── Hero Section ───────────────────────────────────────── */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 py-16 sm:py-24">
+        <section className="relative overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 py-16 sm:py-24 lg:py-28">
           <div className="absolute inset-0 z-0 opacity-10">
             <div
               className="h-full w-full"
@@ -134,23 +134,23 @@ export default async function CityPage({
               }}
             />
           </div>
-          <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6">
+          <div className="relative z-10 mx-auto max-w-4xl px-5 text-center sm:px-6">
             {/* Breadcrumb */}
-            <nav className="mb-6 text-sm text-emerald-200">
+            <nav className="mb-8 text-sm text-emerald-200">
               <Link href="/" className="hover:text-white">
                 Home
               </Link>
               <span className="mx-2">/</span>
-              <span className="text-white font-medium">{location.name}</span>
+              <span className="font-medium text-white">{location.name}</span>
             </nav>
 
-            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
               {location.heroHeading}
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-emerald-100 sm:text-xl">
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-emerald-100 sm:text-xl">
               {location.heroSubheading}
             </p>
-            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link
                 href="/booking"
                 className="group inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
@@ -168,7 +168,7 @@ export default async function CityPage({
             </div>
 
             {/* Trust indicators */}
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-emerald-200">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-emerald-200">
               <div className="flex items-center gap-2">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -191,15 +191,15 @@ export default async function CityPage({
 
         {/* ─── How It Works ───────────────────────────────────────── */}
         <section className="border-b border-slate-200 py-16 sm:py-20">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6">
-            <h2 className="text-center text-3xl font-bold text-slate-900 sm:text-4xl">
+          <div className="mx-auto max-w-5xl px-5 sm:px-6">
+            <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-4xl">
               How it works in {location.name}
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-lg text-slate-600">
+            <p className="mx-auto mt-3 max-w-2xl text-center text-base text-slate-600 sm:text-lg">
               Three simple steps to get your car serviced without leaving work
             </p>
 
-            <div className="mt-12 grid gap-8 sm:grid-cols-3">
+            <div className="mt-12 grid gap-10 sm:grid-cols-3 sm:gap-8">
               {[
                 {
                   step: '1',
@@ -225,7 +225,7 @@ export default async function CityPage({
                     <item.icon className="h-7 w-7" />
                   </div>
                   <h3 className="mt-4 text-lg font-semibold text-slate-900">{item.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{item.desc}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -234,11 +234,11 @@ export default async function CityPage({
 
         {/* ─── Value Props ────────────────────────────────────────── */}
         <section className="border-b border-slate-200 bg-slate-50 py-16 sm:py-20">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6">
-            <h2 className="text-center text-3xl font-bold text-slate-900">
+          <div className="mx-auto max-w-5xl px-5 sm:px-6">
+            <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
               Why {location.name} locals choose Drivlet
             </h2>
-            <div className="mt-10 grid gap-6 sm:grid-cols-2">
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 sm:gap-6">
               {[
                 {
                   title: 'No time off work',
@@ -267,7 +267,7 @@ export default async function CityPage({
               ].map((item) => (
                 <div key={item.title} className="rounded-xl border border-slate-200 bg-white p-5">
                   <h3 className="font-semibold text-slate-900">{item.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{item.desc}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -276,24 +276,24 @@ export default async function CityPage({
 
         {/* ─── Suburbs We Serve ───────────────────────────────────── */}
         <section className="border-b border-slate-200 py-16 sm:py-20">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6">
-            <h2 className="text-center text-3xl font-bold text-slate-900">
+          <div className="mx-auto max-w-5xl px-5 sm:px-6">
+            <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
               Suburbs we serve in {location.name}
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
+            <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
               We cover all suburbs across the greater {location.name} region.
               Click a suburb to learn more about our service in your area.
             </p>
-            <div className="mt-10 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="mt-10 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
               {location.suburbs.map((suburb) => (
                 <Link
                   key={suburb.slug}
                   href={`/${location.slug}/${suburb.slug}`}
-                  className="group flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                  className="group flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
                 >
-                  <MapPin className="h-4 w-4 text-slate-400 group-hover:text-emerald-500" />
-                  {suburb.name}
-                  <span className="ml-auto text-xs text-slate-400">{suburb.postcode}</span>
+                  <MapPin className="hidden h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-emerald-500 sm:block" />
+                  <span className="leading-snug">{suburb.name}</span>
+                  <span className="ml-auto hidden text-xs text-slate-400 sm:inline">{suburb.postcode}</span>
                 </Link>
               ))}
             </div>
@@ -313,16 +313,16 @@ export default async function CityPage({
 
         {/* ─── FAQ Section ────────────────────────────────────────── */}
         <section className="border-b border-slate-200 bg-white py-16 sm:py-20">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6">
-            <h2 className="text-3xl font-bold text-slate-900">
+          <div className="mx-auto max-w-3xl px-5 sm:px-6">
+            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
               Frequently asked questions — {location.name}
             </h2>
             <div className="mt-8 divide-y divide-slate-200">
               {faqs.map((faq, i) => (
-                <details key={i} className="group py-4">
-                  <summary className="flex cursor-pointer items-center justify-between text-base font-medium text-slate-900 sm:text-lg">
+                <details key={i} className="group py-5">
+                  <summary className="flex cursor-pointer items-center justify-between text-base font-medium text-slate-900">
                     {faq.question}
-                    <span className="ml-4 flex-shrink-0 text-slate-400 group-open:rotate-180 transition-transform">
+                    <span className="ml-4 flex-shrink-0 text-slate-400 transition-transform group-open:rotate-180">
                       ▾
                     </span>
                   </summary>
@@ -335,14 +335,14 @@ export default async function CityPage({
 
         {/* ─── CTA Section ────────────────────────────────────────── */}
         <section className="bg-emerald-700 py-16 sm:py-20">
-          <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-            <h2 className="text-3xl font-bold text-white">
+          <div className="mx-auto max-w-3xl px-5 text-center sm:px-6">
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">
               Ready to skip the workshop waiting room?
             </h2>
-            <p className="mt-3 text-lg text-emerald-100">
+            <p className="mt-3 text-base text-emerald-100 sm:text-lg">
               Book a car service pickup in {location.name} today. From $119.
             </p>
-            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link
                 href="/booking"
                 className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-8 py-4 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
@@ -361,16 +361,16 @@ export default async function CityPage({
         </section>
 
         {/* ─── Footer ─────────────────────────────────────────────── */}
-        <footer className="bg-slate-900 py-10">
-          <div className="mx-auto max-w-5xl px-4 text-center sm:px-6">
+        <footer className="bg-slate-900 py-10 sm:py-12">
+          <div className="mx-auto max-w-5xl px-5 text-center sm:px-6">
             <Link href="/" className="text-lg font-bold text-white">
               drivlet
             </Link>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-3 text-sm text-slate-400">
               Car service pickup & delivery in {location.name}, {location.stateShort}.
               Commuto Group Pty Ltd (ABN 73 687 063 618).
             </p>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-400">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-slate-400">
               <Link href="/" className="hover:text-white">Home</Link>
               <Link href="/booking" className="hover:text-white">Book</Link>
               <Link href="/contact" className="hover:text-white">Contact</Link>
