@@ -138,35 +138,36 @@ export default async function SuburbPage({
         </header>
 
         {/* Hero */}
-        <section className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 py-14 sm:py-20">
-          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
+        <section className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 py-16 sm:py-20 lg:py-24">
+          <div className="mx-auto max-w-4xl px-5 text-center sm:px-6">
             {/* Breadcrumb */}
-            <nav className="mb-6 text-sm text-emerald-200">
+            <nav className="mb-8 text-sm text-emerald-200">
               <Link href="/" className="hover:text-white">Home</Link>
               <span className="mx-2">/</span>
               <Link href={`/${location.slug}`} className="hover:text-white">{location.name}</Link>
               <span className="mx-2">/</span>
-              <span className="text-white font-medium">{suburb.name}</span>
+              <span className="font-medium text-white">{suburb.name}</span>
             </nav>
 
-            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
               Car service pickup &amp; delivery in {suburb.name}
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-emerald-100">
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-emerald-100 sm:text-lg">
               {suburb.description}
             </p>
 
-            <div className="mt-8">
+            <div className="mt-10">
               <Link
                 href="/booking"
                 className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
               >
-                Book a pickup in {suburb.name} — $119
+                <span className="sm:hidden">Book a pickup — $119</span>
+                <span className="hidden sm:inline">Book a pickup in {suburb.name} — $119</span>
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-emerald-200">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-emerald-200">
               <div className="flex items-center gap-2">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -188,12 +189,12 @@ export default async function SuburbPage({
         </section>
 
         {/* Content Section */}
-        <section className="border-b border-slate-200 py-14 sm:py-18">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6">
-            <h2 className="text-2xl font-bold text-slate-900">
+        <section className="border-b border-slate-200 py-16 sm:py-20">
+          <div className="mx-auto max-w-3xl px-5 sm:px-6">
+            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
               How Drivlet works in {suburb.name}, {location.name}
             </h2>
-            <div className="mt-6 space-y-4 text-slate-600">
+            <div className="mt-6 space-y-4 text-base leading-relaxed text-slate-600">
               <p>
                 Getting your car serviced in {suburb.name} shouldn&apos;t mean taking time off work or
                 arranging a lift. Drivlet is a car service pickup and delivery service that handles the
@@ -211,12 +212,13 @@ export default async function SuburbPage({
               </p>
             </div>
 
-            <div className="mt-8">
+            <div className="mt-10">
               <Link
                 href="/booking"
                 className="group inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
               >
-                Book a pickup from {suburb.name}
+                <span className="sm:hidden">Book a pickup</span>
+                <span className="hidden sm:inline">Book a pickup from {suburb.name}</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </div>
@@ -224,17 +226,17 @@ export default async function SuburbPage({
         </section>
 
         {/* FAQ */}
-        <section className="border-b border-slate-200 bg-slate-50 py-14 sm:py-18">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6">
-            <h2 className="text-2xl font-bold text-slate-900">
+        <section className="border-b border-slate-200 bg-slate-50 py-16 sm:py-20">
+          <div className="mx-auto max-w-3xl px-5 sm:px-6">
+            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
               FAQs — {suburb.name} car service pickup
             </h2>
-            <div className="mt-6 divide-y divide-slate-200">
+            <div className="mt-8 divide-y divide-slate-200">
               {faqs.slice(0, 5).map((faq, i) => (
-                <details key={i} className="group py-4">
+                <details key={i} className="group py-5">
                   <summary className="flex cursor-pointer items-center justify-between text-base font-medium text-slate-900">
                     {faq.question}
-                    <span className="ml-4 flex-shrink-0 text-slate-400 group-open:rotate-180 transition-transform">
+                    <span className="ml-4 flex-shrink-0 text-slate-400 transition-transform group-open:rotate-180">
                       ▾
                     </span>
                   </summary>
@@ -246,24 +248,27 @@ export default async function SuburbPage({
         </section>
 
         {/* Other Suburbs (Internal Linking) */}
-        <section className="border-b border-slate-200 py-14 sm:py-18">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6">
-            <h2 className="text-2xl font-bold text-slate-900">
+        <section className="border-b border-slate-200 py-16 sm:py-20">
+          <div className="mx-auto max-w-3xl px-5 sm:px-6">
+            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
               Also serving other {location.name} suburbs
             </h2>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+            <div className="mt-8 grid grid-cols-2 gap-2.5 sm:gap-3">
               {siblingSuburbs.map((s) => (
                 <Link
                   key={s.slug}
                   href={`/${location.slug}/${s.slug}`}
-                  className="group flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                  className="group flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
                 >
-                  <MapPin className="h-4 w-4 text-slate-400 group-hover:text-emerald-500" />
-                  Car service pickup {s.name}
+                  <MapPin className="hidden h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-emerald-500 sm:block" />
+                  <span className="leading-snug">
+                    <span className="sm:hidden">{s.name}</span>
+                    <span className="hidden sm:inline">Car service pickup {s.name}</span>
+                  </span>
                 </Link>
               ))}
             </div>
-            <p className="mt-4 text-sm text-slate-500">
+            <p className="mt-5 text-sm text-slate-500">
               <Link href={`/${location.slug}`} className="text-emerald-600 hover:underline">
                 View all {location.name} suburbs →
               </Link>
@@ -272,17 +277,17 @@ export default async function SuburbPage({
         </section>
 
         {/* CTA */}
-        <section className="bg-emerald-700 py-14">
-          <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-            <h2 className="text-2xl font-bold text-white">
+        <section className="bg-emerald-700 py-16 sm:py-20">
+          <div className="mx-auto max-w-3xl px-5 text-center sm:px-6">
+            <h2 className="text-xl font-bold text-white sm:text-2xl">
               Book your car service pickup in {suburb.name}
             </h2>
-            <p className="mt-2 text-emerald-100">
+            <p className="mt-3 text-emerald-100">
               From $119. No time off work needed.
             </p>
             <Link
               href="/booking"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber-400 px-8 py-4 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-amber-400 px-8 py-4 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
             >
               Book Now
               <ArrowRight className="h-5 w-5" />
@@ -291,13 +296,13 @@ export default async function SuburbPage({
         </section>
 
         {/* Footer */}
-        <footer className="bg-slate-900 py-8">
-          <div className="mx-auto max-w-5xl px-4 text-center sm:px-6">
+        <footer className="bg-slate-900 py-10 sm:py-12">
+          <div className="mx-auto max-w-5xl px-5 text-center sm:px-6">
             <Link href="/" className="text-lg font-bold text-white">drivlet</Link>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-3 text-sm text-slate-400">
               Car service pickup & delivery in {suburb.name}, {location.name}.
             </p>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-400">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-slate-400">
               <Link href="/" className="hover:text-white">Home</Link>
               <Link href={`/${location.slug}`} className="hover:text-white">{location.name}</Link>
               <Link href="/booking" className="hover:text-white">Book</Link>
