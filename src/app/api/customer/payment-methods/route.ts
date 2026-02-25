@@ -1,3 +1,9 @@
+// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+// All payment method CRUD operations (GET, POST, DELETE, PATCH) have been
+// commented out. Stripe manages card storage and display natively.
+export {};
+
+/*
 // src/app/api/customer/payment-methods/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -251,3 +257,4 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+*/

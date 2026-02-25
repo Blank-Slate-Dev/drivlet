@@ -28,15 +28,16 @@ export interface IEmergencyContact {
   phone: string;
 }
 
-export interface IPaymentMethod {
-  stripePaymentMethodId: string;
-  brand: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
-  isDefault: boolean;
-  addedAt: Date;
-}
+// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+// export interface IPaymentMethod {
+//   stripePaymentMethodId: string;
+//   brand: string;
+//   last4: string;
+//   expMonth: number;
+//   expYear: number;
+//   isDefault: boolean;
+//   addedAt: Date;
+// }
 
 export interface IUser extends Document {
   username: string;
@@ -67,7 +68,8 @@ export interface IUser extends Document {
   // Customer profile fields
   profilePhoto?: string;
   stripeCustomerId?: string;
-  paymentMethods: IPaymentMethod[];
+  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+  // paymentMethods: IPaymentMethod[];
   emergencyContact?: IEmergencyContact;
 
   // Garage location fields (for garage users without full profile yet)
@@ -187,15 +189,16 @@ const UserSchema = new Schema<IUser>(
       trim: true,
       index: true,
     },
-    paymentMethods: [{
-      stripePaymentMethodId: { type: String, required: true },
-      brand: { type: String, required: true },
-      last4: { type: String, required: true },
-      expMonth: { type: Number, required: true },
-      expYear: { type: Number, required: true },
-      isDefault: { type: Boolean, default: false },
-      addedAt: { type: Date, default: Date.now },
-    }],
+    // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+    // paymentMethods: [{
+    //   stripePaymentMethodId: { type: String, required: true },
+    //   brand: { type: String, required: true },
+    //   last4: { type: String, required: true },
+    //   expMonth: { type: Number, required: true },
+    //   expYear: { type: Number, required: true },
+    //   isDefault: { type: Boolean, default: false },
+    //   addedAt: { type: Date, default: Date.now },
+    // }],
     emergencyContact: {
       name: { type: String, trim: true, maxlength: 100 },
       relationship: { type: String, trim: true, maxlength: 50 },

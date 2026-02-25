@@ -1,3 +1,9 @@
+// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+// SetupIntent creation for saving cards locally has been commented out.
+// Stripe checkout handles payment method collection natively.
+export {};
+
+/*
 // src/app/api/customer/setup-intent/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -59,3 +65,4 @@ export async function POST() {
     );
   }
 }
+*/

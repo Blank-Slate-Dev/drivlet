@@ -1,7 +1,7 @@
 // src/app/account/page.tsx
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,24 +15,23 @@ import {
   User,
   Camera,
   Trash2,
-  CreditCard,
   Heart,
-  Star,
-  Plus,
   Loader2,
-  X,
 } from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-);
+// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+// import { CreditCard, Star, Plus, X } from "lucide-react";
+// import { loadStripe } from "@stripe/stripe-js";
+// import {
+//   Elements,
+//   PaymentElement,
+//   useStripe,
+//   useElements,
+// } from "@stripe/react-stripe-js";
+//
+// const stripePromise = loadStripe(
+//   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+// );
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface EmergencyContact {
@@ -41,6 +40,8 @@ interface EmergencyContact {
   phone: string;
 }
 
+// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+/*
 interface PaymentMethod {
   stripePaymentMethodId: string;
   brand: string;
@@ -173,6 +174,7 @@ function AddCardForm({
     </form>
   );
 }
+*/
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AccountPage() {
@@ -203,17 +205,15 @@ export default function AccountPage() {
   const [ecError, setEcError] = useState("");
   const [ecSuccess, setEcSuccess] = useState("");
 
-  // Payment methods state
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [pmLoading, setPmLoading] = useState(true);
-  const [showAddCard, setShowAddCard] = useState(false);
-  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(
-    null
-  );
-  const [pmError, setPmError] = useState("");
-  const [pmSuccess, setPmSuccess] = useState("");
-  const [deletingPm, setDeletingPm] = useState<string | null>(null);
-  const [settingDefault, setSettingDefault] = useState<string | null>(null);
+  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+  // const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  // const [pmLoading, setPmLoading] = useState(true);
+  // const [showAddCard, setShowAddCard] = useState(false);
+  // const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  // const [pmError, setPmError] = useState("");
+  // const [pmSuccess, setPmSuccess] = useState("");
+  // const [deletingPm, setDeletingPm] = useState<string | null>(null);
+  // const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -228,7 +228,8 @@ export default function AccountPage() {
     if (status === "authenticated") {
       fetchProfile();
       fetchEmergencyContact();
-      fetchPaymentMethods();
+      // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+      // fetchPaymentMethods();
     }
   }, [status]);
 
@@ -265,20 +266,21 @@ export default function AccountPage() {
     }
   };
 
-  const fetchPaymentMethods = useCallback(async () => {
-    try {
-      setPmLoading(true);
-      const res = await fetch("/api/customer/payment-methods");
-      if (res.ok) {
-        const data = await res.json();
-        setPaymentMethods(data.paymentMethods || []);
-      }
-    } catch {
-      console.error("Failed to fetch payment methods");
-    } finally {
-      setPmLoading(false);
-    }
-  }, []);
+  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+  // const fetchPaymentMethods = useCallback(async () => {
+  //   try {
+  //     setPmLoading(true);
+  //     const res = await fetch("/api/customer/payment-methods");
+  //     if (res.ok) {
+  //       const data = await res.json();
+  //       setPaymentMethods(data.paymentMethods || []);
+  //     }
+  //   } catch {
+  //     console.error("Failed to fetch payment methods");
+  //   } finally {
+  //     setPmLoading(false);
+  //   }
+  // }, []);
 
   // ─── Profile Photo Handlers ─────────────────────────────────────────
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -455,7 +457,8 @@ export default function AccountPage() {
     }
   };
 
-  // ─── Payment Methods Handlers ───────────────────────────────────────
+  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
+  /*
   const handleAddCard = async () => {
     setPmError("");
 
@@ -538,6 +541,7 @@ export default function AccountPage() {
       setSettingDefault(null);
     }
   };
+  */
 
   // ─── Password Handler ──────────────────────────────────────────────
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -916,7 +920,9 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* ── Payment Methods Card ───────────────────────────────── */}
+          {/* REMOVED: Payment method storage handled by Stripe directly - 2026-02-25 */}
+          {/* Payment Methods Card UI has been commented out. Stripe handles card management natively. */}
+          {/*
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="p-6">
               <div className="mb-6">
@@ -957,7 +963,6 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* Saved Cards List */}
               {pmLoading ? (
                 <div className="text-center py-6 text-slate-500 text-sm">
                   Loading cards...
@@ -1051,7 +1056,6 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* Add Card Form */}
               {showAddCard && setupClientSecret && (
                 <div className="mt-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
                   <div className="flex items-center justify-between mb-4">
@@ -1094,6 +1098,7 @@ export default function AccountPage() {
               )}
             </div>
           </div>
+          */}
 
           {/* ── Change Password Card ───────────────────────────────── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
