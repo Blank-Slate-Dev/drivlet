@@ -4,9 +4,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { connectDB } from '@/lib/mongodb';
+import { requireValidOrigin } from '@/lib/validation';
 import Booking from '@/models/Booking';
 
 export async function POST(request: NextRequest) {
+  // CSRF protection - validate request origin
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   let body;
   try {
     body = await request.json();

@@ -93,46 +93,13 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.trim().toLowerCase();
         const password = credentials.password.trim();
 
-        // DEBUG: Log detailed password info (REMOVE IN PRODUCTION)
-        console.log("🔐 Login attempt:", {
-          email,
-          passwordLength: password.length,
-          passwordChars: password.split('').map(c => c.charCodeAt(0)),
-          firstChar: password.charAt(0),
-          lastChar: password.charAt(password.length - 1),
-        });
-
         const user = await User.findOne({ email });
 
         if (!user) {
-          console.log("❌ No user found for:", email);
           throw new Error("No user found with this email");
         }
 
-        // DEBUG: Test with the known password directly
-        const knownPassword = "Testtest1!";
-        const isKnownPasswordValid = await bcrypt.compare(knownPassword, user.password);
-        console.log("🔍 Known password test:", { isKnownPasswordValid });
-
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        
-        console.log("🔐 Password comparison:", {
-          email,
-          isValid: isPasswordValid,
-          submittedLength: password.length,
-          knownLength: knownPassword.length,
-          lengthMatch: password.length === knownPassword.length,
-          exactMatch: password === knownPassword,
-        });
-
-        if (!isPasswordValid) {
-          console.log("❌ Invalid password for:", email);
-          throw new Error("Invalid password");
-        }
-
-        console.log("✅ Login successful for:", email);
-
-        // Check account status - prevent suspended or deleted users from logging in
+        // Check account status BEFORE password comparison to avoid wasting bcrypt cycles
         if (user.accountStatus === "suspended") {
           throw new Error("Your account has been suspended. Please contact support.");
         }
@@ -143,6 +110,12 @@ export const authOptions: NextAuthOptions = {
         // Check email verification for regular users
         if (user.role === "user" && !user.emailVerified) {
           throw new Error("Please verify your email before signing in. Check your inbox for the verification link.");
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+          throw new Error("Invalid password");
         }
 
         // If user is a driver, fetch their onboarding status

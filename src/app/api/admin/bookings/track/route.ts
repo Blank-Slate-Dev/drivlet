@@ -1,10 +1,21 @@
 // src/app/api/admin/bookings/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
+import { requireAdmin } from "@/lib/admin";
 import Booking from "@/models/Booking";
 
-// GET /api/bookings/track - Track booking by email and vehicle registration
+// Escape special regex characters to prevent ReDoS
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// GET /api/admin/bookings/track - Track booking by email and vehicle registration (admin only)
 export async function GET(request: NextRequest) {
+  const adminCheck = await requireAdmin();
+  if (!adminCheck.authorized) {
+    return adminCheck.response;
+  }
+
   const { searchParams } = new URL(request.url);
   const email = searchParams.get("email");
   const registration = searchParams.get("registration");
@@ -19,10 +30,10 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    // Find booking by email and registration (case insensitive)
+    // Find booking by email and registration (case insensitive, inputs escaped)
     const booking = await Booking.findOne({
-      userEmail: { $regex: new RegExp(`^${email}$`, "i") },
-      vehicleRegistration: { $regex: new RegExp(`^${registration}$`, "i") },
+      userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, "i") },
+      vehicleRegistration: { $regex: new RegExp(`^${escapeRegExp(registration)}$`, "i") },
     })
       .sort({ createdAt: -1 })
       .select("-__v")
@@ -65,8 +76,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/bookings/track - Alternative method with body
+// POST /api/admin/bookings/track - Alternative method with body (admin only)
 export async function POST(request: NextRequest) {
+  const adminCheck = await requireAdmin();
+  if (!adminCheck.authorized) {
+    return adminCheck.response;
+  }
+
   try {
     const body = await request.json();
     const { email, registration } = body;
@@ -80,10 +96,10 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
-    // Find the most recent booking by email and registration
+    // Find the most recent booking by email and registration (inputs escaped)
     const booking = await Booking.findOne({
-      userEmail: { $regex: new RegExp(`^${email}$`, "i") },
-      vehicleRegistration: { $regex: new RegExp(`^${registration}$`, "i") },
+      userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, "i") },
+      vehicleRegistration: { $regex: new RegExp(`^${escapeRegExp(registration)}$`, "i") },
     })
       .sort({ createdAt: -1 })
       .select("-__v")

@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
+      // Escape special regex characters to prevent ReDoS
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { userName: { $regex: search, $options: "i" } },
-        { userEmail: { $regex: search, $options: "i" } },
-        { vehicleRegistration: { $regex: search, $options: "i" } },
-        { serviceType: { $regex: search, $options: "i" } },
+        { userName: { $regex: escapedSearch, $options: "i" } },
+        { userEmail: { $regex: escapedSearch, $options: "i" } },
+        { vehicleRegistration: { $regex: escapedSearch, $options: "i" } },
+        { serviceType: { $regex: escapedSearch, $options: "i" } },
       ];
     }
 

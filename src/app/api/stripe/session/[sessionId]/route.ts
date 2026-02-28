@@ -1,11 +1,18 @@
 // src/app/api/stripe/session/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { requireValidOrigin } from '@/lib/validation';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  // CSRF protection - validate request origin
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const { sessionId } = await params;
 

@@ -91,9 +91,12 @@ export async function GET(request: NextRequest) {
     // Search by registration or location
     if (search) {
       const searchUpper = search.toUpperCase().trim();
+      // Escape special regex characters to prevent ReDoS
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedSearchUpper = searchUpper.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { vehicleRegistration: { $regex: searchUpper, $options: "i" } },
-        { locationAddress: { $regex: search, $options: "i" } },
+        { vehicleRegistration: { $regex: escapedSearchUpper, $options: "i" } },
+        { locationAddress: { $regex: escapedSearch, $options: "i" } },
       ];
     }
 

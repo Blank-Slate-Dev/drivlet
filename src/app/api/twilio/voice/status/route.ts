@@ -3,11 +3,19 @@
 // Used for logging and optional call tracking
 
 import { NextRequest, NextResponse } from "next/server";
+import { validateTwilioSignature, formDataToObject } from "@/lib/twilio-validate";
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    
+
+    // Validate Twilio webhook signature
+    const params = formDataToObject(formData);
+    if (!validateTwilioSignature(request, params)) {
+      console.error('❌ Invalid Twilio signature on status webhook');
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
     const callSid = formData.get('CallSid') as string;
     const callStatus = formData.get('CallStatus') as string;
     const callDuration = formData.get('CallDuration') as string;

@@ -77,15 +77,19 @@ export async function GET(request: NextRequest) {
       garageQuery["businessAddress.postcode"] = postcode;
     }
     if (suburb) {
-      garageQuery["businessAddress.suburb"] = { $regex: suburb, $options: "i" };
+      // Escape special regex characters to prevent ReDoS
+      const escapedSuburb = suburb.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      garageQuery["businessAddress.suburb"] = { $regex: escapedSuburb, $options: "i" };
     }
 
     // Text search on business name
     if (query) {
+      // Escape special regex characters to prevent ReDoS
+      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       garageQuery.$or = [
-        { businessName: { $regex: query, $options: "i" } },
-        { linkedGarageName: { $regex: query, $options: "i" } },
-        { tradingName: { $regex: query, $options: "i" } },
+        { businessName: { $regex: escapedQuery, $options: "i" } },
+        { linkedGarageName: { $regex: escapedQuery, $options: "i" } },
+        { tradingName: { $regex: escapedQuery, $options: "i" } },
       ];
     }
 

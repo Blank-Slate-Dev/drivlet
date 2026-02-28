@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
+import { validateTwilioSignature, formDataToObject } from "@/lib/twilio-validate";
 
 const TWILIO_PHONE_NUMBER = '+61259416665';
 
@@ -26,7 +27,14 @@ export async function POST(request: NextRequest) {
   try {
     // Twilio sends form data
     const formData = await request.formData();
-    
+
+    // Validate Twilio webhook signature
+    const params = formDataToObject(formData);
+    if (!validateTwilioSignature(request, params)) {
+      console.error('❌ Invalid Twilio signature on incoming call webhook');
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
     // Get caller information from Twilio
     const callerNumber = formData.get('From') as string;
     const calledNumber = formData.get('To') as string;
@@ -121,12 +129,19 @@ export async function POST(request: NextRequest) {
 
     // Generate TwiML to connect to driver
     const driverPhone = formatPhoneNumber(driver.phone);
-    
+
+    // Escape XML special characters to prevent TwiML injection
+    const escapeXml = (str: string) => str.replace(/[&<>"']/g, (c) => {
+      const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
+      return map[c] || c;
+    });
+    const safeDriverPhone = escapeXml(driverPhone);
+
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling Drivlet. Connecting you to your driver now.</Say>
   <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
-    <Number>${driverPhone}</Number>
+    <Number>${safeDriverPhone}</Number>
   </Dial>
   <Say voice="alice">Your driver did not answer. Please try again in a few minutes. Goodbye.</Say>
 </Response>`;
