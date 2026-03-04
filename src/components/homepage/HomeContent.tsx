@@ -1,7 +1,6 @@
 // src/components/homepage/HomeContent.tsx
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import HeroSection from '@/components/homepage/HeroSection';
@@ -11,21 +10,13 @@ import InteractiveServicesSection from '@/components/homepage/InteractiveService
 import TestimonialsSection from '@/components/homepage/TestimonialsSection';
 import FAQSection from '@/components/homepage/FAQSection';
 import Footer from '@/components/homepage/Footer';
-import BookingModal from '@/components/homepage/BookingModal';
 import { LOCATIONS } from '@/lib/seo-data';
 
 export default function HomeContent() {
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const openBookingModal = () => setShowBookingModal(true);
-  const closeBookingModal = () => setShowBookingModal(false);
-
   return (
     <main className="min-h-screen bg-white">
-      {/* Modal */}
-      <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
-
       {/* Header */}
-      <Header onBookingClick={openBookingModal} />
+      <Header />
 
       {/* Hero Section */}
       <HeroSection />
@@ -37,7 +28,7 @@ export default function HomeContent() {
       <HowItWorksSection />
 
       {/* Services Section */}
-      <InteractiveServicesSection onBookingClick={openBookingModal} />
+      <InteractiveServicesSection />
 
       {/* Testimonials Section */}
       <TestimonialsSection />

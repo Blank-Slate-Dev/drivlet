@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Phone,
   Globe,
-  ExternalLink,
 } from 'lucide-react';
 
 // ════════════════════════════════════════════════════════════════════════
@@ -356,7 +355,7 @@ const policies: PolicySection[] = [
 
           <PolicyClause title="How We Investigate">
             <ul className="space-y-1.5 text-slate-600">
-              <li className="flex gap-2"><span className="text-slate-400">•</span>Review pick-up and return condition photos and sign-offs.</li>
+              <li className="flex gap-2"><span className="text-slate.400">•</span>Review pick-up and return condition photos and sign-offs.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Check timestamps and job status logs.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Speak with the driver(s) involved and review notes.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Where relevant, confirm handover details with your nominated workshop.</li>
@@ -556,10 +555,6 @@ function PolicyCard({
 export default function PoliciesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const handleBookingClick = () => {
-    window.location.href = '/#book';
-  };
-
   const togglePolicy = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
@@ -573,7 +568,7 @@ export default function PoliciesPage() {
 
   return (
     <>
-      <Header onBookingClick={handleBookingClick} />
+      <Header />
       <main className="min-h-screen bg-slate-50">
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 py-16 pb-20">

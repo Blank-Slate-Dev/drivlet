@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import {
   ClipboardCheck,
   Cog,
@@ -106,13 +107,7 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   '4x4_accessories': 'Off-road upgrades and accessory installation',
 };
 
-interface InteractiveServicesSectionProps {
-  onBookingClick?: (selectedServices?: string[]) => void;
-}
-
-export default function InteractiveServicesSection({
-  onBookingClick,
-}: InteractiveServicesSectionProps) {
+export default function InteractiveServicesSection() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
@@ -140,12 +135,6 @@ export default function InteractiveServicesSection({
   };
 
   const isPopular = (service: string) => COMMON_SERVICES.includes(service);
-
-  const handleGetQuote = () => {
-    if (onBookingClick) {
-      onBookingClick(selectedServices);
-    }
-  };
 
   return (
     <section id="services" className="relative overflow-hidden bg-slate-50 py-16 sm:py-24">
@@ -371,15 +360,15 @@ export default function InteractiveServicesSection({
                   </div>
                 </div>
 
-                <motion.button
-                  onClick={handleGetQuote}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-emerald-600 shadow-lg transition hover:bg-emerald-50"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Get your quote
-                  <ArrowRight className="h-5 w-5" />
-                </motion.button>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link
+                    href="https://www.drivlet.com.au/booking"
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-emerald-600 shadow-lg transition hover:bg-emerald-50"
+                  >
+                    Get your quote
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                </motion.div>
               </div>
             </motion.div>
           )}
@@ -397,15 +386,15 @@ export default function InteractiveServicesSection({
             <p className="mb-4 text-slate-600">
               Click on any category to explore services, or
             </p>
-            <motion.button
-              onClick={() => onBookingClick?.()}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-lg transition hover:bg-emerald-700"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Get a quote now
-              <ArrowRight className="h-5 w-5" />
-            </motion.button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-block">
+              <Link
+                href="https://www.drivlet.com.au/booking"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-lg transition hover:bg-emerald-700"
+              >
+                Get a quote now
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+            </motion.div>
           </motion.div>
         )}
       </div>

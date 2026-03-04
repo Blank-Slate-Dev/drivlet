@@ -1,23 +1,15 @@
 // src/app/contact/page.tsx
 "use client";
 
-import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/homepage/Footer";
 import ContactForm from "@/components/homepage/ContactForm";
-import BookingModal from "@/components/homepage/BookingModal";
 import { Phone, Mail, MapPin } from "lucide-react";
 
 export default function ContactPage() {
-  const [showBookingModal, setShowBookingModal] = useState(false);
-
   return (
     <main className="min-h-screen bg-white">
-      <BookingModal
-        isOpen={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
-      />
-      <Header onBookingClick={() => setShowBookingModal(true)} />
+      <Header />
 
       <section className="bg-gradient-to-r from-emerald-700 to-teal-700 py-16 sm:py-24">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">

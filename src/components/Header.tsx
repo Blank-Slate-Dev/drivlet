@@ -22,11 +22,7 @@ import {
   FileText,
 } from "lucide-react";
 
-interface HeaderProps {
-  onBookingClick: () => void;
-}
-
-export default function Header({ onBookingClick }: HeaderProps) {
+export default function Header() {
   const { data: session, status } = useSession();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -247,14 +243,13 @@ export default function Header({ onBookingClick }: HeaderProps) {
             </>
           )}
 
-          <button
-            type="button"
-            onClick={onBookingClick}
+          <Link
+            href="https://www.drivlet.com.au/booking"
             className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
           >
             Book a service
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </button>
+          </Link>
         </div>
 
         {/* Mobile: user menu + hamburger */}
@@ -470,16 +465,13 @@ export default function Header({ onBookingClick }: HeaderProps) {
                   </>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMobileMenu(false);
-                    onBookingClick();
-                  }}
+                <Link
+                  href="https://www.drivlet.com.au/booking"
                   className="mt-2 w-full rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+                  onClick={() => setShowMobileMenu(false)}
                 >
                   Book a service
-                </button>
+                </Link>
               </nav>
             </div>
           </>
