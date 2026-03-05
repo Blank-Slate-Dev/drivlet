@@ -179,7 +179,9 @@ export async function POST(request: NextRequest) {
       );
 
       const booking = result;
-      const wasInserted = booking?.createdAt?.getTime() === bookingData.createdAt.getTime();
+      // If the tracking code matches what we just generated, we inserted;
+      // otherwise the doc already existed from the webhook.
+      const wasInserted = booking?.trackingCode === trackingCode;
 
       if (!wasInserted) {
         console.log('ℹ️ Booking already exists (from webhook):', booking?._id);

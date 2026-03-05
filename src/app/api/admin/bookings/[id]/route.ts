@@ -354,7 +354,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/admin/bookings/[id] - Delete booking
+// DELETE /api/admin/bookings/[id] - Soft-delete booking (preserves financial records)
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
@@ -365,7 +365,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     await connectDB();
     const { id } = await params;
 
-    const booking = await Booking.findByIdAndDelete(id);
+    const booking = await Booking.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          status: "cancelled",
+          deletedAt: new Date(),
+          deletedBy: adminCheck.session?.user.id,
+        },
+      },
+      { new: true }
+    );
 
     if (!booking) {
       return NextResponse.json(

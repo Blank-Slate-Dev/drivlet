@@ -307,6 +307,11 @@ export async function POST(request: NextRequest) {
           console.error('Error message:', dbError.message);
           console.error('Error stack:', dbError.stack);
         }
+        // Return 500 so Stripe retries the webhook
+        return NextResponse.json(
+          { error: 'Database error processing payment' },
+          { status: 500 }
+        );
       } finally {
         await client.close();
         console.log('🔌 MongoDB connection closed');

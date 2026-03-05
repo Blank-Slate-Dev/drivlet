@@ -160,8 +160,27 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json();
 
+    // Allow-list fields to prevent injection of internal state
+    const ALLOWED_FIELDS = [
+      "userName", "userEmail", "userId", "isGuest", "guestPhone",
+      "vehicleRegistration", "vehicleState", "vehicleYear", "vehicleModel",
+      "serviceType", "serviceDate", "pickupAddress", "pickupTime", "dropoffTime",
+      "pickupTimeSlot", "dropoffTimeSlot", "estimatedServiceDuration",
+      "hasExistingBooking", "garageName", "garageAddress", "garagePlaceId",
+      "existingBookingRef", "existingBookingNotes", "distanceZone",
+      "distanceSurcharge", "distanceKm", "transmissionType",
+      "isManualTransmission", "selectedServices", "primaryServiceCategory",
+      "serviceNotes", "notes",
+    ] as const;
+
+    const sanitizedData: Record<string, unknown> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in data) sanitizedData[key] = data[key];
+    }
+
     const booking = new Booking({
-      ...data,
+      ...sanitizedData,
+      status: "pending",
       lastUpdatedBy: adminCheck.session?.user.id,
     });
 

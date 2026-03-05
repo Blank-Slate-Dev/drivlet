@@ -149,10 +149,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if driver review already exists
+      // Check if driver review already exists (check both pickup and return drivers)
+      const driverIdsToCheck = [booking.assignedDriverId];
+      if (booking.returnDriverId) driverIdsToCheck.push(booking.returnDriverId);
       const existingDriverReview = await DriverReview.findOne({
         bookingId,
-        driverId: booking.assignedDriverId,
+        driverId: { $in: driverIdsToCheck },
       });
       if (existingDriverReview) {
         return NextResponse.json(

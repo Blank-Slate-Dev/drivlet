@@ -227,6 +227,19 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
+        // Periodically re-check account status to enforce suspensions promptly.
+        // This runs on each session access (typically once per page load).
+        try {
+          await connectDB();
+          const dbUser = await User.findById(token.id).select("accountStatus").lean();
+          if (dbUser && (dbUser.accountStatus === "suspended" || dbUser.accountStatus === "deleted")) {
+            // Return an empty session to force sign-out on the client
+            return { ...session, user: undefined } as unknown as typeof session;
+          }
+        } catch {
+          // DB error — allow session to continue rather than lock user out
+        }
+
         session.user.id = token.id as string;
         session.user.username = token.username as string;
         session.user.email = token.email as string;

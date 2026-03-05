@@ -149,11 +149,17 @@ export async function POST(request: NextRequest) {
       });
       await timeEntry.save();
 
-      // Update driver
-      driver.isClockedIn = true;
-      driver.lastClockIn = now;
-      driver.currentTimeEntryId = timeEntry._id;
-      await driver.save();
+      // Atomically update driver — only if still not clocked in (prevents race condition)
+      const updated = await Driver.findOneAndUpdate(
+        { _id: driver._id, isClockedIn: false },
+        { $set: { isClockedIn: true, lastClockIn: now, currentTimeEntryId: timeEntry._id } },
+        { new: true }
+      );
+      if (!updated) {
+        // Race: another request clocked in first — clean up orphaned time entry
+        await TimeEntry.findByIdAndDelete(timeEntry._id);
+        return NextResponse.json({ error: "Already clocked in" }, { status: 400 });
+      }
 
       return NextResponse.json({
         success: true,

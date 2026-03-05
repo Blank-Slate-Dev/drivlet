@@ -51,6 +51,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate field lengths
+    if (typeof title === "string" && title.length > 200) {
+      return NextResponse.json({ error: "Title must be 200 characters or less" }, { status: 400 });
+    }
+    if (typeof description === "string" && description.length > 5000) {
+      return NextResponse.json({ error: "Description must be 5000 characters or less" }, { status: 400 });
+    }
+
     // Validate booking exists and driver is assigned
     const booking = await Booking.findById(bookingId);
     if (!booking) {

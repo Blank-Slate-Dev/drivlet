@@ -6,11 +6,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limit to prevent enumeration
+  const rateLimit = withRateLimit(request, RATE_LIMITS.api, "confirm-service-payment");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { id: bookingId } = await params;
 
   if (!bookingId) {
@@ -30,6 +39,17 @@ export async function POST(
         { error: 'Booking not found' },
         { status: 404 }
       );
+    }
+
+    // Verify caller owns this booking (session user or matching guest email)
+    const session = await getServerSession(authOptions);
+    const isOwner =
+      session?.user?.role === "admin" ||
+      (session?.user?.id && booking.userId?.toString() === session.user.id) ||
+      (session?.user?.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
+
+    if (!isOwner) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Already paid - return success

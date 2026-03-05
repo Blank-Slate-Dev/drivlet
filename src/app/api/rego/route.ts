@@ -1,5 +1,6 @@
 // src/app/api/rego/route.ts
 import { NextResponse } from 'next/server';
+import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // Force dynamic rendering - this route uses request.url
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,15 @@ type StateCode =
   | 'ACT';
 
 export async function GET(request: Request) {
+  // Rate limit to prevent abuse of paid API
+  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "rego-lookup");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
 

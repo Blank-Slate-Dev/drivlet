@@ -171,20 +171,41 @@ export async function POST(request: Request) {
     let username = baseUsername;
     let counter = 1;
 
-    // Ensure unique username
-    while (await User.findOne({ username })) {
-      username = `${baseUsername}${counter}`;
-      counter++;
+    // Ensure unique username — retry on duplicate key error (TOCTOU safe)
+    let user;
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      // Check for existing username
+      while (await User.findOne({ username })) {
+        username = `${baseUsername}${counter}`;
+        counter++;
+      }
+      try {
+        user = await User.create({
+          username,
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          role: "driver",
+          isApproved: false,
+        });
+        break; // success
+      } catch (err: unknown) {
+        const mongoErr = err as { code?: number };
+        if (mongoErr.code === 11000 && attempt < MAX_RETRIES - 1) {
+          // Duplicate key — try next username
+          username = `${baseUsername}${counter}`;
+          counter++;
+          continue;
+        }
+        throw err;
+      }
     }
-
-    // Create user
-    const user = await User.create({
-      username,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      role: "driver",
-      isApproved: false, // Drivers need manual approval
-    });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Failed to generate unique username" },
+        { status: 500 }
+      );
+    }
 
     // Format phone number
     const cleanPhone = phone.replace(/[\s-]/g, "");

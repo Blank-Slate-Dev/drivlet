@@ -16,8 +16,10 @@ export interface RefundCalculation {
  * Handles formats like "Tomorrow, 9:00 AM - 10:00 AM" or ISO strings
  */
 function parsePickupTime(pickupTimeStr: string): Date {
-  // If it's already an ISO string, parse directly
-  if (pickupTimeStr.includes('T') || pickupTimeStr.includes('-')) {
+  // If it looks like an ISO string (e.g. "2024-03-15T09:00:00"), parse directly.
+  // Check for ISO pattern rather than just any hyphen to avoid matching
+  // human-readable strings like "Tomorrow, 9:00 AM - 10:00 AM".
+  if (pickupTimeStr.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(pickupTimeStr)) {
     const parsed = new Date(pickupTimeStr);
     if (!isNaN(parsed.getTime())) {
       return parsed;

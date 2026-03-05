@@ -95,6 +95,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
     }
 
+    if (!["monthly", "yearly"].includes(billingInterval)) {
+      return NextResponse.json({ error: "Invalid billing interval" }, { status: 400 });
+    }
+
     await connectDB();
 
     const garage = await Garage.findOne({ userId: session.user.id });

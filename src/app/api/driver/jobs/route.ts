@@ -613,13 +613,31 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if payment link already exists
+      // Check if payment link already exists — use atomic findOneAndUpdate
+      // to prevent race condition where two concurrent requests both pass the check
       if (booking.servicePaymentUrl && booking.servicePaymentStatus === "pending") {
         return NextResponse.json({
           success: true,
           message: "Payment link already exists",
           paymentLink: booking.servicePaymentUrl,
           paymentAmount: booking.servicePaymentAmount,
+        });
+      }
+
+      // Atomically claim the right to generate a payment link
+      const claimed = await Booking.findOneAndUpdate(
+        { _id: bookingId, servicePaymentStatus: { $ne: "pending" } },
+        { $set: { servicePaymentStatus: "pending" } },
+        { new: true }
+      );
+      if (!claimed) {
+        // Another request already started generating a payment link — re-fetch
+        const existing = await Booking.findById(bookingId).select("servicePaymentUrl servicePaymentAmount");
+        return NextResponse.json({
+          success: true,
+          message: "Payment link already exists",
+          paymentLink: existing?.servicePaymentUrl,
+          paymentAmount: existing?.servicePaymentAmount,
         });
       }
 
@@ -654,9 +672,10 @@ export async function POST(request: NextRequest) {
           cancel_url: `${appUrl}/payment/cancelled?booking=${bookingId}`,
         });
 
-        // Update booking with payment link
+        // Update booking with payment link and intent ID
         booking.servicePaymentAmount = serviceAmount;
         booking.servicePaymentUrl = checkoutSession.url || undefined;
+        booking.servicePaymentIntentId = (checkoutSession.payment_intent as string) || undefined;
         booking.servicePaymentStatus = "pending";
         booking.currentStage = "service_in_progress";
         booking.overallProgress = 72;

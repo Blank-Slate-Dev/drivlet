@@ -71,10 +71,15 @@ export async function POST(
       const bookingEmail = booking.userEmail?.toLowerCase();
       const bookingPhone = booking.guestPhone?.replace(/[\s\-()]/g, "");
 
-      // Both email AND phone must be provided and match
-      if (providedEmail && providedPhone && bookingEmail && bookingPhone) {
-        isGuestOwner =
-          providedEmail === bookingEmail && providedPhone === bookingPhone;
+      // Verify email match (required) and phone match (when phone was recorded)
+      if (providedEmail && bookingEmail && providedEmail === bookingEmail) {
+        if (bookingPhone) {
+          // Phone exists on booking — require phone match too
+          isGuestOwner = !!(providedPhone && providedPhone === bookingPhone);
+        } else {
+          // No phone on booking — email-only verification is sufficient
+          isGuestOwner = true;
+        }
       }
 
       // If guest credentials don't match, return specific error

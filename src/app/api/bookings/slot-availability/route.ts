@@ -3,11 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import { MAX_BOOKINGS_PER_SLOT, PICKUP_SLOTS, DROPOFF_SLOTS } from '@/config/timeSlots';
+import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // Force dynamic rendering - this route uses request.url for query params
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const rateLimit = withRateLimit(request, RATE_LIMITS.read, "slot-availability");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
