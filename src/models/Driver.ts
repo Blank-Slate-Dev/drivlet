@@ -197,9 +197,13 @@ const DriverSchema = new Schema<IDriver>(
       required: [true, "Date of birth is required"],
       validate: {
         validator: function (v: Date) {
-          // Must be at least 18 years old
+          // Must be at least 18 years old (account for month/day, not just year)
           const today = new Date();
-          const age = today.getFullYear() - v.getFullYear();
+          let age = today.getFullYear() - v.getFullYear();
+          const monthDiff = today.getMonth() - v.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < v.getDate())) {
+            age--;
+          }
           return age >= 18;
         },
         message: "Driver must be at least 18 years old",

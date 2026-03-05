@@ -567,15 +567,7 @@ const BookingSchema = new Schema<IBooking>(
       default: [],
     },
 
-    // Timestamps
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
+    // Note: createdAt/updatedAt are managed automatically by { timestamps: true }
 
     // Cancellation details
     cancellation: {

@@ -39,7 +39,9 @@
       "Bash(git checkout:*)",
       "Bash(iconv:*)",
       "Bash(npm run lint)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(awk '/export async function PATCH/,/try/' /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/garage/profile/route.ts)",
+      "Bash(openssl rand -base64 32)"
     ],
     "deny": [],
     "ask": []

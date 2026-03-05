@@ -157,7 +157,10 @@ const QuoteRequestSchema = new Schema<IQuoteRequest>(
 QuoteRequestSchema.index({ customerId: 1, status: 1 });
 QuoteRequestSchema.index({ customerEmail: 1, status: 1 });
 QuoteRequestSchema.index({ status: 1, expiresAt: 1 });
-QuoteRequestSchema.index({ "locationCoordinates": "2dsphere" });
+// Note: locationCoordinates uses {lat, lng} format, not GeoJSON.
+// A 2dsphere index requires GeoJSON {type:"Point", coordinates:[lng,lat]}.
+// Using a compound index on lat/lng instead for basic location queries.
+QuoteRequestSchema.index({ "locationCoordinates.lat": 1, "locationCoordinates.lng": 1 });
 QuoteRequestSchema.index({ trackingCode: 1, customerEmail: 1 });
 
 // Virtual for checking if request is expired

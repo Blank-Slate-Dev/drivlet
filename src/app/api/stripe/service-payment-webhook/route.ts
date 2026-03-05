@@ -66,10 +66,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No signature' }, { status: 400 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
+  // Use a dedicated secret for this endpoint; fall back to shared secret for backward compat
+  const webhookSecret =
+    process.env.STRIPE_SERVICE_PAYMENT_WEBHOOK_SECRET ??
+    process.env.STRIPE_WEBHOOK_SECRET;
+
   if (!webhookSecret) {
-    console.error('❌ STRIPE_WEBHOOK_SECRET not configured');
+    console.error('❌ STRIPE_SERVICE_PAYMENT_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRET not configured');
     return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
   }
 
