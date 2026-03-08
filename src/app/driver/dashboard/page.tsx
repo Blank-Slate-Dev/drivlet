@@ -5,15 +5,16 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Briefcase,
   DollarSign,
   Clock,
   Settings,
-  DollarSign as DollarSignIcon,
   LogOut,
-  Loader2,
+  RefreshCw,
+  TrendingUp,
+  ChevronRight,
+  CheckCircle2,
 } from "lucide-react";
 
 interface ClockStatus {
@@ -38,76 +39,18 @@ interface EarningsData {
   }[];
 }
 
-interface AppButtonProps {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  sublabel?: string;
-  badge?: number | string;
-  variant?: "default" | "accent";
-  loading?: boolean;
-}
-
-function AppButton({
-  href,
-  icon: Icon,
-  label,
-  sublabel,
-  badge,
-  variant = "default",
-  loading = false,
-}: AppButtonProps) {
-  return (
-    <Link
-      href={href}
-      className={`group relative flex flex-col items-center justify-center rounded-2xl p-5 transition-all active:scale-95 ${
-        variant === "accent"
-          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-          : "bg-white text-slate-700 shadow-sm border border-slate-200/80 hover:shadow-md hover:border-slate-300"
-      }`}
-    >
-      {badge !== undefined && badge !== 0 && (
-        <span
-          className={`absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-bold ${
-            variant === "accent"
-              ? "bg-white text-emerald-700"
-              : "bg-emerald-600 text-white"
-          }`}
-        >
-          {badge}
-        </span>
-      )}
-      <Icon
-        className={`h-7 w-7 mb-2 ${
-          variant === "accent" ? "text-white" : "text-emerald-600"
-        }`}
-      />
-      <span
-        className={`text-sm font-semibold ${
-          variant === "accent" ? "text-white" : "text-slate-800"
-        }`}
-      >
-        {label}
-      </span>
-      {loading ? (
-        <span
-          className={`h-3 w-12 mt-1 rounded animate-pulse ${
-            variant === "accent" ? "bg-emerald-400" : "bg-slate-200"
-          }`}
-        />
-      ) : (
-        sublabel && (
-          <span
-            className={`text-xs mt-0.5 ${
-              variant === "accent" ? "text-emerald-100" : "text-slate-400"
-            }`}
-          >
-            {sublabel}
-          </span>
-        )
-      )}
-    </Link>
-  );
+interface UpcomingJob {
+  _id: string;
+  customerName?: string;
+  userName?: string;
+  vehicleRegistration: string;
+  pickupAddress?: string;
+  garageAddress?: string;
+  pickupTime?: string;
+  pickupTimeSlot?: string;
+  status: string;
+  payout?: number;
+  paymentAmount?: number;
 }
 
 export default function DriverDashboardPage() {
@@ -118,6 +61,8 @@ export default function DriverDashboardPage() {
   const [acceptedCount, setAcceptedCount] = useState<number | null>(null);
   const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
+  const [upcomingJobs, setUpcomingJobs] = useState<UpcomingJob[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch clock status
   const fetchClockStatus = useCallback(async () => {
@@ -132,15 +77,20 @@ export default function DriverDashboardPage() {
     }
   }, []);
 
-  // Fetch job counts
+  // Fetch job counts + upcoming jobs
   const fetchJobCounts = useCallback(async () => {
     try {
       const res = await fetch("/api/driver/jobs?status=all");
       if (res.ok) {
         const data = await res.json();
-        const total = Object.values(data.myJobs as Record<string, unknown[]>)
-          .flat().length;
-        setAcceptedCount(total);
+        const allJobs = Object.values(data.myJobs as Record<string, UpcomingJob[]>).flat();
+        setAcceptedCount(allJobs.length);
+
+        // Extract upcoming jobs (pending or in_progress, sorted by date)
+        const upcoming = allJobs
+          .filter((j: UpcomingJob) => j.status !== "completed" && j.status !== "cancelled")
+          .slice(0, 5);
+        setUpcomingJobs(upcoming);
       }
     } catch {
       // Silently fail
@@ -184,18 +134,10 @@ export default function DriverDashboardPage() {
     }
   }, [status, fetchClockStatus, fetchJobCounts, fetchEarnings]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  };
-
-  const formatDuration = (minutes: number): string => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h === 0) return `${m}m`;
-    return `${h}h ${m}m`;
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchClockStatus(), fetchJobCounts(), fetchEarnings()]);
+    setRefreshing(false);
   };
 
   const formatDate = (dateStr: string): string => {
@@ -212,186 +154,285 @@ export default function DriverDashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="relative flex min-h-[calc(100vh-52px)] flex-col items-center justify-center px-6 py-8">
-        <div className="fixed inset-0 bg-gradient-to-b from-emerald-50 via-white to-slate-50 -z-10" />
-        <div className="animate-pulse space-y-6 w-full max-w-sm">
-          <div className="h-8 w-48 bg-slate-200 rounded mx-auto" />
-          <div className="grid grid-cols-2 gap-4">
+      <div className="flex min-h-[calc(100vh-56px)] items-center justify-center">
+        <div className="animate-pulse space-y-6 w-full max-w-4xl px-6">
+          <div className="h-8 w-48 bg-slate-200 rounded" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-28 bg-slate-200 rounded-2xl" />
+              <div key={i} className="h-24 bg-slate-200 rounded-xl" />
             ))}
           </div>
-          <div className="h-40 bg-slate-200 rounded-lg" />
+          <div className="h-64 bg-slate-200 rounded-xl" />
         </div>
       </div>
     );
   }
 
-  const isClockedIn = clockStatus?.isClockedIn ?? false;
-  const todayMinutes =
-    (clockStatus?.todaySummary?.hoursWorked ?? 0) * 60 +
-    (clockStatus?.todaySummary?.minutesWorked ?? 0);
-  const todayJobsCompleted = clockStatus?.todaySummary?.jobsCompleted ?? 0;
+  // Derive stats from existing data
+  const weekEarnings = earningsData?.totalEarnings ?? 0;
+  const todayJobs = clockStatus?.todaySummary?.jobsCompleted ?? 0;
+  const completedJobs = earningsData?.totalJobs ?? 0;
 
   return (
-    <div className="relative flex min-h-[calc(100vh-52px)] flex-col items-center px-6 py-8">
-      {/* Background: subtle gradient */}
-      <div className="fixed inset-0 bg-gradient-to-b from-emerald-50 via-white to-slate-50 -z-10" />
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
-      {/* Watermark logo */}
-      <div className="fixed inset-0 flex items-center justify-center -z-[5] pointer-events-none">
-        <div className="relative h-64 w-64 opacity-[0.03]">
-          <Image src="/logo.png" alt="" fill className="object-contain" />
+      {/* Page header */}
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
+            Driver Dashboard
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Welcome back, {session?.user?.username || "Driver"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="w-full max-w-sm">
-        {/* Greeting */}
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-semibold text-slate-800">
-            {getGreeting()}, {session?.user?.username || "Driver"} 👋
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {isClockedIn ? "You're on the clock" : "Ready to start your shift?"}
-          </p>
+      {/* Stats row (4 cards) */}
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+
+        {/* Earnings - primary accent card */}
+        <div className="rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 p-4 shadow-sm shadow-emerald-500/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">This Week</p>
+          {earningsLoading ? (
+            <div className="mt-1.5 h-8 w-20 bg-emerald-500/40 rounded animate-pulse" />
+          ) : (
+            <p className="mt-1.5 text-2xl font-bold text-white">${weekEarnings}</p>
+          )}
+          <p className="text-xs text-emerald-200 mt-1">Earnings</p>
         </div>
 
-        {/* App Button Grid */}
-        <div className="grid grid-cols-2 gap-4 w-full">
-          {/* My Jobs - PRIMARY */}
-          <AppButton
-            href="/driver/jobs"
-            icon={Briefcase}
-            label="My Jobs"
-            badge={acceptedCount ?? undefined}
-            variant="accent"
-            loading={acceptedCount === null}
-          />
-
-          {/* Job History */}
-          <AppButton href="/driver/history" icon={Clock} label="History" />
-
-          {/* Settings */}
-          <AppButton href="/driver/settings" icon={Settings} label="Settings" />
-
-          {/* Payments */}
-          <AppButton
-            href="/driver/payments"
-            icon={DollarSignIcon}
-            label="Payments"
-          />
+        {/* Today's jobs */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Today</p>
+          <p className="mt-1.5 text-2xl font-bold text-slate-900">{todayJobs}</p>
+          <p className="text-xs text-slate-400 mt-1">Jobs completed</p>
         </div>
 
-        {/* ═══ EARNINGS SECTION ═══ */}
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        {/* Active jobs */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Active</p>
+          <p className="mt-1.5 text-2xl font-bold text-slate-900">{acceptedCount ?? 0}</p>
+          <p className="text-xs text-slate-400 mt-1">Assigned jobs</p>
+        </div>
+
+        {/* Completed */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Completed</p>
+          {earningsLoading ? (
+            <div className="mt-1.5 h-8 w-12 bg-slate-200 rounded animate-pulse" />
+          ) : (
+            <p className="mt-1.5 text-2xl font-bold text-slate-900">{completedJobs}</p>
+          )}
+          <p className="text-xs text-slate-400 mt-1">This week</p>
+        </div>
+
+      </div>
+
+      {/* Two-column layout: job list + sidebar */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+
+        {/* LEFT: Upcoming jobs panel (takes 2/3 width on lg) */}
+        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-semibold text-slate-800">
-                Earnings
-              </span>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-sm font-semibold text-slate-900">Upcoming Jobs</h2>
             </div>
-            <span className="text-xs text-slate-400">This Week</span>
+            <Link
+              href="/driver/jobs"
+              className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-500 transition"
+            >
+              View all <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
 
-          {earningsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+          {/* Job rows */}
+          {upcomingJobs.length === 0 ? (
+            <div className="py-12 text-center">
+              <Briefcase className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-500">No upcoming jobs</p>
+              <p className="text-xs text-slate-400 mt-1">New jobs will appear here once assigned.</p>
             </div>
-          ) : earningsData && (earningsData.totalJobs > 0 || earningsData.pendingEarnings > 0) ? (
-            <>
-              {/* Stats row */}
-              <div className="flex items-center gap-4 px-4 py-3">
-                <div>
-                  <span className="text-xl font-bold text-emerald-600">
-                    ${earningsData.totalEarnings}
-                  </span>
-                </div>
-                <div className="h-6 w-px bg-slate-200" />
-                <div className="text-sm text-slate-600">
-                  {earningsData.totalJobs} job{earningsData.totalJobs !== 1 ? "s" : ""}
-                </div>
-                {earningsData.pendingEarnings > 0 && (
-                  <>
-                    <div className="h-6 w-px bg-slate-200" />
-                    <div className="text-sm text-slate-400">
-                      ${earningsData.pendingEarnings} pending
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Recent transactions */}
-              {earningsData.earnings.length > 0 && (
-                <div className="border-t border-slate-100">
-                  {earningsData.earnings.slice(0, 3).map((txn, idx) => (
-                    <div
-                      key={txn._id}
-                      className={`flex items-center justify-between px-4 py-2.5 ${
-                        idx < Math.min(earningsData.earnings.length, 3) - 1
-                          ? "border-b border-slate-50"
-                          : ""
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-slate-700">
-                          {txn.vehicleRegistration}
-                          {txn.garageName && (
-                            <span className="text-slate-400">
-                              {" "}
-                              &middot; {txn.garageName}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="ml-3 flex items-center gap-2 text-right">
-                        <span className="text-sm font-medium text-emerald-600">
-                          ${txn.payout}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {formatDate(txn.completedAt)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
           ) : (
-            <div className="py-6 text-center">
-              <p className="text-sm text-slate-400">No earnings this week</p>
+            <div className="divide-y divide-slate-100">
+              {upcomingJobs.map((job) => (
+                <div key={job._id} className="flex items-start gap-4 px-4 py-4 hover:bg-slate-50 transition">
+
+                  {/* Time */}
+                  <div className="min-w-[48px] text-center pt-0.5">
+                    <p className="text-xs font-bold text-slate-800 leading-none">
+                      {job.pickupTimeSlot || job.pickupTime?.split(",")[0] || "--"}
+                    </p>
+                  </div>
+
+                  {/* Route indicator */}
+                  <div className="flex flex-col items-center gap-0.5 pt-1">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white ring-offset-1 ring-offset-emerald-100" />
+                    <div className="w-px flex-1 bg-slate-200 min-h-[28px]" />
+                    <div className="h-2 w-2 rounded-sm border-2 border-emerald-500 bg-white" />
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        job.status === "in_progress"
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                          : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                      }`}>
+                        {job.status === "in_progress" ? "In Progress" : "Pending"}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {job.customerName || job.userName || "Customer"}
+                    </p>
+                    <p className="text-xs text-slate-400 truncate mt-0.5">{job.vehicleRegistration}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                      <p className="text-xs text-slate-500 truncate">{job.pickupAddress || "Pickup address"}</p>
+                      <p className="text-xs text-slate-500 truncate">{job.garageAddress || "Drop-off address"}</p>
+                    </div>
+                  </div>
+
+                  {/* Action */}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {(job.payout || job.paymentAmount) && (
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-emerald-600">
+                          ${job.payout || ((job.paymentAmount ?? 0) / 100).toFixed(0)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">payout</p>
+                      </div>
+                    )}
+                    <Link
+                      href="/driver/jobs"
+                      className="text-xs font-semibold text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 rounded-md px-2.5 py-1 transition"
+                    >
+                      View
+                    </Link>
+                  </div>
+
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Summary Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-slate-500">
-            Today:{" "}
-            <span className="font-medium text-slate-700">
-              {formatDuration(todayMinutes)}
-            </span>
-            {todayJobsCompleted > 0 && (
-              <span>
-                {" "}
-                • {todayJobsCompleted} job
-                {todayJobsCompleted !== 1 ? "s" : ""} completed
-              </span>
-            )}
-          </p>
-        </div>
+        {/* RIGHT: Sidebar (takes 1/3 width on lg) */}
+        <div className="flex flex-col gap-4">
 
-        {/* Sign Out Button */}
-        <div className="mt-6 text-center">
+          {/* Quick links */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Quick Access</p>
+            <div className="space-y-2">
+              {[
+                { href: "/driver/jobs",     label: "My Jobs",     icon: Briefcase,  meta: `${acceptedCount ?? 0} assigned` },
+                { href: "/driver/payments", label: "Payments",    icon: DollarSign,  meta: `$${weekEarnings} this week` },
+                { href: "/driver/history",  label: "Job History",  icon: Clock,       meta: `${completedJobs} completed` },
+                { href: "/driver/settings", label: "Settings",     icon: Settings,    meta: "" },
+              ].map(({ href, label, icon: Icon, meta }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="group flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 hover:border-emerald-200 hover:bg-emerald-50 transition"
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white border border-slate-200 group-hover:border-emerald-300 group-hover:bg-emerald-50 transition">
+                    <Icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600 transition" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-700 group-hover:text-emerald-800">{label}</p>
+                    {meta && <p className="text-xs text-slate-400">{meta}</p>}
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-400 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Earnings summary card */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Earnings Summary</p>
+              <Link href="/driver/payments" className="text-xs font-semibold text-emerald-600 hover:text-emerald-500">
+                Details
+              </Link>
+            </div>
+            {earningsLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between py-1">
+                    <div className="h-3 w-16 bg-slate-200 rounded animate-pulse" />
+                    <div className="h-4 w-12 bg-slate-200 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="text-xs text-slate-500">This Week</span>
+                  <span className="text-sm font-bold text-slate-800">${weekEarnings}</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="text-xs text-slate-500">Pending</span>
+                  <span className="text-sm font-bold text-slate-800">${earningsData?.pendingEarnings ?? 0}</span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-xs text-slate-500">Jobs</span>
+                  <span className="text-sm font-bold text-slate-800">{completedJobs}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Recent earnings */}
+          {earningsData && earningsData.earnings.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <p className="text-sm font-semibold text-slate-900">Recent Earnings</p>
+                </div>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {earningsData.earnings.slice(0, 3).map((txn) => (
+                  <div key={txn._id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-slate-700">
+                        {txn.vehicleRegistration}
+                        {txn.garageName && (
+                          <span className="text-slate-400"> &middot; {txn.garageName}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="ml-3 flex items-center gap-2 text-right">
+                      <span className="text-sm font-medium text-emerald-600">${txn.payout}</span>
+                      <span className="text-xs text-slate-400">{formatDate(txn.completedAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sign out */}
           <button
             onClick={() => signOut({ callbackUrl: "/driver/login" })}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
           >
             <LogOut className="h-4 w-4" />
             Sign Out
           </button>
+
         </div>
       </div>
     </div>

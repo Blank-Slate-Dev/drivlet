@@ -1,7 +1,7 @@
 // src/app/driver/layout.tsx
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -9,11 +9,13 @@ import Image from "next/image";
 import {
   Car,
   Loader2,
-  Home,
   Briefcase,
   Clock,
   DollarSign,
   Settings,
+  LayoutDashboard,
+  LogOut,
+  Home,
 } from "lucide-react";
 
 interface ClockStatus {
@@ -136,7 +138,7 @@ export default function DriverLayout({
     }
   };
 
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
   if (isAuthPage) {
     return <>{children}</>;
@@ -175,31 +177,48 @@ export default function DriverLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Slim Top Bar */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50">
-        <div className="flex items-center justify-between px-4 py-2.5">
-          {/* Left: Clock Status Pill with Toggle */}
-          <div className="flex items-center gap-2">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-0 sm:px-6 lg:px-8 h-14">
+
+          {/* Left: Logo + portal badge + clock toggle */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative h-9 w-28 sm:h-10 sm:w-32">
+                <Image
+                  src="/logo.png"
+                  alt="drivlet"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </Link>
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 tracking-wide uppercase">
+              <Car className="h-3 w-3" />
+              Driver Portal
+            </span>
+
+            {/* Clock toggle */}
             {clockStatus && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-2">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
                   }`}
                 />
                 <span
-                  className={`text-xs font-medium ${
+                  className={`text-xs font-medium hidden sm:inline ${
                     isClockedIn ? "text-emerald-700" : "text-slate-500"
                   }`}
                 >
                   {isClockedIn ? "Active" : "Offline"}
                 </span>
                 {isClockedIn && (
-                  <span className="text-xs text-emerald-600">
+                  <span className="text-xs text-emerald-600 hidden sm:inline">
                     {formatElapsed(elapsedSeconds)}
                   </span>
                 )}
-                {/* iOS-style Toggle */}
                 <button
                   onClick={handleClockToggle}
                   disabled={clockLoading || !clockStatus.canAcceptJobs}
@@ -217,83 +236,50 @@ export default function DriverLayout({
             )}
           </div>
 
-          {/* Center: Logo */}
-          <Link href="/driver/dashboard" className="absolute left-1/2 -translate-x-1/2">
-            <div className="relative h-8 w-28">
-              <Image
-                src="/logo.png"
-                alt="drivlet"
-                fill
-                className="object-contain"
-                priority
-              />
+          {/* Centre: Nav links */}
+          <nav className="hidden md:flex items-center gap-1">
+            {[
+              { href: "/driver/dashboard", label: "Dashboard", icon: LayoutDashboard },
+              { href: "/driver/jobs",      label: "Jobs",      icon: Briefcase },
+              { href: "/driver/payments",  label: "Payments",  icon: DollarSign },
+              { href: "/driver/history",   label: "History",   icon: Clock },
+              { href: "/driver/settings",  label: "Settings",  icon: Settings },
+            ].map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  isActive(href)
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Right: User info + sign out */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-sm font-semibold text-slate-800 leading-none">
+                {session?.user?.username || "Driver"}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">Driver</p>
             </div>
-          </Link>
-
-          {/* Right: Desktop Nav + Avatar */}
-          <div className="flex items-center gap-4">
-            {/* Desktop navigation */}
-            <nav className="hidden md:flex items-center gap-4">
-              <Link
-                href="/driver/dashboard"
-                className={`text-sm transition ${
-                  isActive("/driver/dashboard")
-                    ? "text-emerald-700 font-medium"
-                    : "text-slate-600 hover:text-emerald-600"
-                }`}
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/driver/jobs"
-                className={`text-sm transition ${
-                  isActive("/driver/jobs")
-                    ? "text-emerald-700 font-medium"
-                    : "text-slate-600 hover:text-emerald-600"
-                }`}
-              >
-                Jobs
-              </Link>
-              <Link
-                href="/driver/payments"
-                className={`text-sm transition ${
-                  isActive("/driver/payments")
-                    ? "text-emerald-700 font-medium"
-                    : "text-slate-600 hover:text-emerald-600"
-                }`}
-              >
-                Payments
-              </Link>
-              <Link
-                href="/driver/history"
-                className={`text-sm transition ${
-                  isActive("/driver/history")
-                    ? "text-emerald-700 font-medium"
-                    : "text-slate-600 hover:text-emerald-600"
-                }`}
-              >
-                History
-              </Link>
-              <Link
-                href="/driver/settings"
-                className={`text-sm transition ${
-                  isActive("/driver/settings")
-                    ? "text-emerald-700 font-medium"
-                    : "text-slate-600 hover:text-emerald-600"
-                }`}
-              >
-                Settings
-              </Link>
-            </nav>
-
-            {/* Avatar */}
-            <Link
-              href="/driver/settings"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700"
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold">
+              {(session?.user?.username || "D")[0].toUpperCase()}
+            </div>
+            <button
+              onClick={() => signOut({ callbackUrl: "/driver/login" })}
+              className="hidden md:flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
             >
-              {session.user.username?.charAt(0).toUpperCase() || "D"}
-            </Link>
+              <LogOut className="h-3.5 w-3.5" />
+              Sign Out
+            </button>
           </div>
+
         </div>
       </header>
 
