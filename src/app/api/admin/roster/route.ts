@@ -1,5 +1,6 @@
 // src/app/api/admin/roster/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { Types } from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { requireAdmin } from '@/lib/admin';
 import Roster from '@/models/Roster';
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const driverProfileIds = activeUsers
       .map((u) => u.driverProfile)
-      .filter(Boolean);
+      .filter((id): id is Types.ObjectId => id !== undefined);
 
     const drivers = await Driver.find({
       _id: { $in: driverProfileIds },
