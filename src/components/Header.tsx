@@ -74,7 +74,7 @@ export default function Header() {
 
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
-          <a href="#how-it-works" className="transition hover:text-emerald-600">
+          <a href="/#how-it-works" className="transition hover:text-emerald-600">
             How it works
           </a>
           {/* HIDDEN FOR PHASE 1 - Services section hidden
@@ -87,7 +87,7 @@ export default function Header() {
             Pricing
           </a>
           */}
-          <a href="#faq" className="transition hover:text-emerald-600">
+          <a href="/#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
           <Link href="/contact" className="transition hover:text-emerald-600">
@@ -387,7 +387,7 @@ export default function Header() {
             <div className="absolute left-0 right-0 top-full z-50 border-b border-slate-200 bg-white px-4 py-4 shadow-lg md:hidden">
               <nav className="flex flex-col gap-3">
                 <a
-                  href="#how-it-works"
+                  href="/#how-it-works"
                   className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >
@@ -412,7 +412,7 @@ export default function Header() {
                 </a>
                 */}
                 <a
-                  href="#faq"
+                  href="/#faq"
                   className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
                   onClick={() => setShowMobileMenu(false)}
                 >

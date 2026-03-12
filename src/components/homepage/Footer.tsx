@@ -55,12 +55,12 @@ export default function Footer() {
             <h4 className="mb-4 font-semibold">Meet drivlet</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
               <li>
-                <a href="#how-it-works" className="transition hover:text-white">
+                <a href="/#how-it-works" className="transition hover:text-white">
                   How it works
                 </a>
               </li>
               <li>
-                <a href="#faq" className="transition hover:text-white">
+                <a href="/#faq" className="transition hover:text-white">
                   FAQ
                 </a>
               </li>
