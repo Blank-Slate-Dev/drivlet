@@ -10,7 +10,7 @@ import { sendBookingStageEmail } from '@/lib/email';
 import { sendBookingConfirmationSMS } from '@/lib/sms';
 
 export async function POST(request: NextRequest) {
-  console.log('📥 Create booking after payment request received');
+  console.log('Processing post-payment booking creation');
 
   let body;
   try {
@@ -33,8 +33,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔍 Verifying payment intent:', paymentIntentId);
-
     // Verify the payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
@@ -46,8 +44,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ Payment verified. Status:', paymentIntent.status);
-
     const metadata = paymentIntent.metadata;
 
     if (!metadata || !metadata.customerEmail) {
@@ -57,8 +53,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log('📦 Metadata:', metadata);
 
     // Create booking atomically to prevent race conditions with webhook
     const client = new MongoClient(process.env.MONGODB_URI!);
@@ -98,9 +92,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Generate unique tracking code
-      console.log('🔑 Generating tracking code...');
       const trackingCode = await generateUniqueTrackingCode();
-      console.log('✅ Tracking code generated:', trackingCode);
 
       // Build the confirmation message
       let confirmationMessage = hasExisting
@@ -164,9 +156,6 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       };
 
-      console.log('📝 Creating booking atomically with paymentId:', paymentIntentId);
-      console.log(`📍 Distance zone: ${distanceZone} (${distanceKm} km, surcharge: $${(distanceSurcharge / 100).toFixed(2)})`);
-
       // Use findOneAndUpdate with upsert to atomically create or find existing booking
       // This prevents race conditions between webhook and this fallback endpoint
       const result = await db.collection('bookings').findOneAndUpdate(
@@ -184,16 +173,12 @@ export async function POST(request: NextRequest) {
       const wasInserted = booking?.trackingCode === trackingCode;
 
       if (!wasInserted) {
-        console.log('ℹ️ Booking already exists (from webhook):', booking?._id);
         return NextResponse.json({
           success: true,
           message: 'Booking already exists',
           bookingId: booking?._id,
         });
       }
-
-      console.log('✅✅✅ BOOKING CREATED SUCCESSFULLY!');
-      console.log('🆔 Booking ID:', booking?._id);
 
       // Send booking confirmation email (awaited so Vercel doesn't kill the function early)
       try {
@@ -205,9 +190,7 @@ export async function POST(request: NextRequest) {
           trackingCode,
           garageName: bookingData.garageName || undefined,
         });
-        if (emailSent) {
-          console.log("📧 Booking confirmation email sent to:", bookingData.userEmail);
-        } else {
+        if (!emailSent) {
           console.warn("⚠️ Email not sent (Mailjet may not be configured)");
         }
       } catch (emailErr) {
@@ -229,9 +212,7 @@ export async function POST(request: NextRequest) {
             bookingData.pickupTime,
             trackingUrl
           );
-          if (smsSent) {
-            console.log("📱 Booking confirmation SMS sent to:", bookingData.guestPhone);
-          }
+          void smsSent;
         } catch (smsErr) {
           console.error("❌ Failed to send confirmation SMS:", smsErr);
         }
