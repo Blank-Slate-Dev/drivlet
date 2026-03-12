@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   LogOut,
   Home,
+  CalendarDays,
 } from "lucide-react";
 
 interface ClockStatus {
@@ -240,6 +241,7 @@ export default function DriverLayout({
           <nav className="hidden md:flex items-center gap-1">
             {[
               { href: "/driver/dashboard", label: "Dashboard", icon: LayoutDashboard },
+              { href: "/driver/roster",    label: "Roster",    icon: CalendarDays },
               { href: "/driver/jobs",      label: "Jobs",      icon: Briefcase },
               { href: "/driver/payments",  label: "Payments",  icon: DollarSign },
               { href: "/driver/history",   label: "History",   icon: Clock },
@@ -296,6 +298,15 @@ export default function DriverLayout({
         >
           <Home className="h-5 w-5" />
           <span className="text-[10px] font-medium">Home</span>
+        </Link>
+        <Link
+          href="/driver/roster"
+          className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${
+            isActive("/driver/roster") ? "text-emerald-600" : "text-slate-400"
+          }`}
+        >
+          <CalendarDays className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Roster</span>
         </Link>
         <Link
           href="/driver/jobs"

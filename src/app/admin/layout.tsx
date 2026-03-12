@@ -22,6 +22,7 @@ import {
   Truck,
   AlertTriangle,
   Shield,
+  CalendarDays,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -56,6 +57,7 @@ export default function AdminLayout({
     { href: "/admin/incidents", label: "Incidents", icon: Shield },
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/drivers", label: "Drivers", icon: Car },
+    { href: "/admin/roster", label: "Roster", icon: CalendarDays },
     { href: "/admin/garages", label: "Garages", icon: Building2 },
     { href: "/admin/payment-disputes", label: "Payment Disputes", icon: AlertTriangle },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
