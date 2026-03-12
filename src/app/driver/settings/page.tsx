@@ -11,7 +11,6 @@ import {
   User,
   Phone,
   MapPin,
-  Clock,
   Car,
   Shield,
   CreditCard,
@@ -65,16 +64,7 @@ interface DriverSettings {
     registrationExpiry: string;
   } | null;
   hasOwnVehicle: boolean;
-  availability: {
-    [key: string]: {
-      available: boolean;
-      startTime: string;
-      endTime: string;
-    };
-  };
-  maxJobsPerDay: number;
   preferredAreas: string[];
-  isActive: boolean;
   canAcceptJobs: boolean;
   status: string;
   onboardingStatus: string;
@@ -87,7 +77,6 @@ interface DriverSettings {
   memberSince: string;
 }
 
-const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "NT", "ACT"];
 
 export default function DriverSettingsPage() {
@@ -112,11 +101,8 @@ export default function DriverSettingsPage() {
     state: "NSW",
     postcode: "",
   });
-  const [availability, setAvailability] = useState<DriverSettings["availability"]>({});
-  const [maxJobsPerDay, setMaxJobsPerDay] = useState(10);
   const [preferredAreas, setPreferredAreas] = useState<string[]>([]);
   const [preferredAreasInput, setPreferredAreasInput] = useState("");
-  const [isActive, setIsActive] = useState(true);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -132,10 +118,7 @@ export default function DriverSettingsPage() {
       setSettings(data);
       setPhone(data.profile.phone);
       setAddress(data.profile.address);
-      setAvailability(data.availability);
-      setMaxJobsPerDay(data.maxJobsPerDay);
       setPreferredAreas(data.preferredAreas || []);
-      setIsActive(data.isActive);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch settings");
     } finally {
@@ -159,10 +142,7 @@ export default function DriverSettingsPage() {
         body: JSON.stringify({
           phone,
           address,
-          availability,
-          maxJobsPerDay,
           preferredAreas,
-          isActive,
         }),
       });
 
@@ -286,27 +266,12 @@ export default function DriverSettingsPage() {
     setPreferredAreas(preferredAreas.filter((_, i) => i !== index));
   };
 
-  const handleAvailabilityChange = (
-    day: string,
-    field: "available" | "startTime" | "endTime",
-    value: boolean | string
-  ) => {
-    setAvailability((prev) => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: value,
-      },
-    }));
-  };
-
   const handleSignOut = () => {
     signOut({ callbackUrl: "/driver/login" });
   };
 
   const sections = [
     { key: "profile", label: "Profile", icon: User },
-    { key: "availability", label: "Availability", icon: Clock },
     { key: "preferences", label: "Preferences", icon: Settings },
     { key: "account", label: "Account", icon: Shield },
   ];
@@ -346,7 +311,7 @@ export default function DriverSettingsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
         <p className="text-sm text-slate-500">
-          Manage your profile, availability, and preferences
+          Manage your profile and preferences
         </p>
       </div>
 
@@ -647,111 +612,6 @@ export default function DriverSettingsPage() {
                     </p>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Availability Section */}
-          {activeSection === "availability" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              {/* Active Status */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Available for Jobs</h3>
-                    <p className="text-sm text-slate-500">
-                      Toggle off when you&apos;re not available to accept new jobs
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsActive(!isActive)}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition ${
-                      isActive ? "bg-emerald-500" : "bg-slate-300"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
-                        isActive ? "translate-x-7" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Weekly Schedule */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="mb-4 text-lg font-semibold text-slate-900">Weekly Schedule</h3>
-                <div className="space-y-3">
-                  {DAYS.map((day) => (
-                    <div
-                      key={day}
-                      className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-100 p-3"
-                    >
-                      <div className="w-24">
-                        <span className="text-sm font-medium capitalize text-slate-700">
-                          {day}
-                        </span>
-                      </div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={availability[day]?.available ?? true}
-                          onChange={(e) =>
-                            handleAvailabilityChange(day, "available", e.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="text-sm text-slate-600">Available</span>
-                      </label>
-                      {availability[day]?.available && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="time"
-                            value={availability[day]?.startTime || "07:00"}
-                            onChange={(e) =>
-                              handleAvailabilityChange(day, "startTime", e.target.value)
-                            }
-                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
-                          />
-                          <span className="text-slate-400">to</span>
-                          <input
-                            type="time"
-                            value={availability[day]?.endTime || "18:00"}
-                            onChange={(e) =>
-                              handleAvailabilityChange(day, "endTime", e.target.value)
-                            }
-                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Max Jobs */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="mb-4 text-lg font-semibold text-slate-900">Daily Job Limit</h3>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={maxJobsPerDay}
-                    onChange={(e) => setMaxJobsPerDay(parseInt(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="w-16 rounded-lg bg-slate-100 px-3 py-2 text-center font-semibold text-slate-900">
-                    {maxJobsPerDay}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  Maximum number of jobs you can accept per day
-                </p>
               </div>
             </motion.div>
           )}
