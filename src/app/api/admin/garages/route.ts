@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Garage, { GarageStatus } from "@/models/Garage";
 import User from "@/models/User";
 import { requireAdmin } from "@/lib/admin";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET /api/admin/garages - Get all garage applications
 export async function GET(request: Request) {
@@ -62,6 +63,11 @@ export async function PATCH(request: Request) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
   }
 
   let body;

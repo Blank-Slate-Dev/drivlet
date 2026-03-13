@@ -688,8 +688,6 @@ export async function POST(request: NextRequest) {
         await booking.save();
         notifyBookingUpdate(booking);
 
-        console.log('Payment link created:', checkoutSession.url);
-
         // Send email notification (async)
         sendServicePaymentEmail(
           booking.userEmail,

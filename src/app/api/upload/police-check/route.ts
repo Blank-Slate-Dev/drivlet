@@ -81,7 +81,9 @@ export async function POST(request: Request) {
     }
 
     // Upload to Vercel Blob
-    const filename = `police-checks/${driver._id}/${Date.now()}-${file.name}`;
+    const randomId = crypto.randomUUID();
+    const extension = file.name.split(".").pop() || "pdf";
+    const filename = `police-checks/${driver._id}/${randomId}-${Date.now()}.${extension}`;
     const blob = await put(filename, file, {
       access: "public",
     });

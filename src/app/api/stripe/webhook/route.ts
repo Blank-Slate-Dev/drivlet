@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
       console.log('💳 payment_intent.succeeded received');
       console.log('📦 Payment Intent ID:', paymentIntent.id);
-      console.log('📦 Metadata:', JSON.stringify(metadata, null, 2));
+      console.log('📦 Webhook received for booking:', metadata?.bookingId, 'type:', metadata?.type);
 
       if (!metadata || !metadata.customerEmail) {
         console.log('⚠️ PaymentIntent without booking metadata, skipping');
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
 
       console.log('💳 checkout.session.completed received');
       console.log('📦 Session ID:', session.id);
-      console.log('📦 Metadata:', JSON.stringify(metadata, null, 2));
+      console.log('📦 Webhook received for booking:', metadata?.bookingId, 'type:', metadata?.type);
 
       if (!metadata) {
         console.error('⚠️ No metadata in checkout session');

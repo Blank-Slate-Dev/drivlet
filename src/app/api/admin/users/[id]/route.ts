@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { requireAdmin } from "@/lib/admin";
+import { requireValidOrigin } from "@/lib/validation";
 
 // PATCH /api/admin/users/[id] - Update user account status (suspend/reactivate)
 export async function PATCH(
@@ -13,6 +14,11 @@ export async function PATCH(
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
   }
 
   try {
@@ -162,6 +168,11 @@ export async function DELETE(
     return adminCheck.response;
   }
 
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     await connectDB();
     const { id } = await params;
@@ -225,7 +236,7 @@ export async function DELETE(
 
     await user.save();
 
-    console.log(`[ADMIN ACTION] User ${user._id} (${user.email}) soft deleted by admin ${adminUserId}`);
+    console.log(`[ADMIN ACTION] User ${user._id} soft deleted by admin ${adminUserId}`);
 
     return NextResponse.json({
       success: true,

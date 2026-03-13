@@ -41,7 +41,9 @@
       "Bash(npm run lint)",
       "Bash(npx tsx:*)",
       "Bash(awk '/export async function PATCH/,/try/' /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/garage/profile/route.ts)",
-      "Bash(openssl rand -base64 32)"
+      "Bash(openssl rand -base64 32)",
+      "Bash(npm audit:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

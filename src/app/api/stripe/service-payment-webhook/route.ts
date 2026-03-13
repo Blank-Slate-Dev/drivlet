@@ -8,12 +8,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
 
 async function updateBookingAsPaid(
   bookingId: string,
   paymentId: string,
   amount: number
 ) {
+  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    console.error("Invalid bookingId in Stripe metadata:", bookingId);
+    return false;
+  }
+
   const client = new MongoClient(process.env.MONGODB_URI!);
 
   try {
@@ -102,10 +108,15 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingId = metadata.bookingId;
-    
+
     if (!bookingId) {
       console.error('❌ No bookingId in checkout session metadata');
       return NextResponse.json({ error: 'No booking ID' }, { status: 400 });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      console.error("Invalid bookingId in Stripe metadata:", bookingId);
+      return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
     }
 
     console.log('💳 Service payment completed via checkout!');
@@ -133,10 +144,15 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingId = metadata.bookingId;
-    
+
     if (!bookingId) {
       console.error('❌ No bookingId in payment intent metadata');
       return NextResponse.json({ error: 'No booking ID' }, { status: 400 });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      console.error("Invalid bookingId in Stripe metadata:", bookingId);
+      return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
     }
 
     console.log('💳 Service payment completed via embedded!');

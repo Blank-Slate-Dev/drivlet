@@ -34,7 +34,7 @@ export const authOptions: NextAuthOptions = {
             user.autoLoginTokenExpires = undefined;
             await user.save();
 
-            console.log("Auto-login successful for:", user.email);
+            console.log("Auto-login successful for user ID:", user._id);
 
             // Fetch additional data for drivers
             let onboardingStatus: OnboardingStatus | undefined;

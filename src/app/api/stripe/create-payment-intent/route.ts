@@ -27,8 +27,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.log('📦 Received booking data:', JSON.stringify(body, null, 2));
-
     const {
       customerName,
       customerEmail,

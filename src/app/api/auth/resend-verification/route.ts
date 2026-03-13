@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         user.username,
         verificationCode
       );
-      console.log("Verification code resent to:", user.email);
+      console.log("Verification code resent for user ID:", user._id);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
       return NextResponse.json(

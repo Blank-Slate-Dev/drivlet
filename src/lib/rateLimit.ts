@@ -84,19 +84,16 @@ export function checkRateLimit(
 
 /**
  * Get client identifier from request
- * Uses X-Forwarded-For for proxied requests (Vercel)
+ * Prefers x-real-ip (set by Vercel infrastructure, cannot be spoofed by clients)
  */
 export function getClientIdentifier(request: Request): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    // Get the first IP (client IP)
-    return xff.split(",")[0].trim();
-  }
-
+  // x-real-ip is set by Vercel infrastructure and cannot be spoofed by clients
   const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp;
-  }
+  if (realIp) return realIp;
+
+  // Fallback: x-forwarded-for (first IP in chain, but can be spoofed)
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
 
   return "unknown";
 }

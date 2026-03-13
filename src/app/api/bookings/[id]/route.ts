@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import mongoose from "mongoose";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -23,6 +24,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     await connectDB();
     const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
+    }
 
     const booking = await Booking.findById(id).lean();
 
