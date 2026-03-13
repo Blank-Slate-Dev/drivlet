@@ -195,14 +195,14 @@ export default function DriverLayout({
                 />
               </div>
             </Link>
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 tracking-wide uppercase">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 tracking-wide uppercase whitespace-nowrap">
               <Car className="h-3 w-3" />
               Driver Portal
             </span>
 
             {/* Clock toggle */}
             {clockStatus && (
-              <div className="flex items-center gap-2 ml-2">
+              <div className="flex items-center gap-2 ml-3">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
@@ -238,7 +238,7 @@ export default function DriverLayout({
           </div>
 
           {/* Centre: Nav links */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-2">
             {[
               { href: "/driver/dashboard", label: "Dashboard", icon: LayoutDashboard },
               { href: "/driver/roster",    label: "Roster",    icon: CalendarDays },
@@ -250,7 +250,7 @@ export default function DriverLayout({
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition ${
                   isActive(href)
                     ? "bg-emerald-50 text-emerald-700"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
@@ -263,7 +263,7 @@ export default function DriverLayout({
           </nav>
 
           {/* Right: User info + sign out */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="hidden sm:block text-right">
               <p className="text-sm font-semibold text-slate-800 leading-none">
                 {session?.user?.username || "Driver"}
@@ -273,12 +273,13 @@ export default function DriverLayout({
             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold">
               {(session?.user?.username || "D")[0].toUpperCase()}
             </div>
+            <div className="mx-1 h-6 w-px bg-slate-200 hidden md:block" />
             <button
               onClick={() => signOut({ callbackUrl: "/driver/login" })}
-              className="hidden md:flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+              className="hidden md:flex items-center gap-1.5 rounded-md border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
             >
               <LogOut className="h-3.5 w-3.5" />
-              Sign Out
+              <span className="whitespace-nowrap">Sign Out</span>
             </button>
           </div>
 
