@@ -1,7 +1,7 @@
 // src/app/quotes/request/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -75,7 +75,7 @@ export default function RequestQuotePage() {
   const [copied, setCopied] = useState(false);
 
   // Update form data when session loads
-  useState(() => {
+  useEffect(() => {
     if (session?.user) {
       setFormData((prev) => ({
         ...prev,
@@ -83,7 +83,7 @@ export default function RequestQuotePage() {
         customerEmail: session.user.email || prev.customerEmail,
       }));
     }
-  });
+  }, [session]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

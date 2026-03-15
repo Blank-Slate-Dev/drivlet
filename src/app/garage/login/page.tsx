@@ -212,16 +212,6 @@ export default function GarageLoginPage() {
                 </button>
               </form>
 
-              <div className="mt-8 pt-6 border-t border-slate-200">
-                <p className="text-center text-slate-500 text-sm mb-4">New to drivlet?</p>
-                <Link
-                  href="/garage/register"
-                  className="w-full flex justify-center items-center gap-2 py-3 px-4 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-emerald-300 transition"
-                >
-                  <Building2 className="h-5 w-5" />
-                  Register your garage
-                </Link>
-              </div>
             </div>
 
             {/* Customer login link */}

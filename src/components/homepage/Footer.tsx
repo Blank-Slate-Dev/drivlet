@@ -182,12 +182,6 @@ export default function Footer() {
                   <h4 className="mb-2 font-semibold">Partners</h4>
                   <div className="space-y-2">
                     <Link
-                      href="/garage/join"
-                      className="block text-sm text-emerald-200 transition hover:text-white"
-                    >
-                      Join as a Garage →
-                    </Link>
-                    <Link
                       href="/driver/join"
                       className="block text-sm text-emerald-200 transition hover:text-white"
                     >

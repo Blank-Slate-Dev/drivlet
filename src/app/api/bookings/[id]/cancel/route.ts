@@ -9,6 +9,7 @@ import Booking from "@/models/Booking";
 import { calculateRefund, formatRefundAmount } from "@/lib/refund-calculator";
 import { processRefund } from "@/lib/stripe-refund";
 import { requireValidOrigin } from "@/lib/validation";
+import { notifyGarageOfCancellation } from "@/lib/notifications";
 
 interface CancelRequestBody {
   cancellationReason?: string;
@@ -216,10 +217,15 @@ export async function POST(
 
     // Notify assigned garage if applicable
     if (booking.assignedGarageId) {
-      // TODO: Send notification to garage
-      console.log(
-        `Garage ${booking.assignedGarageId} should be notified of cancellation`
-      );
+      try {
+        await notifyGarageOfCancellation(booking.assignedGarageId, {
+          _id: booking._id,
+          vehicleRegistration: booking.vehicleRegistration,
+          userName: booking.userName || booking.userEmail,
+        });
+      } catch (notifyErr) {
+        console.error("Failed to notify garage of cancellation:", notifyErr);
+      }
     }
 
     // Prepare response

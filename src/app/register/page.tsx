@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   ShieldCheck,
   Car,
-  Wrench,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -34,9 +33,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const passwordChecks = {
-    length: password.length >= 6,
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
     match: password === confirmPassword && confirmPassword.length > 0,
   };
+  const isPasswordStrong = passwordChecks.length && passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number && passwordChecks.special;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,8 +65,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (!isPasswordStrong) {
+      setError("Password must be at least 8 characters with uppercase, lowercase, number, and special character");
       return;
     }
 
@@ -239,7 +243,7 @@ export default function RegisterPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     className="w-full pl-12 pr-12 py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                    placeholder="At least 6 characters"
+                    placeholder="Min 8 chars, upper, lower, number, special"
                   />
                   <button
                     type="button"
@@ -293,20 +297,29 @@ export default function RegisterPage() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
-                  className="space-y-2 text-sm"
+                  className="space-y-1.5 text-sm"
                 >
-                  <div
-                    className={`flex items-center gap-2 ${
-                      passwordChecks.length ? "text-emerald-600" : "text-slate-400"
-                    }`}
-                  >
-                    <CheckCircle2
-                      className={`h-4 w-4 ${
-                        passwordChecks.length ? "opacity-100" : "opacity-40"
+                  {[
+                    { check: passwordChecks.length, label: "At least 8 characters" },
+                    { check: passwordChecks.uppercase, label: "One uppercase letter" },
+                    { check: passwordChecks.lowercase, label: "One lowercase letter" },
+                    { check: passwordChecks.number, label: "One number" },
+                    { check: passwordChecks.special, label: "One special character" },
+                  ].map(({ check, label }) => (
+                    <div
+                      key={label}
+                      className={`flex items-center gap-2 ${
+                        check ? "text-emerald-600" : "text-slate-400"
                       }`}
-                    />
-                    At least 6 characters
-                  </div>
+                    >
+                      <CheckCircle2
+                        className={`h-4 w-4 ${
+                          check ? "opacity-100" : "opacity-40"
+                        }`}
+                      />
+                      {label}
+                    </div>
+                  ))}
                   {confirmPassword.length > 0 && (
                     <div
                       className={`flex items-center gap-2 ${
@@ -376,17 +389,10 @@ export default function RegisterPage() {
                 Want to join as a partner?
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Link href="/driver/join" className={secondaryButtonClass}>
-                  <Car className="h-4 w-4" />
-                  Become a driver
-                </Link>
-
-                <Link href="/garage/join" className={secondaryButtonClass}>
-                  <Wrench className="h-4 w-4" />
-                  Register a garage
-                </Link>
-              </div>
+              <Link href="/driver/join" className={secondaryButtonClass}>
+                <Car className="h-4 w-4" />
+                Become a driver
+              </Link>
             </div>
           </div>
 

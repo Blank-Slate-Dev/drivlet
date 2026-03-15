@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
             : 0
           : 0,
         distanceKm,
-        isAvailable: true, // TODO: Check actual availability
+        isAvailable: true, // Defaults to available for approved garages; no scheduling system yet
         totalBookingsCompleted: bookingStat?.completedBookings || 0,
       };
     });

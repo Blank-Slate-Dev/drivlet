@@ -43,7 +43,19 @@
       "Bash(awk '/export async function PATCH/,/try/' /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/garage/profile/route.ts)",
       "Bash(openssl rand -base64 32)",
       "Bash(npm audit:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(for file in /c/PantyPost/drivlet/src/app/api/**/*route.ts)",
+      "Bash(do if ! grep -q \"export async function GET\\\\|export async function POST\\\\|export async function PUT\\\\|export async function DELETE\\\\|export async function PATCH\" \"$file\")",
+      "Bash(then echo \"NO HANDLERS: $file\" fi done)",
+      "Bash(while read endpoint)",
+      "Bash(do)",
+      "Bash(path=\"/c/PantyPost/drivlet/src/app/api$endpoint\")",
+      "Bash(if [ -f \"$path/route.ts\" ])",
+      "Bash(then)",
+      "Bash(:)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -19,162 +19,12 @@ import {
   Loader2,
 } from "lucide-react";
 
-// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-// import { CreditCard, Star, Plus, X } from "lucide-react";
-// import { loadStripe } from "@stripe/stripe-js";
-// import {
-//   Elements,
-//   PaymentElement,
-//   useStripe,
-//   useElements,
-// } from "@stripe/react-stripe-js";
-//
-// const stripePromise = loadStripe(
-//   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-// );
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface EmergencyContact {
   name: string;
   relationship: string;
   phone: string;
 }
-
-// REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-/*
-interface PaymentMethod {
-  stripePaymentMethodId: string;
-  brand: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
-  isDefault: boolean;
-  addedAt: string;
-}
-
-// ─── Card Brand Icons (text-based) ───────────────────────────────────────────
-function getCardBrandDisplay(brand: string): { label: string; color: string } {
-  switch (brand.toLowerCase()) {
-    case "visa":
-      return { label: "Visa", color: "text-blue-600" };
-    case "mastercard":
-      return { label: "Mastercard", color: "text-orange-600" };
-    case "amex":
-      return { label: "Amex", color: "text-indigo-600" };
-    default:
-      return { label: brand.charAt(0).toUpperCase() + brand.slice(1), color: "text-slate-600" };
-  }
-}
-
-// ─── Add Card Form (wrapped in Elements) ─────────────────────────────────────
-function AddCardForm({
-  onSuccess,
-  onCancel,
-}: {
-  onSuccess: () => void;
-  onCancel: () => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setSaving(true);
-    setError("");
-
-    try {
-      const { error: submitError } = await elements.submit();
-      if (submitError) {
-        setError(submitError.message || "Failed to submit card details");
-        setSaving(false);
-        return;
-      }
-
-      const { error: confirmError, setupIntent } =
-        await stripe.confirmSetup({
-          elements,
-          redirect: "if_required",
-        });
-
-      if (confirmError) {
-        setError(confirmError.message || "Failed to save card");
-        setSaving(false);
-        return;
-      }
-
-      if (setupIntent?.payment_method) {
-        // Save to our database
-        const res = await fetch("/api/customer/payment-methods", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paymentMethodId: setupIntent.payment_method,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setError(data.error || "Failed to save card");
-          setSaving(false);
-          return;
-        }
-
-        onSuccess();
-      }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement
-        options={{
-          layout: "tabs",
-        }}
-      />
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving || !stripe || !elements}
-          className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Save Card"
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className="px-4 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition disabled:opacity-50"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
-*/
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AccountPage() {
@@ -205,16 +55,6 @@ export default function AccountPage() {
   const [ecError, setEcError] = useState("");
   const [ecSuccess, setEcSuccess] = useState("");
 
-  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-  // const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  // const [pmLoading, setPmLoading] = useState(true);
-  // const [showAddCard, setShowAddCard] = useState(false);
-  // const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
-  // const [pmError, setPmError] = useState("");
-  // const [pmSuccess, setPmSuccess] = useState("");
-  // const [deletingPm, setDeletingPm] = useState<string | null>(null);
-  // const [settingDefault, setSettingDefault] = useState<string | null>(null);
-
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -228,8 +68,6 @@ export default function AccountPage() {
     if (status === "authenticated") {
       fetchProfile();
       fetchEmergencyContact();
-      // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-      // fetchPaymentMethods();
     }
   }, [status]);
 
@@ -265,22 +103,6 @@ export default function AccountPage() {
       console.error("Failed to fetch emergency contact");
     }
   };
-
-  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-  // const fetchPaymentMethods = useCallback(async () => {
-  //   try {
-  //     setPmLoading(true);
-  //     const res = await fetch("/api/customer/payment-methods");
-  //     if (res.ok) {
-  //       const data = await res.json();
-  //       setPaymentMethods(data.paymentMethods || []);
-  //     }
-  //   } catch {
-  //     console.error("Failed to fetch payment methods");
-  //   } finally {
-  //     setPmLoading(false);
-  //   }
-  // }, []);
 
   // ─── Profile Photo Handlers ─────────────────────────────────────────
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -457,92 +279,6 @@ export default function AccountPage() {
     }
   };
 
-  // REMOVED: Payment method storage handled by Stripe directly - 2026-02-25
-  /*
-  const handleAddCard = async () => {
-    setPmError("");
-
-    try {
-      const res = await fetch("/api/customer/setup-intent", {
-        method: "POST",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setPmError(data.error || "Failed to initialize card setup");
-        return;
-      }
-
-      setSetupClientSecret(data.clientSecret);
-      setShowAddCard(true);
-    } catch {
-      setPmError("Something went wrong. Please try again.");
-    }
-  };
-
-  const handleCardAdded = () => {
-    setShowAddCard(false);
-    setSetupClientSecret(null);
-    setPmSuccess("Card saved successfully");
-    fetchPaymentMethods();
-  };
-
-  const handleDeletePm = async (paymentMethodId: string) => {
-    setPmError("");
-    setDeletingPm(paymentMethodId);
-
-    try {
-      const res = await fetch("/api/customer/payment-methods", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethodId }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setPmError(data.error || "Failed to remove card");
-        return;
-      }
-
-      setPmSuccess("Card removed");
-      fetchPaymentMethods();
-    } catch {
-      setPmError("Something went wrong. Please try again.");
-    } finally {
-      setDeletingPm(null);
-    }
-  };
-
-  const handleSetDefault = async (paymentMethodId: string) => {
-    setPmError("");
-    setSettingDefault(paymentMethodId);
-
-    try {
-      const res = await fetch("/api/customer/payment-methods", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethodId }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setPmError(data.error || "Failed to set default card");
-        return;
-      }
-
-      setPmSuccess("Default card updated");
-      fetchPaymentMethods();
-    } catch {
-      setPmError("Something went wrong. Please try again.");
-    } finally {
-      setSettingDefault(null);
-    }
-  };
-  */
-
   // ─── Password Handler ──────────────────────────────────────────────
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,8 +290,8 @@ export default function AccountPage() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters");
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setError("Password must be at least 8 characters with uppercase, lowercase, number, and special character");
       return;
     }
 
@@ -920,186 +656,6 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* REMOVED: Payment method storage handled by Stripe directly - 2026-02-25 */}
-          {/* Payment Methods Card UI has been commented out. Stripe handles card management natively. */}
-          {/*
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div className="p-6">
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CreditCard className="h-5 w-5 text-slate-600" />
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      Payment Methods
-                    </h2>
-                  </div>
-                  {!showAddCard && paymentMethods.length < 5 && (
-                    <button
-                      type="button"
-                      onClick={handleAddCard}
-                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Card
-                    </button>
-                  )}
-                </div>
-                <p className="text-sm text-slate-500">
-                  Manage your saved payment methods.
-                </p>
-              </div>
-
-              {pmSuccess && (
-                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-emerald-700 text-sm">{pmSuccess}</p>
-                </div>
-              )}
-
-              {pmError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-red-600 text-sm">{pmError}</p>
-                </div>
-              )}
-
-              {pmLoading ? (
-                <div className="text-center py-6 text-slate-500 text-sm">
-                  Loading cards...
-                </div>
-              ) : paymentMethods.length === 0 && !showAddCard ? (
-                <div className="text-center py-8">
-                  <CreditCard className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500 text-sm mb-4">
-                    No saved payment methods
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAddCard}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Your First Card
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {paymentMethods.map((pm) => {
-                    const brand = getCardBrandDisplay(pm.brand);
-                    return (
-                      <div
-                        key={pm.stripePaymentMethodId}
-                        className="flex items-center justify-between p-4 border border-slate-200 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="h-8 w-8 text-slate-400" />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-sm font-semibold ${brand.color}`}
-                              >
-                                {brand.label}
-                              </span>
-                              <span className="text-sm text-slate-700">
-                                &bull;&bull;&bull;&bull; {pm.last4}
-                              </span>
-                              {pm.isDefault && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                                  <Star className="h-3 w-3" />
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              Expires {String(pm.expMonth).padStart(2, "0")}/
-                              {pm.expYear}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!pm.isDefault && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleSetDefault(pm.stripePaymentMethodId)
-                              }
-                              disabled={
-                                settingDefault === pm.stripePaymentMethodId
-                              }
-                              className="text-xs text-slate-500 hover:text-emerald-600 font-medium disabled:opacity-50"
-                            >
-                              {settingDefault === pm.stripePaymentMethodId
-                                ? "..."
-                                : "Set Default"}
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeletePm(pm.stripePaymentMethodId)
-                            }
-                            disabled={
-                              deletingPm === pm.stripePaymentMethodId
-                            }
-                            className="p-1.5 text-slate-400 hover:text-red-600 transition disabled:opacity-50"
-                          >
-                            {deletingPm === pm.stripePaymentMethodId ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {showAddCard && setupClientSecret && (
-                <div className="mt-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Add New Card
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddCard(false);
-                        setSetupClientSecret(null);
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <Elements
-                    stripe={stripePromise}
-                    options={{
-                      clientSecret: setupClientSecret,
-                      appearance: {
-                        theme: "stripe",
-                        variables: {
-                          colorPrimary: "#059669",
-                          borderRadius: "8px",
-                        },
-                      },
-                    }}
-                  >
-                    <AddCardForm
-                      onSuccess={handleCardAdded}
-                      onCancel={() => {
-                        setShowAddCard(false);
-                        setSetupClientSecret(null);
-                      }}
-                    />
-                  </Elements>
-                </div>
-              )}
-            </div>
-          </div>
-          */}
-
           {/* ── Change Password Card ───────────────────────────────── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="p-6">
@@ -1162,7 +718,7 @@ export default function AccountPage() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
                     className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                    placeholder="At least 6 characters"
+                    placeholder="Min 8 chars, upper, lower, number, special"
                   />
                 </div>
 
