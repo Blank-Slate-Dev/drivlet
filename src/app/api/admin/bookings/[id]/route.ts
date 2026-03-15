@@ -5,6 +5,7 @@ import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
+import { requireValidOrigin } from "@/lib/validation";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -137,6 +138,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return adminCheck.response;
   }
 
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     await connectDB();
     const { id } = await params;
@@ -232,6 +238,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  const originCheckPatch = requireValidOrigin(request);
+  if (!originCheckPatch.valid) {
+    return NextResponse.json({ error: originCheckPatch.error }, { status: 403 });
   }
 
   try {
@@ -359,6 +370,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  const originCheckDel = requireValidOrigin(request);
+  if (!originCheckDel.valid) {
+    return NextResponse.json({ error: originCheckDel.error }, { status: 403 });
   }
 
   try {

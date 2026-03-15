@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { requireAdmin } from '@/lib/admin';
 import Roster from '@/models/Roster';
+import { requireValidOrigin } from '@/lib/validation';
 
 // PATCH /api/admin/roster/[id]
 export async function PATCH(
@@ -11,6 +12,11 @@ export async function PATCH(
 ) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) return adminCheck.response;
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
 
   const { id } = await params;
 

@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     const severity = searchParams.get("severity");
     const type = searchParams.get("type");
     const search = searchParams.get("search");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const skip = (page - 1) * limit;
 
     const query: Record<string, unknown> = {};
@@ -28,9 +28,10 @@ export async function GET(request: NextRequest) {
     if (severity && severity !== "all") query.severity = severity;
     if (type && type !== "all") query.incidentType = type;
     if (search) {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { title: { $regex: escapedSearch, $options: "i" } },
+        { description: { $regex: escapedSearch, $options: "i" } },
       ];
     }
 

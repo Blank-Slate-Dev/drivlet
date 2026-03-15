@@ -3,11 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { put } from "@vercel/blob";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/incidents/upload — Upload incident photo
 export async function POST(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -29,11 +35,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large. Max 10MB." }, { status: 400 });
     }
 
-    // Validate type
+    // Validate MIME type
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/heic"];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: "Invalid file type. Allowed: JPEG, PNG, HEIC" },
+        { status: 400 }
+      );
+    }
+
+    // Validate magic bytes to prevent disguised file uploads
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    // HEIC files use ISO Base Media File Format (ftyp box)
+    const isHEIC = buffer.length >= 12 &&
+      buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70;
+
+    if (!isJPEG && !isPNG && !isHEIC) {
+      return NextResponse.json(
+        { error: "File content does not match an allowed image format" },
         { status: 400 }
       );
     }

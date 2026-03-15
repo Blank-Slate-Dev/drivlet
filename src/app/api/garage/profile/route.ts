@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET - Fetch garage profile for current user
 export async function GET() {
@@ -43,6 +44,11 @@ export async function GET() {
 
 // PATCH - Update garage profile
 export async function PATCH(request: Request) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
 

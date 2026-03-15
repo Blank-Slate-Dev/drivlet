@@ -5,9 +5,14 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { authOptions } from "@/lib/auth";
-import { validatePassword } from "@/lib/validation";
+import { validatePassword, requireValidOrigin } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
 

@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Driver from "@/models/Driver";
 import User from "@/models/User";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,11 @@ export async function GET() {
 
 // PATCH /api/driver/settings - Update driver settings
 export async function PATCH(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
 

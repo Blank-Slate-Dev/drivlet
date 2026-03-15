@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
+import { requireValidOrigin } from "@/lib/validation";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -13,6 +14,11 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) return adminCheck.response;
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
 
   try {
     const { id } = await params;
@@ -129,6 +135,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) return adminCheck.response;
+
+  const originCheckDel = requireValidOrigin(request);
+  if (!originCheckDel.valid) {
+    return NextResponse.json({ error: originCheckDel.error }, { status: 403 });
+  }
 
   try {
     const { id } = await params;

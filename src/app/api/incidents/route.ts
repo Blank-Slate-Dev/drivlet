@@ -6,11 +6,17 @@ import { connectDB } from "@/lib/mongodb";
 import Incident from "@/models/Incident";
 import Booking from "@/models/Booking";
 import User from "@/models/User";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/incidents — Create a new incident report
 export async function POST(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

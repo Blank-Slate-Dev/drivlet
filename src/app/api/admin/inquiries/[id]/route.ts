@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Contact from "@/models/Contact";
+import { requireValidOrigin } from "@/lib/validation";
 
 export async function GET(
   request: NextRequest,
@@ -53,6 +54,11 @@ export async function PATCH(
         { error: "Unauthorized" },
         { status: 401 }
       );
+    }
+
+    const originCheck = requireValidOrigin(request);
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403 });
     }
 
     const { id } = await params;
@@ -119,6 +125,11 @@ export async function DELETE(
         { error: "Unauthorized" },
         { status: 401 }
       );
+    }
+
+    const originCheckDel = requireValidOrigin(request);
+    if (!originCheckDel.valid) {
+      return NextResponse.json({ error: originCheckDel.error }, { status: 403 });
     }
 
     const { id } = await params;

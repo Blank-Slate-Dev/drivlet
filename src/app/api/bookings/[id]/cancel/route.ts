@@ -16,6 +16,7 @@ interface CancelRequestBody {
   // Guest cancellation verification
   guestEmail?: string;
   guestPhone?: string;
+  guestVehicleRego?: string; // Required when phone not on booking
 }
 
 export async function POST(
@@ -71,14 +72,16 @@ export async function POST(
       const bookingEmail = booking.userEmail?.toLowerCase();
       const bookingPhone = booking.guestPhone?.replace(/[\s\-()]/g, "");
 
-      // Verify email match (required) and phone match (when phone was recorded)
+      // Verify email match (required) and second factor (phone or vehicle rego)
       if (providedEmail && bookingEmail && providedEmail === bookingEmail) {
         if (bookingPhone) {
           // Phone exists on booking — require phone match too
           isGuestOwner = !!(providedPhone && providedPhone === bookingPhone);
         } else {
-          // No phone on booking — email-only verification is sufficient
-          isGuestOwner = true;
+          // No phone on booking — require vehicle registration as second factor
+          const providedRego = body.guestVehicleRego?.toUpperCase().replace(/\s/g, "");
+          const bookingRego = booking.vehicleRegistration?.toUpperCase().replace(/\s/g, "");
+          isGuestOwner = !!(providedRego && bookingRego && providedRego === bookingRego);
         }
       }
 
@@ -87,7 +90,7 @@ export async function POST(
         return NextResponse.json(
           {
             error:
-              "Guest verification failed. Please provide the email and phone number used when booking.",
+              "Guest verification failed. Please provide the email and phone number (or vehicle registration) used when booking.",
           },
           { status: 403 }
         );

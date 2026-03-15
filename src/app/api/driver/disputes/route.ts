@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/mongodb";
 import PaymentDispute from "@/models/PaymentDispute";
 import User from "@/models/User";
 import Booking from "@/models/Booking";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,11 @@ export async function GET() {
 
 // POST /api/driver/disputes - Create a new dispute
 export async function POST(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   try {
     const session = await getServerSession(authOptions);
 

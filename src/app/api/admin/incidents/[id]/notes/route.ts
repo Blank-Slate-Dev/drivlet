@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 import { connectDB } from "@/lib/mongodb";
 import Incident from "@/models/Incident";
 import mongoose from "mongoose";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,11 @@ export async function POST(
 ) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) return adminCheck.response;
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
 
   try {
     await connectDB();

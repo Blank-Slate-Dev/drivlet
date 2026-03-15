@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET /api/account/profile - Get current user's profile
 export async function GET() {
@@ -43,6 +44,11 @@ export async function GET() {
 
 // PATCH /api/account/profile - Update current user's profile
 export async function PATCH(request: NextRequest) {
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {

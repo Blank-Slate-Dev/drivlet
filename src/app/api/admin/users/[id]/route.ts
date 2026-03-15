@@ -24,6 +24,11 @@ export async function PATCH(
   try {
     await connectDB();
     const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+    }
+
     const adminUserId = adminCheck.session.user.id;
     const body = await request.json();
     const { action, reason, suspendedUntil, notes } = body;
@@ -176,6 +181,11 @@ export async function DELETE(
   try {
     await connectDB();
     const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+    }
+
     const adminUserId = adminCheck.session.user.id;
 
     const user = await User.findById(id);

@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET /api/admin/bookings - Get all bookings with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -16,12 +17,14 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const status = searchParams.get("status");
     const search = searchParams.get("search");
     const stage = searchParams.get("stage");
-    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const ALLOWED_SORT_FIELDS = ["createdAt", "updatedAt", "pickupTime", "status", "vehicleRegistration", "userName"];
+    const sortByParam = searchParams.get("sortBy") || "createdAt";
+    const sortBy = ALLOWED_SORT_FIELDS.includes(sortByParam) ? sortByParam : "createdAt";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? 1 : -1;
 
     // Build query
@@ -153,6 +156,11 @@ export async function POST(request: NextRequest) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
   }
 
   try {

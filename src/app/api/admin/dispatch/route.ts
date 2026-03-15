@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
+import { requireValidOrigin } from "@/lib/validation";
 
 // GET /api/admin/dispatch - Fetch dispatch board data
 export async function GET() {
@@ -180,6 +181,11 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin();
     if (!auth.authorized) return auth.response;
+
+    const originCheck = requireValidOrigin(request);
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403 });
+    }
 
     let body;
     try {
@@ -377,6 +383,11 @@ export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireAdmin();
     if (!auth.authorized) return auth.response;
+
+    const originCheckDel = requireValidOrigin(request);
+    if (!originCheckDel.valid) {
+      return NextResponse.json({ error: originCheckDel.error }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get("bookingId");

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { connectDB } from "@/lib/mongodb";
 import PaymentDispute from "@/models/PaymentDispute";
+import { requireValidOrigin } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status"); // open, under_review, resolved, dismissed
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const skip = (page - 1) * limit;
 
     // Build query
@@ -77,6 +78,11 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const adminCheck = await requireAdmin();
   if (!adminCheck.authorized) return adminCheck.response;
+
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
 
   try {
     await connectDB();
