@@ -28,8 +28,21 @@ interface AddressAutocompleteProps {
   onSelect?: (details: PlaceDetails) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** User's detected latitude — if provided, used as bias center */
+  userLat?: number | null;
+  /** User's detected longitude — if provided, used as bias center */
+  userLng?: number | null;
+  /**
+   * @deprecated Use userLat/userLng instead. Kept for backwards compatibility.
+   * If true and no userLat/userLng provided, falls back to dual-region search.
+   */
   biasToNewcastle?: boolean;
 }
+
+// Drivlet service region centers
+const NEWCASTLE = { lat: -32.9283, lng: 151.7817 };
+const CANBERRA = { lat: -35.2809, lng: 149.1300 };
+const BIAS_RADIUS = 60000; // 60km radius
 
 export default function AddressAutocomplete({
   value,
@@ -37,6 +50,8 @@ export default function AddressAutocomplete({
   onSelect,
   placeholder = 'Start typing your address...',
   disabled = false,
+  userLat,
+  userLng,
   biasToNewcastle = true,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +83,9 @@ export default function AddressAutocomplete({
     moved: boolean;
     prediction: Prediction | null;
   } | null>(null);
+
+  // Determine if we have a user-provided location
+  const hasUserLocation = userLat != null && userLng != null;
 
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
@@ -132,7 +150,6 @@ export default function AddressAutocomplete({
 
     const initServices = () => {
       try {
-        // Check if the new Places API is available
         if (google.maps.places && google.maps.places.Place) {
           setIsReady(true);
           setError(null);
@@ -193,7 +210,35 @@ export default function AddressAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions using new API
+  // Helper: run a single autocomplete search for a given bias center
+  const fetchForRegion = async (
+    input: string,
+    center: { lat: number; lng: number }
+  ): Promise<Prediction[]> => {
+    const request: google.maps.places.AutocompleteRequest = {
+      input,
+      includedRegionCodes: ['au'],
+      includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
+      locationBias: {
+        center,
+        radius: BIAS_RADIUS,
+      },
+    };
+
+    const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+
+    if (!suggestions || suggestions.length === 0) return [];
+
+    return suggestions
+      .filter((s) => s.placePrediction)
+      .map((s) => ({
+        placeId: s.placePrediction!.placeId,
+        mainText: s.placePrediction!.mainText?.text || '',
+        secondaryText: s.placePrediction!.secondaryText?.text || '',
+      }));
+  };
+
+  // Search for predictions
   const searchPredictions = useCallback(
     async (input: string) => {
       if (!isReady || !input.trim()) {
@@ -211,40 +256,61 @@ export default function AddressAutocomplete({
       setIsSearching(true);
 
       try {
-        // Newcastle area center coordinates
-        const newcastleCenter = { lat: -32.9283, lng: 151.7817 };
+        let results: Prediction[];
 
-        const request: google.maps.places.AutocompleteRequest = {
-          input,
-          includedRegionCodes: ['au'],
-          includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
-          locationBias: biasToNewcastle
-            ? {
-                center: newcastleCenter,
-                radius: 50000, // 50km radius around Newcastle
+        if (hasUserLocation) {
+          // We have the user's detected location — single search biased to them
+          results = await fetchForRegion(input, { lat: userLat!, lng: userLng! });
+        } else if (biasToNewcastle) {
+          // No user location — search both service regions in parallel and merge
+          const [newcastleResults, canberraResults] = await Promise.allSettled([
+            fetchForRegion(input, NEWCASTLE),
+            fetchForRegion(input, CANBERRA),
+          ]);
+
+          const merged: Prediction[] = [];
+          const seen = new Set<string>();
+
+          // Newcastle results first (primary region)
+          if (newcastleResults.status === 'fulfilled') {
+            for (const p of newcastleResults.value) {
+              if (!seen.has(p.placeId)) {
+                seen.add(p.placeId);
+                merged.push(p);
               }
-            : undefined,
-        };
+            }
+          }
 
-        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+          // Then Canberra results
+          if (canberraResults.status === 'fulfilled') {
+            for (const p of canberraResults.value) {
+              if (!seen.has(p.placeId)) {
+                seen.add(p.placeId);
+                merged.push(p);
+              }
+            }
+          }
 
-        if (suggestions && suggestions.length > 0) {
-          const mapped: Prediction[] = suggestions
-            .filter((suggestion) => suggestion.placePrediction)
-            .map((suggestion) => {
-              const prediction = suggestion.placePrediction!;
-              return {
-                placeId: prediction.placeId,
-                mainText: prediction.mainText?.text || '',
-                secondaryText: prediction.secondaryText?.text || '',
-              };
-            });
-          setPredictions(mapped);
+          results = merged.slice(0, 5);
         } else {
-          setPredictions([]);
+          // No bias at all — plain Australian search
+          const request: google.maps.places.AutocompleteRequest = {
+            input,
+            includedRegionCodes: ['au'],
+            includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
+          };
+          const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+          results = (suggestions || [])
+            .filter((s) => s.placePrediction)
+            .map((s) => ({
+              placeId: s.placePrediction!.placeId,
+              mainText: s.placePrediction!.mainText?.text || '',
+              secondaryText: s.placePrediction!.secondaryText?.text || '',
+            }));
         }
+
+        setPredictions(results);
       } catch (err) {
-        // Don't log abort errors
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Autocomplete error:', err);
         }
@@ -253,7 +319,7 @@ export default function AddressAutocomplete({
         setIsSearching(false);
       }
     },
-    [biasToNewcastle, isReady]
+    [biasToNewcastle, isReady, hasUserLocation, userLat, userLng]
   );
 
   // Debounced search

@@ -25,8 +25,48 @@ interface GarageAutocompleteProps {
   onSelect?: (details: GarageDetails) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** User's detected latitude — if provided, used as bias center */
+  userLat?: number | null;
+  /** User's detected longitude — if provided, used as bias center */
+  userLng?: number | null;
+  /**
+   * @deprecated Use userLat/userLng instead. Kept for backwards compatibility.
+   * If true and no userLat/userLng provided, falls back to dual-region search.
+   */
   biasToNewcastle?: boolean;
 }
+
+// Drivlet service region centers
+const NEWCASTLE = { lat: -32.9283, lng: 151.7817 };
+const CANBERRA = { lat: -35.2809, lng: 149.1300 };
+const BIAS_RADIUS = 60000; // 60km radius
+
+// Known suburbs for sorting — Newcastle/Hunter + Canberra/ACT regions
+const KNOWN_SUBURBS: string[] = [
+  // Newcastle & Hunter Valley
+  'hamilton', 'newcastle', 'maitland', 'charlestown', 'kotara', 'lambton',
+  'mayfield', 'wallsend', 'jesmond', 'waratah', 'broadmeadow', 'adamstown',
+  'merewether', 'cooks hill', 'islington', 'cardiff', 'belmont', 'warners bay',
+  'toronto', 'cessnock', 'raymond terrace', 'nelson bay', 'singleton', 'muswellbrook',
+  'beresfield', 'thornton', 'rutherford', 'kurri kurri', 'morisset', 'swansea',
+  'lake macquarie', 'edgeworth', 'maryland', 'fletcher', 'minmi', 'elermore vale',
+  'new lambton', 'georgetown', 'wickham', 'carrington', 'stockton', 'sandgate',
+  'shortland', 'tighes hill', 'bar beach', 'the junction', 'cooranbong',
+  'speers point', 'boolaroo', 'teralba', 'argenton', 'cameron park', 'east maitland',
+  // Canberra & ACT
+  'canberra', 'belconnen', 'woden', 'tuggeranong', 'gungahlin', 'weston creek',
+  'mitchell', 'fyshwick', 'phillip', 'kingston', 'braddon', 'dickson',
+  'civic', 'manuka', 'griffith', 'deakin', 'barton', 'yarralumla',
+  'curtin', 'garran', 'hughes', 'lyons', 'wanniassa', 'kambah',
+  'greenway', 'isabella plains', 'gordon', 'banks', 'conder',
+  'hume', 'pialligo', 'majura', 'symonston', 'queanbeyan',
+  'jerrabomberra', 'kaleen', 'giralang', 'evatt', 'spence',
+  'scullin', 'page', 'hawker', 'weetangera', 'cook',
+  'lyneham', 'turner', 'acton', 'reid', 'ainslie',
+  'hackett', 'downer', 'watson', 'mitchell', 'casey',
+  'ngunnawal', 'amaroo', 'harrison', 'franklin', 'forde',
+  'bonner', 'jacka', 'moncrieff', 'throsby', 'taylor',
+];
 
 export default function GarageAutocomplete({
   value,
@@ -34,6 +74,8 @@ export default function GarageAutocomplete({
   onSelect,
   placeholder = 'Search for a garage...',
   disabled = false,
+  userLat,
+  userLng,
   biasToNewcastle = true,
 }: GarageAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +104,9 @@ export default function GarageAutocomplete({
     moved: boolean;
     prediction: Prediction | null;
   } | null>(null);
+
+  // Determine if we have a user-provided location
+  const hasUserLocation = userLat != null && userLng != null;
 
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
@@ -186,7 +231,83 @@ export default function GarageAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Search for predictions using new API with dual search
+  // Helper: run dual type search (car_repair + car_dealer) for a given bias center
+  const fetchForRegion = async (
+    input: string,
+    center: { lat: number; lng: number }
+  ): Promise<Prediction[]> => {
+    const bias = { center, radius: BIAS_RADIUS };
+
+    const carRepairRequest: google.maps.places.AutocompleteRequest = {
+      input,
+      includedRegionCodes: ['au'],
+      includedPrimaryTypes: ['car_repair'],
+      locationBias: bias,
+    };
+
+    const carDealerRequest: google.maps.places.AutocompleteRequest = {
+      input,
+      includedRegionCodes: ['au'],
+      includedPrimaryTypes: ['car_dealer'],
+      locationBias: bias,
+    };
+
+    const [repairResults, dealerResults] = await Promise.allSettled([
+      google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(carRepairRequest),
+      google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(carDealerRequest),
+    ]);
+
+    const results: Prediction[] = [];
+    const seen = new Set<string>();
+
+    for (const result of [repairResults, dealerResults]) {
+      if (result.status === 'fulfilled' && result.value.suggestions) {
+        for (const suggestion of result.value.suggestions) {
+          if (suggestion.placePrediction && !seen.has(suggestion.placePrediction.placeId)) {
+            seen.add(suggestion.placePrediction.placeId);
+            results.push({
+              placeId: suggestion.placePrediction.placeId,
+              mainText: suggestion.placePrediction.mainText?.text || '',
+              secondaryText: suggestion.placePrediction.secondaryText?.text || '',
+            });
+          }
+        }
+      }
+    }
+
+    return results;
+  };
+
+  // Apply suburb-based sorting
+  const sortBySuburb = (results: Prediction[], input: string): Prediction[] => {
+    const words = input.trim().split(/\s+/);
+    if (words.length < 2) return results;
+
+    const lastWord = words[words.length - 1].toLowerCase();
+    const lastTwoWords = words.length >= 3
+      ? `${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase()
+      : null;
+
+    let suburbFilter: string | null = null;
+    if (lastTwoWords && KNOWN_SUBURBS.includes(lastTwoWords)) {
+      suburbFilter = lastTwoWords;
+    } else if (KNOWN_SUBURBS.includes(lastWord)) {
+      suburbFilter = lastWord;
+    }
+
+    if (!suburbFilter) return results;
+
+    const suburbLower = suburbFilter.toLowerCase();
+    return [...results].sort((a, b) => {
+      const aHas = a.secondaryText.toLowerCase().includes(suburbLower);
+      const bHas = b.secondaryText.toLowerCase().includes(suburbLower);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+  };
+
+  // Search for predictions
   const searchPredictions = useCallback(
     async (input: string) => {
       if (!isReady || !input.trim()) {
@@ -204,107 +325,50 @@ export default function GarageAutocomplete({
       setIsSearching(true);
 
       try {
-        // Newcastle area center coordinates
-        const newcastleCenter = { lat: -32.9283, lng: 151.7817 };
+        let allResults: Prediction[];
 
-        // Search for car repair establishments
-        const carRepairRequest: google.maps.places.AutocompleteRequest = {
-          input,
-          includedRegionCodes: ['au'],
-          includedPrimaryTypes: ['car_repair'],
-          locationBias: biasToNewcastle
-            ? {
-                center: newcastleCenter,
-                radius: 50000,
+        if (hasUserLocation) {
+          // We have the user's detected location — single dual-type search
+          allResults = await fetchForRegion(input, { lat: userLat!, lng: userLng! });
+        } else if (biasToNewcastle) {
+          // No user location — search both service regions in parallel
+          const [newcastleResults, canberraResults] = await Promise.allSettled([
+            fetchForRegion(input, NEWCASTLE),
+            fetchForRegion(input, CANBERRA),
+          ]);
+
+          const merged: Prediction[] = [];
+          const seen = new Set<string>();
+
+          // Newcastle results first
+          if (newcastleResults.status === 'fulfilled') {
+            for (const p of newcastleResults.value) {
+              if (!seen.has(p.placeId)) {
+                seen.add(p.placeId);
+                merged.push(p);
               }
-            : undefined,
-        };
-
-        // Search for car dealers (some service centers are classified this way)
-        const carDealerRequest: google.maps.places.AutocompleteRequest = {
-          input,
-          includedRegionCodes: ['au'],
-          includedPrimaryTypes: ['car_dealer'],
-          locationBias: biasToNewcastle
-            ? {
-                center: newcastleCenter,
-                radius: 50000,
-              }
-            : undefined,
-        };
-
-        // Execute both searches in parallel
-        const [carRepairResults, carDealerResults] = await Promise.allSettled([
-          google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(carRepairRequest),
-          google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(carDealerRequest),
-        ]);
-
-        const allResults: Prediction[] = [];
-        const seenPlaceIds = new Set<string>();
-
-        // Process car repair results
-        if (carRepairResults.status === 'fulfilled' && carRepairResults.value.suggestions) {
-          carRepairResults.value.suggestions.forEach((suggestion) => {
-            if (suggestion.placePrediction && !seenPlaceIds.has(suggestion.placePrediction.placeId)) {
-              seenPlaceIds.add(suggestion.placePrediction.placeId);
-              allResults.push({
-                placeId: suggestion.placePrediction.placeId,
-                mainText: suggestion.placePrediction.mainText?.text || '',
-                secondaryText: suggestion.placePrediction.secondaryText?.text || '',
-              });
             }
-          });
-        }
-
-        // Process car dealer results
-        if (carDealerResults.status === 'fulfilled' && carDealerResults.value.suggestions) {
-          carDealerResults.value.suggestions.forEach((suggestion) => {
-            if (suggestion.placePrediction && !seenPlaceIds.has(suggestion.placePrediction.placeId)) {
-              seenPlaceIds.add(suggestion.placePrediction.placeId);
-              allResults.push({
-                placeId: suggestion.placePrediction.placeId,
-                mainText: suggestion.placePrediction.mainText?.text || '',
-                secondaryText: suggestion.placePrediction.secondaryText?.text || '',
-              });
-            }
-          });
-        }
-
-        // Sort by suburb if user included a suburb name
-        const words = input.trim().split(/\s+/);
-        const knownSuburbs = [
-          'hamilton', 'newcastle', 'maitland', 'charlestown', 'kotara', 'lambton',
-          'mayfield', 'wallsend', 'jesmond', 'waratah', 'broadmeadow', 'adamstown',
-          'merewether', 'cooks hill', 'islington', 'cardiff', 'belmont', 'warners bay',
-          'toronto', 'cessnock', 'raymond terrace', 'nelson bay', 'singleton', 'muswellbrook',
-        ];
-
-        let suburbFilter: string | null = null;
-        if (words.length >= 2) {
-          const lastWord = words[words.length - 1].toLowerCase();
-          const lastTwoWords = words.length >= 3
-            ? `${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase()
-            : null;
-
-          if (lastTwoWords && knownSuburbs.includes(lastTwoWords)) {
-            suburbFilter = lastTwoWords;
-          } else if (knownSuburbs.includes(lastWord)) {
-            suburbFilter = lastWord;
           }
+
+          // Then Canberra results
+          if (canberraResults.status === 'fulfilled') {
+            for (const p of canberraResults.value) {
+              if (!seen.has(p.placeId)) {
+                seen.add(p.placeId);
+                merged.push(p);
+              }
+            }
+          }
+
+          allResults = merged;
+        } else {
+          // No bias — plain search
+          allResults = await fetchForRegion(input, NEWCASTLE);
         }
 
-        if (suburbFilter) {
-          const suburbLower = suburbFilter.toLowerCase();
-          allResults.sort((a, b) => {
-            const aHasSuburb = a.secondaryText.toLowerCase().includes(suburbLower);
-            const bHasSuburb = b.secondaryText.toLowerCase().includes(suburbLower);
-            if (aHasSuburb && !bHasSuburb) return -1;
-            if (!aHasSuburb && bHasSuburb) return 1;
-            return 0;
-          });
-        }
-
-        setPredictions(allResults.slice(0, 5));
+        // Apply suburb sorting and limit
+        const sorted = sortBySuburb(allResults, input);
+        setPredictions(sorted.slice(0, 5));
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Autocomplete error:', err);
@@ -314,7 +378,7 @@ export default function GarageAutocomplete({
         setIsSearching(false);
       }
     },
-    [biasToNewcastle, isReady]
+    [biasToNewcastle, isReady, hasUserLocation, userLat, userLng]
   );
 
   // Debounced search

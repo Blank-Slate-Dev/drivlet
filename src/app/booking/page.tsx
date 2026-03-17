@@ -29,6 +29,7 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '@/components/StripePaymentForm';
+import { useUserLocation } from '@/hooks/useUserLocation';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -88,6 +89,7 @@ const BG_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBo
 export default function BookingPage() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
+  const { location: userLocation } = useUserLocation();
 
   // ── State ───────────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState<Step>('details');
@@ -546,7 +548,8 @@ export default function BookingPage() {
               onSelect={handleAddressSelect}
               placeholder="Where should we collect your car?"
               disabled={isProcessing}
-              biasToNewcastle={true}
+              userLat={userLocation?.lat}
+              userLng={userLocation?.lng}
             />
           </div>
 
@@ -565,7 +568,8 @@ export default function BookingPage() {
                 onSelect={handleGarageSelect}
                 placeholder="e.g. Ultra Tune Jesmond"
                 disabled={isProcessing}
-                biasToNewcastle={true}
+                userLat={userLocation?.lat}
+                userLng={userLocation?.lng}
               />
             </div>
 
@@ -668,81 +672,41 @@ export default function BookingPage() {
               </div>
             </div>
 
-            {/* Live rego plate preview */}
             {regoPlate && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex justify-center"
-              >
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center">
                 <RegistrationPlate plate={regoPlate} state={regoState} />
               </motion.div>
             )}
 
-            {/* Transmission */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Transmission *</label>
               <div className="grid grid-cols-2 gap-3">
                 {(['automatic', 'manual'] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTransmissionType(t)}
-                    className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-center transition-all ${
-                      transmissionType === t
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/20'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
+                  <button key={t} type="button" onClick={() => setTransmissionType(t)} className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-center transition-all ${transmissionType === t ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}>
                     {t === 'automatic' ? 'Automatic' : 'Manual'}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Distance zone */}
             {distanceZoneInfo && selectedPlaceDetails?.lat != null && garageLat != null && garageLng != null && (
-              <div className={`rounded-xl border-2 p-4 space-y-3 ${
-                distanceZoneInfo.zone === 'green' ? 'border-emerald-300 bg-emerald-50/50'
-                : distanceZoneInfo.zone === 'yellow' ? 'border-yellow-300 bg-yellow-50/50'
-                : distanceZoneInfo.zone === 'orange' ? 'border-orange-300 bg-orange-50/50'
-                : 'border-red-300 bg-red-50/50'
-              }`}>
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <MapPin className="h-4 w-4" /> Distance Zone
-                </h3>
-                <DistanceZoneMap
-                  pickupLat={selectedPlaceDetails.lat!}
-                  pickupLng={selectedPlaceDetails.lng!}
-                  garageLat={garageLat}
-                  garageLng={garageLng}
-                  zone={distanceZoneInfo.zone}
-                />
+              <div className={`rounded-xl border-2 p-4 space-y-3 ${distanceZoneInfo.zone === 'green' ? 'border-emerald-300 bg-emerald-50/50' : distanceZoneInfo.zone === 'yellow' ? 'border-yellow-300 bg-yellow-50/50' : distanceZoneInfo.zone === 'orange' ? 'border-orange-300 bg-orange-50/50' : 'border-red-300 bg-red-50/50'}`}>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><MapPin className="h-4 w-4" /> Distance Zone</h3>
+                <DistanceZoneMap pickupLat={selectedPlaceDetails.lat!} pickupLng={selectedPlaceDetails.lng!} garageLat={garageLat} garageLng={garageLng} zone={distanceZoneInfo.zone} />
                 <div className="flex flex-wrap items-center gap-3">
                   <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${ZONE_BADGE_STYLES[distanceZoneInfo.zone]}`}>
-                    <span className={`h-2.5 w-2.5 rounded-full ${
-                      distanceZoneInfo.zone === 'green' ? 'bg-emerald-500'
-                      : distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500'
-                      : distanceZoneInfo.zone === 'orange' ? 'bg-orange-500'
-                      : 'bg-red-500'
-                    }`} />
+                    <span className={`h-2.5 w-2.5 rounded-full ${distanceZoneInfo.zone === 'green' ? 'bg-emerald-500' : distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500' : distanceZoneInfo.zone === 'orange' ? 'bg-orange-500' : 'bg-red-500'}`} />
                     {distanceZoneInfo.label}
                   </span>
                   <span className="text-sm text-slate-600">{distanceZoneInfo.distance} km</span>
-                  {distanceZoneInfo.surchargeAmount > 0 && distanceZoneInfo.zone !== 'red' && (
-                    <span className="text-sm font-semibold text-slate-800">{distanceZoneInfo.surchargeDisplay} surcharge</span>
-                  )}
+                  {distanceZoneInfo.surchargeAmount > 0 && distanceZoneInfo.zone !== 'red' && (<span className="text-sm font-semibold text-slate-800">{distanceZoneInfo.surchargeDisplay} surcharge</span>)}
                   {distanceZoneInfo.zone === 'green' && <span className="text-sm font-medium text-emerald-700">No extra fee</span>}
                 </div>
                 {isRedZone && (
                   <div className="rounded-xl border border-red-300 bg-red-100 p-3">
-                    <p className="text-sm text-red-700">
-                      <span className="font-semibold">Out of range.</span> Please choose a closer garage or{' '}
-                      <Link href="/contact" className="font-semibold underline">contact us</Link>.
-                    </p>
+                    <p className="text-sm text-red-700"><span className="font-semibold">Out of range.</span> Please choose a closer garage or{' '}<Link href="/contact" className="font-semibold underline">contact us</Link>.</p>
                   </div>
                 )}
-                {/* Zone legend */}
                 <div className="rounded-lg bg-white/70 border border-slate-200 p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Zone Guide</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -763,23 +727,9 @@ export default function BookingPage() {
             )}
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => goToStep('details')}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back
-            </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={isHighValueVehicle || isRedZone}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Continue <ArrowRight className="h-5 w-5" />
-            </button>
+            <button type="button" onClick={() => goToStep('details')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
+            <button type="button" onClick={handleContinue} disabled={isHighValueVehicle || isRedZone} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">Continue <ArrowRight className="h-5 w-5" /></button>
           </div>
         </div>
       </div>
@@ -800,23 +750,13 @@ export default function BookingPage() {
         <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl p-6 sm:p-8 space-y-6">
           {renderErrorBanner()}
 
-          {/* Service type */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Service Type *</label>
             <div className="grid gap-3">
               {SERVICE_TYPES.map((svc) => {
                 const SvcIcon = getServiceIcon(svc.value);
                 return (
-                  <button
-                    key={svc.value}
-                    type="button"
-                    onClick={() => setSelectedServiceType(svc.value)}
-                    className={`relative rounded-xl border-2 p-4 text-left transition-all ${
-                      selectedServiceType === svc.value
-                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
-                        : 'border-slate-200 bg-white hover:border-emerald-300'
-                    }`}
-                  >
+                  <button key={svc.value} type="button" onClick={() => setSelectedServiceType(svc.value)} className={`relative rounded-xl border-2 p-4 text-left transition-all ${selectedServiceType === svc.value ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-emerald-300'}`}>
                     <div className="flex items-start gap-3">
                       <SvcIcon className={`h-5 w-5 mt-0.5 ${selectedServiceType === svc.value ? 'text-emerald-600' : 'text-slate-400'}`} />
                       <div className="flex-1">
@@ -834,57 +774,22 @@ export default function BookingPage() {
             </div>
           </div>
 
-          {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              <span className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-emerald-600" /> Service Date *
-              </span>
-            </label>
-            <input
-              type="date"
-              value={serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
-              min={getMinDate()}
-              max={getMaxDate()}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-            />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5"><span className="flex items-center gap-2"><Calendar className="h-4 w-4 text-emerald-600" /> Service Date *</span></label>
+            <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} min={getMinDate()} max={getMaxDate()} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" />
             <p className="mt-1 text-xs text-slate-400">Tomorrow through 90 days from now</p>
           </div>
 
-          {/* Slots */}
           <SlotPicker label="Pickup Slot *" slots={slotAvailability?.pickupSlots || PICKUP_SLOTS.map((s: typeof PICKUP_SLOTS[number]) => ({ slot: s.value, label: s.label, booked: 0, available: 2, isFull: false }))} selected={selectedPickupSlot} onSelect={setSelectedPickupSlot} />
           <SlotPicker label="Drop-off Slot *" slots={slotAvailability?.dropoffSlots || DROPOFF_SLOTS.map((s: typeof DROPOFF_SLOTS[number]) => ({ slot: s.value, label: s.label, booked: 0, available: 2, isFull: false }))} selected={selectedDropoffSlot} onSelect={setSelectedDropoffSlot} />
 
-          {/* Service selection (Phase 2) */}
           {FEATURES.SERVICE_SELECTION && (
-            <ServiceSelector
-              selectedServices={selectedServices}
-              onServicesChange={setSelectedServices}
-              primaryCategory={primaryServiceCategory}
-              onPrimaryCategoryChange={setPrimaryServiceCategory}
-              serviceNotes={serviceNotes}
-              onServiceNotesChange={setServiceNotes}
-              disabled={isProcessing}
-            />
+            <ServiceSelector selectedServices={selectedServices} onServicesChange={setSelectedServices} primaryCategory={primaryServiceCategory} onPrimaryCategoryChange={setPrimaryServiceCategory} serviceNotes={serviceNotes} onServiceNotesChange={setServiceNotes} disabled={isProcessing} />
           )}
 
-          {/* Navigation */}
           <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => goToStep('vehicle')}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back
-            </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-            >
-              Continue <ArrowRight className="h-5 w-5" />
-            </button>
+            <button type="button" onClick={() => goToStep('vehicle')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
+            <button type="button" onClick={handleContinue} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500">Continue <ArrowRight className="h-5 w-5" /></button>
           </div>
         </div>
       </div>
@@ -901,27 +806,11 @@ export default function BookingPage() {
           ) : (
             <div className="grid gap-2">
               {slots.map((slot) => (
-                <button
-                  key={slot.slot}
-                  type="button"
-                  onClick={() => !slot.isFull && onSelect(slot.slot)}
-                  disabled={slot.isFull}
-                  className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${
-                    slot.isFull ? 'opacity-50 border-slate-200 bg-slate-50 cursor-not-allowed'
-                    : selected === slot.slot ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
-                    : 'border-slate-200 bg-white hover:border-emerald-300'
-                  }`}
-                >
+                <button key={slot.slot} type="button" onClick={() => !slot.isFull && onSelect(slot.slot)} disabled={slot.isFull} className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${slot.isFull ? 'opacity-50 border-slate-200 bg-slate-50 cursor-not-allowed' : selected === slot.slot ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-emerald-300'}`}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium text-slate-900">{slot.label}</span>
-                    </div>
+                    <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-slate-400" /><span className="font-medium text-slate-900">{slot.label}</span></div>
                     <div className="flex items-center gap-2">
-                      {slot.isFull
-                        ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Full</span>
-                        : <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">{slot.available} left</span>
-                      }
+                      {slot.isFull ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Full</span> : <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">{slot.available} left</span>}
                       {selected === slot.slot && <Check className="h-5 w-5 text-emerald-600" />}
                     </div>
                   </div>
@@ -949,30 +838,23 @@ export default function BookingPage() {
         <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl p-6 sm:p-8 space-y-4">
           {renderErrorBanner()}
 
-          {/* Customer */}
           <ReviewCard icon={<User className="h-4 w-4 text-emerald-600" />} title="Customer" editStep="details">
             <p className="font-medium text-slate-900">{customerName}</p>
             <p className="text-slate-600">{customerEmail}</p>
             {customerPhone && <p className="text-slate-600">{customerPhone}</p>}
           </ReviewCard>
 
-          {/* Vehicle */}
           <ReviewCard icon={<Car className="h-4 w-4 text-emerald-600" />} title="Vehicle" editStep="vehicle">
             <div className="flex items-center justify-between">
               <span className="font-medium text-slate-900">{vehicleYear} {vehicleModel}</span>
-              <div className="transform scale-75 origin-right">
-                <RegistrationPlate plate={regoPlate} state={regoState} />
-              </div>
+              <div className="transform scale-75 origin-right"><RegistrationPlate plate={regoPlate} state={regoState} /></div>
             </div>
             <div className="mt-2 flex justify-between border-t border-slate-200 pt-2">
               <span className="text-slate-500">Transmission</span>
-              <span className={`font-medium ${transmissionType === 'manual' ? 'text-amber-600' : 'text-slate-900'}`}>
-                {transmissionType === 'manual' ? 'Manual' : 'Automatic'}
-              </span>
+              <span className={`font-medium ${transmissionType === 'manual' ? 'text-amber-600' : 'text-slate-900'}`}>{transmissionType === 'manual' ? 'Manual' : 'Automatic'}</span>
             </div>
           </ReviewCard>
 
-          {/* Schedule */}
           <ReviewCard icon={<Calendar className="h-4 w-4 text-emerald-600" />} title="Schedule" editStep="schedule">
             <p className="font-medium text-slate-900">{formatDateDisplay(serviceDate)}</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -985,44 +867,27 @@ export default function BookingPage() {
             </div>
           </ReviewCard>
 
-          {/* Locations */}
           <ReviewCard icon={<MapPin className="h-4 w-4 text-emerald-600" />} title="Locations" editStep="details">
             <div className="space-y-3">
-              <div>
-                <span className="text-slate-500 text-xs">Pickup</span>
-                <p className="text-slate-900">{pickupAddress}</p>
-              </div>
+              <div><span className="text-slate-500 text-xs">Pickup</span><p className="text-slate-900">{pickupAddress}</p></div>
               <div className="border-t border-slate-200 pt-2">
                 <span className="text-slate-500 text-xs">Garage</span>
                 <p className="font-medium text-slate-900">{garageSearch}</p>
                 {garageAddress && <p className="text-xs text-slate-600 mt-0.5">{garageAddress}</p>}
-                <p className="text-xs text-slate-600 mt-1">
-                  Appointment: {getTimeLabel(garageBookingTime, garageBookingTimeOptions)}
-                </p>
+                <p className="text-xs text-slate-600 mt-1">Appointment: {getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</p>
               </div>
             </div>
           </ReviewCard>
 
-          {/* Distance zone */}
           {distanceZoneInfo && (
-            <div className={`rounded-xl border p-4 ${
-              distanceZoneInfo.zone === 'green' ? 'border-emerald-200 bg-emerald-50'
-              : distanceZoneInfo.zone === 'yellow' ? 'border-yellow-200 bg-yellow-50'
-              : 'border-orange-200 bg-orange-50'
-            }`}>
+            <div className={`rounded-xl border p-4 ${distanceZoneInfo.zone === 'green' ? 'border-emerald-200 bg-emerald-50' : distanceZoneInfo.zone === 'yellow' ? 'border-yellow-200 bg-yellow-50' : 'border-orange-200 bg-orange-50'}`}>
               <div className="flex items-center gap-3 text-sm">
                 <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${ZONE_BADGE_STYLES[distanceZoneInfo.zone]}`}>
-                  <span className={`h-2 w-2 rounded-full ${
-                    distanceZoneInfo.zone === 'green' ? 'bg-emerald-500'
-                    : distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500'
-                    : 'bg-orange-500'
-                  }`} />
+                  <span className={`h-2 w-2 rounded-full ${distanceZoneInfo.zone === 'green' ? 'bg-emerald-500' : distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500' : 'bg-orange-500'}`} />
                   {distanceZoneInfo.label}
                 </span>
                 <span className="text-slate-600">{distanceZoneInfo.distance} km</span>
-                {distanceZoneInfo.surchargeAmount > 0 && (
-                  <span className="font-medium text-slate-800">{distanceZoneInfo.surchargeDisplay}</span>
-                )}
+                {distanceZoneInfo.surchargeAmount > 0 && (<span className="font-medium text-slate-800">{distanceZoneInfo.surchargeDisplay}</span>)}
               </div>
             </div>
           )}
@@ -1034,19 +899,12 @@ export default function BookingPage() {
             </div>
           )}
 
-          {/* Price breakdown */}
           <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
             <div className="space-y-2">
               {distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0 && (
                 <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-emerald-700">Transport fee</span>
-                    <span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span>
-                    <span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span>
-                  </div>
+                  <div className="flex justify-between text-sm"><span className="text-emerald-700">Transport fee</span><span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span><span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span></div>
                   <div className="border-t border-emerald-200" />
                 </>
               )}
@@ -1057,26 +915,10 @@ export default function BookingPage() {
             </div>
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => goToStep('schedule')}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back
-            </button>
-            <button
-              type="button"
-              onClick={handleProceedToPayment}
-              disabled={isProcessing}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {isProcessing ? (
-                <><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>
-              ) : (
-                <><CreditCard className="h-5 w-5" /> Proceed to Payment — {totalPriceDisplay}</>
-              )}
+            <button type="button" onClick={() => goToStep('schedule')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
+            <button type="button" onClick={handleProceedToPayment} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">
+              {isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CreditCard className="h-5 w-5" /> Proceed to Payment — {totalPriceDisplay}</>)}
             </button>
           </div>
         </div>
@@ -1097,46 +939,14 @@ export default function BookingPage() {
         </div>
 
         <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm shadow-2xl p-6 sm:p-8">
-          <button
-            type="button"
-            onClick={() => goToStep('review')}
-            disabled={isProcessing}
-            className="mb-5 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to review
-          </button>
-
+          <button type="button" onClick={() => goToStep('review')} disabled={isProcessing} className="mb-5 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"><ArrowLeft className="h-4 w-4" /> Back to review</button>
           {renderErrorBanner()}
-
-          {/* Price reminder */}
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between">
             <span className="text-sm text-emerald-700">Amount due</span>
             <span className="text-lg font-bold text-emerald-700">{totalPriceDisplay} AUD</span>
           </div>
-
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: {
-                  colorPrimary: '#059669',
-                  colorBackground: '#ffffff',
-                  colorText: '#1e293b',
-                  colorDanger: '#ef4444',
-                  fontFamily: 'system-ui, sans-serif',
-                  borderRadius: '12px',
-                },
-              },
-            }}
-          >
-            <StripePaymentForm
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
-              isProcessing={isProcessing}
-              setIsProcessing={setIsProcessing}
-            />
+          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#059669', colorBackground: '#ffffff', colorText: '#1e293b', colorDanger: '#ef4444', fontFamily: 'system-ui, sans-serif', borderRadius: '12px' } } }}>
+            <StripePaymentForm onSuccess={handlePaymentSuccess} onError={handlePaymentError} isProcessing={isProcessing} setIsProcessing={setIsProcessing} />
           </Elements>
         </div>
       </div>
@@ -1149,24 +959,13 @@ export default function BookingPage() {
   function renderSuccess() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
           <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl text-center">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 0.2 }}
-              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100"
-            >
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }} className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
               <CheckCircle2 className="h-10 w-10 text-emerald-600" />
             </motion.div>
-
             <h2 className="mt-6 text-2xl font-bold text-slate-900">Booking Confirmed!</h2>
             <p className="mt-2 text-slate-600">We&apos;ve received your booking and payment.</p>
-
             <div className="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">Vehicle</span><span className="font-medium text-slate-900">{regoPlate.toUpperCase()} ({regoState})</span></div>
@@ -1175,41 +974,20 @@ export default function BookingPage() {
                 <div className="flex justify-between"><span className="text-slate-500">Pickup</span><span className="font-medium text-slate-900">{getPickupSlotLabel(selectedPickupSlot)}</span></div>
               </div>
             </div>
-
             {trackingCode && (
               <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                 <p className="text-sm text-emerald-700 mb-2 font-medium">Your Tracking Code</p>
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-3xl font-mono font-bold tracking-[0.3em] text-emerald-700">{trackingCode}</span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(trackingCode)}
-                    className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"
-                  >
-                    <Copy className="h-5 w-5" />
-                  </button>
+                  <button type="button" onClick={() => navigator.clipboard.writeText(trackingCode)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"><Copy className="h-5 w-5" /></button>
                 </div>
                 <p className="text-xs text-emerald-600 mt-2">Save this code to track your booking</p>
               </div>
             )}
-
-            <p className="mt-4 text-sm text-slate-500">
-              Confirmation sent to <span className="font-medium">{customerEmail}</span>
-            </p>
-
+            <p className="mt-4 text-sm text-slate-500">Confirmation sent to <span className="font-medium">{customerEmail}</span></p>
             <div className="mt-6 space-y-3">
-              <Link
-                href={trackingUrl}
-                className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-              >
-                <MapPin className="h-4 w-4" /> Track Your Booking
-              </Link>
-              <Link
-                href="/"
-                className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 text-center"
-              >
-                Back to Home
-              </Link>
+              <Link href={trackingUrl} className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"><MapPin className="h-4 w-4" /> Track Your Booking</Link>
+              <Link href="/" className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 text-center">Back to Home</Link>
             </div>
           </div>
         </motion.div>
@@ -1255,13 +1033,7 @@ function FieldInput({ label, value, onChange, placeholder, type = 'text', icon }
       <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
       <div className="relative">
         {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2">{icon}</div>}
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={`w-full rounded-xl border border-slate-300 bg-white py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition ${icon ? 'pl-12 pr-4' : 'px-4'}`}
-        />
+        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`w-full rounded-xl border border-slate-300 bg-white py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition ${icon ? 'pl-12 pr-4' : 'px-4'}`} />
       </div>
     </div>
   );
