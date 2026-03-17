@@ -42,7 +42,7 @@ interface AddressAutocompleteProps {
 // Drivlet service region centers
 const NEWCASTLE = { lat: -32.9283, lng: 151.7817 };
 const CANBERRA = { lat: -35.2809, lng: 149.1300 };
-const BIAS_RADIUS = 60000; // 60km radius
+const BIAS_RADIUS = 50000; // 50km radius (Google max)
 
 export default function AddressAutocomplete({
   value,
