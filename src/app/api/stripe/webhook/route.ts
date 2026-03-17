@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
+import { sendBookingStageEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   console.log('🔔 Webhook received!');
@@ -183,6 +184,21 @@ export async function POST(request: NextRequest) {
         });
 
         const bookingId = booking?._id;
+
+        // Send booking confirmation email (non-blocking)
+        sendBookingStageEmail({
+          customerEmail: bookingData.userEmail,
+          customerName: bookingData.userName,
+          vehicleRegistration: bookingData.vehicleRegistration,
+          currentStage: 'booking_confirmed',
+          trackingCode: trackingCode,
+          garageName: bookingData.garageName ?? undefined,
+        }).then((sent) => {
+          if (sent) console.log('📧 booking_confirmed email sent to:', bookingData.userEmail);
+          else console.warn('⚠️ booking_confirmed email failed for:', bookingData.userEmail);
+        }).catch((err) => {
+          console.error('❌ booking_confirmed email error:', err);
+        });
 
         // Auto-assign to matching garage if garagePlaceId exists
         if (metadata.garagePlaceId) {
@@ -444,6 +460,21 @@ export async function POST(request: NextRequest) {
 
         console.log('✅✅✅ BOOKING SAVED FROM CHECKOUT SESSION!');
         console.log('🆔 Booking ID:', sessionBookingId);
+
+        // Send booking confirmation email (non-blocking)
+        sendBookingStageEmail({
+          customerEmail: sessionBookingData.userEmail,
+          customerName: sessionBookingData.userName,
+          vehicleRegistration: sessionBookingData.vehicleRegistration,
+          currentStage: 'booking_confirmed',
+          trackingCode: undefined,
+          garageName: sessionBookingData.garageName ?? undefined,
+        }).then((sent) => {
+          if (sent) console.log('📧 booking_confirmed email sent to:', sessionBookingData.userEmail);
+          else console.warn('⚠️ booking_confirmed email failed for:', sessionBookingData.userEmail);
+        }).catch((err) => {
+          console.error('❌ booking_confirmed email error:', err);
+        });
 
         // Auto-assign to matching garage if garagePlaceId exists
         if (metadata.garagePlaceId) {
