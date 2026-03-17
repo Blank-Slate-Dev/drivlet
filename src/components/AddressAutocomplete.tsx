@@ -28,21 +28,12 @@ interface AddressAutocompleteProps {
   onSelect?: (details: PlaceDetails) => void;
   placeholder?: string;
   disabled?: boolean;
-  /** User's detected latitude — if provided, used as bias center */
-  userLat?: number | null;
-  /** User's detected longitude — if provided, used as bias center */
-  userLng?: number | null;
-  /**
-   * @deprecated Use userLat/userLng instead. Kept for backwards compatibility.
-   * If true and no userLat/userLng provided, falls back to dual-region search.
-   */
-  biasToNewcastle?: boolean;
 }
 
 // Drivlet service region centers
 const NEWCASTLE = { lat: -32.9283, lng: 151.7817 };
 const CANBERRA = { lat: -35.2809, lng: 149.1300 };
-const BIAS_RADIUS = 50000; // 50km radius (Google max)
+const BIAS_RADIUS = 50000; // 50km (Google max)
 
 export default function AddressAutocomplete({
   value,
@@ -50,9 +41,6 @@ export default function AddressAutocomplete({
   onSelect,
   placeholder = 'Start typing your address...',
   disabled = false,
-  userLat,
-  userLng,
-  biasToNewcastle = true,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,14 +56,11 @@ export default function AddressAutocomplete({
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Track focus ourselves (don't trust event order)
   const isInputFocusedRef = useRef(false);
 
-  // Outside tap handling (tap vs scroll)
   const outsideStartRef = useRef<{ x: number; y: number } | null>(null);
   const SCROLL_THRESHOLD = 10;
 
-  // Dropdown item tap-vs-scroll discrimination
   const itemPointerRef = useRef<{
     pointerId: number;
     startX: number;
@@ -83,9 +68,6 @@ export default function AddressAutocomplete({
     moved: boolean;
     prediction: Prediction | null;
   } | null>(null);
-
-  // Determine if we have a user-provided location
-  const hasUserLocation = userLat != null && userLng != null;
 
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
@@ -106,7 +88,6 @@ export default function AddressAutocomplete({
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
-
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
     };
 
@@ -210,7 +191,7 @@ export default function AddressAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  // Helper: run a single autocomplete search for a given bias center
+  // Helper: run a single autocomplete search biased to a region center
   const fetchForRegion = async (
     input: string,
     center: { lat: number; lng: number }
@@ -219,10 +200,7 @@ export default function AddressAutocomplete({
       input,
       includedRegionCodes: ['au'],
       includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
-      locationBias: {
-        center,
-        radius: BIAS_RADIUS,
-      },
+      locationBias: { center, radius: BIAS_RADIUS },
     };
 
     const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
@@ -238,7 +216,7 @@ export default function AddressAutocomplete({
       }));
   };
 
-  // Search for predictions
+  // Always search both Newcastle and Canberra in parallel
   const searchPredictions = useCallback(
     async (input: string) => {
       if (!isReady || !input.trim()) {
@@ -247,7 +225,6 @@ export default function AddressAutocomplete({
         return;
       }
 
-      // Cancel any pending request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -256,60 +233,35 @@ export default function AddressAutocomplete({
       setIsSearching(true);
 
       try {
-        let results: Prediction[];
+        const [newcastleResults, canberraResults] = await Promise.allSettled([
+          fetchForRegion(input, NEWCASTLE),
+          fetchForRegion(input, CANBERRA),
+        ]);
 
-        if (hasUserLocation) {
-          // We have the user's detected location — single search biased to them
-          results = await fetchForRegion(input, { lat: userLat!, lng: userLng! });
-        } else if (biasToNewcastle) {
-          // No user location — search both service regions in parallel and merge
-          const [newcastleResults, canberraResults] = await Promise.allSettled([
-            fetchForRegion(input, NEWCASTLE),
-            fetchForRegion(input, CANBERRA),
-          ]);
+        const merged: Prediction[] = [];
+        const seen = new Set<string>();
 
-          const merged: Prediction[] = [];
-          const seen = new Set<string>();
-
-          // Newcastle results first (primary region)
-          if (newcastleResults.status === 'fulfilled') {
-            for (const p of newcastleResults.value) {
-              if (!seen.has(p.placeId)) {
-                seen.add(p.placeId);
-                merged.push(p);
-              }
+        // Newcastle results first
+        if (newcastleResults.status === 'fulfilled') {
+          for (const p of newcastleResults.value) {
+            if (!seen.has(p.placeId)) {
+              seen.add(p.placeId);
+              merged.push(p);
             }
           }
-
-          // Then Canberra results
-          if (canberraResults.status === 'fulfilled') {
-            for (const p of canberraResults.value) {
-              if (!seen.has(p.placeId)) {
-                seen.add(p.placeId);
-                merged.push(p);
-              }
-            }
-          }
-
-          results = merged.slice(0, 5);
-        } else {
-          // No bias at all — plain Australian search
-          const request: google.maps.places.AutocompleteRequest = {
-            input,
-            includedRegionCodes: ['au'],
-            includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
-          };
-          const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
-          results = (suggestions || [])
-            .filter((s) => s.placePrediction)
-            .map((s) => ({
-              placeId: s.placePrediction!.placeId,
-              mainText: s.placePrediction!.mainText?.text || '',
-              secondaryText: s.placePrediction!.secondaryText?.text || '',
-            }));
         }
 
-        setPredictions(results);
+        // Then Canberra results
+        if (canberraResults.status === 'fulfilled') {
+          for (const p of canberraResults.value) {
+            if (!seen.has(p.placeId)) {
+              seen.add(p.placeId);
+              merged.push(p);
+            }
+          }
+        }
+
+        setPredictions(merged.slice(0, 5));
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Autocomplete error:', err);
@@ -319,7 +271,7 @@ export default function AddressAutocomplete({
         setIsSearching(false);
       }
     },
-    [biasToNewcastle, isReady, hasUserLocation, userLat, userLng]
+    [isReady]
   );
 
   // Debounced search
@@ -340,7 +292,7 @@ export default function AddressAutocomplete({
     };
   }, [value, isOpen, isReady, searchPredictions]);
 
-  // Handle selection using new API
+  // Handle selection
   const handleSelect = useCallback(
     async (prediction: Prediction) => {
       try {

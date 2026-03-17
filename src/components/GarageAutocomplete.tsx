@@ -25,21 +25,12 @@ interface GarageAutocompleteProps {
   onSelect?: (details: GarageDetails) => void;
   placeholder?: string;
   disabled?: boolean;
-  /** User's detected latitude — if provided, used as bias center */
-  userLat?: number | null;
-  /** User's detected longitude — if provided, used as bias center */
-  userLng?: number | null;
-  /**
-   * @deprecated Use userLat/userLng instead. Kept for backwards compatibility.
-   * If true and no userLat/userLng provided, falls back to dual-region search.
-   */
-  biasToNewcastle?: boolean;
 }
 
 // Drivlet service region centers
 const NEWCASTLE = { lat: -32.9283, lng: 151.7817 };
 const CANBERRA = { lat: -35.2809, lng: 149.1300 };
-const BIAS_RADIUS = 50000; // 50km radius (Google max)
+const BIAS_RADIUS = 50000; // 50km (Google max)
 
 // Known suburbs for sorting — Newcastle/Hunter + Canberra/ACT regions
 const KNOWN_SUBURBS: string[] = [
@@ -63,7 +54,7 @@ const KNOWN_SUBURBS: string[] = [
   'jerrabomberra', 'kaleen', 'giralang', 'evatt', 'spence',
   'scullin', 'page', 'hawker', 'weetangera', 'cook',
   'lyneham', 'turner', 'acton', 'reid', 'ainslie',
-  'hackett', 'downer', 'watson', 'mitchell', 'casey',
+  'hackett', 'downer', 'watson', 'casey',
   'ngunnawal', 'amaroo', 'harrison', 'franklin', 'forde',
   'bonner', 'jacka', 'moncrieff', 'throsby', 'taylor',
 ];
@@ -74,9 +65,6 @@ export default function GarageAutocomplete({
   onSelect,
   placeholder = 'Search for a garage...',
   disabled = false,
-  userLat,
-  userLng,
-  biasToNewcastle = true,
 }: GarageAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,9 +93,6 @@ export default function GarageAutocomplete({
     prediction: Prediction | null;
   } | null>(null);
 
-  // Determine if we have a user-provided location
-  const hasUserLocation = userLat != null && userLng != null;
-
   const handleInputFocus = () => {
     isInputFocusedRef.current = true;
     setIsOpen(true);
@@ -127,7 +112,6 @@ export default function GarageAutocomplete({
       if (!containerRef.current) return;
       const target = e.target as Node;
       if (containerRef.current.contains(target)) return;
-
       outsideStartRef.current = { x: e.clientX, y: e.clientY };
     };
 
@@ -307,7 +291,7 @@ export default function GarageAutocomplete({
     });
   };
 
-  // Search for predictions
+  // Always search both Newcastle and Canberra in parallel
   const searchPredictions = useCallback(
     async (input: string) => {
       if (!isReady || !input.trim()) {
@@ -316,7 +300,6 @@ export default function GarageAutocomplete({
         return;
       }
 
-      // Cancel any pending request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -325,49 +308,35 @@ export default function GarageAutocomplete({
       setIsSearching(true);
 
       try {
-        let allResults: Prediction[];
+        const [newcastleResults, canberraResults] = await Promise.allSettled([
+          fetchForRegion(input, NEWCASTLE),
+          fetchForRegion(input, CANBERRA),
+        ]);
 
-        if (hasUserLocation) {
-          // We have the user's detected location — single dual-type search
-          allResults = await fetchForRegion(input, { lat: userLat!, lng: userLng! });
-        } else if (biasToNewcastle) {
-          // No user location — search both service regions in parallel
-          const [newcastleResults, canberraResults] = await Promise.allSettled([
-            fetchForRegion(input, NEWCASTLE),
-            fetchForRegion(input, CANBERRA),
-          ]);
+        const merged: Prediction[] = [];
+        const seen = new Set<string>();
 
-          const merged: Prediction[] = [];
-          const seen = new Set<string>();
-
-          // Newcastle results first
-          if (newcastleResults.status === 'fulfilled') {
-            for (const p of newcastleResults.value) {
-              if (!seen.has(p.placeId)) {
-                seen.add(p.placeId);
-                merged.push(p);
-              }
+        // Newcastle results first
+        if (newcastleResults.status === 'fulfilled') {
+          for (const p of newcastleResults.value) {
+            if (!seen.has(p.placeId)) {
+              seen.add(p.placeId);
+              merged.push(p);
             }
           }
-
-          // Then Canberra results
-          if (canberraResults.status === 'fulfilled') {
-            for (const p of canberraResults.value) {
-              if (!seen.has(p.placeId)) {
-                seen.add(p.placeId);
-                merged.push(p);
-              }
-            }
-          }
-
-          allResults = merged;
-        } else {
-          // No bias — plain search
-          allResults = await fetchForRegion(input, NEWCASTLE);
         }
 
-        // Apply suburb sorting and limit
-        const sorted = sortBySuburb(allResults, input);
+        // Then Canberra results
+        if (canberraResults.status === 'fulfilled') {
+          for (const p of canberraResults.value) {
+            if (!seen.has(p.placeId)) {
+              seen.add(p.placeId);
+              merged.push(p);
+            }
+          }
+        }
+
+        const sorted = sortBySuburb(merged, input);
         setPredictions(sorted.slice(0, 5));
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
@@ -378,14 +347,12 @@ export default function GarageAutocomplete({
         setIsSearching(false);
       }
     },
-    [biasToNewcastle, isReady, hasUserLocation, userLat, userLng]
+    [isReady]
   );
 
   // Debounced search
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (value.trim() && isOpen && isReady) {
       debounceRef.current = setTimeout(() => {
@@ -397,13 +364,11 @@ export default function GarageAutocomplete({
     }
 
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [value, isOpen, isReady, searchPredictions]);
 
-  // Handle selection using new API
+  // Handle selection
   const handleSelect = useCallback(
     async (prediction: Prediction) => {
       try {
@@ -470,9 +435,7 @@ export default function GarageAutocomplete({
     setIsSearching(false);
     setIsOpen(false);
     isInputFocusedRef.current = false;
-    if (onSelect) {
-      onSelect({ name: '', formattedAddress: '' });
-    }
+    if (onSelect) onSelect({ name: '', formattedAddress: '' });
     inputRef.current?.focus();
   };
 
