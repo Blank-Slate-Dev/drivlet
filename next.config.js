@@ -4,7 +4,7 @@
 const securityHeaders = [
   {
     key: "Content-Security-Policy",
-    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com https://lh3.googleusercontent.com; font-src 'self'; frame-src https://js.stripe.com https://hooks.stripe.com; connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://*.vercel-storage.com; worker-src 'self' blob:",
+    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com https://lh3.googleusercontent.com; font-src 'self'; frame-src https://js.stripe.com https://hooks.stripe.com; connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://*.vercel-storage.com; worker-src 'self' blob:",
   },
   {
     key: "X-DNS-Prefetch-Control",
