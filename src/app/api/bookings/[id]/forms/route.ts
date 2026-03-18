@@ -1,6 +1,7 @@
 // src/app/api/bookings/[id]/forms/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import SignedForm, { FormType } from "@/models/SignedForm";
@@ -13,6 +14,37 @@ export async function POST(
 
   try {
     await connectDB();
+
+    // Verify booking exists first
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return NextResponse.json(
+        { error: "Booking not found" },
+        { status: 404 }
+      );
+    }
+
+    // Auth check: must be logged in as the booking owner, an assigned driver, or admin
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const isAdmin = session.user.role === "admin";
+    const isOwner =
+      (session.user.id && booking.userId?.toString() === session.user.id) ||
+      (session.user.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
+    const isDriver = session.user.role === "driver";
+
+    if (!isAdmin && !isOwner && !isDriver) {
+      return NextResponse.json(
+        { error: "Not authorized to submit forms for this booking" },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json();
     const {
@@ -70,17 +102,6 @@ export async function POST(
       );
     }
 
-    // Verify booking exists
-    const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      return NextResponse.json(
-        { error: "Booking not found" },
-        { status: 404 }
-      );
-    }
-
-    // Determine submitter email — try session first, then body
-    const session = await getServerSession();
     const email =
       session?.user?.email || submittedByEmail || booking.userEmail;
 
@@ -134,7 +155,7 @@ export async function POST(
   }
 }
 
-// GET — fetch signed forms for a booking (admin/customer)
+// GET — fetch signed forms for a booking (admin/customer/driver)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -142,7 +163,38 @@ export async function GET(
   const { id: bookingId } = await params;
 
   try {
+    // Auth check
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     await connectDB();
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return NextResponse.json(
+        { error: "Booking not found" },
+        { status: 404 }
+      );
+    }
+
+    // Verify caller has access to this booking
+    const isAdmin = session.user.role === "admin";
+    const isOwner =
+      (session.user.id && booking.userId?.toString() === session.user.id) ||
+      (session.user.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
+    const isDriver = session.user.role === "driver";
+
+    if (!isAdmin && !isOwner && !isDriver) {
+      return NextResponse.json(
+        { error: "Not authorized to view forms for this booking" },
+        { status: 403 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const formType = searchParams.get("formType") as FormType | null;

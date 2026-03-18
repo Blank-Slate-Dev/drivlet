@@ -53,7 +53,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const matchesByName = booking.garageName &&
       garage.linkedGarageName &&
-      booking.garageName.toLowerCase().includes(garage.linkedGarageName.toLowerCase());
+      booking.garageName.toLowerCase() === garage.linkedGarageName.toLowerCase();
 
     const isNewAndMatches = (!booking.assignedGarageId || booking.garageStatus === "new") &&
       (matchesByPlaceId || matchesByName);
@@ -132,7 +132,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const matchesByName = booking.garageName &&
       garage.linkedGarageName &&
-      booking.garageName.toLowerCase().includes(garage.linkedGarageName.toLowerCase());
+      booking.garageName.toLowerCase() === garage.linkedGarageName.toLowerCase();
 
     const isNew = (!booking.assignedGarageId || booking.garageStatus === "new") &&
       (matchesByPlaceId || matchesByName);

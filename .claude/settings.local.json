@@ -55,7 +55,8 @@
       "Bash(:)",
       "Bash(else)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

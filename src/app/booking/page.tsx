@@ -537,7 +537,7 @@ export default function BookingPage() {
           <button type="button" onClick={() => goToStep('review')} disabled={isProcessing} className="mb-5 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"><ArrowLeft className="h-4 w-4" /> Back to review</button>
           {renderErrorBanner()}
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between"><span className="text-sm text-emerald-700">Amount due</span><span className="text-lg font-bold text-emerald-700">{totalPriceDisplay} AUD</span></div>
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#059669', colorBackground: '#ffffff', colorText: '#1e293b', colorDanger: '#ef4444', fontFamily: 'system-ui, sans-serif', borderRadius: '12px' } } }}><StripePaymentForm onSuccess={handlePaymentSuccess} onError={handlePaymentError} isProcessing={isProcessing} setIsProcessing={setIsProcessing} /></Elements>
+          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#059669', colorBackground: '#ffffff', colorText: '#1e293b', colorDanger: '#ef4444', fontFamily: 'system-ui, sans-serif', borderRadius: '12px' } } }}><StripePaymentForm onSuccess={handlePaymentSuccess} onError={handlePaymentError} isProcessing={isProcessing} setIsProcessing={setIsProcessing} amountDisplay={`${totalPriceDisplay} AUD`} /></Elements>
         </div>
       </div>
     );

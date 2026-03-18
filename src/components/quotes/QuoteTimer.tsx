@@ -176,7 +176,8 @@ function QuoteTimerComponent({
 
     const timer = setInterval(updateTimer, interval);
     return () => clearInterval(timer);
-  }, [firstViewedAt, status, updateTimer, timeRemaining?.totalHours]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstViewedAt, status, updateTimer]);
 
   // Not viewed yet - show "Valid until viewed"
   if (!firstViewedAt && status === 'pending') {
@@ -297,7 +298,8 @@ function QuoteTimerBadgeComponent({
 
     const timer = setInterval(updateTimer, interval);
     return () => clearInterval(timer);
-  }, [firstViewedAt, status, updateTimer, timeRemaining?.totalHours]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstViewedAt, status, updateTimer]);
 
   // Not viewed yet
   if (!firstViewedAt && status === 'pending') {

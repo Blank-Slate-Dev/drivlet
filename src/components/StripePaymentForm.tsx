@@ -14,6 +14,7 @@ interface StripePaymentFormProps {
   onError: (error: string) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
+  amountDisplay?: string;
 }
 
 export default function StripePaymentForm({
@@ -21,6 +22,7 @@ export default function StripePaymentForm({
   onError,
   isProcessing,
   setIsProcessing,
+  amountDisplay,
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -101,7 +103,7 @@ export default function StripePaymentForm({
         ) : (
           <>
             <Lock className="h-5 w-5" />
-            Pay $119.00 AUD
+            Pay {amountDisplay || "now"}
           </>
         )}
       </button>

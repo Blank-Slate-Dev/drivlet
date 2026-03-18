@@ -11,6 +11,16 @@ const mailjet = process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY
     })
   : null;
 
+// Escape HTML special characters to prevent injection in email templates
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface SendEmailOptions {
   to: string;
   toName?: string;
@@ -205,9 +215,12 @@ export async function sendServicePaymentEmail(
   garageName?: string
 ): Promise<boolean> {
   const amountFormatted = (amount / 100).toFixed(2);
-  
+  const safeCustomerName = escapeHtml(customerName);
+  const safeVehicleRego = escapeHtml(vehicleRego);
+  const safeGarageName = garageName ? escapeHtml(garageName) : undefined;
+
   const subject = `Your car is ready! Pay $${amountFormatted} to get it back - ${vehicleRego}`;
-  
+
   const textContent = `
 Hi ${customerName},
 
@@ -245,20 +258,20 @@ The drivlet Team
       
       <!-- Content -->
       <div style="padding: 32px;">
-        <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${customerName},</p>
-        
+        <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${safeCustomerName},</p>
+
         <p style="margin: 0 0 24px; color: #475569; font-size: 16px;">Great news! Your car service is complete and ready for delivery.</p>
-        
+
         <!-- Details Box -->
         <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
           <div style="margin-bottom: 12px;">
             <span style="color: #64748b; font-size: 14px;">Vehicle</span>
-            <div style="color: #1e293b; font-size: 18px; font-weight: 600;">${vehicleRego}</div>
+            <div style="color: #1e293b; font-size: 18px; font-weight: 600;">${safeVehicleRego}</div>
           </div>
-          ${garageName ? `
+          ${safeGarageName ? `
           <div style="margin-bottom: 12px;">
             <span style="color: #64748b; font-size: 14px;">Service at</span>
-            <div style="color: #1e293b; font-size: 16px;">${garageName}</div>
+            <div style="color: #1e293b; font-size: 16px;">${safeGarageName}</div>
           </div>
           ` : ''}
           <div>
@@ -409,6 +422,12 @@ export async function sendBookingStageEmail(
   const progress = STAGE_PROGRESS[currentStage] || 0;
   const message = customMessage || content.message;
 
+  // Escape user-supplied values for HTML templates
+  const safeCustomerName = escapeHtml(customerName);
+  const safeVehicleRegistration = escapeHtml(vehicleRegistration);
+  const safeGarageName = garageName ? escapeHtml(garageName) : undefined;
+  const safeMessage = escapeHtml(message);
+
   // Build tracking URL if tracking code exists
   const trackingUrl = trackingCode
     ? `${appUrl}/track?code=${trackingCode}`
@@ -456,7 +475,7 @@ Newcastle, Australia
             <td style="background: linear-gradient(135deg, ${content.color} 0%, ${content.color}dd 100%); padding: 36px 32px 28px; text-align: center;">
               <div style="font-size: 40px; margin-bottom: 12px;">${content.emoji}</div>
               <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">${content.heading}</h1>
-              <p style="margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">${vehicleRegistration}</p>
+              <p style="margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">${safeVehicleRegistration}</p>
             </td>
           </tr>
 
@@ -473,11 +492,11 @@ Newcastle, Australia
           <tr>
             <td style="padding: 32px;">
               <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hi ${customerName},
+                Hi ${safeCustomerName},
               </p>
 
               <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
-                ${message}
+                ${safeMessage}
               </p>
 
               <!-- Details Box -->
@@ -486,18 +505,18 @@ Newcastle, Australia
                   <tr>
                     <td style="padding: 0 0 12px;">
                       <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Vehicle</span>
-                      <div style="color: #1e293b; font-size: 16px; font-weight: 600; margin-top: 2px;">${vehicleRegistration}</div>
+                      <div style="color: #1e293b; font-size: 16px; font-weight: 600; margin-top: 2px;">${safeVehicleRegistration}</div>
                     </td>
                     <td style="padding: 0 0 12px; text-align: right;">
                       <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Progress</span>
                       <div style="color: ${content.color}; font-size: 16px; font-weight: 700; margin-top: 2px;">${progress}%</div>
                     </td>
                   </tr>
-                  ${garageName ? `
+                  ${safeGarageName ? `
                   <tr>
                     <td colspan="2" style="padding: 12px 0 0; border-top: 1px solid #e2e8f0;">
                       <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Service Centre</span>
-                      <div style="color: #1e293b; font-size: 15px; margin-top: 2px;">${garageName}</div>
+                      <div style="color: #1e293b; font-size: 15px; margin-top: 2px;">${safeGarageName}</div>
                     </td>
                   </tr>
                   ` : ''}

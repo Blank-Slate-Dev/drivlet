@@ -58,6 +58,18 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Validate critical metadata fields before creating a booking
+      if (!metadata.vehicleRegistration || !metadata.pickupAddress || !metadata.customerName) {
+        console.error('❌ PaymentIntent missing critical metadata fields:', {
+          hasVehicleRego: !!metadata.vehicleRegistration,
+          hasPickupAddress: !!metadata.pickupAddress,
+          hasCustomerName: !!metadata.customerName,
+          paymentIntentId: paymentIntent.id,
+        });
+        // Don't break — payment succeeded, so log the error but still create
+        // the booking with whatever data we have. The ops team can follow up.
+      }
+
       console.log('📧 Customer:', metadata.customerEmail, '-', metadata.customerName);
       console.log('🚗 Vehicle:', metadata.vehicleRegistration, '(' + metadata.vehicleState + ')');
       console.log('💰 Amount:', paymentIntent.amount / 100, 'AUD');

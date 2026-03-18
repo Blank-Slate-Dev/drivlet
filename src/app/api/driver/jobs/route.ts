@@ -10,6 +10,7 @@ import { stripe } from "@/lib/stripe";
 import { sendServicePaymentEmail } from "@/lib/email";
 import { sendServicePaymentSMS } from "@/lib/sms";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
+import { requireValidOrigin } from "@/lib/validation";
 
 // Get the app URL for Stripe redirects
 function getAppUrl(): string {
@@ -265,6 +266,15 @@ export async function GET(request: NextRequest) {
 
 // POST /api/driver/jobs - Job actions (admin-assigned only, no accept/decline)
 export async function POST(request: NextRequest) {
+  // CSRF protection
+  const originCheck = requireValidOrigin(request);
+  if (!originCheck.valid) {
+    return NextResponse.json(
+      { error: originCheck.error },
+      { status: 403 }
+    );
+  }
+
   try {
     const session = await getServerSession(authOptions);
 
