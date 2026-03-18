@@ -1,8 +1,8 @@
 // src/components/homepage/HomepageClientWrapper.tsx
 'use client';
 
-import { useState, ReactNode } from 'react';
-import BookingModal from '@/components/homepage/BookingModal';
+import { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface HomepageClientWrapperProps {
   children: (
@@ -13,14 +13,12 @@ interface HomepageClientWrapperProps {
 }
 
 export function HomepageClientWrapper({ children }: HomepageClientWrapperProps) {
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const openBookingModal = () => setShowBookingModal(true);
-  const closeBookingModal = () => setShowBookingModal(false);
+  const router = useRouter();
 
-  return (
-    <>
-      <BookingModal isOpen={showBookingModal} onClose={closeBookingModal} />
-      {children(openBookingModal, closeBookingModal, showBookingModal)}
-    </>
-  );
+  // Navigate to the booking page instead of opening a modal
+  const openBookingModal = () => router.push('/booking');
+  const closeBookingModal = () => {}; // no-op, kept for interface compatibility
+  const showBookingModal = false; // always false, no modal
+
+  return <>{children(openBookingModal, closeBookingModal, showBookingModal)}</>;
 }

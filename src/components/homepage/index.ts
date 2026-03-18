@@ -1,6 +1,5 @@
 // src/components/homepage/index.ts
 export { default as RegistrationPlate } from './RegistrationPlate';
-export { default as BookingModal } from './BookingModal';
 export { default as HeroSection } from './HeroSection';
 export { default as ValuePropsSection } from './ValuePropsSection';
 export { default as HowItWorksSection } from './HowItWorksSection';
