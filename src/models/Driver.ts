@@ -534,6 +534,7 @@ DriverSchema.pre("save", async function () {
   // AUTO-FIX: canAcceptJobs can only be true if onboardingStatus is "active"
   // Instead of throwing an error, we automatically correct invalid state
   if (this.canAcceptJobs === true && this.onboardingStatus !== "active") {
+    console.warn(`[Driver ${this._id}] Auto-corrected canAcceptJobs: true→false (onboardingStatus=${this.onboardingStatus})`);
     this.canAcceptJobs = false;
   }
   
@@ -553,6 +554,7 @@ DriverSchema.pre("save", async function () {
     
     // If trying to be active without requirements, reset to appropriate state
     if (!allContractsSigned || !policeCheckComplete) {
+      console.warn(`[Driver ${this._id}] Auto-corrected onboardingStatus: active→contracts_pending (contracts=${!!allContractsSigned}, policeCheck=${!!policeCheckComplete})`);
       this.onboardingStatus = "contracts_pending";
       this.canAcceptJobs = false;
     }

@@ -1,7 +1,7 @@
 // src/components/homepage/ContactForm.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function ContactForm() {
@@ -14,6 +14,14 @@ export default function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -50,7 +58,8 @@ export default function ContactForm() {
       setFormData({ name: '', email: '', phone: '', message: '' });
 
       // Reset success message after 5 seconds
-      setTimeout(() => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => {
         setSubmitStatus('idle');
       }, 5000);
     } catch (error) {

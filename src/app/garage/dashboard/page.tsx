@@ -115,19 +115,15 @@ export default function GarageDashboardPage() {
     try {
       const seen = localStorage.getItem(welcomeKey) === "1";
 
-      if (welcomeParam && !seen) {
-        setShowWelcome(true);
-        localStorage.setItem(welcomeKey, "1");
-        return;
-      }
-
       if (!seen) {
         setShowWelcome(true);
         localStorage.setItem(welcomeKey, "1");
       }
     } catch {
-      // If localStorage is blocked, still show it once this session.
-      setShowWelcome(true);
+      // If localStorage is blocked, only show on explicit welcome param
+      if (welcomeParam) {
+        setShowWelcome(true);
+      }
     }
   }, [status, isGarage, isApproved, welcomeKey]);
 

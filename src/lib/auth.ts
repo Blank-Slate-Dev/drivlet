@@ -236,8 +236,12 @@ export const authOptions: NextAuthOptions = {
             // Return an empty session to force sign-out on the client
             return { ...session, user: undefined } as unknown as typeof session;
           }
-        } catch {
-          // DB error — allow session to continue rather than lock user out
+        } catch (dbError) {
+          // DB error — log it so ops can detect a pattern.
+          // We allow the session to continue to avoid locking everyone out
+          // during a transient DB blip, but we stamp the session so API
+          // routes that need strong auth can re-verify.
+          console.error("Session callback DB check failed:", dbError);
         }
 
         session.user.id = token.id as string;

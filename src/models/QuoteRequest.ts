@@ -90,7 +90,7 @@ const QuoteRequestSchema = new Schema<IQuoteRequest>(
     vehicleYear: {
       type: Number,
       min: 1900,
-      max: new Date().getFullYear() + 1,
+      max: new Date().getFullYear(),
     },
     serviceCategory: {
       type: String,
@@ -121,8 +121,12 @@ const QuoteRequestSchema = new Schema<IQuoteRequest>(
       trim: true,
     },
     locationCoordinates: {
-      lat: { type: Number, min: -90, max: 90 },
-      lng: { type: Number, min: -180, max: 180 },
+      type: {
+        lat: { type: Number, required: true, min: -90, max: 90 },
+        lng: { type: Number, required: true, min: -180, max: 180 },
+      },
+      required: false,
+      default: undefined,
     },
     photos: {
       type: [String],

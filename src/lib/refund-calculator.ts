@@ -159,7 +159,7 @@ export function calculateRefund(
 
   // Less than 24 hours but before pickup - 50% refund
   if (hoursUntilPickup > 0) {
-    const refundAmount = Math.floor(paymentAmount * 0.5);
+    const refundAmount = Math.round(paymentAmount * 0.5);
     return {
       eligible: true,
       canCancel: true,

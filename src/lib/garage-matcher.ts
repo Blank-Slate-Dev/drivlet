@@ -55,6 +55,12 @@ export async function findGarageByNameOrPlaceId(
   if (garageName) {
     const normalized = normalizeGarageName(garageName);
 
+    // Skip fuzzy matching if normalization produces an empty string
+    if (!normalized) {
+      console.log("⚠️ Garage name normalized to empty string, skipping fuzzy match:", garageName);
+      return null;
+    }
+
     // Get all approved garages and check normalized names
     const garages = await Garage.find({ status: "approved" });
 
@@ -62,7 +68,7 @@ export async function findGarageByNameOrPlaceId(
       const normalizedLinkedName = normalizeGarageName(garage.linkedGarageName || "");
       const normalizedBusinessName = normalizeGarageName(garage.businessName || "");
 
-      if (normalizedLinkedName === normalized || normalizedBusinessName === normalized) {
+      if ((normalizedLinkedName && normalizedLinkedName === normalized) || (normalizedBusinessName && normalizedBusinessName === normalized)) {
         console.log("✅ Matched by normalized name:", garage.businessName);
         return garage._id as Types.ObjectId;
       }
