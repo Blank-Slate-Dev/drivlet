@@ -1,4 +1,5 @@
 // src/lib/trackingCode.ts
+import crypto from 'crypto';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import QuoteRequest from '@/models/QuoteRequest';
@@ -7,13 +8,13 @@ import QuoteRequest from '@/models/QuoteRequest';
 const ALLOWED_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 /**
- * Generate a random 6-character tracking code
+ * Generate a random 6-character tracking code using crypto-safe randomness
  */
 function generateRandomCode(length = 6): string {
+  const bytes = crypto.randomBytes(length);
   let code = '';
   for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * ALLOWED_CHARS.length);
-    code += ALLOWED_CHARS[randomIndex];
+    code += ALLOWED_CHARS[bytes[i] % ALLOWED_CHARS.length];
   }
   return code;
 }

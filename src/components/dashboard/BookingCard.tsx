@@ -526,9 +526,9 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
                     Signed Forms
                   </h4>
                   <div className="space-y-2">
-                    {booking.signedForms.map((form, idx) => (
+                    {booking.signedForms.map((form) => (
                       <div
-                        key={idx}
+                        key={`${form.formType}-${form.submittedAt}`}
                         className="flex items-center justify-between text-sm"
                       >
                         <div className="flex items-center gap-2">
@@ -555,7 +555,7 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
                 </h4>
                 <div className="space-y-3">
                   {booking.updates.slice(-4).reverse().map((update, index) => (
-                    <div key={index} className="flex gap-3">
+                    <div key={`${update.stage}-${update.timestamp}`} className="flex gap-3">
                       <div className="flex flex-col items-center">
                         <div className="h-2 w-2 rounded-full bg-emerald-500" />
                         {index < Math.min(booking.updates.length - 1, 3) && (

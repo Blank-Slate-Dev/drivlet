@@ -572,7 +572,7 @@ const BookingSchema = new Schema<IBooking>(
     // Cancellation details
     cancellation: {
       cancelledAt: { type: Date },
-      cancelledBy: { type: Schema.Types.Mixed },
+      cancelledBy: { type: String },
       cancelledByRole: {
         type: String,
         enum: ["customer", "admin", "system"],

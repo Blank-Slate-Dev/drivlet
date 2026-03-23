@@ -113,12 +113,13 @@ export default function QuotesDashboardPage() {
 
     try {
       const response = await fetch('/api/quotes/request');
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch quote requests');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to fetch quote requests');
       }
 
+      const data = await response.json();
       setQuoteRequests(data.quoteRequests);
       setError(null);
     } catch (err) {

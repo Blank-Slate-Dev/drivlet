@@ -205,14 +205,13 @@ export async function POST(request: NextRequest) {
             ? `${appUrl}/track?code=${trackingCode}`
             : `${appUrl}/track`;
 
-          const smsSent = await sendBookingConfirmationSMS(
+          await sendBookingConfirmationSMS(
             bookingData.guestPhone,
             bookingData.userName,
             bookingData.vehicleRegistration,
             bookingData.pickupTime,
             trackingUrl
           );
-          void smsSent;
         } catch (smsErr) {
           console.error("❌ Failed to send confirmation SMS:", smsErr);
         }

@@ -157,7 +157,11 @@ export async function POST(request: NextRequest) {
       );
       if (!updated) {
         // Race: another request clocked in first — clean up orphaned time entry
-        await TimeEntry.findByIdAndDelete(timeEntry._id);
+        try {
+          await TimeEntry.findByIdAndDelete(timeEntry._id);
+        } catch (cleanupErr) {
+          console.error("Failed to clean up orphaned TimeEntry:", timeEntry._id, cleanupErr);
+        }
         return NextResponse.json({ error: "Already clocked in" }, { status: 400 });
       }
 

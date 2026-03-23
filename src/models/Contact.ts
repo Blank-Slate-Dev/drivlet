@@ -28,6 +28,10 @@ const ContactSchema = new Schema<IContact>(
       required: [true, "Email is required"],
       trim: true,
       lowercase: true,
+      validate: {
+        validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: "Please enter a valid email address",
+      },
     },
     phone: {
       type: String,
