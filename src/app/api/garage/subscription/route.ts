@@ -169,8 +169,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.APP_URL || "https://drivlet.vercel.app"}/garage/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_URL || "https://drivlet.vercel.app"}/garage/subscription/cancelled`,
+      success_url: `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/garage/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/garage/subscription/cancelled`,
       metadata: {
         garageId: garage._id.toString(),
         userId: session.user.id,

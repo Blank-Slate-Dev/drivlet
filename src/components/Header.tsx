@@ -244,7 +244,7 @@ export default function Header() {
           )}
 
           <Link
-            href="https://www.drivlet.com.au/booking"
+            href="/booking"
             className="group flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
           >
             Book a service
@@ -466,7 +466,7 @@ export default function Header() {
                 )}
 
                 <Link
-                  href="https://www.drivlet.com.au/booking"
+                  href="/booking"
                   className="mt-2 w-full rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
                   onClick={() => setShowMobileMenu(false)}
                 >

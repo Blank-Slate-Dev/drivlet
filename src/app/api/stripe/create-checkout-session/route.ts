@@ -5,23 +5,7 @@ import { requireValidOrigin } from '@/lib/validation';
 
 // Get the app URL
 function getAppUrl(): string {
-  // Use APP_URL env var if set, otherwise use production URL
-  if (process.env.APP_URL) {
-    return process.env.APP_URL;
-  }
-  
-  // Check if we're in production (Vercel sets this)
-  if (process.env.VERCEL_ENV === 'production') {
-    return 'https://drivlet.vercel.app';
-  }
-  
-  // For preview deployments, use the deployment URL
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  
-  // Fallback for local development
-  return 'http://localhost:3000';
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
 export async function POST(request: NextRequest) {

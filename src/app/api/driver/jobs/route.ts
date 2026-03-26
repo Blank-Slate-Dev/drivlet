@@ -14,16 +14,7 @@ import { requireValidOrigin } from "@/lib/validation";
 
 // Get the app URL for Stripe redirects
 function getAppUrl(): string {
-  if (process.env.APP_URL) {
-    return process.env.APP_URL;
-  }
-  if (process.env.VERCEL_ENV === 'production') {
-    return 'https://drivlet.vercel.app';
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return 'http://localhost:3000';
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
 // GET /api/driver/jobs - Get jobs assigned to this driver by admin
