@@ -114,15 +114,11 @@ export async function POST(request: NextRequest) {
         const trackingCode = await generateUniqueTrackingCode();
         console.log('✅ Tracking code generated:', trackingCode);
 
-        // Determine if this is a guest or registered user booking
-        const isGuestBooking = metadata.isGuest !== 'false';
-        const customerUserId = (!isGuestBooking && metadata.userId) ? new ObjectId(metadata.userId) : null;
-
         const bookingData = {
-          userId: customerUserId,
+          userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          isGuest: isGuestBooking,
+          isGuest: true,
           guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
@@ -401,15 +397,11 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Determine if this is a guest or registered user booking
-        const isGuestSessionBooking = metadata.isGuest !== 'false';
-        const sessionCustomerUserId = (!isGuestSessionBooking && metadata.userId) ? new ObjectId(metadata.userId) : null;
-
         const sessionBookingData = {
-          userId: sessionCustomerUserId,
+          userId: null, // Guest booking
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          isGuest: isGuestSessionBooking,
+          isGuest: true,
           guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
