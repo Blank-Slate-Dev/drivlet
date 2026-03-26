@@ -114,11 +114,21 @@ export async function POST(request: NextRequest) {
         const trackingCode = await generateUniqueTrackingCode();
         console.log('✅ Tracking code generated:', trackingCode);
 
+        // Determine if this is a guest or registered user booking
+        const isGuestBooking = metadata.isGuest !== 'false';
+        const customerUserId = (!isGuestBooking && metadata.userId) ? new ObjectId(metadata.userId) : null;
+        console.log('🔍 WEBHOOK METADATA DEBUG (PI):', {
+          rawUserId: metadata.userId,
+          rawIsGuest: metadata.isGuest,
+          resolvedUserId: customerUserId,
+          resolvedIsGuest: isGuestBooking,
+        });
+
         const bookingData = {
-          userId: null, // Guest booking
+          userId: customerUserId,
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          isGuest: true,
+          isGuest: isGuestBooking,
           guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,
@@ -397,11 +407,21 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // Determine if this is a guest or registered user booking
+        const isGuestSessionBooking = metadata.isGuest !== 'false';
+        const sessionCustomerUserId = (!isGuestSessionBooking && metadata.userId) ? new ObjectId(metadata.userId) : null;
+        console.log('🔍 WEBHOOK METADATA DEBUG (CS):', {
+          rawUserId: metadata.userId,
+          rawIsGuest: metadata.isGuest,
+          resolvedUserId: sessionCustomerUserId,
+          resolvedIsGuest: isGuestSessionBooking,
+        });
+
         const sessionBookingData = {
-          userId: null, // Guest booking
+          userId: sessionCustomerUserId,
           userName: metadata.customerName,
           userEmail: metadata.customerEmail,
-          isGuest: true,
+          isGuest: isGuestSessionBooking,
           guestPhone: metadata.customerPhone || null,
           vehicleRegistration: metadata.vehicleRegistration,
           vehicleState: metadata.vehicleState,

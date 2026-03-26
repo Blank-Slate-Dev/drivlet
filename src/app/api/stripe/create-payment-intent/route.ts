@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE, ZONE_SURCHARGES, calculateTotalAmount } from '@/lib/stripe';
 import { requireValidOrigin } from '@/lib/validation';
 import { calculateDistance, getDistanceZone } from '@/lib/distanceZones';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   // CSRF protection - validate request origin for payment operations
@@ -71,6 +73,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Check if the customer is logged in (for userId/isGuest metadata)
+    const session = await getServerSession(authOptions);
+    const isGuest = !session?.user?.id;
+    const userId = session?.user?.id || '';
+    console.log('🔍 SESSION DEBUG:', {
+      hasSession: !!session,
+      userId: userId || 'NO_ID',
+      email: session?.user?.email || 'NO_EMAIL',
+      isGuest,
+    });
 
     // ── Server-side distance & zone validation ──────────────────────────
     let verifiedZone = 'green';
@@ -161,12 +174,19 @@ export async function POST(request: NextRequest) {
         distanceZone: verifiedZone,
         distanceSurcharge: String(verifiedSurcharge),
         distanceKm: String(verifiedDistanceKm),
+        userId: userId,
+        isGuest: isGuest ? 'true' : 'false',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}${surchargeNote}`,
     });
 
     console.log('✅ Payment intent created:', paymentIntent.id, '— amount:', totalAmount);
+
+    console.log('🔍 METADATA DEBUG:', {
+      userId: paymentIntent.metadata.userId,
+      isGuest: paymentIntent.metadata.isGuest,
+    });
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
