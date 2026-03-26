@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE, ZONE_SURCHARGES, calculateTotalAmount } from '@/lib/stripe';
 import { requireValidOrigin } from '@/lib/validation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { calculateDistance, getDistanceZone } from '@/lib/distanceZones';
 
 export async function POST(request: NextRequest) {
@@ -62,6 +64,11 @@ export async function POST(request: NextRequest) {
       garageLat,
       garageLng,
     } = body;
+
+    // Check if the customer is logged in (for userId metadata)
+    const session = await getServerSession(authOptions);
+    const isGuest = !session?.user?.id;
+    const userId = session?.user?.id || '';
 
     // Validate required fields
     if (!customerEmail || !customerName || !pickupAddress || !vehicleRegistration) {
@@ -161,6 +168,9 @@ export async function POST(request: NextRequest) {
         distanceZone: verifiedZone,
         distanceSurcharge: String(verifiedSurcharge),
         distanceKm: String(verifiedDistanceKm),
+        // User identification (for correct guest vs registered labelling)
+        userId: userId,
+        isGuest: isGuest ? 'true' : 'false',
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}${surchargeNote}`,

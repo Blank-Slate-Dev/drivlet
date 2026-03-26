@@ -3,7 +3,7 @@
 // It's a fallback in case the webhook isn't working
 
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { stripe } from '@/lib/stripe';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 import { sendBookingStageEmail } from '@/lib/email';
@@ -103,11 +103,15 @@ export async function POST(request: NextRequest) {
         confirmationMessage += ` A distance surcharge of $${(distanceSurcharge / 100).toFixed(2)} was applied (${distanceKm} km, ${distanceZone} zone).`;
       }
 
+      // Determine if this is a guest or registered user booking
+      const isGuestBooking = metadata.isGuest !== 'false';
+      const customerUserId = (!isGuestBooking && metadata.userId) ? new ObjectId(metadata.userId) : null;
+
       const bookingData = {
-        userId: null,
+        userId: customerUserId,
         userName: metadata.customerName,
         userEmail: metadata.customerEmail,
-        isGuest: true,
+        isGuest: isGuestBooking,
         guestPhone: metadata.customerPhone || null,
         vehicleRegistration: metadata.vehicleRegistration,
         vehicleState: metadata.vehicleState,
