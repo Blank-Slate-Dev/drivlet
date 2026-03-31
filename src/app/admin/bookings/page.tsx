@@ -594,14 +594,14 @@ export default function AdminBookingsPage() {
                         </select>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${getPaymentStatusColor(booking.paymentStatus)}`}
+                            className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${getPaymentStatusColor(booking.paymentStatus)}`}
                           >
                             {booking.paymentStatus || "pending"}
                           </span>
                           {booking.paymentAmount && (
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
                               {formatCurrency(booking.paymentAmount)}
                             </span>
                           )}
@@ -609,7 +609,7 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}
+                          className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-tight ${getStatusColor(booking.status)}`}
                         >
                           {booking.status.replace("_", " ")}
                         </span>
