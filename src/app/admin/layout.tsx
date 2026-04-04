@@ -13,7 +13,7 @@ import {
   Home,
   Loader2,
   Users,
-  Building2,
+  // Building2, // Hidden — garages not in use yet
   MessageSquare,
   Star,
   Car,
@@ -58,7 +58,7 @@ export default function AdminLayout({
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/drivers", label: "Drivers", icon: Car },
     { href: "/admin/roster", label: "Roster", icon: CalendarDays },
-    { href: "/admin/garages", label: "Garages", icon: Building2 },
+    // { href: "/admin/garages", label: "Garages", icon: Building2 }, // Hidden — not in use yet
     { href: "/admin/payment-disputes", label: "Payment Disputes", icon: AlertTriangle },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
     { href: "/admin/testimonials", label: "Testimonials", icon: Star },
