@@ -168,15 +168,17 @@ export default function Header() {
                       </div>
                     )}
 
-                    {/* Role-aware dashboard link */}
-                    <Link
-                      href={getDashboardUrl()}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      {isDriver ? <Car className="h-4 w-4" /> : isGarage ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
-                      {getDashboardLabel()}
-                    </Link>
+                    {/* Role-aware dashboard link (skip for admin — already has Admin Dashboard above) */}
+                    {!isAdmin && (
+                      <Link
+                        href={getDashboardUrl()}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        {isDriver ? <Car className="h-4 w-4" /> : isGarage ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                        {getDashboardLabel()}
+                      </Link>
+                    )}
 
                     {/* Customer-specific links */}
                     {!isDriver && !isGarage && !isAdmin && (
