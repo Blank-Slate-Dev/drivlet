@@ -205,6 +205,35 @@ export default function AdminBookingsPage() {
     }
   }, [successMessage]);
 
+  // Auto-open detail drawer when ?view=<id> is present in the URL.
+  // Used by the admin dashboard's "View" link so admins can read details
+  // without leaving the bookings list. Read-only — does not open the edit modal.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const viewId = params.get("view");
+    if (!viewId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/bookings/${viewId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          setSelectedBooking(data);
+          setShowEditModal(false);
+        }
+      } catch {
+        // Silent — drawer simply won't open if fetch fails
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("en-AU", {
       day: "numeric",

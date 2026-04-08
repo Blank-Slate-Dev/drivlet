@@ -292,7 +292,7 @@ export default function AdminDashboardPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Link
-                            href={`/admin/bookings/${booking._id}`}
+                            href={`/admin/bookings?view=${booking._id}`}
                             className="text-sm font-medium text-emerald-600 hover:text-emerald-500"
                           >
                             View
