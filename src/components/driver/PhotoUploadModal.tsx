@@ -286,8 +286,7 @@ export default function PhotoUploadModal({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
-          capture="environment"
+          accept="image/jpeg,image/png,image/webp"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -299,9 +298,10 @@ export default function PhotoUploadModal({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-20 bg-black/90 flex flex-col"
+              className="fixed inset-0 z-50 bg-black/95 flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between p-4 text-white">
+              {/* Header - fixed height */}
+              <div className="flex-shrink-0 flex items-center justify-between p-4 text-white">
                 <div>
                   <p className="font-medium">
                     {CHECKPOINTS.find((c) => c.type === selectedSlot.checkpoint)?.label}
@@ -315,7 +315,8 @@ export default function PhotoUploadModal({
                 </button>
               </div>
 
-              <div className="flex-1 flex items-center justify-center p-4">
+              {/* Image preview - constrained to remaining space */}
+              <div className="flex-1 min-h-0 flex items-center justify-center p-4">
                 <img
                   src={previewUrl}
                   alt="Preview"
@@ -323,7 +324,8 @@ export default function PhotoUploadModal({
                 />
               </div>
 
-              <div className="p-4 space-y-3">
+              {/* Footer actions - always visible */}
+              <div className="flex-shrink-0 p-4 space-y-3">
                 <input
                   type="text"
                   value={notes}
