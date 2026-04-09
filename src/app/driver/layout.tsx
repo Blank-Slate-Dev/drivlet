@@ -13,8 +13,6 @@ import {
   Clock,
   DollarSign,
   Settings,
-  LayoutDashboard,
-  LogOut,
   Home,
   CalendarDays,
 } from "lucide-react";
@@ -195,8 +193,7 @@ export default function DriverLayout({
                 />
               </div>
             </Link>
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 tracking-wide uppercase whitespace-nowrap">
-              <Car className="h-3 w-3" />
+            <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 tracking-wide uppercase whitespace-nowrap">
               Driver Portal
             </span>
 
@@ -240,23 +237,22 @@ export default function DriverLayout({
           {/* Centre: Nav links */}
           <nav className="hidden md:flex items-center gap-2">
             {[
-              { href: "/driver/dashboard", label: "Dashboard", icon: LayoutDashboard },
-              { href: "/driver/roster",    label: "Roster",    icon: CalendarDays },
-              { href: "/driver/jobs",      label: "Jobs",      icon: Briefcase },
-              { href: "/driver/payments",  label: "Payments",  icon: DollarSign },
-              { href: "/driver/history",   label: "History",   icon: Clock },
-              { href: "/driver/settings",  label: "Settings",  icon: Settings },
-            ].map(({ href, label, icon: Icon }) => (
+              { href: "/driver/dashboard", label: "Dashboard" },
+              { href: "/driver/roster",    label: "Roster" },
+              { href: "/driver/jobs",      label: "Jobs" },
+              { href: "/driver/payments",  label: "Payments" },
+              { href: "/driver/history",   label: "History" },
+              { href: "/driver/settings",  label: "Settings" },
+            ].map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                   isActive(href)
                     ? "bg-emerald-50 text-emerald-700"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
                 {label}
               </Link>
             ))}
@@ -276,10 +272,9 @@ export default function DriverLayout({
             <div className="mx-1 h-6 w-px bg-slate-200 hidden md:block" />
             <button
               onClick={() => signOut({ callbackUrl: "/driver/login" })}
-              className="hidden md:flex items-center gap-1.5 rounded-md border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+              className="hidden md:flex items-center rounded-md border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition whitespace-nowrap"
             >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="whitespace-nowrap">Sign Out</span>
+              Sign Out
             </button>
           </div>
 
