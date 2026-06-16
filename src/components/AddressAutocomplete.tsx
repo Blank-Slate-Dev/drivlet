@@ -199,7 +199,6 @@ export default function AddressAutocomplete({
     const request: google.maps.places.AutocompleteRequest = {
       input,
       includedRegionCodes: ['au'],
-      includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
       locationBias: { center, radius: BIAS_RADIUS },
     };
 
@@ -249,6 +248,8 @@ export default function AddressAutocomplete({
               merged.push(p);
             }
           }
+        } else {
+          console.error('Newcastle autocomplete failed:', newcastleResults.reason);
         }
 
         // Then Canberra results
@@ -259,6 +260,8 @@ export default function AddressAutocomplete({
               merged.push(p);
             }
           }
+        } else {
+          console.error('Canberra autocomplete failed:', canberraResults.reason);
         }
 
         setPredictions(merged.slice(0, 5));
