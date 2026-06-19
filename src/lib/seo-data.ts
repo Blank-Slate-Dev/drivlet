@@ -30,6 +30,7 @@ export interface CityData {
   metaDescription: string;
   suburbs: SuburbData[];
   nearbyAreas: string[];
+  regions?: string[];
 }
 
 export const LOCATIONS: Record<string, CityData> = {
@@ -64,6 +65,7 @@ export const LOCATIONS: Record<string, CityData> = {
       { slug: 'maitland', name: 'Maitland', postcode: '2320', description: 'Maitland car service pickup available. Drivlet collects your car, takes it to the workshop, and returns it — distance surcharges may apply.' },
     ],
     nearbyAreas: ['Hunter Valley', 'Central Coast', 'Port Stephens', 'Cessnock', 'Raymond Terrace'],
+    regions: ['Newcastle', 'Lake Macquarie'],
   },
 
   canberra: {

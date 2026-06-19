@@ -277,26 +277,52 @@ export default async function CityPage({
         {/* ─── Suburbs We Serve ───────────────────────────────────── */}
         <section className="border-b border-slate-200 py-16 sm:py-20">
           <div className="mx-auto max-w-5xl px-5 sm:px-6">
-            <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
-              Suburbs we serve in {location.name}
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
-              We cover all suburbs across the greater {location.name} region.
-              Click a suburb to learn more about our service in your area.
-            </p>
-            <div className="mt-10 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
-              {location.suburbs.map((suburb) => (
-                <Link
-                  key={suburb.slug}
-                  href={`/${location.slug}/${suburb.slug}`}
-                  className="group flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-                >
-                  <MapPin className="hidden h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-emerald-500 sm:block" />
-                  <span className="leading-snug">{suburb.name}</span>
-                  <span className="ml-auto hidden text-xs text-slate-400 sm:inline">{suburb.postcode}</span>
-                </Link>
-              ))}
-            </div>
+            {location.regions && location.regions.length > 0 ? (
+              <>
+                <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+                  Areas we serve in {location.name}
+                </h2>
+                <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
+                  We cover the greater {location.name} region. Don&apos;t see your
+                  exact suburb? Chances are we&apos;ve still got you — get in touch
+                  and we&apos;ll confirm.
+                </p>
+                <div className="mt-10 flex flex-wrap justify-center gap-3">
+                  {location.regions.map((region) => (
+                    <div
+                      key={region}
+                      className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700"
+                    >
+                      <MapPin className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+                      <span>{region}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+                  Suburbs we serve in {location.name}
+                </h2>
+                <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
+                  We cover all suburbs across the greater {location.name} region.
+                  Click a suburb to learn more about our service in your area.
+                </p>
+                <div className="mt-10 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+                  {location.suburbs.map((suburb) => (
+                    <Link
+                      key={suburb.slug}
+                      href={`/${location.slug}/${suburb.slug}`}
+                      className="group flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      <MapPin className="hidden h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-emerald-500 sm:block" />
+                      <span className="leading-snug">{suburb.name}</span>
+                      <span className="ml-auto hidden text-xs text-slate-400 sm:inline">{suburb.postcode}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
 
             {location.nearbyAreas.length > 0 && (
               <p className="mt-6 text-center text-sm text-slate-500">
