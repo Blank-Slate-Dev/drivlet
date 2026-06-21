@@ -150,6 +150,7 @@ export async function POST(request: NextRequest) {
         primaryServiceCategory,
         serviceNotes,
         flags,
+        ...(metadata.testMode === 'true' && { testMode: true }),
         paymentStatus: 'paid',
         paymentId: paymentIntentId,
         paymentAmount: paymentIntent.amount,

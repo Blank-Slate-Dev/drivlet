@@ -125,8 +125,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate the total amount using the server-verified zone
-    const totalAmount = DRIVLET_PRICE + verifiedSurcharge;
-    console.log(`💰 Pricing: base=$${(DRIVLET_PRICE / 100).toFixed(2)} + surcharge=$${(verifiedSurcharge / 100).toFixed(2)} = total=$${(totalAmount / 100).toFixed(2)} (zone=${verifiedZone}, ${verifiedDistanceKm} km)`);
+    // ⚠️ TEMPORARY TEST MODE — remove before launch
+    // When STRIPE_TEST_MODE=true, charge $1.00 instead of real price
+    const isTestMode = process.env.STRIPE_TEST_MODE === 'true';
+    const totalAmount = isTestMode ? 100 : DRIVLET_PRICE + verifiedSurcharge;
+    if (isTestMode) {
+      console.warn('⚠️⚠️⚠️ STRIPE TEST MODE ACTIVE — charging $1.00 instead of real price ⚠️⚠️⚠️');
+    }
+    console.log(`💰 Pricing: base=$${(DRIVLET_PRICE / 100).toFixed(2)} + surcharge=$${(verifiedSurcharge / 100).toFixed(2)} = total=$${(totalAmount / 100).toFixed(2)} (zone=${verifiedZone}, ${verifiedDistanceKm} km)${isTestMode ? ' [TEST MODE]' : ''}`);
 
     // Build description
     const serviceDesc = hasExistingBooking 
@@ -176,6 +182,7 @@ export async function POST(request: NextRequest) {
         distanceKm: String(verifiedDistanceKm),
         userId: userId,
         isGuest: isGuest ? 'true' : 'false',
+        ...(isTestMode && { testMode: 'true' }),
       },
       receipt_email: customerEmail,
       description: `Drivlet - ${vehicleRegistration} (${vehicleState}) - ${serviceDesc}${surchargeNote}`,
