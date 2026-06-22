@@ -48,13 +48,15 @@ export default function HomeContent() {
 
           <div className="mt-10 grid gap-8 sm:grid-cols-2">
             {Object.values(LOCATIONS).map((location) => (
-              <div key={location.slug} className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-6">
-                <h3 className="text-lg font-bold text-slate-900">
-                  <Link href={`/${location.slug}`} className="hover:text-emerald-600 transition">
-                    {location.name}, {location.stateShort}
-                  </Link>
+              <Link
+                key={location.slug}
+                href={`/areas-we-serve#${location.slug}`}
+                className="group flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+              >
+                <h3 className="text-lg font-bold text-slate-900 transition group-hover:text-emerald-600">
+                  {location.name}, {location.stateShort}
                 </h3>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

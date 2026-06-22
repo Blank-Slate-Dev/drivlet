@@ -90,6 +90,10 @@ export default function Header() {
           <a href="/#faq" className="transition hover:text-emerald-600">
             FAQ
           </a>
+          <Link href="/areas-we-serve" className="flex items-center gap-1.5 transition hover:text-emerald-600">
+            <MapPin className="h-4 w-4" />
+            Areas we serve
+          </Link>
           <Link href="/contact" className="transition hover:text-emerald-600">
             Contact
           </Link>
@@ -420,6 +424,14 @@ export default function Header() {
                 >
                   FAQ
                 </a>
+                <Link
+                  href="/areas-we-serve"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-700 transition hover:text-emerald-600"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Areas we serve
+                </Link>
                 <Link
                   href="/contact"
                   className="text-sm font-medium text-slate-700 transition hover:text-emerald-600"
