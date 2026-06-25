@@ -32,7 +32,7 @@ import StripePaymentForm from '@/components/StripePaymentForm';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-type Step = 'details' | 'vehicle' | 'schedule' | 'review' | 'payment' | 'success';
+type Step = 'details' | 'vehicle' | 'schedule' | 'review' | 'payment' | 'success' | 'requestReceived';
 interface TimeOption { value: string; label: string; minutes: number; }
 
 function generateTimeOptions(startHour: number, endHour: number): TimeOption[] {
@@ -116,6 +116,7 @@ export default function BookingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
+  const [quotedAmount, setQuotedAmount] = useState<number | null>(null);
 
   const isAuthenticated = authStatus === 'authenticated' && session?.user;
 
@@ -216,11 +217,11 @@ export default function BookingPage() {
     if (err) setSubmitError(err);
   };
 
-  const handleProceedToPayment = async () => {
+  const handleSubmitRequest = async () => {
     setIsProcessing(true); setSubmitError(null);
     try {
       const serviceTypeInfo = getServiceTypeByValue(selectedServiceType);
-      const response = await fetch('/api/stripe/create-payment-intent', {
+      const response = await fetch('/api/booking-requests', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName, customerEmail, customerPhone, pickupAddress: pickupAddress.trim(), serviceType: selectedServiceType,
@@ -239,11 +240,42 @@ export default function BookingPage() {
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to initialize payment');
-      setClientSecret(data.clientSecret); setPaymentIntentId(data.paymentIntentId); goToStep('payment');
+      if (!response.ok) throw new Error(data.error || 'Failed to submit request');
+      setQuotedAmount(data.quotedAmount);
+      goToStep('requestReceived');
     } catch (error) { setSubmitError(error instanceof Error ? error.message : 'Something went wrong.'); }
     finally { setIsProcessing(false); }
   };
+
+  // Preserved for future payment-link flow — do not delete
+  // const handleProceedToPayment = async () => {
+  //   setIsProcessing(true); setSubmitError(null);
+  //   try {
+  //     const serviceTypeInfo = getServiceTypeByValue(selectedServiceType);
+  //     const response = await fetch('/api/stripe/create-payment-intent', {
+  //       method: 'POST', headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         customerName, customerEmail, customerPhone, pickupAddress: pickupAddress.trim(), serviceType: selectedServiceType,
+  //         serviceDate: new Date(serviceDate).toISOString(), vehicleRegistration: regoPlate.trim().toUpperCase(),
+  //         vehicleState: regoState, vehicleYear, vehicleModel: vehicleModel.trim(),
+  //         pickupTimeSlot: selectedPickupSlot, dropoffTimeSlot: selectedDropoffSlot,
+  //         earliestPickup: getPickupSlotLabel(selectedPickupSlot), latestDropoff: getDropoffSlotLabel(selectedDropoffSlot),
+  //         estimatedServiceDuration: serviceTypeInfo?.estimatedHours || 4, hasExistingBooking: true,
+  //         garageName: garageSearch.trim(), garageAddress: garageAddress.trim(), garagePlaceId,
+  //         garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions), additionalNotes: additionalNotes.trim(),
+  //         transmissionType, isManualTransmission: transmissionType === 'manual',
+  //         selectedServices: JSON.stringify(selectedServices), primaryServiceCategory, serviceNotes: serviceNotes.trim(),
+  //         distanceZone: distanceZoneInfo?.zone || 'green', distanceSurcharge: distanceZoneInfo?.surchargeAmount ?? 0,
+  //         distanceKm: distanceZoneInfo?.distance ?? 0, pickupLat: selectedPlaceDetails?.lat ?? 0, pickupLng: selectedPlaceDetails?.lng ?? 0,
+  //         garageLat: garageLat ?? 0, garageLng: garageLng ?? 0,
+  //       }),
+  //     });
+  //     const data = await response.json();
+  //     if (!response.ok) throw new Error(data.error || 'Failed to initialize payment');
+  //     setClientSecret(data.clientSecret); setPaymentIntentId(data.paymentIntentId); goToStep('payment');
+  //   } catch (error) { setSubmitError(error instanceof Error ? error.message : 'Something went wrong.'); }
+  //   finally { setIsProcessing(false); }
+  // };
 
   const handlePaymentSuccess = async () => {
     if (paymentIntentId) {
@@ -270,7 +302,7 @@ export default function BookingPage() {
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2"><div className="relative h-12 w-40 sm:h-14 sm:w-48"><Image src="/logo.png" alt="drivlet" fill className="object-contain brightness-0 invert" priority /></div></Link>
-            {currentStep !== 'success' && (
+            {currentStep !== 'success' && currentStep !== 'requestReceived' && (
               <div className="hidden sm:flex flex-1 justify-center">
                 <div className="flex items-center">
                   {STEPS.map((step, index) => {
@@ -290,7 +322,7 @@ export default function BookingPage() {
             )}
             <div className="hidden sm:block w-40 sm:w-48" />
           </div>
-          {currentStep !== 'success' && (
+          {currentStep !== 'success' && currentStep !== 'requestReceived' && (
             <div className="flex sm:hidden justify-center mt-3">
               <div className="flex items-center">
                 {STEPS.map((step, index) => {
@@ -329,6 +361,7 @@ export default function BookingPage() {
       case 'review': return renderReview();
       case 'payment': return renderPayment();
       case 'success': return renderSuccess();
+      case 'requestReceived': return renderRequestReceived();
       default: return null;
     }
   }
@@ -521,7 +554,7 @@ export default function BookingPage() {
           <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4"><div className="space-y-2">{distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0 && (<><div className="flex justify-between text-sm"><span className="text-emerald-700">Transport fee</span><span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span></div><div className="flex justify-between text-sm"><span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span><span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span></div><div className="border-t border-emerald-200" /></>)}<div className="flex items-center justify-between"><span className="text-lg font-semibold text-emerald-800">Total</span><span className="text-2xl font-bold text-emerald-700">{totalPriceDisplay} AUD</span></div></div></div>
           <div className="flex items-center justify-between pt-2">
             <button type="button" onClick={() => goToStep('schedule')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
-            <button type="button" onClick={handleProceedToPayment} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CreditCard className="h-5 w-5" /> Proceed to Payment — {totalPriceDisplay}</>)}</button>
+            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request — {totalPriceDisplay}</>)}</button>
           </div>
         </div>
       </div>
@@ -555,6 +588,43 @@ export default function BookingPage() {
             {trackingCode && (<div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl"><p className="text-sm text-emerald-700 mb-2 font-medium">Your Tracking Code</p><div className="flex items-center justify-center gap-2"><span className="text-3xl font-mono font-bold tracking-[0.3em] text-emerald-700">{trackingCode}</span><button type="button" onClick={() => navigator.clipboard.writeText(trackingCode)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"><Copy className="h-5 w-5" /></button></div><p className="text-xs text-emerald-600 mt-2">Save this code to track your booking</p></div>)}
             <p className="mt-4 text-sm text-slate-500">Confirmation sent to <span className="font-medium">{customerEmail}</span></p>
             <div className="mt-6 space-y-3"><Link href={trackingUrl} className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"><MapPin className="h-4 w-4" /> Track Your Booking</Link><Link href="/" className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 text-center">Back to Home</Link></div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  function renderRequestReceived() {
+    const displayAmount = quotedAmount ? `$${(quotedAmount / 100).toFixed(2)}` : totalPriceDisplay;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
+          <div className="rounded-3xl border border-white/20 bg-white/95 backdrop-blur-sm p-8 shadow-2xl text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }} className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            </motion.div>
+            <h2 className="mt-6 text-2xl font-bold text-slate-900">Request Received!</h2>
+            <p className="mt-2 text-slate-600">
+              Thanks, {customerName.split(' ')[0]}! Our team will review your request and send a secure payment link to <span className="font-medium text-slate-900">{customerEmail}</span> shortly.
+            </p>
+            <div className="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Vehicle</span><span className="font-medium text-slate-900">{regoPlate.toUpperCase()} ({regoState})</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Date</span><span className="font-medium text-slate-900">{formatDateDisplay(serviceDate)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Garage</span><span className="font-medium text-slate-900">{garageSearch}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Pickup</span><span className="font-medium text-slate-900">{getPickupSlotLabel(selectedPickupSlot)}</span></div>
+                <div className="border-t border-slate-200 pt-2 flex justify-between"><span className="text-slate-500">Quoted total</span><span className="text-lg font-bold text-emerald-700">{displayAmount} AUD</span></div>
+              </div>
+            </div>
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-start gap-3 text-left">
+                <ShieldCheck className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                <p className="text-sm text-emerald-800">You won&apos;t be charged until we confirm we can handle the job. We&apos;ll email you a secure payment link once your request is reviewed.</p>
+              </div>
+            </div>
+            <div className="mt-6">
+              <Link href="/" className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 text-center">Back to Home</Link>
+            </div>
           </div>
         </motion.div>
       </div>

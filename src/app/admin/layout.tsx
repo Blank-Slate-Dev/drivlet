@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Shield,
   CalendarDays,
+  FileText,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -52,6 +53,7 @@ export default function AdminLayout({
 
   const navItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/booking-requests", label: "Requests", icon: FileText },
     { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
     { href: "/admin/dispatch", label: "Dispatch", icon: Truck },
     { href: "/admin/incidents", label: "Incidents", icon: Shield },
