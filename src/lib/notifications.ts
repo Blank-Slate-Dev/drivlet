@@ -196,6 +196,10 @@ export async function notifyAdminOfNewRequest(request: {
   quotedAmount: number;
   garageName?: string | null;
 }) {
+  const fromEmail = process.env.EMAIL_FROM || "noreply@drivlet.com.au"; // [EMAIL_DEBUG]
+  const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au"; // [EMAIL_DEBUG]
+  console.log(`[EMAIL_DEBUG] notifyAdminOfNewRequest ENTERED — from=${fromEmail}, to=${rawEmails}, vehicle=${request.vehicleRegistration}`); // [EMAIL_DEBUG]
+
   const pickupSuburb = request.pickupAddress.split(",")[0]?.trim() || "Unknown";
   const quotedDisplay = `$${(request.quotedAmount / 100).toFixed(2)}`;
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -215,14 +219,16 @@ export async function notifyAdminOfNewRequest(request: {
         quotedAmount: request.quotedAmount,
       },
     });
+    console.log("[EMAIL_DEBUG] AdminNotification DB record created successfully"); // [EMAIL_DEBUG]
   } catch (err) {
+    console.error("[EMAIL_DEBUG] AdminNotification DB create FAILED:", err); // [EMAIL_DEBUG]
     console.error("Failed to create admin notification:", err);
   }
 
   // 2. Send admin email(s) — supports comma-separated list
   try {
-    const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au";
     const adminEmails = rawEmails.split(",").map((e) => e.trim()).filter(Boolean);
+    console.log(`[EMAIL_DEBUG] Sending to ${adminEmails.length} recipient(s): ${adminEmails.join(", ")}`); // [EMAIL_DEBUG]
     const subject = `New booking request — ${request.vehicleRegistration} (${pickupSuburb})`;
     const textContent = [
       `Hi team,`,
@@ -256,13 +262,16 @@ export async function notifyAdminOfNewRequest(request: {
       `<p style="margin-top:24px;color:#94a3b8;font-size:12px">Drivlet</p>`,
     ].join("");
 
-    await Promise.all(
+    const results = await Promise.all(
       adminEmails.map((email) =>
         sendEmail({ to: email, toName: "Drivlet Admin", subject, textContent, htmlContent })
-          .catch((err) => console.error(`Failed to send admin email to ${email}:`, err))
+          .then((ok) => { console.log(`[EMAIL_DEBUG] sendEmail to ${email} returned ${ok}`); return ok; }) // [EMAIL_DEBUG]
+          .catch((err) => { console.error(`[EMAIL_DEBUG] sendEmail to ${email} threw:`, err); return false; }) // [EMAIL_DEBUG]
       )
     );
+    console.log(`[EMAIL_DEBUG] notifyAdminOfNewRequest COMPLETE — results=${JSON.stringify(results)}`); // [EMAIL_DEBUG]
   } catch (err) {
+    console.error("[EMAIL_DEBUG] notifyAdminOfNewRequest email block FAILED:", err); // [EMAIL_DEBUG]
     console.error("Failed to send admin notification email:", err);
   }
 }

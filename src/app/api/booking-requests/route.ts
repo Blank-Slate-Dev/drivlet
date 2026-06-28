@@ -150,15 +150,19 @@ export async function POST(request: NextRequest) {
       status: "pending_review",
     });
 
-    // Non-blocking admin notification
-    notifyAdminOfNewRequest({
-      _id: bookingRequest._id,
-      userName: customerName,
-      vehicleRegistration: bookingRequest.vehicleRegistration,
-      pickupAddress: bookingRequest.pickupAddress,
-      quotedAmount,
-      garageName: garageName || null,
-    }).catch(() => {});
+    // Await notification so Vercel doesn't kill the function before it completes [EMAIL_DEBUG]
+    try {
+      await notifyAdminOfNewRequest({
+        _id: bookingRequest._id,
+        userName: customerName,
+        vehicleRegistration: bookingRequest.vehicleRegistration,
+        pickupAddress: bookingRequest.pickupAddress,
+        quotedAmount,
+        garageName: garageName || null,
+      });
+    } catch (notifyErr) {
+      console.error("[EMAIL_DEBUG] notifyAdminOfNewRequest threw (non-fatal):", notifyErr); // [EMAIL_DEBUG]
+    }
 
     return NextResponse.json({
       success: true,

@@ -56,7 +56,8 @@
       "Bash(else)",
       "Bash(fi)",
       "Bash(done)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npx tsc *)"
     ],
     "deny": [],
     "ask": []

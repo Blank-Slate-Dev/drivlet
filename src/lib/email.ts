@@ -35,12 +35,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     return false;
   }
 
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@drivlet.com.au';
+  console.log(`[EMAIL_DEBUG] sendEmail called — from=${fromEmail}, to=${options.to}, subject="${options.subject}"`); // [EMAIL_DEBUG]
+
   try {
     const result = await mailjet.post('send', { version: 'v3.1' }).request({
       Messages: [
         {
           From: {
-            Email: process.env.EMAIL_FROM || 'noreply@drivlet.com.au',
+            Email: fromEmail,
             Name: 'drivlet',
           },
           To: [
@@ -56,9 +59,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       ],
     });
 
+    const statusCode = (result as { response?: { status?: number } }).response?.status; // [EMAIL_DEBUG]
+    const body = result.body; // [EMAIL_DEBUG]
+    console.log(`[EMAIL_DEBUG] Mailjet success — status=${statusCode}, body=${JSON.stringify(body)}`); // [EMAIL_DEBUG]
     console.log('✅ Email sent successfully to:', options.to);
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; ErrorMessage?: string; message?: string; response?: { status?: number; data?: unknown } }; // [EMAIL_DEBUG]
+    console.error(`[EMAIL_DEBUG] Mailjet FAILED — statusCode=${err.statusCode}, message=${err.ErrorMessage || err.message}, responseStatus=${err.response?.status}, responseData=${JSON.stringify(err.response?.data)}`); // [EMAIL_DEBUG]
     console.error('❌ Failed to send email:', error);
     return false;
   }
