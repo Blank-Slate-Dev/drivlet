@@ -21,6 +21,8 @@ import {
   Inbox,
   DollarSign,
   FileText,
+  Send,
+  BadgeCheck,
 } from "lucide-react";
 
 interface BookingRequestItem {
@@ -51,6 +53,9 @@ interface BookingRequestItem {
   status: string;
   adminNotes: string | null;
   declineReason: string | null;
+  paymentLinkSentAt: string | null;
+  approvedAt: string | null;
+  approvedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +63,9 @@ interface BookingRequestItem {
 interface Stats {
   pending_review: number;
   accepted_awaiting_payment: number;
+  approved: number;
+  payment_link_sent: number;
+  paid: number;
   declined: number;
   converted: number;
   expired: number;
@@ -67,6 +75,9 @@ interface Stats {
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending_review: { label: "Pending Review", color: "bg-blue-100 text-blue-700" },
   accepted_awaiting_payment: { label: "Awaiting Payment", color: "bg-amber-100 text-amber-700" },
+  approved: { label: "Approved", color: "bg-emerald-100 text-emerald-700" },
+  payment_link_sent: { label: "Link Sent", color: "bg-amber-100 text-amber-700" },
+  paid: { label: "Paid", color: "bg-emerald-100 text-emerald-700" },
   declined: { label: "Declined", color: "bg-red-100 text-red-700" },
   converted: { label: "Converted", color: "bg-green-100 text-green-700" },
   expired: { label: "Expired", color: "bg-slate-100 text-slate-600" },
@@ -172,10 +183,11 @@ export default function AdminBookingRequestsPage() {
 
         {/* Stats */}
         {stats && (
-          <div className="mb-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mb-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard icon={Inbox} iconBg="bg-blue-100" iconColor="text-blue-600" value={stats.pending_review} label="Pending" />
-            <StatCard icon={Clock} iconBg="bg-amber-100" iconColor="text-amber-600" value={stats.accepted_awaiting_payment} label="Awaiting Payment" />
-            <StatCard icon={CheckCircle2} iconBg="bg-green-100" iconColor="text-green-600" value={stats.converted} label="Converted" />
+            <StatCard icon={CheckCircle2} iconBg="bg-emerald-100" iconColor="text-emerald-600" value={(stats.approved || 0) + (stats.payment_link_sent || 0)} label="Approved" />
+            <StatCard icon={Clock} iconBg="bg-amber-100" iconColor="text-amber-600" value={stats.accepted_awaiting_payment + (stats.payment_link_sent || 0)} label="Awaiting Pay" />
+            <StatCard icon={BadgeCheck} iconBg="bg-green-100" iconColor="text-green-600" value={(stats.paid || 0) + stats.converted} label="Paid / Converted" />
             <StatCard icon={X} iconBg="bg-red-100" iconColor="text-red-600" value={stats.declined} label="Declined" />
             <StatCard icon={FileText} iconBg="bg-slate-100" iconColor="text-slate-600" value={stats.total} label="Total" />
           </div>
@@ -194,7 +206,7 @@ export default function AdminBookingRequestsPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {["all", "pending_review", "accepted_awaiting_payment", "declined", "converted"].map((s) => (
+            {["all", "pending_review", "approved", "payment_link_sent", "paid", "declined", "converted"].map((s) => (
               <button
                 key={s}
                 onClick={() => { setStatusFilter(s); setPage(1); }}
@@ -340,6 +352,7 @@ export default function AdminBookingRequestsPage() {
             onClose={() => setSelectedRequest(null)}
             formatDateTime={formatDateTime}
             formatPrice={formatPrice}
+            onRefresh={() => { fetchRequests(); setSelectedRequest(null); }}
           />
         )}
       </div>
@@ -369,13 +382,61 @@ function StatCard({ icon: Icon, iconBg, iconColor, value, label }: {
   );
 }
 
-function RequestDetailModal({ request, onClose, formatDateTime, formatPrice }: {
+function RequestDetailModal({ request, onClose, formatDateTime, formatPrice, onRefresh }: {
   request: BookingRequestItem;
   onClose: () => void;
   formatDateTime: (d: string) => string;
   formatPrice: (c: number) => string;
+  onRefresh: () => void;
 }) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const statusInfo = STATUS_CONFIG[request.status] || { label: request.status, color: "bg-slate-100 text-slate-600" };
+
+  const handleApprove = async () => {
+    setActionLoading("approve");
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/booking-requests/${request._id}/approve`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setActionError(data.error || "Failed to approve");
+        return;
+      }
+      setActionSuccess("Request approved! You can now send the payment link.");
+      onRefresh();
+    } catch {
+      setActionError("Failed to approve request");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendPaymentLink = async () => {
+    setActionLoading("send-link");
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/booking-requests/${request._id}/send-payment-link`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setActionError(data.error || "Failed to send");
+        return;
+      }
+      const data = await res.json();
+      setActionSuccess(data.emailSent ? "Payment link sent to customer!" : "Link created but email failed — check Mailjet config.");
+      onRefresh();
+    } catch {
+      setActionError("Failed to send payment link");
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -393,6 +454,50 @@ function RequestDetailModal({ request, onClose, formatDateTime, formatPrice }: {
         </div>
 
         <div className="space-y-5 p-6">
+          {/* Action Buttons */}
+          {(request.status === "pending_review" || request.status === "approved" || request.status === "payment_link_sent") && (
+            <div className="flex flex-wrap gap-3">
+              {request.status === "pending_review" && (
+                <button
+                  onClick={handleApprove}
+                  disabled={actionLoading === "approve"}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {actionLoading === "approve" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Approve Request
+                </button>
+              )}
+              {(request.status === "approved" || request.status === "payment_link_sent") && (
+                <button
+                  onClick={handleSendPaymentLink}
+                  disabled={actionLoading === "send-link"}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {actionLoading === "send-link" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {request.status === "payment_link_sent" ? "Resend Payment Link" : "Send Payment Link"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {actionSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              <CheckCircle2 className="mr-1 inline h-4 w-4" /> {actionSuccess}
+            </div>
+          )}
+          {actionError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <AlertCircle className="mr-1 inline h-4 w-4" /> {actionError}
+            </div>
+          )}
           {/* Customer */}
           <DetailCard icon={User} title="Customer">
             <div className="space-y-2">
@@ -517,6 +622,18 @@ function RequestDetailModal({ request, onClose, formatDateTime, formatPrice }: {
                 <span className="text-slate-500">Submitted</span>
                 <span className="text-slate-900">{formatDateTime(request.createdAt)}</span>
               </div>
+              {request.approvedAt && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Approved{request.approvedBy ? ` by ${request.approvedBy}` : ""}</span>
+                  <span className="text-slate-900">{formatDateTime(request.approvedAt)}</span>
+                </div>
+              )}
+              {request.paymentLinkSentAt && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Payment link sent</span>
+                  <span className="text-slate-900">{formatDateTime(request.paymentLinkSentAt)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-500">Last updated</span>
                 <span className="text-slate-900">{formatDateTime(request.updatedAt)}</span>

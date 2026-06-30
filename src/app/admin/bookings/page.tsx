@@ -37,6 +37,7 @@ import {
   UserPlus,
   UserMinus,
   Loader2,
+  BadgeCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
@@ -142,6 +143,19 @@ interface DriverOption {
   shiftPreference: "am" | "pm" | "full_day";
 }
 
+interface AwaitingPaymentRequest {
+  _id: string;
+  userName: string;
+  userEmail: string;
+  vehicleRegistration: string;
+  pickupAddress: string;
+  garageName: string | null;
+  quotedAmount: number;
+  status: string;
+  createdAt: string;
+  paymentLinkSentAt: string | null;
+}
+
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,6 +172,47 @@ export default function AdminBookingsPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  const [awaitingPayment, setAwaitingPayment] = useState<AwaitingPaymentRequest[]>([]);
+  const [awaitingLoading, setAwaitingLoading] = useState(true);
+  const [sendingLink, setSendingLink] = useState<string | null>(null);
+
+  const fetchAwaitingPayment = useCallback(async () => {
+    try {
+      setAwaitingLoading(true);
+      const res = await fetch("/api/admin/booking-requests?status=approved&limit=50");
+      if (!res.ok) return;
+      const data = await res.json();
+      const res2 = await fetch("/api/admin/booking-requests?status=payment_link_sent&limit=50");
+      const data2 = res2.ok ? await res2.json() : { requests: [] };
+      setAwaitingPayment([...data.requests, ...data2.requests]);
+    } catch {
+      // Silent fail — section just won't show
+    } finally {
+      setAwaitingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAwaitingPayment();
+  }, [fetchAwaitingPayment]);
+
+  const handleSendPaymentLink = async (requestId: string) => {
+    setSendingLink(requestId);
+    try {
+      const res = await fetch(`/api/admin/booking-requests/${requestId}/send-payment-link`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setSuccessMessage("Payment link sent!");
+        fetchAwaitingPayment();
+      }
+    } catch {
+      // Silent
+    } finally {
+      setSendingLink(null);
+    }
+  };
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -416,6 +471,55 @@ export default function AdminBookingsPage() {
           </button>
         </div>
 
+        {/* Awaiting Payment Section */}
+        {!awaitingLoading && awaitingPayment.length > 0 && (
+          <div className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-800">
+              <Clock className="h-4 w-4" />
+              Awaiting Payment ({awaitingPayment.length})
+            </h2>
+            <div className="space-y-2">
+              {awaitingPayment.map((req) => (
+                <div
+                  key={req._id}
+                  className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="font-medium text-slate-900">{req.userName}</span>
+                    <span className="font-mono text-xs font-semibold text-slate-600">{req.vehicleRegistration}</span>
+                    <span className="text-xs text-slate-500 max-w-[200px] truncate">{req.pickupAddress.split(",")[0]}</span>
+                    <span className="font-semibold text-emerald-700">${(req.quotedAmount / 100).toFixed(2)}</span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      req.status === "payment_link_sent"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}>
+                      {req.status === "payment_link_sent" ? "Link Sent" : "Approved"}
+                    </span>
+                    {req.paymentLinkSentAt && (
+                      <span className="text-[10px] text-slate-400">
+                        Sent {new Date(req.paymentLinkSentAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleSendPaymentLink(req._id)}
+                    disabled={sendingLink === req._id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {sendingLink === req._id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Mail className="h-3 w-3" />
+                    )}
+                    {req.status === "payment_link_sent" ? "Resend Link" : "Send Link"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
           <div className="relative flex-1">
@@ -625,8 +729,9 @@ export default function AdminBookingsPage() {
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${getPaymentStatusColor(booking.paymentStatus)}`}
+                            className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${getPaymentStatusColor(booking.paymentStatus)}`}
                           >
+                            {booking.paymentStatus === "paid" && <BadgeCheck className="h-3 w-3" />}
                             {booking.paymentStatus || "pending"}
                           </span>
                           {booking.paymentAmount && (

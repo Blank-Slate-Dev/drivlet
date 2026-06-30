@@ -3,6 +3,9 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 export type BookingRequestStatus =
   | "pending_review"
   | "accepted_awaiting_payment"
+  | "approved"
+  | "payment_link_sent"
+  | "paid"
   | "declined"
   | "converted"
   | "expired";
@@ -76,7 +79,11 @@ export interface IBookingRequest extends Document {
   declineReason: string | null;
   adminNotes: string | null;
 
-  // Payment linkage (placeholders for later prompts)
+  // Payment linkage
+  paymentToken: string | null;
+  paymentTokenCreatedAt: Date | null;
+  approvedAt: Date | null;
+  approvedBy: string | null;
   paymentIntentId: string | null;
   checkoutSessionId: string | null;
   paymentLinkUrl: string | null;
@@ -165,7 +172,7 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     // Review / lifecycle
     status: {
       type: String,
-      enum: ["pending_review", "accepted_awaiting_payment", "declined", "converted", "expired"],
+      enum: ["pending_review", "accepted_awaiting_payment", "approved", "payment_link_sent", "paid", "declined", "converted", "expired"],
       default: "pending_review",
     },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
@@ -173,7 +180,11 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     declineReason: { type: String, default: null },
     adminNotes: { type: String, default: null },
 
-    // Payment linkage (placeholders)
+    // Payment linkage
+    paymentToken: { type: String, default: null },
+    paymentTokenCreatedAt: { type: Date, default: null },
+    approvedAt: { type: Date, default: null },
+    approvedBy: { type: String, default: null },
     paymentIntentId: { type: String, default: null },
     checkoutSessionId: { type: String, default: null },
     paymentLinkUrl: { type: String, default: null },
@@ -186,6 +197,7 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
 
 BookingRequestSchema.index({ status: 1, createdAt: -1 });
 BookingRequestSchema.index({ userEmail: 1, createdAt: -1 });
+BookingRequestSchema.index({ paymentToken: 1 }, { unique: true, sparse: true });
 
 const BookingRequest: Model<IBookingRequest> =
   mongoose.models.BookingRequest ||

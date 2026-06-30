@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
     const statMap: Record<string, number> = {
       pending_review: 0,
       accepted_awaiting_payment: 0,
+      approved: 0,
+      payment_link_sent: 0,
+      paid: 0,
       declined: 0,
       converted: 0,
       expired: 0,
