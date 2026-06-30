@@ -21,6 +21,9 @@ export async function GET(request: Request) {
     const status = searchParams.get("status"); // pending, approved, rejected, suspended, all
     const onboardingStatus = searchParams.get("onboardingStatus"); // Filter by onboarding status
 
+    const canAcceptJobs = searchParams.get("canAcceptJobs");
+    const isActive = searchParams.get("isActive");
+
     // Build query
     const query: Record<string, unknown> = {};
     if (status && status !== "all") {
@@ -29,6 +32,10 @@ export async function GET(request: Request) {
     if (onboardingStatus && onboardingStatus !== "all") {
       query.onboardingStatus = onboardingStatus;
     }
+    if (canAcceptJobs === "true") query.canAcceptJobs = true;
+    else if (canAcceptJobs === "false") query.canAcceptJobs = false;
+    if (isActive === "true") query.isActive = true;
+    else if (isActive === "false") query.isActive = false;
 
     // Define the shape of populated user data
     interface PopulatedUser {

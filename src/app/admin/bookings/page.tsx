@@ -147,9 +147,21 @@ interface AwaitingPaymentRequest {
   _id: string;
   userName: string;
   userEmail: string;
+  customerPhone?: string;
+  isGuest?: boolean;
   vehicleRegistration: string;
+  vehicleState?: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
+  isManualTransmission?: boolean;
   pickupAddress: string;
   garageName: string | null;
+  hasExistingBooking?: boolean;
+  serviceType?: string;
+  earliestPickup?: string;
+  latestDropoff?: string;
+  pickupTimeSlot?: string;
+  dropoffTimeSlot?: string;
   quotedAmount: number;
   status: string;
   createdAt: string;
@@ -180,12 +192,18 @@ export default function AdminBookingsPage() {
   const fetchAwaitingPayment = useCallback(async () => {
     try {
       setAwaitingLoading(true);
-      const res = await fetch("/api/admin/booking-requests?status=approved&limit=50");
-      if (!res.ok) return;
-      const data = await res.json();
-      const res2 = await fetch("/api/admin/booking-requests?status=payment_link_sent&limit=50");
+      const [res1, res2] = await Promise.all([
+        fetch("/api/admin/booking-requests?status=approved&limit=50"),
+        fetch("/api/admin/booking-requests?status=payment_link_sent&limit=50"),
+      ]);
+      const data1 = res1.ok ? await res1.json() : { requests: [] };
       const data2 = res2.ok ? await res2.json() : { requests: [] };
-      setAwaitingPayment([...data.requests, ...data2.requests]);
+      const combined = [...(data1.requests || []), ...(data2.requests || [])]
+        .filter((r: AwaitingPaymentRequest) => r.status !== "paid")
+        .sort((a: AwaitingPaymentRequest, b: AwaitingPaymentRequest) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      setAwaitingPayment(combined);
     } catch {
       // Silent fail — section just won't show
     } finally {
@@ -195,6 +213,15 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     fetchAwaitingPayment();
+    const interval = setInterval(fetchAwaitingPayment, 30_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchAwaitingPayment();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [fetchAwaitingPayment]);
 
   const handleSendPaymentLink = async (requestId: string) => {
@@ -459,7 +486,7 @@ export default function AdminBookingsPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Manage Bookings</h1>
             <p className="mt-1 text-slate-600">
-              {total} total bookings • View and manage all customer bookings
+              {total} total bookings{awaitingPayment.length > 0 ? ` • ${awaitingPayment.length} awaiting payment` : ""} • View and manage all customer bookings
             </p>
           </div>
           <button
@@ -471,54 +498,12 @@ export default function AdminBookingsPage() {
           </button>
         </div>
 
-        {/* Awaiting Payment Section */}
-        {!awaitingLoading && awaitingPayment.length > 0 && (
+        {/* Old Awaiting Payment banner — superseded: requests now render as rows inside the main table below */}
+        {/* {!awaitingLoading && awaitingPayment.length > 0 && (
           <div className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 shadow-sm">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-800">
-              <Clock className="h-4 w-4" />
-              Awaiting Payment ({awaitingPayment.length})
-            </h2>
-            <div className="space-y-2">
-              {awaitingPayment.map((req) => (
-                <div
-                  key={req._id}
-                  className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="font-medium text-slate-900">{req.userName}</span>
-                    <span className="font-mono text-xs font-semibold text-slate-600">{req.vehicleRegistration}</span>
-                    <span className="text-xs text-slate-500 max-w-[200px] truncate">{req.pickupAddress.split(",")[0]}</span>
-                    <span className="font-semibold text-emerald-700">${(req.quotedAmount / 100).toFixed(2)}</span>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      req.status === "payment_link_sent"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-emerald-100 text-emerald-700"
-                    }`}>
-                      {req.status === "payment_link_sent" ? "Link Sent" : "Approved"}
-                    </span>
-                    {req.paymentLinkSentAt && (
-                      <span className="text-[10px] text-slate-400">
-                        Sent {new Date(req.paymentLinkSentAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleSendPaymentLink(req._id)}
-                    disabled={sendingLink === req._id}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                  >
-                    {sendingLink === req._id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Mail className="h-3 w-3" />
-                    )}
-                    {req.status === "payment_link_sent" ? "Resend Link" : "Send Link"}
-                  </button>
-                </div>
-              ))}
-            </div>
+            ...
           </div>
-        )}
+        )} */}
 
         {/* Filters */}
         <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
@@ -602,7 +587,7 @@ export default function AdminBookingsPage() {
               <RefreshCw className="mx-auto h-8 w-8 animate-spin text-emerald-500" />
               <p className="mt-3 text-sm text-slate-500">Loading bookings...</p>
             </div>
-          ) : bookings.length === 0 ? (
+          ) : bookings.length === 0 && awaitingPayment.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
                 <Car className="h-8 w-8 text-slate-400" />
@@ -625,6 +610,105 @@ export default function AdminBookingsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {/* Awaiting-payment request rows — pinned at top on page 1 */}
+                  {page === 1 && statusFilter === "all" && stageFilter === "all" && awaitingPayment.map((req) => (
+                    <tr key={`req-${req._id}`} className="border-l-4 border-l-amber-400 bg-amber-50/40 transition hover:bg-amber-50/70">
+                      {/* Customer */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900">{req.userName}</p>
+                          {req.isGuest && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Guest</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">{req.userEmail}</p>
+                        {req.customerPhone && (
+                          <p className="text-xs text-slate-400">{req.customerPhone}</p>
+                        )}
+                      </td>
+                      {/* Vehicle */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900">{req.vehicleRegistration}</p>
+                          {req.isManualTransmission && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title="Manual transmission">Manual</span>
+                          )}
+                        </div>
+                        {(req.vehicleYear || req.vehicleModel) && (
+                          <p className="text-xs text-slate-500">{[req.vehicleYear, req.vehicleModel].filter(Boolean).join(" ")}</p>
+                        )}
+                      </td>
+                      {/* Details */}
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-slate-700 truncate max-w-[180px]">{req.pickupAddress.split(",")[0]}</p>
+                        {req.garageName && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                            <Building className="h-3 w-3" />
+                            {req.garageName}
+                          </span>
+                        )}
+                      </td>
+                      {/* Pickup */}
+                      <td className="px-4 py-4">
+                        {req.pickupTimeSlot ? (
+                          <p className="text-sm text-slate-900">{getPickupSlotLabel(req.pickupTimeSlot)}</p>
+                        ) : req.earliestPickup ? (
+                          <p className="text-sm text-slate-900">{req.earliestPickup}</p>
+                        ) : (
+                          <p className="text-sm text-slate-400">—</p>
+                        )}
+                        {req.dropoffTimeSlot && (
+                          <p className="text-xs text-emerald-600">Return: {getDropoffSlotLabel(req.dropoffTimeSlot)}</p>
+                        )}
+                      </td>
+                      {/* Stage — static pill */}
+                      <td className="px-4 py-4">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                          <Clock className="h-3 w-3" />
+                          Awaiting Payment
+                        </span>
+                      </td>
+                      {/* Payment */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium leading-tight text-amber-700">
+                            Unpaid
+                          </span>
+                          <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                            {formatCurrency(req.quotedAmount)}
+                          </span>
+                        </div>
+                      </td>
+                      {/* Status */}
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-tight ${
+                          req.status === "payment_link_sent" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {req.status === "payment_link_sent" ? "Link Sent" : "Approved"}
+                        </span>
+                        {req.paymentLinkSentAt && (
+                          <p className="mt-0.5 text-[10px] text-slate-400">
+                            Sent {new Date(req.paymentLinkSentAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                          </p>
+                        )}
+                      </td>
+                      {/* Actions */}
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => handleSendPaymentLink(req._id)}
+                          disabled={sendingLink === req._id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          {sendingLink === req._id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Mail className="h-3 w-3" />
+                          )}
+                          {req.status === "payment_link_sent" ? "Resend" : "Send Link"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                   {bookings.map((booking) => (
                     <tr key={booking._id} className="transition hover:bg-slate-50">
                       <td className="px-4 py-4">
@@ -880,7 +964,7 @@ function ViewDetailsModal({
     const fetchDrivers = async () => {
       setLoadingDrivers(true);
       try {
-        const response = await fetch("/api/admin/drivers?status=active&canAcceptJobs=true");
+        const response = await fetch("/api/admin/drivers?status=approved&onboardingStatus=active&canAcceptJobs=true&isActive=true");
         if (response.ok) {
           const data = await response.json();
           setDrivers(data.drivers || []);
