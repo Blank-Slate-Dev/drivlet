@@ -12,10 +12,12 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
-  Image as ImageIcon,
+  // Image as ImageIcon, // commented out — unused after fullscreen refactor
   MapPin,
   RefreshCw,
   WifiOff,
+  Lock,
+  Pencil,
 } from "lucide-react";
 import { usePhotoUpload } from "@/hooks/usePhotoUpload";
 import { CheckpointType, PhotoType } from "@/models/VehiclePhoto";
@@ -28,6 +30,27 @@ interface PhotoUploadModalProps {
   vehicleRegistration: string;
   vehicleState: string;
   currentStage?: string;
+}
+
+interface PhotoData {
+  id: string;
+  checkpointType: CheckpointType;
+  photoType: PhotoType;
+  url: string;
+  uploadedAt?: string;
+  notes?: string;
+  capturedAt?: string;
+  capturedLocation?: string;
+}
+
+interface ViewingPhoto {
+  id: string;
+  url: string;
+  notes?: string;
+  capturedAt?: string;
+  capturedLocation?: string;
+  checkpoint: CheckpointType;
+  photoType: PhotoType;
 }
 
 const CHECKPOINTS: { type: CheckpointType; label: string; description: string }[] = [
@@ -61,6 +84,47 @@ const PHOTO_TYPES: { type: PhotoType; label: string; icon: string }[] = [
   { type: "odometer", label: "Odometer", icon: "🔢" },
 ];
 
+const REQUIRED_PHOTO_TYPES: PhotoType[] = ["front", "back", "left_side", "right_side"];
+
+function isCheckpointComplete(
+  checkpoint: CheckpointType,
+  photos: Array<{ checkpointType: CheckpointType; photoType: PhotoType }>
+): boolean {
+  return REQUIRED_PHOTO_TYPES.every((pt) =>
+    photos.some((p) => p.checkpointType === checkpoint && p.photoType === pt)
+  );
+}
+
+function isCheckpointUnlocked(
+  checkpoint: CheckpointType,
+  photos: Array<{ checkpointType: CheckpointType; photoType: PhotoType }>
+): boolean {
+  const idx = CHECKPOINTS.findIndex((c) => c.type === checkpoint);
+  if (idx === 0) return true;
+  return CHECKPOINTS.slice(0, idx).every((c) => isCheckpointComplete(c.type, photos));
+}
+
+function getLockMessage(checkpoint: CheckpointType): string {
+  const idx = CHECKPOINTS.findIndex((c) => c.type === checkpoint);
+  if (idx <= 0) return "";
+  const prev = CHECKPOINTS[idx - 1];
+  return `Complete ${prev.label} photos to unlock`;
+}
+
+function formatCapturedDate(dateStr?: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+function formatCapturedTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function PhotoUploadModal({
   isOpen,
   onClose,
@@ -81,12 +145,30 @@ export default function PhotoUploadModal({
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Capture details state
+  const [captureDate, setCaptureDate] = useState("");
+  const [captureTime, setCaptureTime] = useState("");
+  const [captureLocation, setCaptureLocation] = useState("");
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [replacePhotoId, setReplacePhotoId] = useState<string | null>(null);
+
+  // View/Edit photo state
+  const [viewingPhoto, setViewingPhoto] = useState<ViewingPhoto | null>(null);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   const {
     photos,
     checkpointStatus,
     loading,
     uploadPhoto,
     deletePhoto,
+    updatePhotoDetails,
     fetchPhotos,
     getPhoto,
     getUploadState,
@@ -97,15 +179,28 @@ export default function PhotoUploadModal({
   useEffect(() => {
     if (isOpen) {
       fetchPhotos();
-      // Auto-expand current checkpoint based on stage
-      const checkpointFromStage = getCheckpointFromStage(currentStage);
-      if (checkpointFromStage) {
-        setExpandedCheckpoint(checkpointFromStage);
-      } else {
-        setExpandedCheckpoint("pre_pickup");
-      }
     }
-  }, [isOpen, fetchPhotos, currentStage]);
+  }, [isOpen, fetchPhotos]);
+
+  // Auto-expand after fetch completes (loading transitions true→false)
+  const prevLoadingRef = useRef(false);
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+
+    if (!isOpen) return;
+    if (!(wasLoading && !loading)) return;
+
+    const stageCheckpoint = getCheckpointFromStage(currentStage);
+    if (stageCheckpoint && isCheckpointUnlocked(stageCheckpoint, photos)) {
+      setExpandedCheckpoint(stageCheckpoint);
+      return;
+    }
+    const firstIncomplete = CHECKPOINTS.find(
+      (c) => isCheckpointUnlocked(c.type, photos) && !isCheckpointComplete(c.type, photos)
+    );
+    setExpandedCheckpoint(firstIncomplete?.type ?? "pre_pickup");
+  }, [isOpen, loading, photos, currentStage]);
 
   // Online/offline detection
   useEffect(() => {
@@ -125,6 +220,31 @@ export default function PhotoUploadModal({
     };
   }, [processQueue]);
 
+  // Auto-request geolocation when preview opens
+  useEffect(() => {
+    if (!previewUrl || !selectedSlot) return;
+    setIsGettingLocation(true);
+    if (!navigator.geolocation) {
+      setIsGettingLocation(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsCoords(coords);
+        if (!captureLocation) {
+          setCaptureLocation(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+        }
+        setIsGettingLocation(false);
+      },
+      () => {
+        setIsGettingLocation(false);
+      },
+      { timeout: 5000, maximumAge: 60000 }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only trigger on preview open
+  }, [previewUrl]);
+
   const getCheckpointFromStage = (stage?: string): CheckpointType | null => {
     if (!stage) return null;
     if (["driver_en_route", "car_picked_up"].includes(stage)) return "pre_pickup";
@@ -135,10 +255,17 @@ export default function PhotoUploadModal({
   };
 
   const handleCaptureClick = (checkpoint: CheckpointType, photoType: PhotoType) => {
+    if (!isCheckpointUnlocked(checkpoint, photos)) return;
     setSelectedSlot({ checkpoint, photoType });
     setPreviewUrl(null);
     setNotes("");
     setSelectedFile(null);
+    setReplacePhotoId(null);
+    const now = new Date();
+    setCaptureDate(now.toISOString().slice(0, 10));
+    setCaptureTime(now.toTimeString().slice(0, 5));
+    setCaptureLocation("");
+    setGpsCoords(null);
     fileInputRef.current?.click();
   };
 
@@ -146,7 +273,6 @@ export default function PhotoUploadModal({
     const file = e.target.files?.[0];
     if (!file || !selectedSlot) return;
 
-    // Create preview
     const reader = new FileReader();
     reader.onload = (event) => {
       setPreviewUrl(event.target?.result as string);
@@ -154,18 +280,24 @@ export default function PhotoUploadModal({
     };
     reader.readAsDataURL(file);
 
-    // Clear input for next selection
     e.target.value = "";
   };
 
   const handleUpload = async () => {
     if (!selectedFile || !selectedSlot) return;
+    if (!captureLocation.trim()) return;
 
-    await uploadPhoto(selectedFile, selectedSlot.checkpoint, selectedSlot.photoType, notes);
-    setSelectedSlot(null);
-    setPreviewUrl(null);
-    setNotes("");
-    setSelectedFile(null);
+    const capturedAt = new Date(`${captureDate}T${captureTime}`).toISOString();
+
+    await uploadPhoto(selectedFile, selectedSlot.checkpoint, selectedSlot.photoType, notes, {
+      capturedAt,
+      capturedLocation: captureLocation.trim(),
+      gpsLatitude: gpsCoords?.lat,
+      gpsLongitude: gpsCoords?.lng,
+      replacePhotoId: replacePhotoId || undefined,
+    });
+
+    handleCancelPreview();
   };
 
   const handleDelete = async (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => {
@@ -179,6 +311,116 @@ export default function PhotoUploadModal({
     setPreviewUrl(null);
     setNotes("");
     setSelectedFile(null);
+    setCaptureDate("");
+    setCaptureTime("");
+    setCaptureLocation("");
+    setGpsCoords(null);
+    setIsGettingLocation(false);
+    setReplacePhotoId(null);
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsCoords(coords);
+        setCaptureLocation(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+        setIsGettingLocation(false);
+      },
+      () => {
+        setIsGettingLocation(false);
+      },
+      { timeout: 5000, maximumAge: 60000 }
+    );
+  };
+
+  // --- View / Edit / Replace handlers ---
+  const handleViewPhoto = (photo: PhotoData) => {
+    setViewingPhoto({
+      id: photo.id,
+      url: photo.url,
+      notes: photo.notes,
+      capturedAt: photo.capturedAt,
+      capturedLocation: photo.capturedLocation,
+      checkpoint: photo.checkpointType,
+      photoType: photo.photoType,
+    });
+    setIsEditingDetails(false);
+  };
+
+  const handleStartEdit = () => {
+    if (!viewingPhoto) return;
+    setIsEditingDetails(true);
+    setEditNotes(viewingPhoto.notes || "");
+    if (viewingPhoto.capturedAt) {
+      const d = new Date(viewingPhoto.capturedAt);
+      setEditDate(d.toISOString().slice(0, 10));
+      setEditTime(d.toTimeString().slice(0, 5));
+    } else {
+      setEditDate("");
+      setEditTime("");
+    }
+    setEditLocation(viewingPhoto.capturedLocation || "");
+  };
+
+  const handleSaveDetails = async () => {
+    if (!viewingPhoto) return;
+    setIsSavingDetails(true);
+
+    const capturedAt = editDate && editTime
+      ? new Date(`${editDate}T${editTime}`).toISOString()
+      : undefined;
+
+    const ok = await updatePhotoDetails(viewingPhoto.id, {
+      notes: editNotes,
+      capturedAt,
+      capturedLocation: editLocation,
+    });
+
+    setIsSavingDetails(false);
+    if (ok) {
+      setViewingPhoto({
+        ...viewingPhoto,
+        notes: editNotes,
+        capturedAt,
+        capturedLocation: editLocation,
+      });
+      setIsEditingDetails(false);
+    }
+  };
+
+  const handleReplacePhoto = () => {
+    if (!viewingPhoto) return;
+    const rpId = viewingPhoto.id;
+    const cpType = viewingPhoto.checkpoint;
+    const ptType = viewingPhoto.photoType;
+    setViewingPhoto(null);
+    setReplacePhotoId(rpId);
+    setSelectedSlot({ checkpoint: cpType, photoType: ptType });
+    setNotes("");
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    const now = new Date();
+    setCaptureDate(now.toISOString().slice(0, 10));
+    setCaptureTime(now.toTimeString().slice(0, 5));
+    setCaptureLocation("");
+    setGpsCoords(null);
+    setTimeout(() => fileInputRef.current?.click(), 50);
+  };
+
+  const handleDeleteFromViewer = async () => {
+    if (!viewingPhoto) return;
+    if (confirm("Delete this photo?")) {
+      await deletePhoto(viewingPhoto.id, viewingPhoto.checkpoint, viewingPhoto.photoType);
+      setViewingPhoto(null);
+    }
+  };
+
+  const handleToggleCheckpoint = (checkpoint: CheckpointType) => {
+    if (!isCheckpointUnlocked(checkpoint, photos)) return;
+    setExpandedCheckpoint(expandedCheckpoint === checkpoint ? null : checkpoint);
   };
 
   const getTotalProgress = () => {
@@ -250,23 +492,27 @@ export default function PhotoUploadModal({
             </div>
           ) : (
             <div className="p-4 space-y-3">
-              {CHECKPOINTS.map((checkpoint) => (
-                <CheckpointSection
-                  key={checkpoint.type}
-                  checkpoint={checkpoint}
-                  isExpanded={expandedCheckpoint === checkpoint.type}
-                  onToggle={() =>
-                    setExpandedCheckpoint(
-                      expandedCheckpoint === checkpoint.type ? null : checkpoint.type
-                    )
-                  }
-                  count={checkpointStatus[checkpoint.type]}
-                  onCapture={handleCaptureClick}
-                  onDelete={handleDelete}
-                  getPhoto={getPhoto}
-                  getUploadState={getUploadState}
-                />
-              ))}
+              {CHECKPOINTS.map((checkpoint) => {
+                const locked = !isCheckpointUnlocked(checkpoint.type, photos);
+                const complete = isCheckpointComplete(checkpoint.type, photos);
+                return (
+                  <CheckpointSection
+                    key={checkpoint.type}
+                    checkpoint={checkpoint}
+                    isExpanded={expandedCheckpoint === checkpoint.type}
+                    onToggle={() => handleToggleCheckpoint(checkpoint.type)}
+                    count={checkpointStatus[checkpoint.type]}
+                    isComplete={complete}
+                    isLocked={locked}
+                    lockMessage={getLockMessage(checkpoint.type)}
+                    onCapture={handleCaptureClick}
+                    onDelete={handleDelete}
+                    onViewPhoto={handleViewPhoto}
+                    getPhoto={getPhoto}
+                    getUploadState={getUploadState}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -291,7 +537,7 @@ export default function PhotoUploadModal({
           className="hidden"
         />
 
-        {/* Preview Modal */}
+        {/* Preview Modal (new capture or replace) */}
         <AnimatePresence>
           {previewUrl && selectedSlot && (
             <motion.div
@@ -300,7 +546,7 @@ export default function PhotoUploadModal({
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 bg-black/95 flex flex-col overflow-hidden"
             >
-              {/* Header - fixed height */}
+              {/* Header */}
               <div className="flex-shrink-0 flex items-center justify-between p-4 text-white">
                 <div>
                   <p className="font-medium">
@@ -308,6 +554,7 @@ export default function PhotoUploadModal({
                   </p>
                   <p className="text-sm text-white/70">
                     {PHOTO_TYPES.find((p) => p.type === selectedSlot.photoType)?.label}
+                    {replacePhotoId && " (Replacing)"}
                   </p>
                 </div>
                 <button onClick={handleCancelPreview} className="p-2">
@@ -315,7 +562,7 @@ export default function PhotoUploadModal({
                 </button>
               </div>
 
-              {/* Image preview - constrained to remaining space */}
+              {/* Image preview */}
               <div className="flex-1 min-h-0 flex items-center justify-center p-4">
                 <img
                   src={previewUrl}
@@ -324,8 +571,8 @@ export default function PhotoUploadModal({
                 />
               </div>
 
-              {/* Footer actions - always visible */}
-              <div className="flex-shrink-0 p-4 space-y-3">
+              {/* Footer: capture details + actions */}
+              <div className="flex-shrink-0 p-4 space-y-3 overflow-y-auto max-h-[45vh]">
                 <input
                   type="text"
                   value={notes}
@@ -333,6 +580,48 @@ export default function PhotoUploadModal({
                   placeholder="Add notes (optional)"
                   className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+
+                {/* Capture Details */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Capture Details</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={captureDate}
+                      onChange={(e) => setCaptureDate(e.target.value)}
+                      className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                    />
+                    <input
+                      type="time"
+                      value={captureTime}
+                      onChange={(e) => setCaptureTime(e.target.value)}
+                      className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={captureLocation}
+                      onChange={(e) => setCaptureLocation(e.target.value)}
+                      placeholder="Location *"
+                      className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      onClick={handleUseCurrentLocation}
+                      disabled={isGettingLocation}
+                      className="flex-shrink-0 rounded-xl bg-emerald-600/80 px-3 py-2.5 text-white hover:bg-emerald-600 disabled:opacity-50 transition flex items-center gap-1.5"
+                      title="Use current location"
+                    >
+                      {isGettingLocation ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MapPin className="h-4 w-4" />
+                      )}
+                      <span className="text-xs">GPS</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
                   <button
                     onClick={handleCancelPreview}
@@ -342,7 +631,8 @@ export default function PhotoUploadModal({
                   </button>
                   <button
                     onClick={handleUpload}
-                    className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 flex items-center justify-center gap-2"
+                    disabled={!captureLocation.trim()}
+                    className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Check className="h-5 w-5" />
                     Upload
@@ -352,23 +642,169 @@ export default function PhotoUploadModal({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Fullscreen Photo Viewer / Editor */}
+        <AnimatePresence>
+          {viewingPhoto && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex-shrink-0 flex items-center justify-between p-4 text-white">
+                <div>
+                  <p className="font-medium">
+                    {CHECKPOINTS.find((c) => c.type === viewingPhoto.checkpoint)?.label}
+                  </p>
+                  <p className="text-sm text-white/70">
+                    {PHOTO_TYPES.find((p) => p.type === viewingPhoto.photoType)?.label}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setViewingPhoto(null); setIsEditingDetails(false); }}
+                  className="p-2"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Image */}
+              <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+                <img
+                  src={viewingPhoto.url}
+                  alt="Photo"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+
+              {/* Metadata & Actions */}
+              <div className="flex-shrink-0 p-4 space-y-3 overflow-y-auto max-h-[45vh]">
+                {isEditingDetails ? (
+                  /* --- Edit Mode --- */
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Edit Details</p>
+                    <input
+                      type="text"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Notes (optional)"
+                      className="w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                      />
+                      <input
+                        type="time"
+                        value={editTime}
+                        onChange={(e) => setEditTime(e.target.value)}
+                        className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="Location"
+                      className="w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setIsEditingDetails(false)}
+                        className="flex-1 rounded-xl border border-white/30 py-2.5 font-medium text-white hover:bg-white/10 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveDetails}
+                        disabled={isSavingDetails}
+                        className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                      >
+                        {isSavingDetails ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* --- View Mode --- */
+                  <>
+                    {(viewingPhoto.capturedAt || viewingPhoto.capturedLocation || viewingPhoto.notes) && (
+                      <div className="rounded-xl bg-white/10 p-3 space-y-1.5">
+                        {viewingPhoto.capturedAt && (
+                          <p className="text-sm text-white/80">
+                            <span className="text-white/50">Captured:</span>{" "}
+                            {formatCapturedDate(viewingPhoto.capturedAt)}{" "}
+                            {formatCapturedTime(viewingPhoto.capturedAt)}
+                          </p>
+                        )}
+                        {viewingPhoto.capturedLocation && (
+                          <p className="text-sm text-white/80 flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-white/50 flex-shrink-0" />
+                            {viewingPhoto.capturedLocation}
+                          </p>
+                        )}
+                        {viewingPhoto.notes && (
+                          <p className="text-sm text-white/70 italic">{viewingPhoto.notes}</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleReplacePhoto}
+                        className="flex-1 rounded-xl bg-white/10 border border-white/20 py-2.5 font-medium text-white hover:bg-white/20 flex items-center justify-center gap-2 text-sm"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Replace
+                      </button>
+                      <button
+                        onClick={handleStartEdit}
+                        className="flex-1 rounded-xl bg-white/10 border border-white/20 py-2.5 font-medium text-white hover:bg-white/20 flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit Details
+                      </button>
+                      <button
+                        onClick={handleDeleteFromViewer}
+                        className="rounded-xl bg-red-500/20 border border-red-500/30 px-4 py-2.5 font-medium text-red-400 hover:bg-red-500/30 flex items-center justify-center text-sm"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
 }
+
+// ─── CheckpointSection ───────────────────────────────────────────────
 
 interface CheckpointSectionProps {
   checkpoint: { type: CheckpointType; label: string; description: string };
   isExpanded: boolean;
   onToggle: () => void;
   count: number;
+  isComplete: boolean;
+  isLocked: boolean;
+  lockMessage: string;
   onCapture: (checkpoint: CheckpointType, photoType: PhotoType) => void;
   onDelete: (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => void;
-  getPhoto: (checkpoint: CheckpointType, photoType: PhotoType) => {
-    id: string;
-    url: string;
-    notes?: string;
-  } | undefined;
+  onViewPhoto: (photo: PhotoData) => void;
+  getPhoto: (checkpoint: CheckpointType, photoType: PhotoType) => PhotoData | undefined;
   getUploadState: (
     checkpoint: CheckpointType,
     photoType: PhotoType
@@ -380,17 +816,21 @@ function CheckpointSection({
   isExpanded,
   onToggle,
   count,
+  isComplete,
+  isLocked,
+  lockMessage,
   onCapture,
   onDelete,
+  onViewPhoto,
   getPhoto,
   getUploadState,
 }: CheckpointSectionProps) {
-  const isComplete = count >= 5;
-
   return (
     <div
       className={`rounded-2xl border transition-all ${
-        isComplete
+        isLocked
+          ? "border-slate-200 bg-slate-50/50 opacity-60"
+          : isComplete
           ? "border-emerald-200 bg-emerald-50/50"
           : "border-slate-200 bg-white"
       }`}
@@ -398,27 +838,38 @@ function CheckpointSection({
       {/* Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4"
+        disabled={isLocked}
+        className={`w-full flex items-center justify-between p-4 ${
+          isLocked ? "cursor-not-allowed" : ""
+        }`}
       >
         <div className="flex items-center gap-3">
           <div
             className={`flex h-10 w-10 items-center justify-center rounded-full ${
-              isComplete
+              isLocked
+                ? "bg-slate-200 text-slate-400"
+                : isComplete
                 ? "bg-emerald-500 text-white"
                 : count > 0
                 ? "bg-emerald-100 text-emerald-600"
                 : "bg-slate-100 text-slate-400"
             }`}
           >
-            {isComplete ? (
+            {isLocked ? (
+              <Lock className="h-5 w-5" />
+            ) : isComplete ? (
               <Check className="h-5 w-5" />
             ) : (
               <Camera className="h-5 w-5" />
             )}
           </div>
           <div className="text-left">
-            <p className="font-semibold text-slate-900">{checkpoint.label}</p>
-            <p className="text-xs text-slate-500">{checkpoint.description}</p>
+            <p className={`font-semibold ${isLocked ? "text-slate-500" : "text-slate-900"}`}>
+              {checkpoint.label}
+            </p>
+            <p className="text-xs text-slate-500">
+              {isLocked ? lockMessage : checkpoint.description}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -429,17 +880,18 @@ function CheckpointSection({
           >
             {count}/5
           </span>
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-slate-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-slate-400" />
-          )}
+          {!isLocked &&
+            (isExpanded ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            ))}
         </div>
       </button>
 
       {/* Photo Grid */}
       <AnimatePresence>
-        {isExpanded && (
+        {isExpanded && !isLocked && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -456,6 +908,7 @@ function CheckpointSection({
                   uploadState={getUploadState(checkpoint.type, photoType.type)}
                   onCapture={() => onCapture(checkpoint.type, photoType.type)}
                   onDelete={onDelete}
+                  onViewPhoto={onViewPhoto}
                 />
               ))}
             </div>
@@ -466,13 +919,16 @@ function CheckpointSection({
   );
 }
 
+// ─── PhotoSlot ───────────────────────────────────────────────────────
+
 interface PhotoSlotProps {
   checkpoint: CheckpointType;
   photoType: { type: PhotoType; label: string; icon: string };
-  photo?: { id: string; url: string; notes?: string };
+  photo?: PhotoData;
   uploadState: { status: string; progress: number; error?: string };
   onCapture: () => void;
   onDelete: (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => void;
+  onViewPhoto: (photo: PhotoData) => void;
 }
 
 function PhotoSlot({
@@ -482,53 +938,35 @@ function PhotoSlot({
   uploadState,
   onCapture,
   onDelete,
+  onViewPhoto,
 }: PhotoSlotProps) {
-  const [showFullscreen, setShowFullscreen] = useState(false);
-
   if (photo) {
     return (
-      <>
-        <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
-          <img
-            src={photo.url}
-            alt={photoType.label}
-            className="w-full h-full object-cover cursor-pointer"
-            onClick={() => setShowFullscreen(true)}
-          />
-          <button
-            onClick={() => onDelete(photo.id, checkpoint, photoType.type)}
-            className="absolute top-1 right-1 p-1.5 rounded-full bg-red-500/90 text-white hover:bg-red-600"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1">
-            <p className="text-[10px] font-medium text-white">{photoType.label}</p>
-          </div>
-          <div className="absolute top-1 left-1 p-1 rounded-full bg-emerald-500">
-            <Check className="h-3 w-3 text-white" />
-          </div>
+      <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
+        <img
+          src={photo.url}
+          alt={photoType.label}
+          className="w-full h-full object-cover cursor-pointer"
+          onClick={() => onViewPhoto(photo)}
+        />
+        <button
+          onClick={() => onDelete(photo.id, checkpoint, photoType.type)}
+          className="absolute top-1 right-1 p-1.5 rounded-full bg-red-500/90 text-white hover:bg-red-600"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1">
+          <p className="text-[10px] font-medium text-white">{photoType.label}</p>
+          {photo.capturedAt && (
+            <p className="text-[8px] text-white/70 leading-tight">
+              {formatCapturedDate(photo.capturedAt)} {formatCapturedTime(photo.capturedAt)}
+            </p>
+          )}
         </div>
-
-        {/* Fullscreen Modal */}
-        {showFullscreen && (
-          <div
-            className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-            onClick={() => setShowFullscreen(false)}
-          >
-            <button
-              className="absolute top-4 right-4 p-2 text-white"
-              onClick={() => setShowFullscreen(false)}
-            >
-              <X className="h-8 w-8" />
-            </button>
-            <img
-              src={photo.url}
-              alt={photoType.label}
-              className="max-w-full max-h-full object-contain"
-            />
-          </div>
-        )}
-      </>
+        <div className="absolute top-1 left-1 p-1 rounded-full bg-emerald-500">
+          <Check className="h-3 w-3 text-white" />
+        </div>
+      </div>
     );
   }
 

@@ -12,6 +12,24 @@ interface UploadedPhoto {
   notes?: string;
   gpsLatitude?: number;
   gpsLongitude?: number;
+  capturedAt?: string;
+  capturedLocation?: string;
+}
+
+interface PhotoMetadata {
+  capturedAt?: string;
+  capturedLocation?: string;
+  gpsLatitude?: number;
+  gpsLongitude?: number;
+  replacePhotoId?: string;
+}
+
+interface QueueItem {
+  file: File;
+  checkpoint: CheckpointType;
+  photoType: PhotoType;
+  notes?: string;
+  metadata?: PhotoMetadata;
 }
 
 interface PhotoUploadState {
@@ -40,14 +58,12 @@ export function usePhotoUpload(bookingId: string) {
     final_delivery: 0,
   });
   const [loading, setLoading] = useState(false);
-  const queueRef = useRef<Array<{ file: File; checkpoint: CheckpointType; photoType: PhotoType; notes?: string }>>([]);
+  const queueRef = useRef<QueueItem[]>([]);
   const isProcessingRef = useRef(false);
 
-  // Generate unique key for photo state
   const getPhotoKey = (checkpoint: CheckpointType, photoType: PhotoType) =>
     `${checkpoint}_${photoType}`;
 
-  // Compress image before upload
   const compressImage = async (file: File, maxWidth = 1920, quality = 0.8): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -57,7 +73,6 @@ export function usePhotoUpload(bookingId: string) {
           const canvas = document.createElement("canvas");
           let { width, height } = img;
 
-          // Scale down if larger than maxWidth
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
             width = maxWidth;
@@ -92,7 +107,6 @@ export function usePhotoUpload(bookingId: string) {
     });
   };
 
-  // Get GPS coordinates
   const getGPSCoordinates = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -115,24 +129,22 @@ export function usePhotoUpload(bookingId: string) {
     });
   };
 
-  // Upload single photo
   const uploadPhoto = useCallback(
     async (
       file: File,
       checkpoint: CheckpointType,
       photoType: PhotoType,
-      notes?: string
+      notes?: string,
+      metadata?: PhotoMetadata
     ): Promise<UploadedPhoto | null> => {
       const key = getPhotoKey(checkpoint, photoType);
 
-      // Update state to uploading
       setUploadState((prev) => ({
         ...prev,
         [key]: { status: "uploading", progress: 0 },
       }));
 
       try {
-        // Compress image
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "uploading", progress: 10 },
@@ -140,31 +152,38 @@ export function usePhotoUpload(bookingId: string) {
 
         const compressedBlob = await compressImage(file);
 
-        // Get GPS coordinates
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "uploading", progress: 30 },
         }));
 
-        const gps = await getGPSCoordinates();
+        // Use provided GPS or auto-fetch as fallback
+        let gpsLat = metadata?.gpsLatitude;
+        let gpsLng = metadata?.gpsLongitude;
+        if (gpsLat == null || gpsLng == null) {
+          const gps = await getGPSCoordinates();
+          if (gps) {
+            gpsLat = gps.lat;
+            gpsLng = gps.lng;
+          }
+        }
 
-        // Prepare form data
         const formData = new FormData();
         formData.append("photo", compressedBlob, `${photoType}.jpg`);
         formData.append("checkpoint_type", checkpoint);
         formData.append("photo_type", photoType);
         if (notes) formData.append("notes", notes);
-        if (gps) {
-          formData.append("gps_latitude", String(gps.lat));
-          formData.append("gps_longitude", String(gps.lng));
-        }
+        if (gpsLat != null) formData.append("gps_latitude", String(gpsLat));
+        if (gpsLng != null) formData.append("gps_longitude", String(gpsLng));
+        if (metadata?.capturedAt) formData.append("captured_at", metadata.capturedAt);
+        if (metadata?.capturedLocation) formData.append("captured_location", metadata.capturedLocation);
+        if (metadata?.replacePhotoId) formData.append("replace_photo_id", metadata.replacePhotoId);
 
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "uploading", progress: 50 },
         }));
 
-        // Upload
         const response = await fetch(`/api/driver/bookings/${bookingId}/photos`, {
           method: "POST",
           body: formData,
@@ -183,13 +202,19 @@ export function usePhotoUpload(bookingId: string) {
 
         const photo: UploadedPhoto = data.photo;
 
-        // Update state
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "success", progress: 100, photo },
         }));
 
-        setPhotos((prev) => [...prev.filter((p) => p.id !== photo.id), photo]);
+        setPhotos((prev) => {
+          let updated = prev.filter((p) => p.id !== photo.id);
+          // On replace, also remove the superseded photo from local state
+          if (metadata?.replacePhotoId) {
+            updated = updated.filter((p) => p.id !== metadata.replacePhotoId);
+          }
+          return [...updated, photo];
+        });
         setCheckpointStatus(data.checkpointStatus);
 
         return photo;
@@ -200,9 +225,8 @@ export function usePhotoUpload(bookingId: string) {
           [key]: { status: "error", progress: 0, error: errorMsg },
         }));
 
-        // Queue for retry if offline
         if (!navigator.onLine) {
-          queueRef.current.push({ file, checkpoint, photoType, notes });
+          queueRef.current.push({ file, checkpoint, photoType, notes, metadata });
           setUploadState((prev) => ({
             ...prev,
             [key]: { status: "queued", progress: 0 },
@@ -215,7 +239,6 @@ export function usePhotoUpload(bookingId: string) {
     [bookingId]
   );
 
-  // Process queued uploads
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current || !navigator.onLine) return;
 
@@ -224,21 +247,19 @@ export function usePhotoUpload(bookingId: string) {
     queueRef.current = [];
 
     for (const item of queue) {
-      await uploadPhoto(item.file, item.checkpoint, item.photoType, item.notes);
+      await uploadPhoto(item.file, item.checkpoint, item.photoType, item.notes, item.metadata);
     }
 
     isProcessingRef.current = false;
   }, [uploadPhoto]);
 
-  // Retry failed upload
   const retryUpload = useCallback(
-    async (checkpoint: CheckpointType, photoType: PhotoType, file: File, notes?: string) => {
-      return uploadPhoto(file, checkpoint, photoType, notes);
+    async (checkpoint: CheckpointType, photoType: PhotoType, file: File, notes?: string, metadata?: PhotoMetadata) => {
+      return uploadPhoto(file, checkpoint, photoType, notes, metadata);
     },
     [uploadPhoto]
   );
 
-  // Delete photo
   const deletePhoto = useCallback(
     async (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => {
       const key = getPhotoKey(checkpoint, photoType);
@@ -272,7 +293,47 @@ export function usePhotoUpload(bookingId: string) {
     [bookingId]
   );
 
-  // Fetch existing photos
+  const updatePhotoDetails = useCallback(
+    async (
+      photoId: string,
+      updates: { notes?: string; capturedAt?: string; capturedLocation?: string }
+    ): Promise<boolean> => {
+      try {
+        const response = await fetch(`/api/driver/bookings/${bookingId}/photos`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoId, ...updates }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Update failed");
+        }
+
+        const data = await response.json();
+
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photoId
+              ? {
+                  ...p,
+                  notes: data.photo.notes,
+                  capturedAt: data.photo.capturedAt,
+                  capturedLocation: data.photo.capturedLocation,
+                }
+              : p
+          )
+        );
+
+        return true;
+      } catch (error) {
+        console.error("Update details error:", error);
+        return false;
+      }
+    },
+    [bookingId]
+  );
+
   const fetchPhotos = useCallback(async () => {
     setLoading(true);
     try {
@@ -290,7 +351,6 @@ export function usePhotoUpload(bookingId: string) {
           }
         );
 
-        // Update upload state for existing photos
         const newState: PhotoUploadState = {};
         (data.photos || []).forEach((photo: UploadedPhoto) => {
           const key = getPhotoKey(photo.checkpointType, photo.photoType);
@@ -305,7 +365,6 @@ export function usePhotoUpload(bookingId: string) {
     }
   }, [bookingId]);
 
-  // Get photo for specific slot
   const getPhoto = useCallback(
     (checkpoint: CheckpointType, photoType: PhotoType) => {
       return photos.find(
@@ -315,7 +374,6 @@ export function usePhotoUpload(bookingId: string) {
     [photos]
   );
 
-  // Get upload state for specific slot
   const getUploadState = useCallback(
     (checkpoint: CheckpointType, photoType: PhotoType) => {
       const key = getPhotoKey(checkpoint, photoType);
@@ -330,6 +388,7 @@ export function usePhotoUpload(bookingId: string) {
     loading,
     uploadPhoto,
     deletePhoto,
+    updatePhotoDetails,
     fetchPhotos,
     getPhoto,
     getUploadState,

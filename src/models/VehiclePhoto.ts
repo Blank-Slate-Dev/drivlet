@@ -45,6 +45,10 @@ export interface IVehiclePhoto extends Document {
   notes?: string;
   gpsLatitude?: number;
   gpsLongitude?: number;
+  capturedAt?: Date;
+  capturedLocation?: string;
+  superseded?: boolean;
+  supersededAt?: Date;
   fileSize: number; // in bytes
   mimeType: string;
   createdAt: Date;
@@ -101,6 +105,21 @@ const VehiclePhotoSchema = new Schema<IVehiclePhoto>(
       min: -180,
       max: 180,
     },
+    capturedAt: {
+      type: Date,
+    },
+    capturedLocation: {
+      type: String,
+      maxlength: 200,
+      trim: true,
+    },
+    superseded: {
+      type: Boolean,
+      default: false,
+    },
+    supersededAt: {
+      type: Date,
+    },
     fileSize: {
       type: Number,
       required: true,
@@ -118,7 +137,9 @@ const VehiclePhotoSchema = new Schema<IVehiclePhoto>(
 
 // Compound index for efficient queries
 VehiclePhotoSchema.index({ bookingId: 1, checkpointType: 1 });
-VehiclePhotoSchema.index({ bookingId: 1, checkpointType: 1, photoType: 1 }, { unique: true });
+// Commented out — supersede-and-retain requires multiple docs per slot.
+// Drop in MongoDB if exists: db.vehiclephotos.dropIndex("bookingId_1_checkpointType_1_photoType_1")
+// VehiclePhotoSchema.index({ bookingId: 1, checkpointType: 1, photoType: 1 }, { unique: true });
 
 // Virtual for public URL (for serving photos)
 VehiclePhotoSchema.virtual("publicUrl").get(function () {
@@ -130,7 +151,7 @@ VehiclePhotoSchema.statics.getCheckpointStatus = async function (
   bookingId: mongoose.Types.ObjectId
 ): Promise<Record<CheckpointType, number>> {
   const counts = await this.aggregate([
-    { $match: { bookingId } },
+    { $match: { bookingId, superseded: { $ne: true } } },
     { $group: { _id: "$checkpointType", count: { $sum: 1 } } },
   ]);
 
