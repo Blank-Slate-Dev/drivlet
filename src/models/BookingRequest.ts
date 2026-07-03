@@ -197,7 +197,14 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
 
 BookingRequestSchema.index({ status: 1, createdAt: -1 });
 BookingRequestSchema.index({ userEmail: 1, createdAt: -1 });
-BookingRequestSchema.index({ paymentToken: 1 }, { unique: true, sparse: true });
+// Unique only for real (string) tokens. A sparse unique index still indexes
+// documents whose field is present-but-null, so with `paymentToken` defaulting
+// to null every new request collides on { paymentToken: null } (E11000).
+// A partial index skips null entirely, allowing many unreviewed requests.
+BookingRequestSchema.index(
+  { paymentToken: 1 },
+  { unique: true, partialFilterExpression: { paymentToken: { $type: "string" } } }
+);
 
 const BookingRequest: Model<IBookingRequest> =
   mongoose.models.BookingRequest ||

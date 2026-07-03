@@ -62,7 +62,8 @@
       "Bash(mkdir -p /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/admin/booking-requests/\\\\[id\\\\]/send-payment-link)",
       "Bash(mkdir -p /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/pay/\\\\[token\\\\])",
       "Bash(mkdir -p /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/pay/\\\\[token\\\\])",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(node -e ' *)"
     ],
     "deny": [],
     "ask": []
