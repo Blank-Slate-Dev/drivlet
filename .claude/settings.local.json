@@ -63,7 +63,9 @@
       "Bash(mkdir -p /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/api/pay/\\\\[token\\\\])",
       "Bash(mkdir -p /Users/geromedykyj/Documents/GitHub/blank-slate-dev/drivlet/src/app/pay/\\\\[token\\\\])",
       "Bash(npx next *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(command -v mongosh)",
+      "Bash(command -v vercel)"
     ],
     "deny": [],
     "ask": []
