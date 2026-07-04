@@ -68,7 +68,10 @@
       "Bash(command -v vercel)",
       "Bash(grep -rnE \"@drivlet\\\\.com\\([^.a]|$\\)\" src)",
       "Bash(npm run *)",
-      "Bash(grep -rniE \"drivers?@drivlet\\\\.com\\([^.]|$\\)\" src)"
+      "Bash(grep -rniE \"drivers?@drivlet\\\\.com\\([^.]|$\\)\" src)",
+      "Bash(grep -E '\\\\+=|\\\\$inc|completedJobs:')",
+      "Bash(echo \"BUILD EXIT CODE: $?\")",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": []

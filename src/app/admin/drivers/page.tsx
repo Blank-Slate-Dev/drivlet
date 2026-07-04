@@ -32,6 +32,7 @@ import {
   Settings2,
   ImageIcon,
   ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
 
 interface Driver {
@@ -192,6 +193,9 @@ export default function AdminDriversPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  // Gate for the Approve/Reject buttons on pending applications — admin must confirm
+  // they've reviewed the application (incl. documents) before actions appear.
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -222,6 +226,12 @@ export default function AdminDriversPage() {
   useEffect(() => {
     fetchDrivers();
   }, [fetchDrivers]);
+
+  // Reset the review-confirmation gate whenever the modal opens/closes or the
+  // selected driver changes, so each application must be confirmed independently.
+  useEffect(() => {
+    setReviewConfirmed(false);
+  }, [selectedDriver?._id]);
 
   const handleAction = async (driverId: string, action: string, reason?: string) => {
     try {
@@ -1127,26 +1137,43 @@ export default function AdminDriversPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons — gated behind a review confirmation for pending apps */}
                 {selectedDriver.status === "pending" && (
-                  <div className="flex gap-3 pt-4 border-t border-slate-200">
-                    <button
-                      onClick={() => handleAction(selectedDriver._id, "approve")}
-                      disabled={actionLoading}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Approve Application
-                    </button>
-                    <button
-                      onClick={() => openRejectModal(selectedDriver._id)}
-                      disabled={actionLoading}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Reject Application
-                    </button>
-                  </div>
+                  !reviewConfirmed ? (
+                    <div className="pt-4 border-t border-slate-200">
+                      <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={reviewConfirmed}
+                          onChange={(e) => setReviewConfirmed(e.target.checked)}
+                          className="mt-0.5 h-5 w-5 rounded border-slate-300 accent-emerald-600 cursor-pointer"
+                        />
+                        <span className="flex items-start gap-2 text-sm text-slate-700">
+                          <ShieldCheck className="h-5 w-5 flex-shrink-0 text-emerald-600" />
+                          I confirm I have reviewed this application in full, including the licence photos and police check document.
+                        </span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3 pt-4 border-t border-slate-200">
+                      <button
+                        onClick={() => handleAction(selectedDriver._id, "approve")}
+                        disabled={actionLoading}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Approve Application
+                      </button>
+                      <button
+                        onClick={() => openRejectModal(selectedDriver._id)}
+                        disabled={actionLoading}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Reject Application
+                      </button>
+                    </div>
+                  )
                 )}
 
                 {selectedDriver.status === "approved" && (

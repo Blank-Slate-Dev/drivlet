@@ -37,7 +37,6 @@ import {
   UserPlus,
   UserMinus,
   Loader2,
-  BadgeCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
@@ -156,8 +155,10 @@ interface AwaitingPaymentRequest {
   isManualTransmission?: boolean;
   pickupAddress: string;
   garageName: string | null;
+  garageAddress?: string | null;
   hasExistingBooking?: boolean;
   serviceType?: string;
+  serviceDate?: string;
   earliestPickup?: string;
   latestDropoff?: string;
   pickupTimeSlot?: string;
@@ -167,6 +168,11 @@ interface AwaitingPaymentRequest {
   createdAt: string;
   paymentLinkSentAt: string | null;
 }
+
+// Admin-facing reference for a request row. Requests have no dedicated reference
+// field, so we derive one from the _id: "REQ-" + last 8 chars uppercased.
+// (Customer-facing surfaces use the last 6 chars of _id — kept separate on purpose.)
+const requestReference = (id: string) => `REQ-${id.slice(-8).toUpperCase()}`;
 
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -188,6 +194,7 @@ export default function AdminBookingsPage() {
   const [awaitingPayment, setAwaitingPayment] = useState<AwaitingPaymentRequest[]>([]);
   const [awaitingLoading, setAwaitingLoading] = useState(true);
   const [sendingLink, setSendingLink] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<AwaitingPaymentRequest | null>(null);
 
   const fetchAwaitingPayment = useCallback(async () => {
     try {
@@ -340,6 +347,18 @@ export default function AdminBookingsPage() {
     }).format(cents / 100);
   };
 
+  // Payment timestamp. Bookings only exist after payment succeeds (the webhook creates
+  // the booking at the moment of payment), so createdAt IS the payment time.
+  const formatPaidAt = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -355,20 +374,21 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const getPaymentStatusColor = (status?: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-700";
-      case "pending":
-        return "bg-amber-100 text-amber-700";
-      case "failed":
-        return "bg-red-100 text-red-700";
-      case "refunded":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
+  // HIDDEN — superseded by the explicit "Paid" badge (bookings only exist after payment).
+  // const getPaymentStatusColor = (status?: string) => {
+  //   switch (status) {
+  //     case "paid":
+  //       return "bg-green-100 text-green-700";
+  //     case "pending":
+  //       return "bg-amber-100 text-amber-700";
+  //     case "failed":
+  //       return "bg-red-100 text-red-700";
+  //     case "refunded":
+  //       return "bg-blue-100 text-blue-700";
+  //     default:
+  //       return "bg-slate-100 text-slate-700";
+  //   }
+  // };
 
   const getStageLabel = (stageId: string) => {
     const stage = STAGES.find((s) => s.id === stageId);
@@ -625,6 +645,10 @@ export default function AdminBookingsPage() {
                         {req.customerPhone && (
                           <p className="text-xs text-slate-400">{req.customerPhone}</p>
                         )}
+                        {/* Reference (Task 5) */}
+                        <span className="mt-1 inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+                          {requestReference(req._id)}
+                        </span>
                       </td>
                       {/* Vehicle */}
                       <td className="px-4 py-4">
@@ -641,12 +665,14 @@ export default function AdminBookingsPage() {
                       {/* Details */}
                       <td className="px-4 py-4">
                         <p className="text-sm text-slate-700 truncate max-w-[180px]">{req.pickupAddress.split(",")[0]}</p>
+                        {/* HIDDEN — moved to View Details
                         {req.garageName && (
                           <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
                             <Building className="h-3 w-3" />
                             {req.garageName}
                           </span>
                         )}
+                        */}
                       </td>
                       {/* Pickup */}
                       <td className="px-4 py-4">
@@ -694,18 +720,27 @@ export default function AdminBookingsPage() {
                       </td>
                       {/* Actions */}
                       <td className="px-4 py-4">
-                        <button
-                          onClick={() => handleSendPaymentLink(req._id)}
-                          disabled={sendingLink === req._id}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                        >
-                          {sendingLink === req._id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Mail className="h-3 w-3" />
-                          )}
-                          {req.status === "payment_link_sent" ? "Resend" : "Send Link"}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setSelectedRequest(req)}
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSendPaymentLink(req._id)}
+                            disabled={sendingLink === req._id}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                          >
+                            {sendingLink === req._id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Mail className="h-3 w-3" />
+                            )}
+                            {req.status === "payment_link_sent" ? "Resend" : "Send Link"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -729,6 +764,12 @@ export default function AdminBookingsPage() {
                           <p className="text-xs text-slate-400">
                             {booking.guestPhone || booking.userMobile}
                           </p>
+                        )}
+                        {/* Booking reference (Task 5) */}
+                        {booking.trackingCode && (
+                          <span className="mt-1 inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+                            {booking.trackingCode}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-4">
@@ -765,12 +806,14 @@ export default function AdminBookingsPage() {
                           </p>
                         )}
                         <div className="mt-1 flex flex-wrap gap-1">
+                          {/* HIDDEN — moved to View Details
                           {booking.hasExistingBooking && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
                               <Building className="h-3 w-3" />
                               {booking.garageName}
                             </span>
                           )}
+                          */}
                           {FEATURES.SERVICE_SELECTION && booking.selectedServices && booking.selectedServices.length > 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                               <Wrench className="h-3 w-3" />
@@ -811,12 +854,11 @@ export default function AdminBookingsPage() {
                         </select>
                       </td>
                       <td className="px-4 py-4">
+                        {/* Bookings only exist after payment — show an explicit Paid badge + payment time (createdAt). */}
                         <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${getPaymentStatusColor(booking.paymentStatus)}`}
-                          >
-                            {booking.paymentStatus === "paid" && <BadgeCheck className="h-3 w-3" />}
-                            {booking.paymentStatus || "pending"}
+                          <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium leading-tight text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Paid
                           </span>
                           {booking.paymentAmount && (
                             <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
@@ -824,6 +866,9 @@ export default function AdminBookingsPage() {
                             </span>
                           )}
                         </div>
+                        <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">
+                          {formatPaidAt(booking.createdAt)}
+                        </p>
                       </td>
                       <td className="px-4 py-4">
                         <span
@@ -924,6 +969,165 @@ export default function AdminBookingsPage() {
             saving={saving}
           />
         )}
+
+        {selectedRequest && (
+          <RequestDetailsModal
+            request={selectedRequest}
+            onClose={() => setSelectedRequest(null)}
+            formatCurrency={formatCurrency}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// View-details surface for an awaiting-payment request row. Requests aren't bookings
+// yet (no booking record exists until payment), so this is a focused read-only modal.
+function RequestDetailsModal({
+  request,
+  onClose,
+  formatCurrency,
+}: {
+  request: AwaitingPaymentRequest;
+  onClose: () => void;
+  formatCurrency: (cents: number) => string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-900">Request Details</h2>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              request.status === "payment_link_sent" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+            }`}>
+              {request.status === "payment_link_sent" ? "Link Sent" : "Approved"}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-6">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+              <Clock className="h-4 w-4" />
+              Awaiting Payment
+            </div>
+            <p className="mt-2 font-mono text-sm text-slate-900">{requestReference(request._id)}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <User className="h-4 w-4 text-emerald-600" />
+              Customer
+              {request.isGuest && (
+                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Guest</span>
+              )}
+            </div>
+            <div className="mt-3">
+              <p className="font-medium text-slate-900">{request.userName}</p>
+              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
+                <Mail className="h-3.5 w-3.5" />
+                {request.userEmail}
+              </div>
+              {request.customerPhone && (
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
+                  <Phone className="h-3.5 w-3.5" />
+                  {request.customerPhone}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Car className="h-4 w-4 text-emerald-600" />
+              Vehicle
+              {request.isManualTransmission && (
+                <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                  Manual Transmission
+                </span>
+              )}
+            </div>
+            <div className="mt-3">
+              <div className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2">
+                {request.vehicleState && (
+                  <span className="text-xs font-medium text-slate-400">{request.vehicleState}</span>
+                )}
+                <span className="text-xl font-bold tracking-wider text-white">{request.vehicleRegistration}</span>
+              </div>
+              {(request.vehicleYear || request.vehicleModel) && (
+                <p className="mt-2 text-sm text-slate-600">{[request.vehicleYear, request.vehicleModel].filter(Boolean).join(" ")}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Service Centre — garage name + full address */}
+          {request.garageName && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+                Service Centre
+              </div>
+              <div className="mt-3">
+                <p className="font-medium text-slate-900">{request.garageName}</p>
+                {request.garageAddress && (
+                  <p className="mt-0.5 text-sm text-slate-600">{request.garageAddress}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Clock className="h-4 w-4 text-emerald-600" />
+              Schedule
+            </div>
+            {request.serviceDate && (
+              <p className="mt-3 text-sm text-slate-900">
+                {new Date(request.serviceDate).toLocaleDateString("en-AU", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Pickup Slot</p>
+                <p className="font-medium text-slate-900">
+                  {request.pickupTimeSlot ? getPickupSlotLabel(request.pickupTimeSlot) : request.earliestPickup || "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Drop-off Slot</p>
+                <p className="font-medium text-slate-900">
+                  {request.dropoffTimeSlot ? getDropoffSlotLabel(request.dropoffTimeSlot) : request.latestDropoff || "—"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-xs text-slate-500">Pickup Address</p>
+              <p className="text-sm text-slate-900">{request.pickupAddress}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-emerald-700">Quoted Total</span>
+              <span className="text-lg font-bold text-emerald-700">{formatCurrency(request.quotedAmount)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1193,8 +1397,37 @@ function ViewDetailsModal({
                   </p>
                 </div>
               )}
+              {/* Explicit Paid indicator + payment time. Bookings only exist after
+                  payment succeeds, so createdAt is the payment timestamp. */}
+              <div className="col-span-2 flex items-center gap-2 border-t border-slate-100 pt-3">
+                <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Paid
+                </span>
+                <span className="text-xs text-slate-500">
+                  {new Date(booking.createdAt).toLocaleString("en-AU", {
+                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  })}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Service Centre — garage name + full address (moved here from the table rows) */}
+          {booking.garageName && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+                Service Centre
+              </div>
+              <div className="mt-3">
+                <p className="font-medium text-slate-900">{booking.garageName}</p>
+                {booking.garageAddress && (
+                  <p className="mt-0.5 text-sm text-slate-600">{booking.garageAddress}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">

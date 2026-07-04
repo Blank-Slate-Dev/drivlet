@@ -41,6 +41,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [paidReference, setPaidReference] = useState<string | null>(null);
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [creatingPI, setCreatingPI] = useState(false);
@@ -55,6 +56,13 @@ export default function PaymentPage() {
       try {
         const res = await fetch(`/api/pay/${token}`);
         if (res.status === 410) {
+          // Already paid — capture the reference (if provided) for the confirmation screen.
+          try {
+            const paidJson = await res.json();
+            if (paidJson?.reference) setPaidReference(paidJson.reference);
+          } catch {
+            /* no body — still show the already-paid state */
+          }
           setAlreadyPaid(true);
           return;
         }
@@ -84,6 +92,14 @@ export default function PaymentPage() {
         body: JSON.stringify({ token }),
       });
 
+      if (res.status === 409) {
+        // Server authoritatively refused — this reference is already paid. Switch to the
+        // already-paid screen rather than showing an inline error.
+        setPaidReference(data?.reference || null);
+        setAlreadyPaid(true);
+        return;
+      }
+
       if (!res.ok) {
         const err = await res.json();
         setPaymentError(err.error || "Failed to initialize payment");
@@ -108,22 +124,31 @@ export default function PaymentPage() {
   }
 
   if (alreadyPaid) {
+    const ref = paidReference || data?.reference || null;
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+          </div>
           <h1 className="mt-4 text-xl font-semibold text-slate-900">
-            Already Paid
+            This booking is already paid and confirmed
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            This booking has already been paid. Check your email for the
-            confirmation and tracking code.
+            You&apos;re all set — no need to pay again. We&apos;ve got everything we need and
+            your car&apos;s in good hands.
           </p>
+          {ref && (
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-400">Reference</p>
+              <p className="font-mono text-sm font-semibold text-slate-800">{ref}</p>
+            </div>
+          )}
           <Link
-            href="/"
+            href="/track"
             className="mt-6 inline-block rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
           >
-            Go to Drivlet
+            Track your booking
           </Link>
         </div>
       </div>

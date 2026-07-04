@@ -2,8 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
+import BookingRequest from '@/models/BookingRequest';
 import { MAX_BOOKINGS_PER_SLOT, PICKUP_SLOTS, DROPOFF_SLOTS } from '@/config/timeSlots';
 import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+
+// A slot is held by a live booking OR by a request the admin has approved and is
+// awaiting payment on. Pending (unreviewed) and rejected/expired requests do NOT hold
+// a slot. Once a request is paid it converts to a booking (status paid/converted) and
+// only the booking counts — so those statuses are excluded here to avoid double-counting.
+const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepted_awaiting_payment"];
 
 // Force dynamic rendering - this route uses request.url for query params
 export const dynamic = 'force-dynamic';
@@ -42,13 +49,17 @@ export async function GET(request: NextRequest) {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const bookings = await Booking.find({
-      serviceDate: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
-      status: { $ne: 'cancelled' },
-    }).select('pickupTimeSlot dropoffTimeSlot').lean();
+    // Query live bookings AND approved/awaiting-payment requests for the same day, in parallel.
+    const [bookings, holdingRequests] = await Promise.all([
+      Booking.find({
+        serviceDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $ne: 'cancelled' },
+      }).select('pickupTimeSlot dropoffTimeSlot').lean(),
+      BookingRequest.find({
+        serviceDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: SLOT_HOLDING_REQUEST_STATUSES },
+      }).select('pickupTimeSlot dropoffTimeSlot').lean(),
+    ]);
 
     // Count bookings per slot
     const pickupCounts: Record<string, number> = {};
@@ -60,6 +71,16 @@ export async function GET(request: NextRequest) {
       }
       if (booking.dropoffTimeSlot) {
         dropoffCounts[booking.dropoffTimeSlot] = (dropoffCounts[booking.dropoffTimeSlot] || 0) + 1;
+      }
+    });
+
+    // Merge in approved/awaiting-payment requests — they hold a slot until paid or rejected.
+    holdingRequests.forEach((req) => {
+      if (req.pickupTimeSlot) {
+        pickupCounts[req.pickupTimeSlot] = (pickupCounts[req.pickupTimeSlot] || 0) + 1;
+      }
+      if (req.dropoffTimeSlot) {
+        dropoffCounts[req.dropoffTimeSlot] = (dropoffCounts[req.dropoffTimeSlot] || 0) + 1;
       }
     });
 

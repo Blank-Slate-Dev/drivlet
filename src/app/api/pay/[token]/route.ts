@@ -28,7 +28,11 @@ export async function GET(
     }
 
     if (bookingRequest.status === "paid" || bookingRequest.convertedBookingId) {
-      return NextResponse.json({ error: "already_paid" }, { status: 410 });
+      // Include the reference so the pay page can show a friendly, identifiable "already paid" state.
+      return NextResponse.json(
+        { error: "already_paid", reference: bookingRequest._id.toString().slice(-6).toUpperCase() },
+        { status: 410 }
+      );
     }
 
     if (!["approved", "payment_link_sent"].includes(bookingRequest.status)) {

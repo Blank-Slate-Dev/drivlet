@@ -32,8 +32,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payment link" }, { status: 404 });
     }
 
+    // Hard block against paying twice on the same reference — never create a second
+    // PaymentIntent once the request is paid/converted.
     if (bookingRequest.status === "paid" || bookingRequest.convertedBookingId) {
-      return NextResponse.json({ error: "This booking has already been paid" }, { status: 400 });
+      return NextResponse.json({ error: "This booking has already been paid." }, { status: 409 });
     }
 
     if (!["approved", "payment_link_sent"].includes(bookingRequest.status)) {

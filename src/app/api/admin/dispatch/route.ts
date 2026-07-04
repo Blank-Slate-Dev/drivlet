@@ -7,6 +7,16 @@ import Driver from "@/models/Driver";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 import { requireValidOrigin } from "@/lib/validation";
 
+// Atomically decrement a driver's lifetime assigned-jobs counter, never below zero.
+// The { $gt: 0 } guard means the update matches nothing (no-op) once the count is 0.
+async function decrementDriverJobs(driverId: string | null) {
+  if (!driverId) return;
+  await Driver.updateOne(
+    { _id: driverId, "metrics.totalJobs": { $gt: 0 } },
+    { $inc: { "metrics.totalJobs": -1 } }
+  );
+}
+
 // GET /api/admin/dispatch - Fetch dispatch board data
 export async function GET() {
   try {
@@ -74,7 +84,10 @@ export async function GET() {
         .lean(),
     ]);
 
-    // Count today's jobs per driver for limit checking
+    // Count today's jobs per driver for limit checking.
+    // Filter by serviceDate (the day the work happens), NOT createdAt — a booking
+    // created on a previous day but scheduled/assigned for today still consumes the
+    // driver's daily capacity. A completed job today also counts, so no status filter.
     const driverJobCounts: Record<string, number> = {};
     const allDispatched = await Booking.find({
       $or: [
@@ -82,11 +95,13 @@ export async function GET() {
         { returnDriverId: { $exists: true } },
       ],
       "cancellation.cancelledAt": { $exists: false },
-      createdAt: { $gte: today, $lt: tomorrow },
+      serviceDate: { $gte: today, $lt: tomorrow },
     })
       .select("assignedDriverId returnDriverId")
       .lean();
 
+    // Each leg is real work: +1 for the pickup driver, +1 for the return driver.
+    // The same driver holding both legs of one booking correctly counts as 2 jobs.
     for (const b of allDispatched) {
       if (b.assignedDriverId) {
         const id = b.assignedDriverId.toString();
@@ -281,16 +296,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Update driver metrics
-      driver.metrics = driver.metrics || {
-        totalJobs: 0,
-        completedJobs: 0,
-        cancelledJobs: 0,
-        averageRating: 0,
-        totalRatings: 0,
-      };
-      driver.metrics.totalJobs += 1;
-      await driver.save();
+      // Increment the driver's lifetime assigned-jobs counter atomically.
+      // Safe against double-increment: the conditional update above only succeeds
+      // when this leg was previously UNASSIGNED (assignedDriverId did not exist).
+      // Convention: metrics.totalJobs = jobs assigned; metrics.completedJobs = completions.
+      await Driver.updateOne({ _id: driverId }, { $inc: { "metrics.totalJobs": 1 } });
 
       notifyBookingUpdate(result);
 
@@ -350,15 +360,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      driver.metrics = driver.metrics || {
-        totalJobs: 0,
-        completedJobs: 0,
-        cancelledJobs: 0,
-        averageRating: 0,
-        totalRatings: 0,
-      };
-      driver.metrics.totalJobs += 1;
-      await driver.save();
+      // Increment the driver's lifetime assigned-jobs counter atomically (return leg).
+      // Only reached after the conditional assignment above succeeded (leg was unassigned).
+      await Driver.updateOne({ _id: driverId }, { $inc: { "metrics.totalJobs": 1 } });
 
       notifyBookingUpdate(result);
 
@@ -428,8 +432,13 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
+      // Capture driver IDs BEFORE clearing so we can decrement their job counters.
+      const removedPickupDriverId = booking.assignedDriverId?.toString() || null;
+      let removedReturnDriverId: string | null = null;
+
       // If return driver assigned and not started, clear them too
       if (booking.returnDriverId && !booking.returnDriver?.startedAt) {
+        removedReturnDriverId = booking.returnDriverId.toString();
         booking.returnDriverId = undefined;
         booking.returnDriver = undefined;
         booking.updates.push({
@@ -454,6 +463,12 @@ export async function DELETE(request: NextRequest) {
       });
 
       await booking.save();
+
+      // Decrement lifetime job counters for the removed leg(s), never below zero.
+      // The { "metrics.totalJobs": { $gt: 0 } } guard makes the $inc a no-op at zero.
+      await decrementDriverJobs(removedPickupDriverId);
+      await decrementDriverJobs(removedReturnDriverId);
+
       notifyBookingUpdate(booking);
 
       return NextResponse.json({
@@ -471,6 +486,8 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
+      const removedReturnDriverId = booking.returnDriverId?.toString() || null;
+
       booking.returnDriverId = undefined;
       booking.returnDriver = undefined;
 
@@ -482,6 +499,10 @@ export async function DELETE(request: NextRequest) {
       });
 
       await booking.save();
+
+      // Decrement the return driver's counter, never below zero.
+      await decrementDriverJobs(removedReturnDriverId);
+
       notifyBookingUpdate(booking);
 
       return NextResponse.json({
