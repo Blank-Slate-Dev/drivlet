@@ -59,7 +59,18 @@ export interface IDriver extends Document {
     state: string;
     class: LicenseClass;
     expiryDate: Date;
-    photoUrl?: string;
+    photoUrl?: string; // DEPRECATED — superseded by frontPhotoUrl/backPhotoUrl, retained for legacy records
+    frontPhotoUrl?: string; // Vercel Blob URL
+    backPhotoUrl?: string; // Vercel Blob URL
+  };
+
+  // SOP: manual transmission bookings must only be allocated to manual-capable drivers
+  canDriveManual: boolean;
+
+  // Right to work in Australia (collected at registration)
+  rightToWork?: {
+    status: "citizen" | "permanent_resident" | "visa_with_work_rights";
+    visaSubclass?: string; // only relevant when status is visa_with_work_rights
   };
 
   // Police Check - REQUIRED for onboarding
@@ -275,7 +286,29 @@ const DriverSchema = new Schema<IDriver>(
       },
       photoUrl: {
         type: String,
+        // DEPRECATED — superseded by frontPhotoUrl/backPhotoUrl, retained for legacy records
       },
+      frontPhotoUrl: {
+        type: String, // Vercel Blob URL
+      },
+      backPhotoUrl: {
+        type: String, // Vercel Blob URL
+      },
+    },
+
+    // SOP: manual transmission bookings must only be allocated to manual-capable drivers
+    canDriveManual: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Right to work in Australia (collected at registration)
+    rightToWork: {
+      status: {
+        type: String,
+        enum: ["citizen", "permanent_resident", "visa_with_work_rights"],
+      },
+      visaSubclass: { type: String, trim: true }, // only relevant when status is visa_with_work_rights
     },
 
     // Police Check - REQUIRED for onboarding

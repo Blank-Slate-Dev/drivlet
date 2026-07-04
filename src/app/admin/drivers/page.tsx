@@ -28,6 +28,10 @@ import {
   Trash2,
   AlertTriangle,
   History,
+  IdCard,
+  Settings2,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react";
 
 interface Driver {
@@ -35,6 +39,7 @@ interface Driver {
   firstName: string;
   lastName: string;
   phone: string;
+  dateOfBirth?: string;
   address: {
     street: string;
     suburb: string;
@@ -46,11 +51,21 @@ interface Driver {
     state: string;
     class: string;
     expiryDate: string;
+    photoUrl?: string; // legacy single photo
+    frontPhotoUrl?: string;
+    backPhotoUrl?: string;
+  };
+  canDriveManual?: boolean;
+  rightToWork?: {
+    status?: "citizen" | "permanent_resident" | "visa_with_work_rights";
+    visaSubclass?: string;
   };
   policeCheck?: {
     completed: boolean;
     certificateNumber?: string;
+    issueDate?: string;
     expiryDate?: string;
+    documentUrl?: string;
   };
   hasOwnVehicle: boolean;
   vehicle?: {
@@ -142,6 +157,26 @@ const DAY_LABELS: Record<string, string> = {
   saturday: "Sat",
   sunday: "Sun",
 };
+
+const RIGHT_TO_WORK_LABELS: Record<string, string> = {
+  citizen: "Australian citizen",
+  permanent_resident: "Permanent resident",
+  visa_with_work_rights: "Visa with work rights",
+};
+
+// A police check issued more than 12 months ago is considered expired
+const isPoliceCheckExpired = (issueDate?: string): boolean => {
+  if (!issueDate) return false;
+  const issued = new Date(issueDate);
+  if (isNaN(issued.getTime())) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 12);
+  return issued < cutoff;
+};
+
+// Label a document URL as PDF or Image based on its extension
+const docKindFromUrl = (url: string): "PDF" | "Image" =>
+  /\.pdf($|\?)/i.test(url) ? "PDF" : "Image";
 
 export default function AdminDriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -707,6 +742,37 @@ export default function AdminDriversPage() {
                         {selectedDriver.employmentType === "contractor" ? "Contractor" : "Employee"}
                       </span>
                     </div>
+                    <div>
+                      <p className="text-slate-500">Date of Birth</p>
+                      <p className="font-medium text-slate-900">
+                        {selectedDriver.dateOfBirth ? formatDate(selectedDriver.dateOfBirth) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Transmission</p>
+                      {selectedDriver.canDriveManual ? (
+                        <span className="inline-flex items-center rounded-full bg-teal-100 px-2.5 py-1 text-xs font-medium text-teal-700">
+                          <Settings2 className="mr-1 h-3 w-3" />
+                          Manual capable
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                          <Settings2 className="mr-1 h-3 w-3" />
+                          Auto only
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Right to Work</p>
+                      <p className="font-medium text-slate-900">
+                        {selectedDriver.rightToWork?.status
+                          ? RIGHT_TO_WORK_LABELS[selectedDriver.rightToWork.status] || selectedDriver.rightToWork.status
+                          : "—"}
+                        {selectedDriver.rightToWork?.status === "visa_with_work_rights" && selectedDriver.rightToWork?.visaSubclass && (
+                          <span className="text-slate-500"> (subclass {selectedDriver.rightToWork.visaSubclass})</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -777,6 +843,80 @@ export default function AdminDriversPage() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Documents — shown for EVERY status so they remain accessible permanently, including after approval */}
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3">
+                    <IdCard className="h-4 w-4 text-emerald-600" />
+                    Documents
+                  </div>
+
+                  {/* Licence photos */}
+                  {selectedDriver.license.frontPhotoUrl || selectedDriver.license.backPhotoUrl ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <LicenceThumb label="Licence front" url={selectedDriver.license.frontPhotoUrl} />
+                      <LicenceThumb label="Licence back" url={selectedDriver.license.backPhotoUrl} />
+                    </div>
+                  ) : selectedDriver.license.photoUrl ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <LicenceThumb label="Licence photo (legacy)" url={selectedDriver.license.photoUrl} />
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">
+                      Not provided — registered before document upload was required
+                    </p>
+                  )}
+
+                  {/* Police check document */}
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    {selectedDriver.policeCheck?.documentUrl || selectedDriver.policeCheck?.certificateNumber ? (
+                      <div className="rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <Shield className="h-4 w-4 text-emerald-600" />
+                            Police Check
+                          </div>
+                          {isPoliceCheckExpired(selectedDriver.policeCheck?.issueDate) && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                              <AlertTriangle className="h-3 w-3" />
+                              Expired — request a new check
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <p className="text-slate-500">Certificate</p>
+                            <p className="font-medium text-slate-900 break-words">{selectedDriver.policeCheck?.certificateNumber || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Issued</p>
+                            <p className="font-medium text-slate-900">{selectedDriver.policeCheck?.issueDate ? formatDate(selectedDriver.policeCheck.issueDate) : "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Expires</p>
+                            <p className="font-medium text-slate-900">{selectedDriver.policeCheck?.expiryDate ? formatDate(selectedDriver.policeCheck.expiryDate) : "—"}</p>
+                          </div>
+                        </div>
+                        {selectedDriver.policeCheck?.documentUrl && (
+                          <a
+                            href={selectedDriver.policeCheck.documentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            View document ({docKindFromUrl(selectedDriver.policeCheck.documentUrl)})
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">
+                        No police check on file
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Vehicle Info (if applicable) */}
@@ -1183,5 +1323,31 @@ export default function AdminDriversPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// A licence photo thumbnail that opens the full Blob URL in a new tab.
+// Falls back to a placeholder when the URL is missing (e.g. one side only).
+function LicenceThumb({ label, url }: { label: string; url?: string }) {
+  if (!url) {
+    return (
+      <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
+        <ImageIcon className="h-5 w-5 text-slate-300" />
+        <span className="text-[11px] text-slate-400">{label}</span>
+        <span className="text-[10px] text-slate-300">Not provided</span>
+      </div>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="group block" title={`Open ${label} in a new tab`}>
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={label} className="h-full w-full object-cover transition group-hover:opacity-90" />
+        <span className="absolute bottom-1 right-1 inline-flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          <ExternalLink className="h-2.5 w-2.5" /> Open
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] font-medium text-slate-600">{label}</p>
+    </a>
   );
 }

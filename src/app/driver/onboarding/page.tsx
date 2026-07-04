@@ -533,12 +533,28 @@ export default function DriverOnboardingPage() {
                   </div>
 
                   {policeCheckUploaded ? (
+                    /* Read-only "on file" summary — police check is now collected at registration,
+                       so we don't ask approved drivers to upload it again. */
                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-8 w-8 text-emerald-600" />
+                      <div className="flex items-center gap-3 mb-4">
+                        <CheckCircle className="h-8 w-8 text-emerald-600 flex-shrink-0" />
                         <div>
-                          <h3 className="font-semibold text-emerald-900">Police Check Uploaded</h3>
-                          <p className="text-emerald-700 text-sm">Certificate: {certificateNumber}</p>
+                          <h3 className="font-semibold text-emerald-900">Police Check On File</h3>
+                          <p className="text-emerald-700 text-sm">We already have your National Police Check — no need to upload it again.</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div className="rounded-xl bg-white/70 border border-emerald-100 p-3">
+                          <p className="text-emerald-700/70 text-xs">Certificate</p>
+                          <p className="font-medium text-emerald-900 break-words">{certificateNumber || "—"}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/70 border border-emerald-100 p-3">
+                          <p className="text-emerald-700/70 text-xs">Issued</p>
+                          <p className="font-medium text-emerald-900">{issueDate ? new Date(issueDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/70 border border-emerald-100 p-3">
+                          <p className="text-emerald-700/70 text-xs">Expires</p>
+                          <p className="font-medium text-emerald-900">{expiryDate ? new Date(expiryDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
                         </div>
                       </div>
                     </div>

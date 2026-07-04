@@ -209,13 +209,13 @@ export default function DriverPendingPage() {
                 </h3>
                 <div className="space-y-2">
                   <a
-                    href="mailto:drivers@drivlet.com"
+                    href="mailto:support@drivlet.com.au"
                     className="flex items-center gap-3 text-sm text-slate-600 hover:text-emerald-600 transition p-2 rounded-lg hover:bg-white"
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
                       <Mail className="h-4 w-4 text-emerald-600" />
                     </div>
-                    drivers@drivlet.com
+                    support@drivlet.com.au
                   </a>
                   <a
                     href="tel:1300123456"

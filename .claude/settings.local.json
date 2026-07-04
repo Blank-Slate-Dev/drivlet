@@ -65,7 +65,10 @@
       "Bash(npx next *)",
       "Bash(node -e ' *)",
       "Bash(command -v mongosh)",
-      "Bash(command -v vercel)"
+      "Bash(command -v vercel)",
+      "Bash(grep -rnE \"@drivlet\\\\.com\\([^.a]|$\\)\" src)",
+      "Bash(npm run *)",
+      "Bash(grep -rniE \"drivers?@drivlet\\\\.com\\([^.]|$\\)\" src)"
     ],
     "deny": [],
     "ask": []
