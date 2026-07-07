@@ -71,7 +71,9 @@
       "Bash(grep -rniE \"drivers?@drivlet\\\\.com\\([^.]|$\\)\" src)",
       "Bash(grep -E '\\\\+=|\\\\$inc|completedJobs:')",
       "Bash(echo \"BUILD EXIT CODE: $?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(perl -0pi -e 's{/api/admin/bookings\\\\?limit=200}{/api/admin/bookings?limit=500}g; s{booking-requests\\\\?status=all_open&limit=200}{booking-requests?status=all_open&limit=500}g' src/app/admin/bookings/page.tsx)"
     ],
     "deny": [],
     "ask": []

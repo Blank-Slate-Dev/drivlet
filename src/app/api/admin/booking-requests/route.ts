@@ -4,6 +4,20 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 
+// Always serve fresh data — the admin pipeline view must reflect the latest state.
+export const dynamic = "force-dynamic";
+
+// Every non-converted, non-paid request state — used by the unified /admin/bookings page
+// so it can load the whole pre-conversion pipeline in a single request.
+const OPEN_REQUEST_STATUSES = [
+  "pending_review",
+  "accepted_awaiting_payment",
+  "approved",
+  "payment_link_sent",
+  "declined",
+  "expired",
+];
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role !== "admin") {
@@ -20,7 +34,10 @@ export async function GET(request: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filter: any = {};
-    if (status && status !== "all") {
+    if (status === "all_open") {
+      // Whole pre-conversion pipeline in one call (unified /admin/bookings page)
+      filter.status = { $in: OPEN_REQUEST_STATUSES };
+    } else if (status && status !== "all") {
       filter.status = status;
     }
 

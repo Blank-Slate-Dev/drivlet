@@ -1,467 +1,327 @@
 // src/app/admin/bookings/page.tsx
+// Unified admin pipeline: booking requests (pending → approved → awaiting payment)
+// AND paid bookings (all lifecycle stages) in one auto-refreshing, filterable view.
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useDebounce } from "@/hooks/useDebounce";
 import {
   Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Edit2,
   RefreshCw,
-  X,
-  Check,
   AlertCircle,
-  Car,
-  Clock,
-  MapPin,
-  Wrench,
-  User,
-  MessageSquare,
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardCheck,
-  Download,
-  FileWarning,
-  Phone,
-  Mail,
-  Building,
-  CreditCard,
-  ExternalLink,
-  Calendar,
-  Copy,
-  QrCode,
-  Truck,
-  UserPlus,
-  UserMinus,
   Loader2,
+  CheckCircle2,
+  Inbox,
+  CreditCard,
+  Truck,
+  Send,
+  Eye,
+  Car,
+  X,
 } from "lucide-react";
-import Link from "next/link";
-import { SERVICE_CATEGORIES, getCategoryById, getTotalSelectedCount } from "@/constants/serviceCategories";
-import { FEATURES } from "@/lib/featureFlags";
-import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
+import { getPickupSlotLabel, getDropoffSlotLabel } from "@/config/timeSlots";
+import {
+  ViewDetailsModal,
+  EditBookingModal,
+  STAGES,
+  type Booking,
+} from "@/components/admin/BookingDetailModals";
+import {
+  RequestDetailModal,
+  StatCard,
+  type BookingRequestItem,
+} from "@/components/admin/RequestDetailModal";
 
-const STAGES = [
-  { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
-  { id: "driver_en_route", label: "Driver En Route", progress: 28 },
-  { id: "car_picked_up", label: "Car Picked Up", progress: 42 },
-  { id: "at_garage", label: "At Garage", progress: 57 },
-  { id: "service_in_progress", label: "Service In Progress", progress: 72 },
-  { id: "driver_returning", label: "Driver Returning", progress: 86 },
-  { id: "delivered", label: "Delivered", progress: 100 },
+// ---- Unified row model -----------------------------------------------------
+
+type StatusKey =
+  | "needs_review"
+  | "awaiting_payment"
+  | "active"
+  | "completed"
+  | "rejected";
+
+type TabKey = "all" | StatusKey;
+
+interface UnifiedRow {
+  kind: "request" | "booking";
+  id: string;
+  reference: string;
+  customerName: string;
+  email: string;
+  rego: string;
+  serviceDate?: string;
+  pickupSlot?: string;
+  dropoffSlot?: string;
+  statusKey: StatusKey;
+  statusLabel: string;
+  stageLabel?: string; // bookings only
+  paidAt?: string; // bookings only (= createdAt)
+  createdAt: string;
+  raw: Booking | BookingRequestItem;
+}
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "needs_review", label: "Needs Review" },
+  { key: "awaiting_payment", label: "Awaiting Payment" },
+  { key: "active", label: "Active" },
+  { key: "completed", label: "Completed" },
+  { key: "rejected", label: "Rejected / Cancelled" },
 ];
 
-interface Update {
-  stage: string;
-  timestamp: string;
-  message: string;
-  updatedBy: string;
-}
-
-interface SignedFormRef {
-  formId: string;
-  formType: "pickup_consent" | "return_confirmation" | "claim_lodgement";
-  submittedAt: string;
-}
-
-interface SelectedService {
-  category: string;
-  services: string[];
-}
-
-interface DriverLeg {
-  driverId: string;
-  driverName?: string;
-  assignedAt: string;
-  acceptedAt?: string;
-  startedAt?: string;
-  arrivedAt?: string;
-  collectedAt?: string;
-  completedAt?: string;
-}
-
-interface Booking {
-  _id: string;
-  userId: string | null;
-  userEmail: string;
-  userName: string;
-  isGuest: boolean;
-  guestPhone?: string;
-  userMobile?: string; // Mobile from User model for registered users
-  vehicleRegistration: string;
-  vehicleState: string;
-  vehicleYear?: string;
-  vehicleModel?: string;
-  vehicleColor?: string;
-  serviceType: string;
-  serviceDate?: string;
-  pickupAddress: string;
-  pickupTime: string;
-  dropoffTime: string;
-  pickupTimeSlot?: string;
-  dropoffTimeSlot?: string;
-  estimatedServiceDuration?: number;
-  trackingCode?: string;
-  hasExistingBooking: boolean;
-  garageName?: string;
-  garageAddress?: string;
-  existingBookingRef?: string;
-  existingBookingNotes?: string;
-  paymentStatus?: string;
-  paymentId?: string;
-  paymentAmount?: number;
-  transmissionType?: 'automatic' | 'manual';
-  isManualTransmission?: boolean;
-  selectedServices?: SelectedService[];
-  primaryServiceCategory?: string | null;
-  serviceNotes?: string;
-  signedForms?: SignedFormRef[];
-  currentStage: string;
-  overallProgress: number;
-  status: string;
-  updates: Update[];
-  createdAt: string;
-  updatedAt: string;
-  // Two-phase driver assignment
-  pickupDriver?: DriverLeg;
-  returnDriver?: DriverLeg;
-  pickupDriverName?: string;
-  returnDriverName?: string;
-  // Legacy driver fields
-  assignedDriverId?: string;
-  assignedDriverName?: string;
-}
-
-interface DriverOption {
-  _id: string;
-  firstName: string;
-  lastName: string;
-  canAcceptJobs: boolean;
-  shiftPreference: "am" | "pm" | "full_day";
-}
-
-interface AwaitingPaymentRequest {
-  _id: string;
-  userName: string;
-  userEmail: string;
-  customerPhone?: string;
-  isGuest?: boolean;
-  vehicleRegistration: string;
-  vehicleState?: string;
-  vehicleYear?: string;
-  vehicleModel?: string;
-  isManualTransmission?: boolean;
-  pickupAddress: string;
-  garageName: string | null;
-  garageAddress?: string | null;
-  hasExistingBooking?: boolean;
-  serviceType?: string;
-  serviceDate?: string;
-  earliestPickup?: string;
-  latestDropoff?: string;
-  pickupTimeSlot?: string;
-  dropoffTimeSlot?: string;
-  quotedAmount: number;
-  status: string;
-  createdAt: string;
-  paymentLinkSentAt: string | null;
-}
-
-// Admin-facing reference for a request row. Requests have no dedicated reference
-// field, so we derive one from the _id: "REQ-" + last 8 chars uppercased.
-// (Customer-facing surfaces use the last 6 chars of _id — kept separate on purpose.)
+// Request reference: REQ- + last 8 of _id (requests have no dedicated ref field).
 const requestReference = (id: string) => `REQ-${id.slice(-8).toUpperCase()}`;
+
+const stageLabelFor = (stageId: string) =>
+  STAGES.find((s) => s.id === stageId)?.label || stageId;
+
+// yyyy-mm-dd in local time, for the service-date filter
+const toLocalYmd = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-CA") : "");
+
+function normalizeBooking(b: Booking): UnifiedRow {
+  let statusKey: StatusKey;
+  let statusLabel: string;
+  if (b.status === "cancelled") {
+    statusKey = "rejected";
+    statusLabel = "Cancelled";
+  } else if (b.status === "completed") {
+    statusKey = "completed";
+    statusLabel = "Completed";
+  } else {
+    statusKey = "active";
+    statusLabel = "Paid";
+  }
+  return {
+    kind: "booking",
+    id: b._id,
+    reference: b.trackingCode || "—",
+    customerName: b.userName,
+    email: b.userEmail,
+    rego: b.vehicleRegistration,
+    serviceDate: b.serviceDate,
+    pickupSlot: b.pickupTimeSlot,
+    dropoffSlot: b.dropoffTimeSlot,
+    statusKey,
+    statusLabel,
+    stageLabel: stageLabelFor(b.currentStage),
+    paidAt: b.createdAt, // bookings only exist after payment → createdAt is the paid time
+    createdAt: b.createdAt,
+    raw: b,
+  };
+}
+
+function normalizeRequest(r: BookingRequestItem): UnifiedRow {
+  let statusKey: StatusKey;
+  let statusLabel: string;
+  switch (r.status) {
+    case "pending_review":
+      statusKey = "needs_review";
+      statusLabel = "Needs Review";
+      break;
+    case "approved":
+    case "accepted_awaiting_payment":
+      statusKey = "awaiting_payment";
+      statusLabel = "Awaiting Payment";
+      break;
+    case "payment_link_sent":
+      statusKey = "awaiting_payment";
+      statusLabel = "Link Sent";
+      break;
+    case "declined":
+      statusKey = "rejected";
+      statusLabel = "Rejected";
+      break;
+    default: // expired
+      statusKey = "rejected";
+      statusLabel = "Expired";
+  }
+  return {
+    kind: "request",
+    id: r._id,
+    reference: requestReference(r._id),
+    customerName: r.userName,
+    email: r.userEmail,
+    rego: r.vehicleRegistration,
+    serviceDate: r.serviceDate,
+    pickupSlot: r.pickupTimeSlot,
+    dropoffSlot: r.dropoffTimeSlot,
+    statusKey,
+    statusLabel,
+    createdAt: r.createdAt,
+    raw: r,
+  };
+}
+
+const STATUS_BADGE: Record<StatusKey, string> = {
+  needs_review: "bg-amber-100 text-amber-700",
+  awaiting_payment: "bg-blue-100 text-blue-700",
+  active: "bg-emerald-100 text-emerald-700",
+  completed: "bg-slate-100 text-slate-600",
+  rejected: "bg-red-100 text-red-700",
+};
+
+const formatPaidAt = (iso: string) =>
+  new Date(iso).toLocaleString("en-AU", {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+
+const compactSlots = (row: UnifiedRow) => {
+  const parts: string[] = [];
+  if (row.pickupSlot) parts.push(getPickupSlotLabel(row.pickupSlot));
+  if (row.dropoffSlot) parts.push(getDropoffSlotLabel(row.dropoffSlot));
+  return parts.join(" / ");
+};
+
+const serviceDateShort = (iso?: string) =>
+  iso ? new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "short" }) : "—";
+
+// ---- Page ------------------------------------------------------------------
 
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [requests, setRequests] = useState<BookingRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const debouncedSearch = useDebounce(searchInput, 400); // Debounce search for performance
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [stageFilter, setStageFilter] = useState("all");
-  const [userTypeFilter, setUserTypeFilter] = useState("all");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<TabKey>("all");
+  const [dateFilter, setDateFilter] = useState("");
+
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<BookingRequestItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sendingLink, setSendingLink] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
 
-  const [awaitingPayment, setAwaitingPayment] = useState<AwaitingPaymentRequest[]>([]);
-  const [awaitingLoading, setAwaitingLoading] = useState(true);
-  const [sendingLink, setSendingLink] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<AwaitingPaymentRequest | null>(null);
-
-  const fetchAwaitingPayment = useCallback(async () => {
+  // ONE fetch for the whole page: bookings + all open requests, in parallel, uncached.
+  const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
-      setAwaitingLoading(true);
-      const [res1, res2] = await Promise.all([
-        fetch("/api/admin/booking-requests?status=approved&limit=50"),
-        fetch("/api/admin/booking-requests?status=payment_link_sent&limit=50"),
+      const [bRes, rRes] = await Promise.all([
+        fetch("/api/admin/bookings?limit=500", { cache: "no-store" }),
+        fetch("/api/admin/booking-requests?status=all_open&limit=500", { cache: "no-store" }),
       ]);
-      const data1 = res1.ok ? await res1.json() : { requests: [] };
-      const data2 = res2.ok ? await res2.json() : { requests: [] };
-      const combined = [...(data1.requests || []), ...(data2.requests || [])]
-        .filter((r: AwaitingPaymentRequest) => r.status !== "paid")
-        .sort((a: AwaitingPaymentRequest, b: AwaitingPaymentRequest) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      setAwaitingPayment(combined);
+      if (!bRes.ok) throw new Error("Failed to fetch bookings");
+      const bData = await bRes.json();
+      const rData = rRes.ok ? await rRes.json() : { requests: [] };
+      setBookings(bData.bookings || []);
+      setRequests(rData.requests || []);
+      setLastUpdated(new Date());
+      setError("");
     } catch {
-      // Silent fail — section just won't show
+      setError("Failed to load the bookings pipeline");
     } finally {
-      setAwaitingLoading(false);
+      setLoading(false);
     }
   }, []);
 
+  // Single refresh loop for the ENTIRE page: 30s interval + visibility + focus.
   useEffect(() => {
-    fetchAwaitingPayment();
-    const interval = setInterval(fetchAwaitingPayment, 30_000);
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchAwaitingPayment();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
+    fetchAll();
+    const interval = setInterval(() => fetchAll({ silent: true }), 30_000);
+    const onVisible = () => { if (document.visibilityState === "visible") fetchAll({ silent: true }); };
+    const onFocus = () => fetchAll({ silent: true });
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
     };
-  }, [fetchAwaitingPayment]);
+  }, [fetchAll]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const t = setTimeout(() => setSuccessMessage(""), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [successMessage]);
+
+  // Deep link: /admin/bookings?view=<bookingId> opens the booking modal (dashboard links).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const viewId = new URLSearchParams(window.location.search).get("view");
+    if (!viewId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/bookings/${viewId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) { setSelectedBooking(data); setShowEditModal(false); }
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Normalise + sort newest-first by createdAt.
+  const rows = useMemo(() => {
+    const merged = [
+      ...bookings.map(normalizeBooking),
+      ...requests.map(normalizeRequest),
+    ];
+    merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return merged;
+  }, [bookings, requests]);
+
+  const stats = useMemo(() => ({
+    needs_review: rows.filter((r) => r.statusKey === "needs_review").length,
+    awaiting_payment: rows.filter((r) => r.statusKey === "awaiting_payment").length,
+    active: rows.filter((r) => r.statusKey === "active").length,
+    completed: rows.filter((r) => r.statusKey === "completed").length,
+  }), [rows]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (tab !== "all" && row.statusKey !== tab) return false;
+      if (dateFilter && toLocalYmd(row.serviceDate) !== dateFilter) return false;
+      if (q) {
+        const hay = `${row.reference} ${row.customerName} ${row.rego} ${row.email}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rows, tab, dateFilter, search]);
+
+  const hasActiveFilters = tab !== "all" || !!dateFilter || !!search.trim();
+  const clearFilters = () => { setTab("all"); setDateFilter(""); setSearch(""); };
 
   const handleSendPaymentLink = async (requestId: string) => {
     setSendingLink(requestId);
     try {
-      const res = await fetch(`/api/admin/booking-requests/${requestId}/send-payment-link`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/admin/booking-requests/${requestId}/send-payment-link`, { method: "POST" });
       if (res.ok) {
         setSuccessMessage("Payment link sent!");
-        fetchAwaitingPayment();
+        await fetchAll({ silent: true });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to send payment link");
       }
     } catch {
-      // Silent
+      setError("Failed to send payment link");
     } finally {
       setSendingLink(null);
     }
   };
 
-  const fetchBookings = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "15",
-        ...(debouncedSearch && { search: debouncedSearch }),
-        ...(statusFilter !== "all" && { status: statusFilter }),
-        ...(stageFilter !== "all" && { stage: stageFilter }),
-      });
-
-      const response = await fetch(`/api/admin/bookings?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch bookings");
-
-      const data = await response.json();
-      
-      // Filter by user type client-side (API doesn't support this filter)
-      let filteredBookings = data.bookings;
-      if (userTypeFilter === "guest") {
-        filteredBookings = data.bookings.filter((b: Booking) => b.isGuest);
-      } else if (userTypeFilter === "registered") {
-        filteredBookings = data.bookings.filter((b: Booking) => !b.isGuest);
-      }
-
-      setBookings(filteredBookings);
-      setTotalPages(data.pagination.totalPages);
-      setTotal(data.pagination.total);
-      setError("");
-    } catch {
-      setError("Failed to load bookings");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debouncedSearch, statusFilter, stageFilter, userTypeFilter]);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
-
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(""), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
-
-  // Auto-open detail drawer when ?view=<id> is present in the URL.
-  // Used by the admin dashboard's "View" link so admins can read details
-  // without leaving the bookings list. Read-only — does not open the edit modal.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const viewId = params.get("view");
-    if (!viewId) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/bookings/${viewId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) {
-          setSelectedBooking(data);
-          setShowEditModal(false);
-        }
-      } catch {
-        // Silent — drawer simply won't open if fetch fails
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-AU", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-AU", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat("en-AU", {
-      style: "currency",
-      currency: "AUD",
-    }).format(cents / 100);
-  };
-
-  // Payment timestamp. Bookings only exist after payment succeeds (the webhook creates
-  // the booking at the moment of payment), so createdAt IS the payment time.
-  const formatPaidAt = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-AU", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-amber-100 text-amber-700";
-      case "in_progress":
-        return "bg-emerald-100 text-emerald-700";
-      case "completed":
-        return "bg-green-100 text-green-700";
-      case "cancelled":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
-
-  // HIDDEN — superseded by the explicit "Paid" badge (bookings only exist after payment).
-  // const getPaymentStatusColor = (status?: string) => {
-  //   switch (status) {
-  //     case "paid":
-  //       return "bg-green-100 text-green-700";
-  //     case "pending":
-  //       return "bg-amber-100 text-amber-700";
-  //     case "failed":
-  //       return "bg-red-100 text-red-700";
-  //     case "refunded":
-  //       return "bg-blue-100 text-blue-700";
-  //     default:
-  //       return "bg-slate-100 text-slate-700";
-  //   }
-  // };
-
-  const getStageLabel = (stageId: string) => {
-    const stage = STAGES.find((s) => s.id === stageId);
-    return stage?.label || stageId;
-  };
-
-  const getStageIndex = (stageId: string) => {
-    return STAGES.findIndex((s) => s.id === stageId);
-  };
-
-  const handleQuickStageUpdate = async (bookingId: string, newStage: string) => {
-    const booking = bookings.find((b) => b._id === bookingId);
-    if (!booking) return;
-
-    const currentIndex = getStageIndex(booking.currentStage);
-    const newIndex = getStageIndex(newStage);
-
-    if (newIndex < currentIndex) {
-      alert("Cannot move to an earlier stage from the table. Use the Edit modal to override this.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const response = await fetch(`/api/admin/bookings/${bookingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentStage: newStage }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update");
-      }
-
-      const updated = await response.json();
-      setBookings((prev) =>
-        prev.map((b) => (b._id === bookingId ? updated : b))
-      );
-      if (selectedBooking?._id === bookingId) {
-        setSelectedBooking(updated);
-      }
-      setSuccessMessage("Progress updated successfully!");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update booking progress");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleSaveBooking = async (data: Record<string, unknown>) => {
     if (!selectedBooking) return;
-
     try {
       setSaving(true);
-      const response = await fetch(
-        `/api/admin/bookings/${selectedBooking._id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        }
-      );
-
+      const response = await fetch(`/api/admin/bookings/${selectedBooking._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to save");
       }
-
       const updated = await response.json();
-      setBookings((prev) =>
-        prev.map((b) => (b._id === selectedBooking._id ? updated : b))
-      );
+      setBookings((prev) => prev.map((b) => (b._id === selectedBooking._id ? updated : b)));
       setSelectedBooking(updated);
       setShowEditModal(false);
       setSuccessMessage("Booking updated successfully!");
@@ -472,25 +332,109 @@ export default function AdminBookingsPage() {
     }
   };
 
-  // Generate tracking link for a booking
-  const getTrackingLink = (booking: Booking) => {
-    if (booking.trackingCode) {
-      return `/track?code=${encodeURIComponent(booking.trackingCode)}`;
-    }
-    // Fallback to email + rego if no tracking code
-    return `/track?email=${encodeURIComponent(booking.userEmail)}&rego=${encodeURIComponent(booking.vehicleRegistration)}`;
-  };
+  const getTrackingLink = (b: Booking) =>
+    b.trackingCode
+      ? `/track?code=${encodeURIComponent(b.trackingCode)}`
+      : `/track?email=${encodeURIComponent(b.userEmail)}&rego=${encodeURIComponent(b.vehicleRegistration)}`;
 
-  // Copy text to clipboard
-  const copyToClipboard = async (text: string, label: string = "Text") => {
+  const copyToClipboard = async (text: string, label = "Text") => {
     try {
       await navigator.clipboard.writeText(text);
       setSuccessMessage(`${label} copied to clipboard`);
-    } catch (err) {
-      console.error("Failed to copy:", err);
+    } catch {
       setSuccessMessage("Failed to copy to clipboard");
     }
   };
+
+  const formatDateTime = (d: string) =>
+    new Date(d).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  const formatCurrency = (cents: number) =>
+    new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(cents / 100);
+
+  const openRow = (row: UnifiedRow) => {
+    if (row.kind === "request") setSelectedRequest(row.raw as BookingRequestItem);
+    else { setSelectedBooking(row.raw as Booking); setShowEditModal(false); }
+  };
+
+  // The single contextual action per row.
+  const RowAction = ({ row }: { row: UnifiedRow }) => {
+    if (row.kind === "request") {
+      const st = (row.raw as BookingRequestItem).status;
+      if (st === "approved" || st === "accepted_awaiting_payment") {
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleSendPaymentLink(row.id); }}
+            disabled={sendingLink === row.id}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {sendingLink === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Send Link
+          </button>
+        );
+      }
+      if (st === "payment_link_sent") {
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleSendPaymentLink(row.id); }}
+            disabled={sendingLink === row.id}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {sendingLink === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Resend
+          </button>
+        );
+      }
+      if (st === "pending_review") {
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedRequest(row.raw as BookingRequestItem); }}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-400"
+          >
+            <Eye className="h-3 w-3" /> Review
+          </button>
+        );
+      }
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); setSelectedRequest(row.raw as BookingRequestItem); }}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          <Eye className="h-3 w-3" /> View
+        </button>
+      );
+    }
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setSelectedBooking(row.raw as Booking); setShowEditModal(false); }}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
+      >
+        <Eye className="h-3 w-3" /> View
+      </button>
+    );
+  };
+
+  const StatusCell = ({ row }: { row: UnifiedRow }) => (
+    <div className="flex flex-col gap-0.5">
+      <span className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${STATUS_BADGE[row.statusKey]}`}>
+        {row.statusKey === "active" && <CheckCircle2 className="h-3 w-3" />}
+        {row.statusLabel}
+      </span>
+      {row.kind === "booking" && row.statusKey === "active" && row.stageLabel && (
+        <span className="text-[11px] text-slate-500">{row.stageLabel}</span>
+      )}
+      {row.kind === "booking" && row.paidAt && row.statusKey !== "rejected" && (
+        <span className="text-xs text-slate-400">{formatPaidAt(row.paidAt)}</span>
+      )}
+    </div>
+  );
+
+  const RefBadge = ({ value }: { value: string }) => (
+    <span className="inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+      {value}
+    </span>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -502,89 +446,72 @@ export default function AdminBookingsPage() {
           </div>
         )}
 
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Header */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Manage Bookings</h1>
-            <p className="mt-1 text-slate-600">
-              {total} total bookings{awaitingPayment.length > 0 ? ` • ${awaitingPayment.length} awaiting payment` : ""} • View and manage all customer bookings
-            </p>
+            <h1 className="text-3xl font-bold text-slate-900">Bookings</h1>
+            <p className="mt-1 text-slate-600">Requests and bookings across the full pipeline</p>
           </div>
-          <button
-            onClick={fetchBookings}
-            className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
-          >
-            <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-slate-400">
+                Updated {lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}
+              </span>
+            )}
+            <button
+              onClick={() => fetchAll()}
+              className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+            >
+              <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Old Awaiting Payment banner — superseded: requests now render as rows inside the main table below */}
-        {/* {!awaitingLoading && awaitingPayment.length > 0 && (
-          <div className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 shadow-sm">
-            ...
-          </div>
-        )} */}
+        {/* Stat cards (click to filter) */}
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard icon={Inbox} iconBg="bg-amber-100" iconColor="text-amber-600" value={stats.needs_review} label="Needs Review" active={tab === "needs_review"} onClick={() => setTab(tab === "needs_review" ? "all" : "needs_review")} />
+          <StatCard icon={CreditCard} iconBg="bg-blue-100" iconColor="text-blue-600" value={stats.awaiting_payment} label="Awaiting Payment" active={tab === "awaiting_payment"} onClick={() => setTab(tab === "awaiting_payment" ? "all" : "awaiting_payment")} />
+          <StatCard icon={Truck} iconBg="bg-emerald-100" iconColor="text-emerald-600" value={stats.active} label="Active" active={tab === "active"} onClick={() => setTab(tab === "active" ? "all" : "active")} />
+          <StatCard icon={CheckCircle2} iconBg="bg-slate-100" iconColor="text-slate-600" value={stats.completed} label="Completed" active={tab === "completed"} onClick={() => setTab(tab === "completed" ? "all" : "completed")} />
+        </div>
 
-        {/* Filters */}
-        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, registration..."
-              value={searchInput}
-              onChange={(e) => {
-                setSearchInput(e.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+        {/* Controls */}
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search reference, name, rego, email…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
             </div>
-            <select
-              value={stageFilter}
-              onChange={(e) => {
-                setStageFilter(e.target.value);
-                setPage(1);
-              }}
-              className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="all">All Stages</option>
-              {STAGES.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={userTypeFilter}
-              onChange={(e) => {
-                setUserTypeFilter(e.target.value);
-                setPage(1);
-              }}
-              className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="all">All Users</option>
-              <option value="registered">Registered</option>
-              <option value="guest">Guests</option>
-            </select>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-slate-400">Service date</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+          </div>
+          {/* Pill tabs */}
+          <div className="flex flex-wrap gap-2">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  tab === t.key ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -592,375 +519,122 @@ export default function AdminBookingsPage() {
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
             <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
             <p className="mt-2 text-sm font-medium text-red-700">{error}</p>
-            <button
-              onClick={fetchBookings}
-              className="mt-3 text-sm font-medium text-red-600 hover:text-red-700"
-            >
+            <button onClick={() => fetchAll()} className="mt-3 text-sm font-medium text-red-600 hover:text-red-700">
               Try again
             </button>
           </div>
         )}
 
+        {/* List */}
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           {loading ? (
             <div className="p-12 text-center">
               <RefreshCw className="mx-auto h-8 w-8 animate-spin text-emerald-500" />
-              <p className="mt-3 text-sm text-slate-500">Loading bookings...</p>
+              <p className="mt-3 text-sm text-slate-500">Loading pipeline…</p>
             </div>
-          ) : bookings.length === 0 && awaitingPayment.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
                 <Car className="h-8 w-8 text-slate-400" />
               </div>
-              <p className="mt-4 text-sm font-medium text-slate-600">No bookings found</p>
+              <p className="mt-4 text-sm font-medium text-slate-600">
+                {hasActiveFilters ? "No results" : "Nothing in the pipeline yet"}
+              </p>
+              {hasActiveFilters && (
+                <button onClick={clearFilters} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700">
+                  <X className="h-3.5 w-3.5" /> Clear filters
+                </button>
+              )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-4">Customer</th>
-                    <th className="px-4 py-4">Vehicle</th>
-                    <th className="px-4 py-4">{FEATURES.SERVICE_SELECTION ? 'Service' : 'Details'}</th>
-                    <th className="px-4 py-4">Pickup</th>
-                    <th className="px-4 py-4">Stage</th>
-                    <th className="px-4 py-4">Payment</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {/* Awaiting-payment request rows — pinned at top on page 1 */}
-                  {page === 1 && statusFilter === "all" && stageFilter === "all" && awaitingPayment.map((req) => (
-                    <tr key={`req-${req._id}`} className="border-l-4 border-l-amber-400 bg-amber-50/40 transition hover:bg-amber-50/70">
-                      {/* Customer */}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">{req.userName}</p>
-                          {req.isGuest && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Guest</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">{req.userEmail}</p>
-                        {req.customerPhone && (
-                          <p className="text-xs text-slate-400">{req.customerPhone}</p>
-                        )}
-                        {/* Reference (Task 5) */}
-                        <span className="mt-1 inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
-                          {requestReference(req._id)}
-                        </span>
-                      </td>
-                      {/* Vehicle */}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">{req.vehicleRegistration}</p>
-                          {req.isManualTransmission && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title="Manual transmission">Manual</span>
-                          )}
-                        </div>
-                        {(req.vehicleYear || req.vehicleModel) && (
-                          <p className="text-xs text-slate-500">{[req.vehicleYear, req.vehicleModel].filter(Boolean).join(" ")}</p>
-                        )}
-                      </td>
-                      {/* Details */}
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-slate-700 truncate max-w-[180px]">{req.pickupAddress.split(",")[0]}</p>
-                        {/* HIDDEN — moved to View Details
-                        {req.garageName && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                            <Building className="h-3 w-3" />
-                            {req.garageName}
-                          </span>
-                        )}
-                        */}
-                      </td>
-                      {/* Pickup */}
-                      <td className="px-4 py-4">
-                        {req.pickupTimeSlot ? (
-                          <p className="text-sm text-slate-900">{getPickupSlotLabel(req.pickupTimeSlot)}</p>
-                        ) : req.earliestPickup ? (
-                          <p className="text-sm text-slate-900">{req.earliestPickup}</p>
-                        ) : (
-                          <p className="text-sm text-slate-400">—</p>
-                        )}
-                        {req.dropoffTimeSlot && (
-                          <p className="text-xs text-emerald-600">Return: {getDropoffSlotLabel(req.dropoffTimeSlot)}</p>
-                        )}
-                      </td>
-                      {/* Stage — static pill */}
-                      <td className="px-4 py-4">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                          <Clock className="h-3 w-3" />
-                          Awaiting Payment
-                        </span>
-                      </td>
-                      {/* Payment */}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium leading-tight text-amber-700">
-                            Unpaid
-                          </span>
-                          <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
-                            {formatCurrency(req.quotedAmount)}
-                          </span>
-                        </div>
-                      </td>
-                      {/* Status */}
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-tight ${
-                          req.status === "payment_link_sent" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-                        }`}>
-                          {req.status === "payment_link_sent" ? "Link Sent" : "Approved"}
-                        </span>
-                        {req.paymentLinkSentAt && (
-                          <p className="mt-0.5 text-[10px] text-slate-400">
-                            Sent {new Date(req.paymentLinkSentAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                          </p>
-                        )}
-                      </td>
-                      {/* Actions */}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setSelectedRequest(req)}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSendPaymentLink(req._id)}
-                            disabled={sendingLink === req._id}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                          >
-                            {sendingLink === req._id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Mail className="h-3 w-3" />
-                            )}
-                            {req.status === "payment_link_sent" ? "Resend" : "Send Link"}
-                          </button>
-                        </div>
-                      </td>
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-4">Reference</th>
+                      <th className="px-4 py-4">Customer</th>
+                      <th className="px-4 py-4">Vehicle</th>
+                      <th className="px-4 py-4">Service date</th>
+                      <th className="px-4 py-4">Status</th>
+                      <th className="px-4 py-4 text-right">Action</th>
                     </tr>
-                  ))}
-                  {bookings.map((booking) => (
-                    <tr key={booking._id} className="transition hover:bg-slate-50">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">
-                            {booking.userName}
-                          </p>
-                          {booking.isGuest && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                              Guest
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          {booking.userEmail}
-                        </p>
-                        {(booking.guestPhone || booking.userMobile) && (
-                          <p className="text-xs text-slate-400">
-                            {booking.guestPhone || booking.userMobile}
-                          </p>
-                        )}
-                        {/* Booking reference (Task 5) */}
-                        {booking.trackingCode && (
-                          <span className="mt-1 inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
-                            {booking.trackingCode}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">
-                            {booking.vehicleRegistration}
-                          </p>
-                          {booking.isManualTransmission && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title="Manual transmission - requires manual-capable driver">
-                              Manual
-                            </span>
-                          )}
-                        </div>
-                        {booking.vehicleYear || booking.vehicleModel ? (
-                          <p className="text-xs text-slate-500">
-                            {[booking.vehicleYear, booking.vehicleModel].filter(Boolean).join(' ')}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-slate-500">
-                            {booking.vehicleState}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-slate-700">
-                          {(() => {
-                            const svcType = getServiceTypeByValue(booking.serviceType);
-                            return svcType ? svcType.label : booking.serviceType;
-                          })()}
-                        </p>
-                        {booking.estimatedServiceDuration && (
-                          <p className="text-xs text-slate-500">
-                            ~{booking.estimatedServiceDuration}h
-                          </p>
-                        )}
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {/* HIDDEN — moved to View Details
-                          {booking.hasExistingBooking && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                              <Building className="h-3 w-3" />
-                              {booking.garageName}
-                            </span>
-                          )}
-                          */}
-                          {FEATURES.SERVICE_SELECTION && booking.selectedServices && booking.selectedServices.length > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                              <Wrench className="h-3 w-3" />
-                              {booking.selectedServices.reduce((acc, s) => acc + s.services.length, 0)} services
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-slate-900">
-                          {booking.pickupTimeSlot
-                            ? getPickupSlotLabel(booking.pickupTimeSlot)
-                            : booking.pickupTime}
-                        </p>
-                        {booking.dropoffTimeSlot && (
-                          <p className="text-xs text-emerald-600">
-                            Return: {getDropoffSlotLabel(booking.dropoffTimeSlot)}
-                          </p>
-                        )}
-                        <p className="text-xs text-slate-500 truncate max-w-[150px]">
-                          {booking.pickupAddress}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <select
-                          value={booking.currentStage}
-                          onChange={(e) =>
-                            handleQuickStageUpdate(booking._id, e.target.value)
-                          }
-                          disabled={saving || booking.status === "cancelled" || booking.status === "completed"}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
-                        >
-                          {STAGES.map((stage) => (
-                            <option key={stage.id} value={stage.id}>
-                              {stage.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-4">
-                        {/* Bookings only exist after payment — show an explicit Paid badge + payment time (createdAt). */}
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium leading-tight text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Paid
-                          </span>
-                          {booking.paymentAmount && (
-                            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
-                              {formatCurrency(booking.paymentAmount)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">
-                          {formatPaidAt(booking.createdAt)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-tight ${getStatusColor(booking.status)}`}
-                        >
-                          {booking.status.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setSelectedBooking(booking)}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedBooking(booking);
-                              setShowEditModal(true);
-                            }}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
-                            title="Edit"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <Link
-                            href={getTrackingLink(booking)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
-                            title="View Tracking Page"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-4">
-              <p className="text-sm text-slate-500">
-                Page {page} of {totalPages} ({total} bookings)
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Prev
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => (
+                      <tr key={`${row.kind}-${row.id}`} onClick={() => openRow(row)} className="cursor-pointer transition hover:bg-slate-50">
+                        <td className="px-4 py-4"><RefBadge value={row.reference} /></td>
+                        <td className="px-4 py-4">
+                          <p className="font-medium text-slate-900">{row.customerName}</p>
+                          <p className="text-xs text-slate-500">{row.email}</p>
+                        </td>
+                        <td className="px-4 py-4"><span className="font-mono text-sm font-semibold text-slate-900">{row.rego}</span></td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm text-slate-900">{serviceDateShort(row.serviceDate)}</p>
+                          {compactSlots(row) && <p className="text-xs text-slate-500">{compactSlots(row)}</p>}
+                        </td>
+                        <td className="px-4 py-4"><StatusCell row={row} /></td>
+                        <td className="px-4 py-4 text-right"><RowAction row={row} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+
+              {/* Mobile cards */}
+              <div className="divide-y divide-slate-100 lg:hidden">
+                {filteredRows.map((row) => (
+                  <div key={`${row.kind}-${row.id}`} onClick={() => openRow(row)} className="cursor-pointer p-4 transition hover:bg-slate-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <RefBadge value={row.reference} />
+                        <p className="mt-1 font-medium text-slate-900">{row.customerName}</p>
+                        <p className="truncate text-xs text-slate-500">{row.email}</p>
+                      </div>
+                      <StatusCell row={row} />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="text-sm text-slate-600">
+                        <span className="font-mono font-semibold text-slate-900">{row.rego}</span>
+                        <span className="mx-2 text-slate-300">·</span>
+                        <span>{serviceDateShort(row.serviceDate)}</span>
+                        {compactSlots(row) && <span className="text-slate-400"> · {compactSlots(row)}</span>}
+                      </div>
+                      <RowAction row={row} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-slate-100 px-4 py-3">
+                <p className="text-xs text-slate-400">
+                  Showing {filteredRows.length} of {rows.length}
+                  {hasActiveFilters && <> · <button onClick={clearFilters} className="font-medium text-emerald-600 hover:text-emerald-700">clear filters</button></>}
+                </p>
+              </div>
+            </>
           )}
         </div>
 
+        {/* Booking modals (reused verbatim) */}
         {selectedBooking && !showEditModal && (
           <ViewDetailsModal
             booking={selectedBooking}
             onClose={() => setSelectedBooking(null)}
             onEdit={() => setShowEditModal(true)}
-            getStageLabel={getStageLabel}
+            getStageLabel={stageLabelFor}
             formatDateTime={formatDateTime}
             formatDate={formatDate}
             formatCurrency={formatCurrency}
             getTrackingLink={getTrackingLink}
             copyToClipboard={copyToClipboard}
             onBookingUpdated={(updated) => {
-              setBookings((prev) =>
-                prev.map((b) => (b._id === updated._id ? updated : b))
-              );
+              setBookings((prev) => prev.map((b) => (b._id === updated._id ? updated : b)));
               setSelectedBooking(updated);
             }}
           />
         )}
-
         {selectedBooking && showEditModal && (
           <EditBookingModal
             booking={selectedBooking}
@@ -970,1348 +644,15 @@ export default function AdminBookingsPage() {
           />
         )}
 
+        {/* Request modal (reused verbatim from the retired requests page) */}
         {selectedRequest && (
-          <RequestDetailsModal
+          <RequestDetailModal
             request={selectedRequest}
             onClose={() => setSelectedRequest(null)}
-            formatCurrency={formatCurrency}
+            onRefresh={() => { fetchAll({ silent: true }); setSelectedRequest(null); }}
           />
         )}
       </div>
-    </div>
-  );
-}
-
-// View-details surface for an awaiting-payment request row. Requests aren't bookings
-// yet (no booking record exists until payment), so this is a focused read-only modal.
-function RequestDetailsModal({
-  request,
-  onClose,
-  formatCurrency,
-}: {
-  request: AwaitingPaymentRequest;
-  onClose: () => void;
-  formatCurrency: (cents: number) => string;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-900">Request Details</h2>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              request.status === "payment_link_sent" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-            }`}>
-              {request.status === "payment_link_sent" ? "Link Sent" : "Approved"}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-5 p-6">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
-              <Clock className="h-4 w-4" />
-              Awaiting Payment
-            </div>
-            <p className="mt-2 font-mono text-sm text-slate-900">{requestReference(request._id)}</p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <User className="h-4 w-4 text-emerald-600" />
-              Customer
-              {request.isGuest && (
-                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Guest</span>
-              )}
-            </div>
-            <div className="mt-3">
-              <p className="font-medium text-slate-900">{request.userName}</p>
-              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
-                <Mail className="h-3.5 w-3.5" />
-                {request.userEmail}
-              </div>
-              {request.customerPhone && (
-                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
-                  <Phone className="h-3.5 w-3.5" />
-                  {request.customerPhone}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Car className="h-4 w-4 text-emerald-600" />
-              Vehicle
-              {request.isManualTransmission && (
-                <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                  Manual Transmission
-                </span>
-              )}
-            </div>
-            <div className="mt-3">
-              <div className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2">
-                {request.vehicleState && (
-                  <span className="text-xs font-medium text-slate-400">{request.vehicleState}</span>
-                )}
-                <span className="text-xl font-bold tracking-wider text-white">{request.vehicleRegistration}</span>
-              </div>
-              {(request.vehicleYear || request.vehicleModel) && (
-                <p className="mt-2 text-sm text-slate-600">{[request.vehicleYear, request.vehicleModel].filter(Boolean).join(" ")}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Service Centre — garage name + full address */}
-          {request.garageName && (
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <MapPin className="h-4 w-4 text-emerald-600" />
-                Service Centre
-              </div>
-              <div className="mt-3">
-                <p className="font-medium text-slate-900">{request.garageName}</p>
-                {request.garageAddress && (
-                  <p className="mt-0.5 text-sm text-slate-600">{request.garageAddress}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Clock className="h-4 w-4 text-emerald-600" />
-              Schedule
-            </div>
-            {request.serviceDate && (
-              <p className="mt-3 text-sm text-slate-900">
-                {new Date(request.serviceDate).toLocaleDateString("en-AU", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-              </p>
-            )}
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">Pickup Slot</p>
-                <p className="font-medium text-slate-900">
-                  {request.pickupTimeSlot ? getPickupSlotLabel(request.pickupTimeSlot) : request.earliestPickup || "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Drop-off Slot</p>
-                <p className="font-medium text-slate-900">
-                  {request.dropoffTimeSlot ? getDropoffSlotLabel(request.dropoffTimeSlot) : request.latestDropoff || "—"}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <p className="text-xs text-slate-500">Pickup Address</p>
-              <p className="text-sm text-slate-900">{request.pickupAddress}</p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-emerald-700">Quoted Total</span>
-              <span className="text-lg font-bold text-emerald-700">{formatCurrency(request.quotedAmount)}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="w-full rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ViewDetailsModal({
-  booking,
-  onClose,
-  onEdit,
-  getStageLabel,
-  formatDateTime,
-  formatDate,
-  formatCurrency,
-  getTrackingLink,
-  copyToClipboard,
-  onBookingUpdated,
-}: {
-  booking: Booking;
-  onClose: () => void;
-  onEdit: () => void;
-  getStageLabel: (id: string) => string;
-  formatDateTime: (date: string) => string;
-  formatDate: (date: string) => string;
-  formatCurrency: (cents: number) => string;
-  getTrackingLink: (booking: Booking) => string;
-  copyToClipboard: (text: string, label: string) => void;
-  onBookingUpdated: (booking: Booking) => void;
-}) {
-  const [drivers, setDrivers] = useState<DriverOption[]>([]);
-  const [loadingDrivers, setLoadingDrivers] = useState(false);
-  const [assigningDriver, setAssigningDriver] = useState<"pickup" | "return" | null>(null);
-  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
-  const [driverActionLoading, setDriverActionLoading] = useState(false);
-  const [driverError, setDriverError] = useState("");
-
-  // Fetch available drivers
-  useEffect(() => {
-    const fetchDrivers = async () => {
-      setLoadingDrivers(true);
-      try {
-        const response = await fetch("/api/admin/drivers?status=approved&onboardingStatus=active&canAcceptJobs=true&isActive=true");
-        if (response.ok) {
-          const data = await response.json();
-          setDrivers(data.drivers || []);
-        }
-      } catch (error) {
-        console.error("Failed to fetch drivers:", error);
-      } finally {
-        setLoadingDrivers(false);
-      }
-    };
-    fetchDrivers();
-  }, []);
-
-  const handleAssignDriver = async (leg: "pickup" | "return") => {
-    if (!selectedDriverId) return;
-    setDriverActionLoading(true);
-    setDriverError("");
-
-    try {
-      const response = await fetch(`/api/admin/bookings/${booking._id}/assign-driver`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ driverId: selectedDriverId, leg }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to assign driver");
-      }
-
-      // Refresh booking data
-      const bookingResponse = await fetch(`/api/admin/bookings/${booking._id}`);
-      if (bookingResponse.ok) {
-        const updatedBooking = await bookingResponse.json();
-        onBookingUpdated(updatedBooking);
-      }
-
-      setAssigningDriver(null);
-      setSelectedDriverId("");
-    } catch (error) {
-      setDriverError(error instanceof Error ? error.message : "Failed to assign driver");
-    } finally {
-      setDriverActionLoading(false);
-    }
-  };
-
-  const handleUnassignDriver = async (leg: "pickup" | "return") => {
-    if (!confirm(`Are you sure you want to unassign the ${leg} driver?`)) return;
-    setDriverActionLoading(true);
-    setDriverError("");
-
-    try {
-      const response = await fetch(`/api/admin/bookings/${booking._id}/assign-driver`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leg }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to unassign driver");
-      }
-
-      // Refresh booking data
-      const bookingResponse = await fetch(`/api/admin/bookings/${booking._id}`);
-      if (bookingResponse.ok) {
-        const updatedBooking = await bookingResponse.json();
-        onBookingUpdated(updatedBooking);
-      }
-    } catch (error) {
-      setDriverError(error instanceof Error ? error.message : "Failed to unassign driver");
-    } finally {
-      setDriverActionLoading(false);
-    }
-  };
-
-  // Check if return driver assignment is allowed
-  const canAssignReturnDriver = booking.pickupDriver?.completedAt;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Booking Details
-            </h2>
-            {booking.isGuest && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                Guest
-              </span>
-            )}
-            {booking.hasExistingBooking && (
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                Existing Booking
-              </span>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-5 p-6">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-medium text-slate-500">Booking ID</p>
-            <p className="font-mono text-sm text-slate-900">{booking._id}</p>
-          </div>
-
-          {/* Tracking Information */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 mb-3">
-              <QrCode className="h-4 w-4" />
-              Tracking Information
-            </div>
-            <div className="space-y-3">
-              {/* Tracking Code */}
-              <div>
-                <p className="text-xs text-emerald-600 mb-1">Tracking Code</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-mono text-slate-900 border border-emerald-200">
-                    {booking.trackingCode || 'Not available'}
-                  </code>
-                  {booking.trackingCode && (
-                    <button
-                      onClick={() => copyToClipboard(booking.trackingCode!, 'Tracking code')}
-                      className="rounded-lg p-2 bg-emerald-500 text-white hover:bg-emerald-600 transition"
-                      title="Copy tracking code"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Tracking URL */}
-              <div>
-                <p className="text-xs text-emerald-600 mb-1">Tracking URL</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}${getTrackingLink(booking)}`}
-                    className="flex-1 rounded-lg bg-white px-3 py-2 text-xs text-slate-700 border border-emerald-200"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(`${window.location.origin}${getTrackingLink(booking)}`, 'Tracking URL')}
-                    className="rounded-lg p-2 bg-slate-500 text-white hover:bg-slate-600 transition"
-                    title="Copy tracking URL"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* View Tracking Page Button */}
-              <Link
-                href={getTrackingLink(booking)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
-              >
-                <ExternalLink className="h-4 w-4" />
-                View Customer Tracking Page
-              </Link>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <User className="h-4 w-4 text-emerald-600" />
-              Customer
-              {booking.isGuest && (
-                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
-                  Guest Checkout
-                </span>
-              )}
-            </div>
-            <div className="mt-3">
-              <p className="font-medium text-slate-900">{booking.userName}</p>
-              <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
-                <Mail className="h-3.5 w-3.5" />
-                {booking.userEmail}
-              </div>
-              {(booking.guestPhone || booking.userMobile) && (
-                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
-                  <Phone className="h-3.5 w-3.5" />
-                  {booking.guestPhone || booking.userMobile}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Payment Info */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <CreditCard className="h-4 w-4 text-emerald-600" />
-              Payment
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">Status</p>
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium mt-1 ${
-                  booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
-                  booking.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-700' :
-                  'bg-slate-100 text-slate-700'
-                }`}>
-                  {booking.paymentStatus || 'pending'}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Amount</p>
-                <p className="font-medium text-slate-900">
-                  {booking.paymentAmount ? formatCurrency(booking.paymentAmount) : '—'}
-                </p>
-              </div>
-              {booking.paymentId && (
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Payment ID</p>
-                  <p className="font-mono text-xs text-slate-600 break-all">
-                    {booking.paymentId}
-                  </p>
-                </div>
-              )}
-              {/* Explicit Paid indicator + payment time. Bookings only exist after
-                  payment succeeds, so createdAt is the payment timestamp. */}
-              <div className="col-span-2 flex items-center gap-2 border-t border-slate-100 pt-3">
-                <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Paid
-                </span>
-                <span className="text-xs text-slate-500">
-                  {new Date(booking.createdAt).toLocaleString("en-AU", {
-                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Service Centre — garage name + full address (moved here from the table rows) */}
-          {booking.garageName && (
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <MapPin className="h-4 w-4 text-emerald-600" />
-                Service Centre
-              </div>
-              <div className="mt-3">
-                <p className="font-medium text-slate-900">{booking.garageName}</p>
-                {booking.garageAddress && (
-                  <p className="mt-0.5 text-sm text-slate-600">{booking.garageAddress}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Car className="h-4 w-4 text-emerald-600" />
-              Vehicle
-              {booking.isManualTransmission && (
-                <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                  Manual Transmission
-                </span>
-              )}
-            </div>
-            <div className="mt-3 space-y-3">
-              {/* Registration badge */}
-              <div className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2">
-                <span className="text-xs font-medium text-slate-400">
-                  {booking.vehicleState}
-                </span>
-                <span className="text-xl font-bold tracking-wider text-white">
-                  {booking.vehicleRegistration}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-slate-500">Year</p>
-                  <p className="font-medium text-slate-900">
-                    {booking.vehicleYear || '—'}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Make & Model</p>
-                  <p className="font-medium text-slate-900">
-                    {booking.vehicleModel || '—'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-500">Transmission</p>
-                <p className={`font-medium ${booking.isManualTransmission ? 'text-amber-600' : 'text-slate-900'}`}>
-                  {booking.transmissionType === 'manual' ? 'Manual' : 'Automatic'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Wrench className="h-4 w-4 text-emerald-600" />
-              Service Details
-            </div>
-            <div className="mt-3">
-              <p className="text-xs text-slate-500">Service Type</p>
-              <p className="font-medium text-slate-900">
-                {(() => {
-                  const svcType = getServiceTypeByValue(booking.serviceType);
-                  return svcType
-                    ? `${svcType.label} (~${svcType.estimatedHours}h)`
-                    : booking.serviceType;
-                })()}
-              </p>
-            </div>
-            {booking.serviceDate && (
-              <div className="mt-3">
-                <p className="text-xs text-slate-500">Service Date</p>
-                <p className="font-medium text-slate-900">
-                  {new Date(booking.serviceDate).toLocaleDateString('en-AU', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </p>
-              </div>
-            )}
-            {FEATURES.SERVICE_SELECTION && booking.primaryServiceCategory && (
-              <div className="mt-3">
-                <p className="text-xs text-slate-500">Primary Category</p>
-                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                  {getCategoryById(booking.primaryServiceCategory)?.name || booking.primaryServiceCategory}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Selected Services - Hidden in Phase 1 (Transport Only) */}
-          {FEATURES.SERVICE_SELECTION && booking.selectedServices && booking.selectedServices.length > 0 && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
-                <Wrench className="h-4 w-4" />
-                Services Requested ({booking.selectedServices.reduce((acc, s) => acc + s.services.length, 0)})
-              </div>
-              <div className="mt-3 space-y-2">
-                {booking.selectedServices.map((sel) => {
-                  const cat = getCategoryById(sel.category);
-                  return (
-                    <div key={sel.category}>
-                      <p className="text-xs font-medium text-emerald-800">{cat?.name || sel.category}</p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {sel.services.map((service) => (
-                          <span
-                            key={service}
-                            className="inline-flex rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700"
-                          >
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {booking.serviceNotes && (
-                <div className="mt-3 border-t border-emerald-200 pt-3">
-                  <p className="text-xs text-emerald-600">Service Notes:</p>
-                  <p className="mt-1 text-sm text-emerald-800">{booking.serviceNotes}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {booking.hasExistingBooking && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
-                <Building className="h-4 w-4" />
-                Existing Garage Booking
-              </div>
-              <div className="mt-3 space-y-2">
-                <div>
-                  <p className="text-xs text-blue-600">Garage Name</p>
-                  <p className="font-medium text-blue-900">{booking.garageName}</p>
-                </div>
-                {booking.existingBookingRef && (
-                  <div>
-                    <p className="text-xs text-blue-600">Booking Reference</p>
-                    <p className="font-medium text-blue-900">{booking.existingBookingRef}</p>
-                  </div>
-                )}
-                {booking.existingBookingNotes && (
-                  <div>
-                    <p className="text-xs text-blue-600">Notes</p>
-                    <p className="text-sm text-blue-800">{booking.existingBookingNotes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Clock className="h-4 w-4 text-emerald-600" />
-              Schedule
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">Pickup Slot</p>
-                <p className="font-medium text-slate-900">
-                  {booking.pickupTimeSlot
-                    ? getPickupSlotLabel(booking.pickupTimeSlot)
-                    : booking.pickupTime}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Drop-off Slot</p>
-                <p className="font-medium text-slate-900">
-                  {booking.dropoffTimeSlot
-                    ? getDropoffSlotLabel(booking.dropoffTimeSlot)
-                    : booking.dropoffTime}
-                </p>
-              </div>
-            </div>
-            {booking.estimatedServiceDuration && (
-              <div className="mt-3">
-                <p className="text-xs text-slate-500">Estimated Duration</p>
-                <p className="font-medium text-slate-900">{booking.estimatedServiceDuration} hours</p>
-              </div>
-            )}
-            <div className="mt-3">
-              <p className="text-xs text-slate-500">Pickup Address</p>
-              <p className="text-sm text-slate-900">{booking.pickupAddress}</p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <MapPin className="h-4 w-4 text-emerald-600" />
-                Progress
-              </div>
-              <span className="text-sm font-semibold text-emerald-600">
-                {booking.overallProgress}%
-              </span>
-            </div>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${booking.overallProgress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Current Stage:{" "}
-              <span className="font-medium text-slate-900">
-                {getStageLabel(booking.currentStage)}
-              </span>
-            </p>
-          </div>
-
-          {/* Driver Assignments - Two-Slot Layout */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-4">
-              <Truck className="h-4 w-4 text-emerald-600" />
-              Driver Assignments
-            </div>
-
-            {driverError && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {driverError}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {/* Pickup Driver Slot */}
-              <div className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Pickup Driver
-                  </span>
-                  <span className="text-xs text-slate-400">Customer → Workshop</span>
-                </div>
-
-                {booking.pickupDriver ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {booking.pickupDriverName || "Unknown Driver"}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          {booking.pickupDriver.completedAt ? (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Completed
-                            </span>
-                          ) : booking.pickupDriver.startedAt ? (
-                            <span className="flex items-center gap-1 text-blue-600">
-                              <Clock className="h-3 w-3" />
-                              In Progress
-                            </span>
-                          ) : booking.pickupDriver.acceptedAt ? (
-                            <span className="flex items-center gap-1 text-emerald-600">
-                              <Check className="h-3 w-3" />
-                              Accepted
-                            </span>
-                          ) : (
-                            <span className="text-amber-600">Assigned</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {!booking.pickupDriver.startedAt && (
-                      <button
-                        onClick={() => handleUnassignDriver("pickup")}
-                        disabled={driverActionLoading}
-                        className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                        title="Unassign Driver"
-                      >
-                        {driverActionLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <UserMinus className="h-4 w-4" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                ) : assigningDriver === "pickup" ? (
-                  <div className="space-y-3">
-                    <select
-                      value={selectedDriverId}
-                      onChange={(e) => setSelectedDriverId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                      <option value="">Select a driver...</option>
-                      {drivers.map((driver) => (
-                        <option key={driver._id} value={driver._id}>
-                          {driver.firstName} {driver.lastName}
-                          {driver.shiftPreference !== "full_day" && ` (${driver.shiftPreference.toUpperCase()})`}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAssignDriver("pickup")}
-                        disabled={!selectedDriverId || driverActionLoading}
-                        className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                      >
-                        {driverActionLoading ? "Assigning..." : "Assign"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAssigningDriver(null);
-                          setSelectedDriverId("");
-                        }}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setAssigningDriver("pickup")}
-                    disabled={loadingDrivers}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600"
-                  >
-                    {loadingDrivers ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4" />
-                        Assign Pickup Driver
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Return Driver Slot */}
-              <div className={`rounded-lg border p-3 ${canAssignReturnDriver ? "border-slate-200" : "border-slate-100 bg-slate-50"}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Return Driver
-                  </span>
-                  <span className="text-xs text-slate-400">Workshop → Customer</span>
-                </div>
-
-                {!canAssignReturnDriver && !booking.returnDriver && (
-                  <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <AlertTriangle className="h-4 w-4" />
-                    Available after pickup is completed
-                  </div>
-                )}
-
-                {booking.returnDriver ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {booking.returnDriverName || "Unknown Driver"}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          {booking.returnDriver.completedAt ? (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Completed
-                            </span>
-                          ) : booking.returnDriver.startedAt ? (
-                            <span className="flex items-center gap-1 text-blue-600">
-                              <Clock className="h-3 w-3" />
-                              In Progress
-                            </span>
-                          ) : booking.returnDriver.acceptedAt ? (
-                            <span className="flex items-center gap-1 text-emerald-600">
-                              <Check className="h-3 w-3" />
-                              Accepted
-                            </span>
-                          ) : (
-                            <span className="text-amber-600">Assigned</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {!booking.returnDriver.startedAt && (
-                      <button
-                        onClick={() => handleUnassignDriver("return")}
-                        disabled={driverActionLoading}
-                        className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                        title="Unassign Driver"
-                      >
-                        {driverActionLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <UserMinus className="h-4 w-4" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                ) : canAssignReturnDriver && (
-                  assigningDriver === "return" ? (
-                    <div className="space-y-3">
-                      <select
-                        value={selectedDriverId}
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option value="">Select a driver...</option>
-                        {drivers.map((driver) => (
-                          <option key={driver._id} value={driver._id}>
-                            {driver.firstName} {driver.lastName}
-                            {driver.shiftPreference !== "full_day" && ` (${driver.shiftPreference.toUpperCase()})`}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleAssignDriver("return")}
-                          disabled={!selectedDriverId || driverActionLoading}
-                          className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
-                        >
-                          {driverActionLoading ? "Assigning..." : "Assign"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAssigningDriver(null);
-                            setSelectedDriverId("");
-                          }}
-                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setAssigningDriver("return")}
-                      disabled={loadingDrivers}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 transition hover:border-blue-400 hover:text-blue-600"
-                    >
-                      {loadingDrivers ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <UserPlus className="h-4 w-4" />
-                          Assign Return Driver
-                        </>
-                      )}
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Signed Forms */}
-          {booking.signedForms && booking.signedForms.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <ClipboardCheck className="h-4 w-4 text-emerald-600" />
-                Signed Forms ({booking.signedForms.length})
-              </div>
-              <div className="mt-3 space-y-2">
-                {booking.signedForms.map((form, index) => {
-                  const labelMap: Record<string, { label: string; color: string; bgColor: string; borderColor: string }> = {
-                    pickup_consent: { label: "Pickup Consent", color: "text-emerald-700", bgColor: "bg-emerald-50", borderColor: "border-emerald-200" },
-                    return_confirmation: { label: "Return Confirmation", color: "text-blue-700", bgColor: "bg-blue-50", borderColor: "border-blue-200" },
-                    claim_lodgement: { label: "Claim Lodgement", color: "text-amber-700", bgColor: "bg-amber-50", borderColor: "border-amber-200" },
-                  };
-                  const config = labelMap[form.formType] || { label: form.formType, color: "text-slate-700", bgColor: "bg-slate-50", borderColor: "border-slate-200" };
-                  return (
-                    <div key={index} className={`flex items-center justify-between rounded-lg border ${config.borderColor} ${config.bgColor} px-3 py-2`}>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className={`h-4 w-4 ${config.color}`} />
-                        <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-500">
-                          {new Date(form.submittedAt).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        <a
-                          href={`/api/admin/forms/${form.formId}/pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition hover:opacity-80 ${config.bgColor} ${config.color} border ${config.borderColor}`}
-                          title="Download / Print Form"
-                        >
-                          <Download className="h-3 w-3" />
-                          PDF
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <MessageSquare className="h-4 w-4 text-emerald-600" />
-              Updates History
-            </div>
-            <div className="mt-4 space-y-3">
-              {booking.updates.length > 0 ? (
-                booking.updates.map((update, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                      <Check className="h-3 w-3" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">
-                        {getStageLabel(update.stage)}
-                      </p>
-                      <p className="text-sm text-slate-600">{update.message}</p>
-                      <p className="text-xs text-slate-400">
-                        {formatDateTime(update.timestamp)} • {update.updatedBy}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No updates yet</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-            <div>
-              <p>Created: {formatDate(booking.createdAt)}</p>
-            </div>
-            <div>
-              <p>Updated: {formatDateTime(booking.updatedAt)}</p>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onEdit}
-              className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-            >
-              Edit Booking
-            </button>
-            <Link
-              href={getTrackingLink(booking)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              <ExternalLink className="h-4 w-4" />
-              View Tracking
-            </Link>
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditBookingModal({
-  booking,
-  onSave,
-  onClose,
-  saving,
-}: {
-  booking: Booking;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  onClose: () => void;
-  saving: boolean;
-}) {
-  const [formData, setFormData] = useState({
-    currentStage: booking.currentStage,
-    status: booking.status,
-    message: "",
-    pickupTime: booking.pickupTime,
-    dropoffTime: booking.dropoffTime,
-    pickupAddress: booking.pickupAddress,
-    vehicleYear: booking.vehicleYear || "",
-    vehicleModel: booking.vehicleModel || "",
-    allowBackwardsProgression: false,
-  });
-  const [error, setError] = useState("");
-  const [showConfirmDialog, setShowConfirmDialog] = useState<"cancelled" | "completed" | null>(null);
-
-  const currentStageIndex = STAGES.findIndex((s) => s.id === booking.currentStage);
-  const newStageIndex = STAGES.findIndex((s) => s.id === formData.currentStage);
-  const isBackwardsProgression = newStageIndex < currentStageIndex;
-  const newProgress = STAGES[newStageIndex]?.progress || booking.overallProgress;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (formData.status !== booking.status && (formData.status === "cancelled" || formData.status === "completed")) {
-      setShowConfirmDialog(formData.status as "cancelled" | "completed");
-      return;
-    }
-
-    await submitForm();
-  };
-
-  const submitForm = async () => {
-    try {
-      await onSave({
-        ...formData,
-        currentStage: formData.currentStage !== booking.currentStage ? formData.currentStage : undefined,
-        status: formData.status !== booking.status ? formData.status : undefined,
-        message: formData.message || undefined,
-        pickupTime: formData.pickupTime !== booking.pickupTime ? formData.pickupTime : undefined,
-        dropoffTime: formData.dropoffTime !== booking.dropoffTime ? formData.dropoffTime : undefined,
-        pickupAddress: formData.pickupAddress !== booking.pickupAddress ? formData.pickupAddress : undefined,
-        vehicleYear: formData.vehicleYear !== (booking.vehicleYear || "") ? formData.vehicleYear : undefined,
-        vehicleModel: formData.vehicleModel !== (booking.vehicleModel || "") ? formData.vehicleModel : undefined,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save booking");
-    }
-  };
-
-  const handleConfirmedStatusChange = async () => {
-    setShowConfirmDialog(null);
-    await submitForm();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
-          <h2 className="text-lg font-semibold text-slate-900">Edit Booking</h2>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          {error && (
-            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Current Stage
-            </label>
-            <select
-              value={formData.currentStage}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  currentStage: e.target.value,
-                })
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              {STAGES.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.label} ({stage.progress}%)
-                </option>
-              ))}
-            </select>
-
-            {formData.currentStage !== booking.currentStage && (
-              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 text-sm text-emerald-700">
-                  <span>Progress: {booking.overallProgress}%</span>
-                  <span>→</span>
-                  <span className="font-semibold">{newProgress}%</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
-                    style={{ width: `${newProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {isBackwardsProgression && (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-800">
-                      Going back to an earlier stage
-                    </p>
-                    <p className="mt-1 text-xs text-amber-700">
-                      This will move the booking from &quot;{STAGES[currentStageIndex]?.label}&quot; back to &quot;{STAGES[newStageIndex]?.label}&quot;.
-                    </p>
-                    <label className="mt-3 flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.allowBackwardsProgression}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            allowBackwardsProgression: e.target.checked,
-                          })
-                        }
-                        className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                      />
-                      <span className="text-sm text-amber-800">
-                        I confirm this change
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            {formData.status === "cancelled" && formData.status !== booking.status && (
-              <p className="mt-2 text-xs text-red-600">
-                ⚠️ This will cancel the booking
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Update Message
-              <span className="ml-1 font-normal text-slate-400">(shown to customer)</span>
-            </label>
-            <textarea
-              value={formData.message}
-              onChange={(e) =>
-                setFormData({ ...formData, message: e.target.value })
-              }
-              rows={3}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              placeholder="Optional: Custom message for this update..."
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Leave empty to use the default message for the selected stage.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Pickup Time
-            </label>
-            <input
-              type="text"
-              value={formData.pickupTime}
-              onChange={(e) =>
-                setFormData({ ...formData, pickupTime: e.target.value })
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Dropoff Time
-            </label>
-            <input
-              type="text"
-              value={formData.dropoffTime}
-              onChange={(e) =>
-                setFormData({ ...formData, dropoffTime: e.target.value })
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Pickup Address
-            </label>
-            <input
-              type="text"
-              value={formData.pickupAddress}
-              onChange={(e) =>
-                setFormData({ ...formData, pickupAddress: e.target.value })
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-
-          {/* Vehicle Details */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Vehicle Year
-              </label>
-              <input
-                type="text"
-                value={formData.vehicleYear}
-                onChange={(e) =>
-                  setFormData({ ...formData, vehicleYear: e.target.value.replace(/\D/g, '').slice(0, 4) })
-                }
-                maxLength={4}
-                placeholder="2020"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Make & Model
-              </label>
-              <input
-                type="text"
-                value={formData.vehicleModel}
-                onChange={(e) =>
-                  setFormData({ ...formData, vehicleModel: e.target.value })
-                }
-                placeholder="Toyota Camry"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={saving || (isBackwardsProgression && !formData.allowBackwardsProgression)}
-              className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving..." : "Update Booking"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {showConfirmDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${showConfirmDialog === "cancelled" ? "bg-red-100" : "bg-green-100"}`}>
-                <AlertTriangle className={`h-6 w-6 ${showConfirmDialog === "cancelled" ? "text-red-600" : "text-green-600"}`} />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900">
-                {showConfirmDialog === "cancelled" ? "Cancel Booking?" : "Complete Booking?"}
-              </h3>
-            </div>
-            <p className="mt-4 text-sm text-slate-600">
-              {showConfirmDialog === "cancelled"
-                ? "Are you sure you want to cancel this booking? The customer will be notified."
-                : "Are you sure you want to mark this booking as completed? This indicates the service is finished and the car has been returned."}
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={handleConfirmedStatusChange}
-                disabled={saving}
-                className={`flex-1 rounded-full py-3 text-sm font-semibold text-white shadow-lg ${showConfirmDialog === "cancelled" ? "bg-red-600 hover:bg-red-500" : "bg-green-600 hover:bg-green-500"} disabled:opacity-50`}
-              >
-                {saving ? "Saving..." : "Yes, Confirm"}
-              </button>
-              <button
-                onClick={() => setShowConfirmDialog(null)}
-                className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Go Back
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

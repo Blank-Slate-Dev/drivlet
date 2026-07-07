@@ -6,6 +6,9 @@ import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
 import { requireValidOrigin } from "@/lib/validation";
 
+// Always serve fresh data — the admin bookings view must never be cached/stale.
+export const dynamic = "force-dynamic";
+
 // GET /api/admin/bookings - Get all bookings with filtering and pagination
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin();
@@ -18,7 +21,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    // Cap raised to 500 so the unified /admin/bookings pipeline can load the full set
+    // in one request. Other callers pass their own (smaller) limits, so this is additive.
+    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const status = searchParams.get("status");
     const search = searchParams.get("search");
     const stage = searchParams.get("stage");
