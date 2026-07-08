@@ -26,9 +26,6 @@ import {
   Camera,
   CheckCircle2,
   Circle,
-  PhoneCall,
-  ArrowRight,
-  ArrowLeft,
   Package,
   Truck,
 } from "lucide-react";
@@ -96,15 +93,12 @@ interface MyJobs {
 }
 
 // ─── Tailwind class maps (avoid dynamic class purging) ─────────
-
+// One badge system across the whole page: neutral (not-yet-started / done-resting),
+// active (current in-progress state), waiting (blocked). No purple/blue.
 const statusColorMap: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-100", text: "text-blue-700" },
-  amber: { bg: "bg-amber-100", text: "text-amber-700" },
-  emerald: { bg: "bg-emerald-100", text: "text-emerald-700" },
-  orange: { bg: "bg-orange-100", text: "text-orange-700" },
-  slate: { bg: "bg-slate-100", text: "text-slate-700" },
-  purple: { bg: "bg-purple-100", text: "text-purple-700" },
-  red: { bg: "bg-red-100", text: "text-red-700" },
+  neutral: { bg: "bg-slate-100", text: "text-slate-600" },
+  active: { bg: "bg-emerald-50", text: "text-emerald-700" },
+  waiting: { bg: "bg-amber-50", text: "text-amber-700" },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -112,17 +106,17 @@ const statusColorMap: Record<string, { bg: string; text: string }> = {
 function getPickupStateInfo(state: string | null | undefined) {
   switch (state) {
     case "assigned":
-      return { label: "Upcoming", colorKey: "blue" };
+      return { label: "Upcoming", colorKey: "neutral" };
     case "started":
-      return { label: "En Route", colorKey: "amber" };
+      return { label: "En Route", colorKey: "active" };
     case "arrived":
-      return { label: "At Customer", colorKey: "purple" };
+      return { label: "At Customer", colorKey: "active" };
     case "collected":
-      return { label: "Car Collected", colorKey: "amber" };
+      return { label: "Car Collected", colorKey: "active" };
     case "completed":
-      return { label: "Completed", colorKey: "emerald" };
+      return { label: "Completed", colorKey: "active" };
     default:
-      return { label: "Pending", colorKey: "slate" };
+      return { label: "Pending", colorKey: "neutral" };
   }
 }
 
@@ -131,26 +125,26 @@ function getReturnStateInfo(
   canStart: boolean,
   hasReturn: boolean
 ) {
-  if (!hasReturn) return { label: "Not Assigned", colorKey: "slate" };
+  if (!hasReturn) return { label: "Not Assigned", colorKey: "neutral" };
   switch (state) {
     case "assigned":
-      if (canStart) return { label: "Ready", colorKey: "emerald" };
-      return { label: "Waiting", colorKey: "amber" };
+      if (canStart) return { label: "Ready", colorKey: "active" };
+      return { label: "Waiting", colorKey: "waiting" };
     case "started":
-      return { label: "Heading to Workshop", colorKey: "blue" };
+      return { label: "Heading to Workshop", colorKey: "active" };
     case "collected":
-      return { label: "Collected from Workshop", colorKey: "amber" };
+      return { label: "Collected from Workshop", colorKey: "active" };
     case "delivering":
-      return { label: "Delivering", colorKey: "blue" };
+      return { label: "Delivering", colorKey: "active" };
     case "completed":
-      return { label: "Delivered", colorKey: "emerald" };
+      return { label: "Delivered", colorKey: "active" };
     default:
-      return { label: "Pending", colorKey: "slate" };
+      return { label: "Pending", colorKey: "neutral" };
   }
 }
 
 function StatusBadge({ colorKey, label }: { colorKey: string; label: string }) {
-  const colors = statusColorMap[colorKey] || statusColorMap.slate;
+  const colors = statusColorMap[colorKey] || statusColorMap.neutral;
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
@@ -606,7 +600,7 @@ export default function DriverJobsPage() {
                   {selectedJob.customerPhone && (
                     <a
                       href={`sms:${selectedJob.customerPhone}?body=Your car service is complete! Please pay here: ${generatedLink}`}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                     >
                       <Phone className="h-4 w-4" />
                       Send via SMS
@@ -728,7 +722,6 @@ function GatedAdvanceButton({
   checkpoint,
   label,
   Icon,
-  colorScheme,
   isLoading,
   photos,
   onAction,
@@ -740,7 +733,6 @@ function GatedAdvanceButton({
   checkpoint: GatedCheckpoint;
   label: string;
   Icon: React.ElementType;
-  colorScheme: "emerald" | "blue";
   isLoading: boolean;
   photos?: MinimalPhoto[];
   onAction: (jobId: string, action: JobAction) => void;
@@ -755,66 +747,110 @@ function GatedAdvanceButton({
   }, [photosLoaded, job._id, onEnsurePhotos]);
 
   const v = validateCheckpointPhotos(photos ?? [], checkpoint);
-  const btnColor =
-    colorScheme === "blue"
-      ? "bg-blue-600 hover:bg-blue-500"
-      : "bg-emerald-600 hover:bg-emerald-500";
+  const pct = v.required > 0 ? Math.min(100, Math.round((v.present / v.required) * 100)) : 0;
 
+  // REPLACED — old amber photo-requirements box, now a flat sub-section with a
+  // slim progress bar and a strict one-primary action hierarchy. cleanup 2026-07-08
   return (
-    <div className="mt-3 w-full space-y-2">
+    <div className="mt-4 w-full space-y-4 border-t border-slate-100 pt-4">
       {!v.valid && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
-            <Camera className="h-4 w-4 flex-shrink-0" />
-            {photosLoaded
-              ? `${v.present} of ${v.required} required photos taken`
-              : "Checking photos…"}
+        <div className="space-y-3">
+          {/* Header + slim progress bar (merges the checklist with photo progress) */}
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+              <Camera className="h-4 w-4 flex-shrink-0 text-slate-400" />
+              <span>
+                Photos ·{" "}
+                {photosLoaded ? `${v.present} of ${v.required} required` : "checking…"}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
           </div>
-          {photosLoaded && v.missing.length > 0 && (
-            <p className="mt-1 text-[11px] text-amber-700">
-              Missing: {v.missing.map((s) => SLOT_LABELS[s] || s).join(", ")}
-            </p>
-          )}
-          <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+
+          {/* Slot checklist — 2 cols desktop, 1 col at 375px */}
+          <ul className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
             {v.requiredSlots.map((slot) => {
               const done = photosLoaded && !v.missing.includes(slot);
               return (
-                <li key={slot} className="flex items-center gap-1.5 text-xs">
+                <li key={slot} className="flex items-center gap-2 text-sm">
                   {done ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                    <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-500" />
                   ) : (
-                    <Circle className="h-3.5 w-3.5 flex-shrink-0 text-slate-300" />
+                    <Circle className="h-4 w-4 flex-shrink-0 text-slate-300" />
                   )}
-                  <span className={done ? "text-slate-600" : "text-slate-500"}>
+                  <span className={done ? "text-slate-700" : "text-slate-500"}>
                     {SLOT_LABELS[slot] || slot}
                   </span>
                 </li>
               );
             })}
           </ul>
+
+          {/* Missing list retained for screen readers (unchecked items convey it visually) */}
+          {photosLoaded && v.missing.length > 0 && (
+            <p className="sr-only">
+              Missing: {v.missing.map((s) => SLOT_LABELS[s] || s).join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Action hierarchy — exactly one primary at a time */}
+      {!v.valid ? (
+        <div className="space-y-2">
+          {/* Primary while photos incomplete */}
           <button
             onClick={() => onOpenPhotos(job)}
-            className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+          >
+            <Camera className="h-4 w-4" />
+            Take photos
+          </button>
+          {/* Disabled secondary — never green (green implies go) */}
+          <div>
+            <button
+              onClick={() => onAction(job._id, action)}
+              disabled={isLoading || !v.valid}
+              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-medium text-slate-400 disabled:cursor-not-allowed"
+            >
+              <Camera className="h-4 w-4" />
+              {label}
+            </button>
+            <p className="mt-1 text-center text-xs text-slate-400">
+              Complete required photos to continue
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {/* Primary once the gate is met */}
+          <button
+            onClick={() => onAction(job._id, action)}
+            disabled={isLoading}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Icon className="h-4 w-4" />
+            )}
+            {label}
+          </button>
+          {/* Take photos demotes to outline secondary (still available for extra/damage shots) */}
+          <button
+            onClick={() => onOpenPhotos(job)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
           >
             <Camera className="h-4 w-4" />
             Take photos
           </button>
         </div>
       )}
-      <button
-        onClick={() => onAction(job._id, action)}
-        disabled={isLoading || !v.valid}
-        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${btnColor}`}
-      >
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : v.valid ? (
-          <Icon className="h-4 w-4" />
-        ) : (
-          <Camera className="h-4 w-4" />
-        )}
-        {label}
-      </button>
     </div>
   );
 }
@@ -867,19 +903,10 @@ function MyJobCard({
     hasReturn
   );
 
-  // Photo progress
+  // Photo progress — total uploaded across all checkpoints (20 slots total).
   const cs = job.checkpointStatus;
   const photoCount = cs
     ? cs.pre_pickup + cs.service_dropoff + cs.service_pickup + cs.final_delivery
-    : 0;
-  const photoProgress = Math.round((photoCount / 20) * 100);
-  const completedCheckpoints = cs
-    ? [
-        cs.pre_pickup >= 5,
-        cs.service_dropoff >= 5,
-        cs.service_pickup >= 5,
-        cs.final_delivery >= 5,
-      ].filter(Boolean).length
     : 0;
 
   // Determine if any leg is actively in progress (for showing photos/call)
@@ -896,23 +923,25 @@ function MyJobCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
     >
       {/* ─── Vehicle Header ─── */}
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-        <Car className="h-5 w-5 text-emerald-600" />
+      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-slate-900">
-            {job.vehicleRegistration} ({job.vehicleState})
-          </p>
-          <p className="truncate text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <Car className="h-5 w-5 flex-shrink-0 text-emerald-600" />
+            <p className="truncate text-lg font-semibold text-slate-900">
+              {job.vehicleRegistration} ({job.vehicleState})
+            </p>
+          </div>
+          <p className="mt-0.5 truncate text-sm text-slate-500">
             {job.customerName} &middot; {job.serviceType}
             {job.isManualTransmission && (
               <span className="ml-1 text-amber-600">Manual</span>
             )}
           </p>
         </div>
-        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
           ${job.payout}
         </span>
       </div>
@@ -937,10 +966,9 @@ function MyJobCard({
 
       {/* ─── Pickup Leg ─── */}
       {isMyPickup && (
-        <div className="border-b border-slate-50 px-4 py-3">
-          <div className="mb-2 flex items-center gap-2">
-            <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Pickup
             </span>
             <StatusBadge
@@ -948,26 +976,26 @@ function MyJobCard({
               label={pickupInfo.label}
             />
             {job.isPreferredArea && (
-              <span className="flex items-center gap-0.5 text-xs text-amber-500">
-                <Star className="h-3 w-3 fill-amber-400" />
+              <span className="flex items-center gap-0.5 text-xs text-emerald-600">
+                <Star className="h-3 w-3 fill-emerald-400" />
                 Your area
               </span>
             )}
           </div>
 
-          <div className="space-y-1 text-sm text-slate-600">
-            <div className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+          <div className="space-y-2 text-sm text-slate-700">
+            <div className="flex items-start gap-2.5">
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
               <span>{job.pickupAddress}</span>
             </div>
             {job.garageName && (
-              <div className="flex items-start gap-2">
-                <Navigation className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+              <div className="flex items-start gap-2.5">
+                <Navigation className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
                 <span>{job.garageName}</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-2.5">
+              <Clock className="h-4 w-4 flex-shrink-0 text-slate-400" />
               <span>Pickup: {job.pickupTime}</span>
             </div>
           </div>
@@ -1010,7 +1038,6 @@ function MyJobCard({
                   checkpoint="pre_pickup"
                   label="Car Collected"
                   Icon={Car}
-                  colorScheme="emerald"
                   isLoading={isLoading}
                   photos={photos}
                   onAction={onAction}
@@ -1026,7 +1053,6 @@ function MyJobCard({
                     checkpoint="service_dropoff"
                     label="Dropped at Workshop"
                     Icon={Navigation}
-                    colorScheme="emerald"
                     isLoading={isLoading}
                     photos={photos}
                     onAction={onAction}
@@ -1060,10 +1086,9 @@ function MyJobCard({
 
       {/* ─── Return Leg ─── */}
       {isMyReturn && (
-        <div className="px-4 py-3">
-          <div className="mb-2 flex items-center gap-2">
-            <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Return
             </span>
             <StatusBadge
@@ -1072,25 +1097,33 @@ function MyJobCard({
             />
           </div>
 
-          <p className="text-sm text-slate-600">
-            {job.garageName || "Workshop"} &rarr; {job.pickupAddress}
-          </p>
-          {job.dropoffTime && (
-            <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Return: {job.dropoffTime}</span>
+          {/* REPLACED — old prose route line, now stacked icon rows (from → to → time). cleanup 2026-07-08 */}
+          <div className="space-y-2 text-sm text-slate-700">
+            <div className="flex items-start gap-2.5">
+              <Navigation className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+              <span>{job.garageName || "Workshop"}</span>
             </div>
-          )}
+            <div className="flex items-start gap-2.5">
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+              <span>{job.pickupAddress}</span>
+            </div>
+            {job.dropoffTime && (
+              <div className="flex items-center gap-2.5">
+                <Clock className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                <span>Return: {job.dropoffTime}</span>
+              </div>
+            )}
+          </div>
 
           {/* Return Actions — not started */}
           {(returnState === "assigned") && (
             <>
               {job.canStartReturn ? (
-                <div className="mt-3">
+                <div className="mt-4">
                   <button
                     onClick={() => onAction(job._id, "start_return")}
                     disabled={isLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1101,7 +1134,7 @@ function MyJobCard({
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                <div className="mt-3 flex items-center gap-2 text-sm italic text-slate-400">
                   <Clock className="h-4 w-4 flex-shrink-0" />
                   <span>
                     {job.returnWaitingReason || "Waiting to start..."}
@@ -1119,7 +1152,6 @@ function MyJobCard({
               checkpoint="service_pickup"
               label="Collected from Workshop"
               Icon={Package}
-              colorScheme="blue"
               isLoading={isLoading}
               photos={photos}
               onAction={onAction}
@@ -1128,11 +1160,11 @@ function MyJobCard({
             />
           )}
           {returnState === "collected" && (
-            <div className="mt-3">
+            <div className="mt-4">
               <button
                 onClick={() => onAction(job._id, "delivering")}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1144,11 +1176,11 @@ function MyJobCard({
             </div>
           )}
           {returnState === "delivering" && (
-            <div className="mt-3">
+            <div className="mt-4">
               <button
                 onClick={() => onAction(job._id, "delivered")}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1160,7 +1192,7 @@ function MyJobCard({
             </div>
           )}
           {returnState === "completed" && (
-            <div className="mt-2 flex items-center gap-1.5 text-blue-600">
+            <div className="mt-3 flex items-center gap-1.5 text-emerald-600">
               <CheckCircle className="h-4 w-4" />
               <span className="text-xs font-medium">Delivery Complete</span>
             </div>
@@ -1170,15 +1202,15 @@ function MyJobCard({
 
       {/* ─── Info sections when not assigned to specific legs ─── */}
       {!isMyPickup && !isMyReturn && (
-        <div className="px-4 py-3">
-          <div className="space-y-1 text-sm text-slate-600">
-            <div className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+          <div className="space-y-2 text-sm text-slate-700">
+            <div className="flex items-start gap-2.5">
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
               <span>{job.pickupAddress}</span>
             </div>
             {job.garageName && (
-              <div className="flex items-start gap-2">
-                <Navigation className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+              <div className="flex items-start gap-2.5">
+                <Navigation className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
                 <span>{job.garageName}</span>
               </div>
             )}
@@ -1186,14 +1218,14 @@ function MyJobCard({
         </div>
       )}
 
-      {/* Payment info for awaiting_payment stage */}
+      {/* Payment info for awaiting_payment stage (waiting → amber) */}
       {job.servicePaymentStatus === "pending" && job.servicePaymentUrl && (
-        <div className="mx-4 mb-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
-          <div className="flex items-center gap-2 text-sm text-orange-800">
+        <div className="mx-5 mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:mx-6">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
             <CreditCard className="h-4 w-4" />
             <span className="font-medium">Awaiting customer payment</span>
           </div>
-          <p className="mt-1 text-xs text-orange-600">
+          <p className="mt-1 text-xs text-amber-700">
             $
             {job.servicePaymentAmount
               ? (job.servicePaymentAmount / 100).toFixed(2)
@@ -1205,7 +1237,7 @@ function MyJobCard({
 
       {/* Payment received badge */}
       {job.servicePaymentStatus === "paid" && (
-        <div className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+        <div className="mx-5 mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:mx-6">
           <div className="flex items-center gap-2 text-sm text-emerald-800">
             <CheckCircle className="h-4 w-4" />
             <span className="font-medium">
@@ -1223,10 +1255,10 @@ function MyJobCard({
         pickupComplete &&
         !job.servicePaymentUrl &&
         job.servicePaymentStatus !== "paid" && (
-          <div className="mx-4 mb-3">
+          <div className="mx-5 mb-3 sm:mx-6">
             <button
               onClick={() => onOpenPayment(job)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               <DollarSign className="h-4 w-4" />
               Generate Payment Link
@@ -1236,50 +1268,24 @@ function MyJobCard({
 
       {/* ─── Footer: Photos + Call + Incident ─── */}
       {hasActiveLeg && (
-        <div className="space-y-2 border-t border-slate-100 px-4 py-3">
-          {/* Photo Progress */}
-          <button
-            onClick={() => onOpenPhotos(job)}
-            className="w-full rounded-lg bg-slate-50 p-3 transition hover:bg-slate-100"
-          >
-            <div className="mb-1.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Camera className="h-4 w-4 text-slate-500" />
-                <span className="text-sm font-medium text-slate-700">
-                  Vehicle Photos
-                </span>
-              </div>
-              <span className="text-sm font-bold text-emerald-600">
-                {photoCount}/20
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
-                  style={{ width: `${photoProgress}%` }}
-                />
-              </div>
-              <div className="flex gap-0.5">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      i < completedCheckpoints
-                        ? "bg-emerald-500"
-                        : "bg-slate-300"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          </button>
+        <div className="space-y-3 border-t border-slate-100 px-5 py-4 sm:px-6">
+          {/* REPLACED — old big "Vehicle Photos 0/20" progress bar, now a single quiet
+              row so it no longer competes with the per-checkpoint checklist. cleanup 2026-07-08 */}
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>20 photo slots total &middot; {photoCount} uploaded</span>
+            <button
+              onClick={() => onOpenPhotos(job)}
+              className="font-medium text-emerald-600 transition hover:text-emerald-700"
+            >
+              View all
+            </button>
+          </div>
 
-          {/* Call Customer */}
+          {/* Call Customer — outline secondary (brand-consistent, not solid blue) */}
           {job.customerPhone && (
             <div>
               {isCallSuccess ? (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                   <CheckCircle className="h-5 w-5 text-emerald-600" />
                   <div>
                     <span className="text-sm font-medium text-emerald-800">
@@ -1294,7 +1300,7 @@ function MyJobCard({
                 <button
                   onClick={() => onCallCustomer(job)}
                   disabled={isCalling}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:bg-blue-400"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {isCalling ? (
                     <>
@@ -1303,7 +1309,7 @@ function MyJobCard({
                     </>
                   ) : (
                     <>
-                      <PhoneCall className="h-4 w-4" />
+                      <Phone className="h-4 w-4" />
                       Call Customer
                     </>
                   )}
@@ -1315,8 +1321,10 @@ function MyJobCard({
             </div>
           )}
 
-          {/* Report Incident */}
-          <IncidentReportButton onClick={() => onReportIncident(job._id)} />
+          {/* Report Incident — low-key text button at the very bottom */}
+          <div className="flex justify-center">
+            <IncidentReportButton onClick={() => onReportIncident(job._id)} />
+          </div>
         </div>
       )}
     </motion.div>

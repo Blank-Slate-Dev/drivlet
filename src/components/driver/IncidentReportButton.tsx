@@ -11,7 +11,7 @@ export default function IncidentReportButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 active:scale-95"
+      className="inline-flex min-h-[44px] items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 transition hover:text-red-700"
     >
       <AlertTriangle className="h-4 w-4" />
       Report Incident

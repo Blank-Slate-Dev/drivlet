@@ -75,7 +75,8 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(perl -0pi -e 's{/api/admin/bookings\\\\?limit=200}{/api/admin/bookings?limit=500}g; s{booking-requests\\\\?status=all_open&limit=200}{booking-requests?status=all_open&limit=500}g' src/app/admin/bookings/page.tsx)",
       "Bash(grep -rn \"Serve\\\\|\\\\[city\\\\]\\\\|/\\\\${\" src/components/homepage)",
-      "Bash(test -f \"src/app/[city]/[suburb]/page.tsx\")"
+      "Bash(test -f \"src/app/[city]/[suburb]/page.tsx\")",
+      "Bash(echo \"BUILD EXIT: $?\")"
     ],
     "deny": [],
     "ask": []
