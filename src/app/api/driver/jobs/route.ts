@@ -11,10 +11,32 @@ import { sendServicePaymentEmail } from "@/lib/email";
 import { sendServicePaymentSMS } from "@/lib/sms";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 import { requireValidOrigin } from "@/lib/validation";
+import VehiclePhoto from "@/models/VehiclePhoto";
+import {
+  validateCheckpointPhotos,
+  type GatedCheckpoint,
+  type MinimalPhoto,
+  type CheckpointValidation,
+} from "@/lib/photoRequirements";
 
 // Get the app URL for Stripe redirects
 function getAppUrl(): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
+
+// Re-fetch the booking's active photos and validate them against a custody
+// checkpoint. Single source of truth = src/lib/photoRequirements.ts (shared with UI).
+async function runPhotoGate(
+  bookingId: string,
+  checkpoint: GatedCheckpoint
+): Promise<CheckpointValidation> {
+  const photos = await VehiclePhoto.find({
+    bookingId,
+    superseded: { $ne: true },
+  })
+    .select("checkpointType photoType superseded")
+    .lean();
+  return validateCheckpointPhotos(photos as MinimalPhoto[], checkpoint);
 }
 
 // GET /api/driver/jobs - Get jobs assigned to this driver by admin
@@ -403,6 +425,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
       }
 
+      // GATE: compulsory pickup photos (4 exterior wides + odometer/fuel = 5)
+      const gate = await runPhotoGate(bookingId, "pre_pickup");
+      if (!gate.valid) {
+        console.warn(
+          `[photo-gate] booking ${bookingId} pre_pickup incomplete — ${gate.present}/${gate.required}, missing: ${gate.missing.join(", ")}`
+        );
+        return NextResponse.json(
+          { error: "Required photos must be uploaded before this step can be completed." },
+          { status: 400 }
+        );
+      }
+
       booking.currentStage = "car_picked_up";
       booking.overallProgress = 42;
 
@@ -414,6 +448,12 @@ export async function POST(request: NextRequest) {
         stage: "car_picked_up",
         timestamp: now,
         message: "Vehicle has been picked up. Heading to garage.",
+        updatedBy: "driver",
+      });
+      booking.updates.push({
+        stage: "car_picked_up",
+        timestamp: now,
+        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to collected`,
         updatedBy: "driver",
       });
       await booking.save();
@@ -428,6 +468,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
       }
 
+      // GATE: compulsory proof-of-drop-off photo (1 minimum)
+      const gate = await runPhotoGate(bookingId, "service_dropoff");
+      if (!gate.valid) {
+        console.warn(
+          `[photo-gate] booking ${bookingId} service_dropoff incomplete — ${gate.present}/${gate.required}, missing: ${gate.missing.join(", ")}`
+        );
+        return NextResponse.json(
+          { error: "Required photos must be uploaded before this step can be completed." },
+          { status: 400 }
+        );
+      }
+
       booking.currentStage = "at_garage";
       booking.overallProgress = 57;
 
@@ -439,6 +491,12 @@ export async function POST(request: NextRequest) {
         stage: "at_garage",
         timestamp: now,
         message: "Vehicle has arrived at the garage. Pickup leg complete.",
+        updatedBy: "driver",
+      });
+      booking.updates.push({
+        stage: "at_garage",
+        timestamp: now,
+        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to dropped off`,
         updatedBy: "driver",
       });
       await booking.save();
@@ -496,6 +554,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to return" }, { status: 403 });
       }
 
+      // GATE: compulsory return-pickup photos (4 exterior wides)
+      const gate = await runPhotoGate(bookingId, "service_pickup");
+      if (!gate.valid) {
+        console.warn(
+          `[photo-gate] booking ${bookingId} service_pickup incomplete — ${gate.present}/${gate.required}, missing: ${gate.missing.join(", ")}`
+        );
+        return NextResponse.json(
+          { error: "Required photos must be uploaded before this step can be completed." },
+          { status: 400 }
+        );
+      }
+
       if (booking.returnDriver) {
         booking.returnDriver.collectedAt = now;
       }
@@ -504,6 +574,12 @@ export async function POST(request: NextRequest) {
         stage: "collected_from_workshop",
         timestamp: now,
         message: "Vehicle collected from workshop. Heading to customer.",
+        updatedBy: "driver",
+      });
+      booking.updates.push({
+        stage: "collected_from_workshop",
+        timestamp: now,
+        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to in transit (return)`,
         updatedBy: "driver",
       });
       await booking.save();

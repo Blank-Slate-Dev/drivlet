@@ -24,6 +24,8 @@ import {
   CreditCard,
   X,
   Camera,
+  CheckCircle2,
+  Circle,
   PhoneCall,
   ArrowRight,
   ArrowLeft,
@@ -31,6 +33,12 @@ import {
   Truck,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
+import {
+  validateCheckpointPhotos,
+  SLOT_LABELS,
+  type GatedCheckpoint,
+  type MinimalPhoto,
+} from "@/lib/photoRequirements";
 import IncidentReportButton from "@/components/driver/IncidentReportButton";
 import IncidentReportForm, {
   IncidentSubmittedModal,
@@ -193,6 +201,26 @@ export default function DriverJobsPage() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoJob, setPhotoJob] = useState<Job | null>(null);
 
+  // Per-booking active photos, used to gate custody-checkpoint transitions in the UI.
+  // Loaded lazily (only for cards at a gated step) to stay light on 4G.
+  const [photosByBooking, setPhotosByBooking] = useState<Record<string, MinimalPhoto[]>>({});
+
+  const loadPhotos = useCallback(async (bookingId: string) => {
+    try {
+      const res = await fetch(`/api/driver/bookings/${bookingId}/photos`);
+      if (!res.ok) return;
+      const data = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API returns untyped JSON
+      const list: MinimalPhoto[] = (data.photos || []).map((p: any) => ({
+        checkpointType: p.checkpointType,
+        photoType: p.photoType,
+      }));
+      setPhotosByBooking((prev) => ({ ...prev, [bookingId]: list }));
+    } catch {
+      /* silent — button stays gated until photos load */
+    }
+  }, []);
+
   // Call customer state
   const [callingCustomer, setCallingCustomer] = useState<string | null>(null);
   const [callSuccess, setCallSuccess] = useState<string | null>(null);
@@ -346,9 +374,12 @@ export default function DriverJobsPage() {
   };
 
   const closePhotoModal = () => {
+    const id = photoJob?._id;
     setShowPhotoModal(false);
     setPhotoJob(null);
     fetchJobs();
+    // Refresh gate state after any uploads/edits in the modal.
+    if (id) loadPhotos(id);
   };
 
   // ─── Computed ─────────────────────────────────────────────
@@ -424,6 +455,8 @@ export default function DriverJobsPage() {
                       onAction={handleJobAction}
                       onOpenPayment={openPaymentModal}
                       onOpenPhotos={openPhotoModal}
+                      photos={photosByBooking[job._id]}
+                      onEnsurePhotos={loadPhotos}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -443,6 +476,8 @@ export default function DriverJobsPage() {
                       onAction={handleJobAction}
                       onOpenPayment={openPaymentModal}
                       onOpenPhotos={openPhotoModal}
+                      photos={photosByBooking[job._id]}
+                      onEnsurePhotos={loadPhotos}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -462,6 +497,8 @@ export default function DriverJobsPage() {
                       onAction={handleJobAction}
                       onOpenPayment={openPaymentModal}
                       onOpenPhotos={openPhotoModal}
+                      photos={photosByBooking[job._id]}
+                      onEnsurePhotos={loadPhotos}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -481,6 +518,8 @@ export default function DriverJobsPage() {
                       onAction={handleJobAction}
                       onOpenPayment={openPaymentModal}
                       onOpenPhotos={openPhotoModal}
+                      photos={photosByBooking[job._id]}
+                      onEnsurePhotos={loadPhotos}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -679,6 +718,107 @@ export default function DriverJobsPage() {
 // ─── MyJobCard Component ───────────────────────────────────────
 // Shows a paired card with both pickup and return legs visible
 
+// ─── Compulsory-photo gated advance button ─────────────────────
+// Disables the custody status-advance until the checkpoint's required photos exist,
+// and shows an inline checklist of what's still missing. Same rules as the API
+// (src/lib/photoRequirements.ts) so UI and server can never disagree.
+function GatedAdvanceButton({
+  job,
+  action,
+  checkpoint,
+  label,
+  Icon,
+  colorScheme,
+  isLoading,
+  photos,
+  onAction,
+  onOpenPhotos,
+  onEnsurePhotos,
+}: {
+  job: Job;
+  action: JobAction;
+  checkpoint: GatedCheckpoint;
+  label: string;
+  Icon: React.ElementType;
+  colorScheme: "emerald" | "blue";
+  isLoading: boolean;
+  photos?: MinimalPhoto[];
+  onAction: (jobId: string, action: JobAction) => void;
+  onOpenPhotos: (job: Job) => void;
+  onEnsurePhotos: (bookingId: string) => void;
+}) {
+  const photosLoaded = photos !== undefined;
+
+  // Lazily load this booking's photos the first time a gated card mounts.
+  useEffect(() => {
+    if (!photosLoaded) onEnsurePhotos(job._id);
+  }, [photosLoaded, job._id, onEnsurePhotos]);
+
+  const v = validateCheckpointPhotos(photos ?? [], checkpoint);
+  const btnColor =
+    colorScheme === "blue"
+      ? "bg-blue-600 hover:bg-blue-500"
+      : "bg-emerald-600 hover:bg-emerald-500";
+
+  return (
+    <div className="mt-3 w-full space-y-2">
+      {!v.valid && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+            <Camera className="h-4 w-4 flex-shrink-0" />
+            {photosLoaded
+              ? `${v.present} of ${v.required} required photos taken`
+              : "Checking photos…"}
+          </div>
+          {photosLoaded && v.missing.length > 0 && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              Missing: {v.missing.map((s) => SLOT_LABELS[s] || s).join(", ")}
+            </p>
+          )}
+          <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+            {v.requiredSlots.map((slot) => {
+              const done = photosLoaded && !v.missing.includes(slot);
+              return (
+                <li key={slot} className="flex items-center gap-1.5 text-xs">
+                  {done ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                  ) : (
+                    <Circle className="h-3.5 w-3.5 flex-shrink-0 text-slate-300" />
+                  )}
+                  <span className={done ? "text-slate-600" : "text-slate-500"}>
+                    {SLOT_LABELS[slot] || slot}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            onClick={() => onOpenPhotos(job)}
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+          >
+            <Camera className="h-4 w-4" />
+            Take photos
+          </button>
+        </div>
+      )}
+      <button
+        onClick={() => onAction(job._id, action)}
+        disabled={isLoading || !v.valid}
+        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${btnColor}`}
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : v.valid ? (
+          <Icon className="h-4 w-4" />
+        ) : (
+          <Camera className="h-4 w-4" />
+        )}
+        {label}
+      </button>
+    </div>
+  );
+}
+
 function MyJobCard({
   job,
   actionLoading,
@@ -689,6 +829,8 @@ function MyJobCard({
   callingCustomer,
   callSuccess,
   onReportIncident,
+  photos,
+  onEnsurePhotos,
 }: {
   job: Job;
   actionLoading: string | null;
@@ -703,6 +845,8 @@ function MyJobCard({
   callingCustomer: string | null;
   callSuccess: string | null;
   onReportIncident: (bookingId: string) => void;
+  photos?: MinimalPhoto[];
+  onEnsurePhotos: (bookingId: string) => void;
 }) {
   const isLoading = actionLoading === job._id;
   const isCalling = callingCustomer === job._id;
@@ -860,33 +1004,35 @@ function MyJobCard({
                 </button>
               )}
               {pickupState === "arrived" && (
-                <button
-                  onClick={() => onAction(job._id, "collected")}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Car className="h-4 w-4" />
-                  )}
-                  Car Collected
-                </button>
+                <GatedAdvanceButton
+                  job={job}
+                  action="collected"
+                  checkpoint="pre_pickup"
+                  label="Car Collected"
+                  Icon={Car}
+                  colorScheme="emerald"
+                  isLoading={isLoading}
+                  photos={photos}
+                  onAction={onAction}
+                  onOpenPhotos={onOpenPhotos}
+                  onEnsurePhotos={onEnsurePhotos}
+                />
               )}
               {pickupState === "collected" && (
                 <>
-                  <button
-                    onClick={() => onAction(job._id, "dropped_at_workshop")}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Navigation className="h-4 w-4" />
-                    )}
-                    Dropped at Workshop
-                  </button>
+                  <GatedAdvanceButton
+                    job={job}
+                    action="dropped_at_workshop"
+                    checkpoint="service_dropoff"
+                    label="Dropped at Workshop"
+                    Icon={Navigation}
+                    colorScheme="emerald"
+                    isLoading={isLoading}
+                    photos={photos}
+                    onAction={onAction}
+                    onOpenPhotos={onOpenPhotos}
+                    onEnsurePhotos={onEnsurePhotos}
+                  />
                   {!job.servicePaymentUrl && (
                     <button
                       onClick={() => onOpenPayment(job)}
@@ -967,20 +1113,19 @@ function MyJobCard({
 
           {/* Return Actions — in progress */}
           {returnState === "started" && (
-            <div className="mt-3">
-              <button
-                onClick={() => onAction(job._id, "collected_from_workshop")}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Package className="h-4 w-4" />
-                )}
-                Collected from Workshop
-              </button>
-            </div>
+            <GatedAdvanceButton
+              job={job}
+              action="collected_from_workshop"
+              checkpoint="service_pickup"
+              label="Collected from Workshop"
+              Icon={Package}
+              colorScheme="blue"
+              isLoading={isLoading}
+              photos={photos}
+              onAction={onAction}
+              onOpenPhotos={onOpenPhotos}
+              onEnsurePhotos={onEnsurePhotos}
+            />
           )}
           {returnState === "collected" && (
             <div className="mt-3">

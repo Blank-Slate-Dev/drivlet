@@ -1,7 +1,9 @@
 // src/components/homepage/HomeContent.tsx
 'use client';
 
-import Link from 'next/link';
+import { MapPin } from 'lucide-react';
+// HIDDEN FOR CURRENT PHASE — location page links. Re-enable when expanding launch areas.
+// import Link from 'next/link';
 import Header from '@/components/Header';
 import HeroSection from '@/components/homepage/HeroSection';
 import ValuePropsSection from '@/components/homepage/ValuePropsSection';
@@ -10,7 +12,8 @@ import InteractiveServicesSection from '@/components/homepage/InteractiveService
 import TestimonialsSection from '@/components/homepage/TestimonialsSection';
 import FAQSection from '@/components/homepage/FAQSection';
 import Footer from '@/components/homepage/Footer';
-import { LOCATIONS } from '@/lib/seo-data';
+// HIDDEN FOR CURRENT PHASE — location page links. Re-enable when expanding launch areas.
+// import { LOCATIONS } from '@/lib/seo-data';
 
 export default function HomeContent() {
   return (
@@ -36,16 +39,17 @@ export default function HomeContent() {
       {/* FAQ Section */}
       <FAQSection />
 
-      {/* Location Links Section — crawlable internal links to city/suburb pages */}
+      {/* Areas We Serve Section */}
       <section className="border-b border-slate-200 bg-slate-50 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
             Areas we serve
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
-            Car service pickup and delivery across Newcastle and Canberra
+            Drivlet currently operates across NSW and Canberra.
           </p>
 
+          {/* HIDDEN FOR CURRENT PHASE — location page links. Re-enable when expanding launch areas.
           <div className="mt-10 grid gap-8 sm:grid-cols-2">
             {Object.values(LOCATIONS).map((location) => (
               <Link
@@ -57,6 +61,23 @@ export default function HomeContent() {
                   {location.name}, {location.stateShort}
                 </h3>
               </Link>
+            ))}
+          </div>
+          */}
+
+          {/* Non-clickable current-service-area badges */}
+          <div className="mx-auto mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
+            {[
+              { label: 'New South Wales' },
+              { label: 'Canberra (ACT)' },
+            ].map((area) => (
+              <div
+                key={area.label}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-emerald-700 shadow-sm"
+              >
+                <MapPin className="h-5 w-5 shrink-0" />
+                <span className="text-lg font-semibold">{area.label}</span>
+              </div>
             ))}
           </div>
         </div>
