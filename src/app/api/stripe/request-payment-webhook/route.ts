@@ -292,6 +292,11 @@ export async function POST(request: NextRequest) {
       currentStage: "booking_confirmed",
       trackingCode,
       garageName: requestDoc.garageName ?? undefined,
+      serviceType: requestDoc.serviceType,
+      serviceDate: requestDoc.serviceDate,
+      pickupTime: requestDoc.pickupTimeSlot,
+      dropoffTime: requestDoc.dropoffTimeSlot,
+      pickupAddress: requestDoc.pickupAddress,
     }).then((sent) => {
       if (sent) console.log("request-payment-webhook: confirmation email sent to:", requestDoc.userEmail);
       else console.warn("request-payment-webhook: confirmation email failed for:", requestDoc.userEmail);

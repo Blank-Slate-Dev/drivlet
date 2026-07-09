@@ -91,10 +91,11 @@ interface Driver {
   preferredAreas: string[];
   employmentType: "employee" | "contractor";
   abn?: string;
-  bankDetails: {
-    accountName: string;
-    bsb: string;
-    accountNumber: string;
+  // Optional — payment details are collected after the application is approved
+  bankDetails?: {
+    accountName?: string;
+    bsb?: string;
+    accountNumber?: string;
   };
   emergencyContact: {
     name: string;
@@ -995,22 +996,26 @@ export default function AdminDriversPage() {
                     <CreditCard className="h-4 w-4 text-emerald-600" />
                     Bank Details
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-slate-500">Account Name</p>
-                      <p className="font-medium text-slate-900">{selectedDriver.bankDetails.accountName}</p>
+                  {selectedDriver.bankDetails?.accountName || selectedDriver.bankDetails?.bsb || selectedDriver.bankDetails?.accountNumber ? (
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">Account Name</p>
+                        <p className="font-medium text-slate-900">{selectedDriver.bankDetails?.accountName || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">BSB</p>
+                        <p className="font-medium text-slate-900">{selectedDriver.bankDetails?.bsb || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Account Number</p>
+                        <p className="font-medium text-slate-900">
+                          {selectedDriver.bankDetails?.accountNumber ? `****${selectedDriver.bankDetails.accountNumber.slice(-4)}` : "—"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-slate-500">BSB</p>
-                      <p className="font-medium text-slate-900">{selectedDriver.bankDetails.bsb}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Account Number</p>
-                      <p className="font-medium text-slate-900">
-                        ****{selectedDriver.bankDetails.accountNumber.slice(-4)}
-                      </p>
-                    </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Not provided — payment details are collected after approval.</p>
+                  )}
                   {selectedDriver.abn && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <p className="text-slate-500 text-sm">ABN</p>

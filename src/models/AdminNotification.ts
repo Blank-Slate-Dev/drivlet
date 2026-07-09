@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-export type AdminNotificationType = "new_request" | "system";
+export type AdminNotificationType = "new_request" | "cancel_request" | "incident" | "system";
 
 export interface IAdminNotificationMetadata {
   vehicleRegistration?: string;
@@ -16,6 +16,7 @@ export interface IAdminNotification extends Document {
   isRead: boolean;
   readAt?: Date;
   bookingRequestId?: Types.ObjectId;
+  bookingId?: Types.ObjectId;
   metadata?: IAdminNotificationMetadata;
   createdAt: Date;
   updatedAt: Date;
@@ -35,7 +36,7 @@ const AdminNotificationSchema = new Schema<IAdminNotification>(
   {
     type: {
       type: String,
-      enum: ["new_request", "system"],
+      enum: ["new_request", "cancel_request", "incident", "system"],
       required: true,
     },
     title: { type: String, required: true },
@@ -45,6 +46,11 @@ const AdminNotificationSchema = new Schema<IAdminNotification>(
     bookingRequestId: {
       type: Schema.Types.ObjectId,
       ref: "BookingRequest",
+      required: false,
+    },
+    bookingId: {
+      type: Schema.Types.ObjectId,
+      ref: "Booking",
       required: false,
     },
     metadata: {

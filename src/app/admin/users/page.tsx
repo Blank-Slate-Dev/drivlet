@@ -55,7 +55,7 @@ interface Stats {
   newToday: number;
 }
 
-type UserFilter = "all" | "registered" | "guest" | "active";
+type UserFilter = "all" | "customer" | "driver" | "garage" | "guest" | "active";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -217,7 +217,9 @@ export default function AdminUsersPage() {
   // Filter users based on search and filter
   const filteredUsers = users.filter((user) => {
     // Apply type filter
-    if (filter === "registered" && user.isGuest) return false;
+    if (filter === "customer" && (user.isGuest || user.role !== "user")) return false;
+    if (filter === "driver" && user.role !== "driver") return false;
+    if (filter === "garage" && user.role !== "garage") return false;
     if (filter === "guest" && !user.isGuest) return false;
     if (filter === "active" && user.bookingCount === 0) return false;
 
@@ -364,7 +366,9 @@ export default function AdminUsersPage() {
                 className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 <option value="all">All Users</option>
-                <option value="registered">Registered Only</option>
+                <option value="customer">Customers</option>
+                <option value="driver">Drivers</option>
+                <option value="garage">Garages</option>
                 <option value="guest">Guests Only</option>
                 <option value="active">With Bookings</option>
               </select>
@@ -456,13 +460,21 @@ export default function AdminUsersPage() {
                             <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
                               Admin
                             </span>
+                          ) : user.role === "driver" ? (
+                            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">
+                              Driver
+                            </span>
+                          ) : user.role === "garage" ? (
+                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                              Garage
+                            </span>
                           ) : user.isGuest ? (
                             <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                              Guest
+                              Guest (no account)
                             </span>
                           ) : (
                             <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                              Registered
+                              Customer
                             </span>
                           )}
                           {/* Account Status Badge */}
@@ -532,6 +544,16 @@ export default function AdminUsersPage() {
                   {selectedUser.role === "admin" && (
                     <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
                       Admin
+                    </span>
+                  )}
+                  {selectedUser.role === "driver" && (
+                    <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+                      Driver
+                    </span>
+                  )}
+                  {selectedUser.role === "garage" && (
+                    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                      Garage
                     </span>
                   )}
                   {selectedUser.isGuest && (

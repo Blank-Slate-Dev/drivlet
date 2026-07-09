@@ -185,6 +185,72 @@ export async function getUnreadNotificationCount(garageId: Types.ObjectId | stri
 }
 
 /**
+ * Generic admin alert: in-app AdminNotification + email to ADMIN_NOTIFICATION_EMAIL.
+ * Used for cancel requests, incidents, and other operational events.
+ * Non-blocking — failures are logged, never thrown.
+ */
+export async function notifyAdmin(params: {
+  type: "cancel_request" | "incident" | "system";
+  title: string;
+  message: string;
+  bookingId?: Types.ObjectId | string;
+  metadata?: {
+    vehicleRegistration?: string;
+    customerName?: string;
+    pickupSuburb?: string;
+    quotedAmount?: number;
+  };
+}) {
+  const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au";
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  try {
+    await connectDB();
+    await AdminNotification.create({
+      type: params.type,
+      title: params.title,
+      message: params.message,
+      bookingId: params.bookingId,
+      metadata: params.metadata,
+    });
+  } catch (err) {
+    console.error("Failed to create admin notification:", err);
+  }
+
+  try {
+    const adminEmails = rawEmails.split(",").map((e) => e.trim()).filter(Boolean);
+    const textContent = [
+      `Hi team,`,
+      ``,
+      params.message,
+      ``,
+      `Review it in the admin dashboard:`,
+      `${appUrl}/admin/bookings`,
+      ``,
+      `Cheers,`,
+      `drivlet`,
+    ].join("\n");
+    const escapedMessage = params.message
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const htmlContent = [
+      `<p>Hi team,</p>`,
+      `<p>${escapedMessage}</p>`,
+      `<p style="margin-top:16px"><a href="${appUrl}/admin/bookings" style="background:#059669;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">Review in Dashboard</a></p>`,
+      `<p style="margin-top:24px;color:#94a3b8;font-size:12px">drivlet</p>`,
+    ].join("");
+
+    await Promise.all(
+      adminEmails.map((email) =>
+        sendEmail({ to: email, toName: "Drivlet Admin", subject: params.title, textContent, htmlContent })
+          .catch((err) => { console.error(`Admin notification email to ${email} failed:`, err); return false; })
+      )
+    );
+  } catch (err) {
+    console.error("Failed to send admin notification email:", err);
+  }
+}
+
+/**
  * Notify admin of a new booking request (DB notification + email).
  * Non-blocking — failures are logged, never thrown.
  */
@@ -196,9 +262,7 @@ export async function notifyAdminOfNewRequest(request: {
   quotedAmount: number;
   garageName?: string | null;
 }) {
-  const fromEmail = process.env.EMAIL_FROM || "noreply@drivlet.com.au"; // [EMAIL_DEBUG]
-  const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au"; // [EMAIL_DEBUG]
-  console.log(`[EMAIL_DEBUG] notifyAdminOfNewRequest ENTERED — from=${fromEmail}, to=${rawEmails}, vehicle=${request.vehicleRegistration}`); // [EMAIL_DEBUG]
+  const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au";
 
   const pickupSuburb = request.pickupAddress.split(",")[0]?.trim() || "Unknown";
   const quotedDisplay = `$${(request.quotedAmount / 100).toFixed(2)}`;
@@ -219,16 +283,13 @@ export async function notifyAdminOfNewRequest(request: {
         quotedAmount: request.quotedAmount,
       },
     });
-    console.log("[EMAIL_DEBUG] AdminNotification DB record created successfully"); // [EMAIL_DEBUG]
   } catch (err) {
-    console.error("[EMAIL_DEBUG] AdminNotification DB create FAILED:", err); // [EMAIL_DEBUG]
     console.error("Failed to create admin notification:", err);
   }
 
   // 2. Send admin email(s) — supports comma-separated list
   try {
     const adminEmails = rawEmails.split(",").map((e) => e.trim()).filter(Boolean);
-    console.log(`[EMAIL_DEBUG] Sending to ${adminEmails.length} recipient(s): ${adminEmails.join(", ")}`); // [EMAIL_DEBUG]
     const subject = `New booking request — ${request.vehicleRegistration} (${pickupSuburb})`;
     const textContent = [
       `Hi team,`,
@@ -262,16 +323,13 @@ export async function notifyAdminOfNewRequest(request: {
       `<p style="margin-top:24px;color:#94a3b8;font-size:12px">Drivlet</p>`,
     ].join("");
 
-    const results = await Promise.all(
+    await Promise.all(
       adminEmails.map((email) =>
         sendEmail({ to: email, toName: "Drivlet Admin", subject, textContent, htmlContent })
-          .then((ok) => { console.log(`[EMAIL_DEBUG] sendEmail to ${email} returned ${ok}`); return ok; }) // [EMAIL_DEBUG]
-          .catch((err) => { console.error(`[EMAIL_DEBUG] sendEmail to ${email} threw:`, err); return false; }) // [EMAIL_DEBUG]
+          .catch((err) => { console.error(`Admin notification email to ${email} failed:`, err); return false; })
       )
     );
-    console.log(`[EMAIL_DEBUG] notifyAdminOfNewRequest COMPLETE — results=${JSON.stringify(results)}`); // [EMAIL_DEBUG]
   } catch (err) {
-    console.error("[EMAIL_DEBUG] notifyAdminOfNewRequest email block FAILED:", err); // [EMAIL_DEBUG]
     console.error("Failed to send admin notification email:", err);
   }
 }

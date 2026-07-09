@@ -39,9 +39,23 @@ interface BookingDocument {
   trackingCode?: string;
   garageName?: string;
   guestPhone?: string;
+  serviceType?: string;
+  serviceDate?: Date;
+  pickupTime?: string;
+  dropoffTime?: string;
+  pickupAddress?: string;
 }
 
-export function notifyBookingUpdate(booking: BookingDocument): void {
+interface NotifyOptions {
+  /**
+   * Skip the stage email/SMS to the customer. Use when the booking changed but
+   * the stage did not (e.g. admin edits) and the caller sends its own email —
+   * without this, calling notifyBookingUpdate re-sends the current stage email.
+   */
+  suppressCustomerNotifications?: boolean;
+}
+
+export function notifyBookingUpdate(booking: BookingDocument, options: NotifyOptions = {}): void {
   const bookingId = typeof booking._id === 'string' ? booking._id : booking._id.toString();
   
   // ── 1. Emit SSE event (existing behaviour) ──
@@ -60,6 +74,8 @@ export function notifyBookingUpdate(booking: BookingDocument): void {
   };
 
   emitBookingUpdate(data);
+
+  if (options.suppressCustomerNotifications) return;
 
   // ── 2. Send stage email (async, non-blocking) ──
   if (booking.userEmail && booking.userName && booking.vehicleRegistration) {
@@ -82,6 +98,11 @@ export function notifyBookingUpdate(booking: BookingDocument): void {
       trackingCode: booking.trackingCode,
       garageName: booking.garageName,
       customMessage,
+      serviceType: booking.serviceType,
+      serviceDate: booking.serviceDate,
+      pickupTime: booking.pickupTime,
+      dropoffTime: booking.dropoffTime,
+      pickupAddress: booking.pickupAddress,
     }).then((sent) => {
       if (sent) {
         console.log(`📧 Stage email sent to ${booking.userEmail} for stage: ${booking.currentStage}`);

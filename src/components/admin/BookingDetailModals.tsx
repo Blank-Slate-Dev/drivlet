@@ -32,10 +32,21 @@ import {
   UserPlus,
   UserMinus,
   Loader2,
+  DollarSign,
+  Pencil,
+  Send,
+  ShieldAlert,
+  XCircle,
 } from "lucide-react";
 import { getCategoryById } from "@/constants/serviceCategories";
 import { FEATURES } from "@/lib/featureFlags";
-import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
+import {
+  getPickupSlotLabel,
+  getDropoffSlotLabel,
+  getServiceTypeByValue,
+  PICKUP_SLOTS,
+  DROPOFF_SLOTS,
+} from "@/config/timeSlots";
 
 export const STAGES = [
   { id: "booking_confirmed", label: "Booking Confirmed", progress: 14 },
@@ -46,6 +57,14 @@ export const STAGES = [
   { id: "driver_returning", label: "Driver Returning", progress: 86 },
   { id: "delivered", label: "Delivered", progress: 100 },
 ];
+
+// Chip colours for payment statuses (transport/service payments, extra charges)
+const PAYMENT_STATUS_CHIP: Record<string, string> = {
+  paid: "bg-green-100 text-green-700",
+  pending: "bg-amber-100 text-amber-700",
+  failed: "bg-red-100 text-red-700",
+  refunded: "bg-purple-100 text-purple-700",
+};
 
 interface Update {
   stage: string;
@@ -74,6 +93,35 @@ interface DriverLeg {
   arrivedAt?: string;
   collectedAt?: string;
   completedAt?: string;
+}
+
+interface RefundEntry {
+  target: "transport" | "service";
+  amount: number; // cents
+  refundId?: string;
+  reason?: string;
+  processedBy: string;
+  processedAt: string;
+}
+
+interface ExtraCharge {
+  description: string;
+  amount: number; // cents
+  status: "pending" | "paid";
+  checkoutSessionId?: string;
+  paymentUrl?: string;
+  createdBy: string;
+  createdAt: string;
+  paidAt?: string;
+}
+
+interface CancellationRequest {
+  status: "pending" | "approved" | "denied";
+  reason?: string;
+  requestedAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  denyReason?: string;
 }
 
 export interface Booking {
@@ -106,6 +154,15 @@ export interface Booking {
   paymentStatus?: string;
   paymentId?: string;
   paymentAmount?: number;
+  servicePaymentAmount?: number;
+  servicePaymentStatus?: string;
+  servicePaymentIntentId?: string;
+  refunds?: RefundEntry[];
+  extraCharges?: ExtraCharge[];
+  cancellationRequest?: CancellationRequest;
+  incidents?: string[];
+  hasActiveIncident?: boolean;
+  incidentExceptionState?: "none" | "continue" | "hold" | "stop";
   transmissionType?: "automatic" | "manual";
   isManualTransmission?: boolean;
   selectedServices?: SelectedService[];
@@ -123,6 +180,7 @@ export interface Booking {
   pickupDriverName?: string;
   returnDriverName?: string;
   assignedDriverId?: string;
+  returnDriverId?: string;
   assignedDriverName?: string;
 }
 
@@ -167,6 +225,158 @@ export function ViewDetailsModal({
   const [selectedDriverId, setSelectedDriverId] = useState<string>("");
   const [driverActionLoading, setDriverActionLoading] = useState(false);
   const [driverError, setDriverError] = useState("");
+
+  // Success banner shown at the top of the modal after any action
+  const [flash, setFlash] = useState("");
+
+  // Cancellation request handling
+  const [cancelActionLoading, setCancelActionLoading] = useState<"approve" | "deny" | null>(null);
+  const [cancelError, setCancelError] = useState("");
+  const [showDenyForm, setShowDenyForm] = useState(false);
+  const [denyReason, setDenyReason] = useState("");
+
+  // Payments: refunds + extra charge
+  const [refundTarget, setRefundTarget] = useState<"transport" | "service" | null>(null);
+  const [refundAmount, setRefundAmount] = useState(""); // dollars
+  const [refundReason, setRefundReason] = useState("");
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState("");
+  const [showExtraChargeForm, setShowExtraChargeForm] = useState(false);
+  const [extraChargeAmount, setExtraChargeAmount] = useState(""); // dollars
+  const [extraChargeDescription, setExtraChargeDescription] = useState("");
+  const [extraChargeLoading, setExtraChargeLoading] = useState(false);
+
+  // Edit logistics details (post-payment, pre-pickup only)
+  const [showEditDetails, setShowEditDetails] = useState(false);
+
+  // Re-fetch the booking and push it up (same pattern as driver assignment)
+  const refreshBooking = async () => {
+    const res = await fetch(`/api/admin/bookings/${booking._id}`, { cache: "no-store" });
+    if (res.ok) {
+      const updated = await res.json();
+      onBookingUpdated(updated);
+    }
+  };
+
+  const handleCancelRequestAction = async (action: "approve" | "deny") => {
+    if (
+      action === "approve" &&
+      !confirm("This cancels the booking and emails the customer. Refunds are processed separately from the payments panel.")
+    ) {
+      return;
+    }
+    setCancelActionLoading(action);
+    setCancelError("");
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/cancel-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "approve" ? { action: "approve" } : { action: "deny", denyReason: denyReason.trim() }
+        ),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCancelError(data.error || "Failed to resolve the cancellation request");
+        return;
+      }
+      setFlash(data.message || "Cancellation request resolved.");
+      setShowDenyForm(false);
+      setDenyReason("");
+      await refreshBooking();
+    } catch {
+      setCancelError("Failed to resolve the cancellation request");
+    } finally {
+      setCancelActionLoading(null);
+    }
+  };
+
+  // Remaining refundable per target (paid amount minus refunds already processed)
+  const refundedFor = (target: "transport" | "service") =>
+    (booking.refunds || []).filter((r) => r.target === target).reduce((sum, r) => sum + r.amount, 0);
+  const remainingFor = (target: "transport" | "service") => {
+    const paid = target === "transport" ? booking.paymentAmount || 0 : booking.servicePaymentAmount || 0;
+    return Math.max(0, paid - refundedFor(target));
+  };
+
+  const openRefundForm = (target: "transport" | "service") => {
+    setRefundTarget(target);
+    setRefundAmount((remainingFor(target) / 100).toFixed(2));
+    setRefundReason("");
+    setPaymentsError("");
+  };
+
+  const handleProcessRefund = async () => {
+    if (!refundTarget) return;
+    const dollars = parseFloat(refundAmount);
+    if (!Number.isFinite(dollars) || dollars <= 0) {
+      setPaymentsError("Enter a refund amount greater than zero.");
+      return;
+    }
+    setRefundLoading(true);
+    setPaymentsError("");
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: refundTarget,
+          amount: Math.round(dollars * 100),
+          ...(refundReason.trim() ? { reason: refundReason.trim() } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPaymentsError(data.error || "Failed to process refund");
+        return;
+      }
+      setFlash(data.message || "Refund processed.");
+      setRefundTarget(null);
+      await refreshBooking();
+    } catch {
+      setPaymentsError("Failed to process refund");
+    } finally {
+      setRefundLoading(false);
+    }
+  };
+
+  const handleSendExtraCharge = async () => {
+    const dollars = parseFloat(extraChargeAmount);
+    if (!Number.isFinite(dollars) || dollars < 10) {
+      setPaymentsError("Extra charge amount must be at least $10.");
+      return;
+    }
+    if (extraChargeDescription.trim().length < 5) {
+      setPaymentsError("Description must be at least 5 characters.");
+      return;
+    }
+    setExtraChargeLoading(true);
+    setPaymentsError("");
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/extra-charge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Math.round(dollars * 100),
+          description: extraChargeDescription.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPaymentsError(data.error || "Failed to create the payment link");
+        return;
+      }
+      setFlash(data.message || "Payment link sent to the customer.");
+      setShowExtraChargeForm(false);
+      setExtraChargeAmount("");
+      setExtraChargeDescription("");
+      await refreshBooking();
+    } catch {
+      setPaymentsError("Failed to create the payment link");
+    } finally {
+      setExtraChargeLoading(false);
+    }
+  };
 
   // Fetch available drivers
   useEffect(() => {
@@ -254,6 +464,11 @@ export function ViewDetailsModal({
 
   // Check if return driver assignment is allowed
   const canAssignReturnDriver = booking.pickupDriver?.completedAt;
+
+  // Logistics can only be edited post-payment while the car hasn't been picked up
+  const canEditDetails =
+    ["pending", "in_progress"].includes(booking.status) &&
+    ["booking_confirmed", "driver_en_route"].includes(booking.currentStage);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
@@ -282,6 +497,131 @@ export function ViewDetailsModal({
         </div>
 
         <div className="space-y-5 p-6">
+          {flash && (
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              <span>
+                <CheckCircle2 className="mr-1 inline h-4 w-4" /> {flash}
+              </span>
+              <button onClick={() => setFlash("")} className="text-emerald-500 hover:text-emerald-700" title="Dismiss">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Active incident indicator */}
+          {booking.hasActiveIncident && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-red-700">
+                  <ShieldAlert className="h-4 w-4" />
+                  Active Incident
+                  {booking.incidentExceptionState && booking.incidentExceptionState !== "none" && (
+                    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-red-700">
+                      {booking.incidentExceptionState}
+                    </span>
+                  )}
+                </div>
+                <Link
+                  href="/admin/incidents"
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View Incidents
+                </Link>
+              </div>
+              {booking.incidents && booking.incidents.length > 0 && (
+                <p className="mt-2 text-xs text-red-600">
+                  {booking.incidents.length} incident{booking.incidents.length === 1 ? "" : "s"} recorded on this booking.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Pending cancellation request — needs an admin decision */}
+          {booking.cancellationRequest?.status === "pending" && (
+            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+                Cancellation Requested by Customer
+              </div>
+              <div className="mt-3 space-y-1 text-sm">
+                <p className="text-amber-800">
+                  <span className="font-medium">Reason:</span>{" "}
+                  {booking.cancellationRequest.reason || "No reason provided"}
+                </p>
+                <p className="text-xs text-amber-700">
+                  Requested {formatDateTime(booking.cancellationRequest.requestedAt)}
+                </p>
+              </div>
+              {cancelError && (
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="mr-1 inline h-4 w-4" /> {cancelError}
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleCancelRequestAction("approve")}
+                  disabled={cancelActionLoading !== null}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                >
+                  {cancelActionLoading === "approve" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Approve &amp; Cancel Booking
+                </button>
+                <button
+                  onClick={() => { setShowDenyForm((v) => !v); setCancelError(""); }}
+                  disabled={cancelActionLoading !== null}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Deny Request
+                </button>
+              </div>
+              {showDenyForm && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-white p-3">
+                  <label className="mb-1 block text-sm font-medium text-amber-800">
+                    Reason for denying <span className="font-normal text-amber-600">(sent to the customer, min 5 characters)</span>
+                  </label>
+                  <textarea
+                    value={denyReason}
+                    onChange={(e) => setDenyReason(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="e.g. The driver is already on the way to collect your car, so we can't cancel this booking."
+                    className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                  />
+                  <button
+                    onClick={() => handleCancelRequestAction("deny")}
+                    disabled={cancelActionLoading !== null || denyReason.trim().length < 5}
+                    className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50"
+                  >
+                    {cancelActionLoading === "deny" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Confirm Deny &amp; Email Customer
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Resolved cancellation request — context for the admin */}
+          {booking.cancellationRequest && booking.cancellationRequest.status !== "pending" && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <p className="font-medium text-slate-700">
+                Cancellation request {booking.cancellationRequest.status}
+                {booking.cancellationRequest.resolvedAt && ` — ${formatDateTime(booking.cancellationRequest.resolvedAt)}`}
+              </p>
+              {booking.cancellationRequest.denyReason && (
+                <p className="mt-1 text-xs text-slate-500">Deny reason: {booking.cancellationRequest.denyReason}</p>
+              )}
+            </div>
+          )}
+
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-medium text-slate-500">Booking ID</p>
             <p className="font-mono text-sm text-slate-900">{booking._id}</p>
@@ -371,50 +711,269 @@ export function ViewDetailsModal({
             </div>
           </div>
 
-          {/* Payment Info */}
+          {/* Payments — transport + service payments, refunds, extra charges */}
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <CreditCard className="h-4 w-4 text-emerald-600" />
-              Payment
+              Payments
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">Status</p>
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium mt-1 ${
-                  booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
-                  booking.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-700' :
-                  'bg-slate-100 text-slate-700'
-                }`}>
-                  {booking.paymentStatus || 'pending'}
-                </span>
+
+            {paymentsError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="mr-1 inline h-4 w-4" /> {paymentsError}
               </div>
-              <div>
-                <p className="text-xs text-slate-500">Amount</p>
-                <p className="font-medium text-slate-900">
-                  {booking.paymentAmount ? formatCurrency(booking.paymentAmount) : '—'}
-                </p>
-              </div>
-              {booking.paymentId && (
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Payment ID</p>
-                  <p className="font-mono text-xs text-slate-600 break-all">
-                    {booking.paymentId}
+            )}
+
+            <div className="mt-3 space-y-3">
+              {/* Transport payment (paid at booking) */}
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Transport payment</p>
+                    <p className="mt-1 font-medium text-slate-900">
+                      {booking.paymentAmount ? formatCurrency(booking.paymentAmount) : "—"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Paid {formatDateTime(booking.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${PAYMENT_STATUS_CHIP[booking.paymentStatus || "pending"] || "bg-slate-100 text-slate-700"}`}>
+                      {booking.paymentStatus || "pending"}
+                    </span>
+                    {booking.paymentStatus === "paid" && booking.paymentId && remainingFor("transport") > 0 && (
+                      <button
+                        onClick={() => openRefundForm("transport")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                        Refund
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {refundedFor("transport") > 0 && booking.paymentStatus !== "refunded" && (
+                  <p className="mt-2 text-xs text-purple-600">
+                    {formatCurrency(refundedFor("transport"))} refunded so far — {formatCurrency(remainingFor("transport"))} remaining
                   </p>
+                )}
+                {booking.paymentId && (
+                  <p className="mt-2 break-all font-mono text-[11px] text-slate-400">{booking.paymentId}</p>
+                )}
+              </div>
+
+              {/* Service payment (paid before car return), when one exists */}
+              {(booking.servicePaymentAmount || booking.servicePaymentStatus) && (
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Service payment</p>
+                      <p className="mt-1 font-medium text-slate-900">
+                        {booking.servicePaymentAmount ? formatCurrency(booking.servicePaymentAmount) : "—"}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${PAYMENT_STATUS_CHIP[booking.servicePaymentStatus || "pending"] || "bg-slate-100 text-slate-700"}`}>
+                        {booking.servicePaymentStatus || "pending"}
+                      </span>
+                      {booking.servicePaymentStatus === "paid" && remainingFor("service") > 0 && (
+                        <button
+                          onClick={() => openRefundForm("service")}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                        >
+                          <DollarSign className="h-3 w-3" />
+                          Refund
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {refundedFor("service") > 0 && booking.servicePaymentStatus !== "refunded" && (
+                    <p className="mt-2 text-xs text-purple-600">
+                      {formatCurrency(refundedFor("service"))} refunded so far — {formatCurrency(remainingFor("service"))} remaining
+                    </p>
+                  )}
                 </div>
               )}
-              {/* Explicit Paid indicator + payment time. Bookings only exist after
-                  payment succeeds, so createdAt is the payment timestamp. */}
-              <div className="col-span-2 flex items-center gap-2 border-t border-slate-100 pt-3">
-                <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Paid
-                </span>
-                <span className="text-xs text-slate-500">
-                  {new Date(booking.createdAt).toLocaleString("en-AU", {
-                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                  })}
-                </span>
-              </div>
+
+              {/* Refund form */}
+              {refundTarget && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-semibold text-red-800">
+                    Refund {refundTarget === "transport" ? "transport" : "service"} payment
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-red-700">Amount (AUD)</label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                      />
+                      <p className="mt-1 text-[11px] text-red-600">
+                        Max refundable: {formatCurrency(remainingFor(refundTarget))}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-red-700">Reason (optional)</label>
+                      <input
+                        type="text"
+                        value={refundReason}
+                        onChange={(e) => setRefundReason(e.target.value)}
+                        maxLength={500}
+                        placeholder="e.g. Booking cancelled before pickup"
+                        className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={handleProcessRefund}
+                      disabled={refundLoading}
+                      className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                    >
+                      {refundLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
+                      Process refund via Stripe
+                    </button>
+                    <button
+                      onClick={() => { setRefundTarget(null); setPaymentsError(""); }}
+                      disabled={refundLoading}
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Refund history */}
+              {booking.refunds && booking.refunds.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Refund history</p>
+                  <div className="mt-2 space-y-2">
+                    {booking.refunds.map((refund, index) => (
+                      <div key={index} className="flex items-start justify-between gap-3 text-sm">
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {formatCurrency(refund.amount)}{" "}
+                            <span className="text-xs font-normal text-slate-500">
+                              ({refund.target === "transport" ? "transport" : "service"} payment)
+                            </span>
+                          </p>
+                          {refund.reason && <p className="text-xs text-slate-600">{refund.reason}</p>}
+                          <p className="text-[11px] text-slate-400">
+                            {formatDateTime(refund.processedAt)} • {refund.processedBy}
+                          </p>
+                        </div>
+                        <span className="inline-flex whitespace-nowrap rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                          refunded
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Extra charges (custom payment links) */}
+              {booking.extraCharges && booking.extraCharges.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Extra charges</p>
+                  <div className="mt-2 space-y-2">
+                    {booking.extraCharges.map((charge, index) => (
+                      <div key={index} className="flex items-start justify-between gap-3 text-sm">
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {formatCurrency(charge.amount)}{" "}
+                            <span className="text-xs font-normal text-slate-600">— {charge.description}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            Created {formatDateTime(charge.createdAt)}
+                            {charge.paidAt ? ` • Paid ${formatDateTime(charge.paidAt)}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${charge.status === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                            {charge.status}
+                          </span>
+                          {charge.status === "pending" && charge.paymentUrl && (
+                            <button
+                              onClick={() => copyToClipboard(charge.paymentUrl!, "Payment link")}
+                              className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                              title="Copy payment link"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Send custom payment link (extra charge) */}
+              {booking.status !== "cancelled" && (
+                showExtraChargeForm ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-sm font-semibold text-emerald-800">Send custom payment link</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[8rem_1fr]">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-emerald-700">Amount (AUD)</label>
+                        <input
+                          type="number"
+                          min="10"
+                          step="0.01"
+                          value={extraChargeAmount}
+                          onChange={(e) => setExtraChargeAmount(e.target.value)}
+                          placeholder="10.00"
+                          className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-emerald-700">Description (sent to the customer)</label>
+                        <input
+                          type="text"
+                          value={extraChargeDescription}
+                          onChange={(e) => setExtraChargeDescription(e.target.value)}
+                          maxLength={200}
+                          placeholder="e.g. Replacement wiper blades fitted during service"
+                          className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-emerald-700">
+                      Emails the customer a secure Stripe link (valid 24 hours). Minimum $10.
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={handleSendExtraCharge}
+                        disabled={extraChargeLoading}
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {extraChargeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Send payment link
+                      </button>
+                      <button
+                        onClick={() => { setShowExtraChargeForm(false); setPaymentsError(""); }}
+                        disabled={extraChargeLoading}
+                        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setShowExtraChargeForm(true); setPaymentsError(""); }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-2.5 text-sm text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600"
+                  >
+                    <Send className="h-4 w-4" />
+                    Send custom payment link
+                  </button>
+                )
+              )}
             </div>
           </div>
 
@@ -585,6 +1144,15 @@ export function ViewDetailsModal({
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Clock className="h-4 w-4 text-emerald-600" />
               Schedule
+              {canEditDetails && (
+                <button
+                  onClick={() => setShowEditDetails(true)}
+                  className="ml-auto inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit Details
+                </button>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-4">
               <div>
@@ -693,6 +1261,10 @@ export function ViewDetailsModal({
                             <span className="text-amber-600">Assigned</span>
                           )}
                         </div>
+                        <p className="text-[11px] text-slate-400">
+                          Assigned {formatDateTime(booking.pickupDriver.assignedAt)}
+                          {booking.pickupDriver.completedAt && ` • Completed ${formatDateTime(booking.pickupDriver.completedAt)}`}
+                        </p>
                       </div>
                     </div>
                     {!booking.pickupDriver.startedAt && (
@@ -808,6 +1380,10 @@ export function ViewDetailsModal({
                             <span className="text-amber-600">Assigned</span>
                           )}
                         </div>
+                        <p className="text-[11px] text-slate-400">
+                          Assigned {formatDateTime(booking.returnDriver.assignedAt)}
+                          {booking.returnDriver.completedAt && ` • Completed ${formatDateTime(booking.returnDriver.completedAt)}`}
+                        </p>
                       </div>
                     </div>
                     {!booking.returnDriver.startedAt && (
@@ -986,6 +1562,205 @@ export function ViewDetailsModal({
             </button>
           </div>
         </div>
+      </div>
+
+      {showEditDetails && (
+        <EditBookingDetailsModal
+          booking={booking}
+          onClose={() => setShowEditDetails(false)}
+          onSaved={async (message) => {
+            setShowEditDetails(false);
+            setFlash(message);
+            await refreshBooking();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// EditBookingDetailsModal — post-payment logistics edits via
+// POST /api/admin/bookings/{id}/edit. Only rendered while the booking is
+// pending/in_progress AND at booking_confirmed / driver_en_route.
+// The API emails the customer a summary of the changes automatically.
+// ============================================================================
+
+function EditBookingDetailsModal({
+  booking,
+  onClose,
+  onSaved,
+}: {
+  booking: Booking;
+  onClose: () => void;
+  onSaved: (message: string) => void | Promise<void>;
+}) {
+  // yyyy-mm-dd in local time for the date input
+  const toYmd = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-CA") : "");
+
+  const [form, setForm] = useState({
+    serviceDate: toYmd(booking.serviceDate),
+    pickupTimeSlot: booking.pickupTimeSlot || "",
+    dropoffTimeSlot: booking.dropoffTimeSlot || "",
+    pickupAddress: booking.pickupAddress || "",
+    garageName: booking.garageName || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    // Only send fields that actually changed
+    const payload: Record<string, unknown> = {};
+    if (form.serviceDate && form.serviceDate !== toYmd(booking.serviceDate)) {
+      payload.serviceDate = form.serviceDate;
+    }
+    if (form.pickupTimeSlot && form.pickupTimeSlot !== (booking.pickupTimeSlot || "")) {
+      payload.pickupTimeSlot = form.pickupTimeSlot;
+    }
+    if (form.dropoffTimeSlot && form.dropoffTimeSlot !== (booking.dropoffTimeSlot || "")) {
+      payload.dropoffTimeSlot = form.dropoffTimeSlot;
+    }
+    if (form.pickupAddress.trim() && form.pickupAddress.trim() !== booking.pickupAddress) {
+      payload.pickupAddress = form.pickupAddress.trim();
+    }
+    if (form.garageName.trim() && form.garageName.trim() !== (booking.garageName || "")) {
+      payload.garageName = form.garageName.trim();
+    }
+    if (Object.keys(payload).length === 0) {
+      setError("No changes to apply");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Failed to update the booking");
+        return;
+      }
+      await onSaved(
+        data.message || "Booking updated. The customer has been emailed a summary of the changes."
+      );
+    } catch {
+      setError("Failed to update the booking");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
+          <h2 className="text-lg font-semibold text-slate-900">Edit Booking Details</h2>
+          <button
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
+          {error && (
+            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Service Date</label>
+            <input
+              type="date"
+              value={form.serviceDate}
+              onChange={(e) => setForm({ ...form, serviceDate: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Pickup Slot</label>
+              <select
+                value={form.pickupTimeSlot}
+                onChange={(e) => setForm({ ...form, pickupTimeSlot: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="">Keep current</option>
+                {PICKUP_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Drop-off Slot</label>
+              <select
+                value={form.dropoffTimeSlot}
+                onChange={(e) => setForm({ ...form, dropoffTimeSlot: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="">Keep current</option>
+                {DROPOFF_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Pickup Address</label>
+            <input
+              type="text"
+              value={form.pickupAddress}
+              onChange={(e) => setForm({ ...form, pickupAddress: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Service Centre (Garage Name)</label>
+            <input
+              type="text"
+              value={form.garageName}
+              onChange={(e) => setForm({ ...form, garageName: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">
+            The customer automatically receives a &quot;booking updated&quot; email summarising the changes.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

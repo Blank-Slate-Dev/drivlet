@@ -3,12 +3,15 @@
 // Listens for:
 // - checkout.session.completed events where type='service_payment' (redirect flow)
 // - payment_intent.succeeded events where type='service_payment' (embedded flow)
+// - checkout.session.completed events where type='extra_charge' (admin-requested
+//   additional payments — marks the matching extraCharges entry as paid)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
+import { sendEmail } from '@/lib/email';
 
 async function updateBookingAsPaid(
   bookingId: string,
@@ -61,6 +64,106 @@ async function updateBookingAsPaid(
   }
 }
 
+// Mark an admin-requested extra charge as paid. Matches the extraCharges entry
+// by checkoutSessionId first, falling back to the oldest pending entry for the
+// booking. Sends the customer a short receipt email (non-blocking).
+async function markExtraChargeAsPaid(
+  bookingId: string,
+  checkoutSessionId: string,
+  amount: number
+) {
+  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    console.error('Invalid bookingId in Stripe metadata:', bookingId);
+    return false;
+  }
+
+  const client = new MongoClient(process.env.MONGODB_URI!);
+  const now = new Date();
+  const amountDisplay = `$${(amount / 100).toFixed(2)}`;
+
+  try {
+    await client.connect();
+    const db = client.db();
+
+    const buildUpdate = () => ({
+      $set: {
+        'extraCharges.$.status': 'paid',
+        'extraCharges.$.paidAt': now,
+        updatedAt: now,
+      },
+      $push: {
+        updates: {
+          stage: 'extra_charge_paid',
+          timestamp: now,
+          message: `Customer paid the additional charge of ${amountDisplay}.`,
+          updatedBy: 'system',
+        } as never,
+      },
+    });
+
+    // Match by checkout session ID first (only pending entries)
+    let result = await db.collection('bookings').findOneAndUpdate(
+      {
+        _id: new ObjectId(bookingId),
+        extraCharges: { $elemMatch: { checkoutSessionId, status: 'pending' } },
+      },
+      buildUpdate(),
+      { returnDocument: 'after' }
+    );
+
+    // Fallback: oldest pending entry for this booking (legacy entries without a session ID)
+    if (!result) {
+      result = await db.collection('bookings').findOneAndUpdate(
+        {
+          _id: new ObjectId(bookingId),
+          extraCharges: { $elemMatch: { status: 'pending' } },
+        },
+        buildUpdate(),
+        { returnDocument: 'after' }
+      );
+    }
+
+    if (!result) {
+      console.error('❌ No pending extra charge found for booking:', bookingId);
+      return false;
+    }
+
+    console.log('✅ Extra charge marked as paid for booking:', bookingId);
+
+    // Short receipt email (non-blocking)
+    const userEmail = result.userEmail as string | undefined;
+    const userName = (result.userName as string | undefined) || userEmail;
+    const vehicleRegistration = (result.vehicleRegistration as string | undefined) || '';
+    const trackingCode = result.trackingCode as string | undefined;
+    if (userEmail) {
+      const firstName = (result.userName as string | undefined)?.split(' ')[0] || 'there';
+      const reference = trackingCode || vehicleRegistration;
+      sendEmail({
+        to: userEmail,
+        toName: userName || userEmail,
+        subject: `Payment received — ${vehicleRegistration}`,
+        textContent: [
+          `Hi ${firstName},`,
+          ``,
+          `We've received your additional payment of ${amountDisplay} AUD for booking ${reference}. No further action is needed.`,
+          ``,
+          `Thanks,`,
+          `The drivlet team`,
+        ].join('\n'),
+        htmlContent: [
+          `<p style="color: #475569; font-size: 16px;">Hi ${firstName},</p>`,
+          `<p style="color: #475569; font-size: 16px; line-height: 1.6;">We've received your additional payment of <strong>${amountDisplay} AUD</strong> for booking <strong>${reference}</strong>. No further action is needed.</p>`,
+          `<p style="margin-top: 24px; color: #94a3b8; font-size: 12px;">The drivlet team</p>`,
+        ].join(''),
+      }).catch((err) => console.error('Failed to send extra charge receipt email:', err));
+    }
+
+    return true;
+  } finally {
+    await client.close();
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('🔔 Service payment webhook received!');
 
@@ -100,6 +203,29 @@ export async function POST(request: NextRequest) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata;
+
+    // Admin-requested extra charge — mark the matching extraCharges entry as paid
+    if (metadata?.type === 'extra_charge') {
+      const bookingId = metadata.bookingId;
+
+      if (!bookingId) {
+        console.error('❌ No bookingId in extra charge checkout session metadata');
+        return NextResponse.json({ error: 'No booking ID' }, { status: 400 });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        console.error('Invalid bookingId in Stripe metadata:', bookingId);
+        return NextResponse.json({ error: 'Invalid booking ID' }, { status: 400 });
+      }
+
+      console.log('💳 Extra charge paid via checkout!');
+      console.log('📦 Booking ID:', bookingId);
+      console.log('💰 Amount:', (session.amount_total || 0) / 100, 'AUD');
+
+      await markExtraChargeAsPaid(bookingId, session.id, session.amount_total || 0);
+
+      return NextResponse.json({ received: true });
+    }
 
     // Only process service payments
     if (metadata?.type !== 'service_payment') {

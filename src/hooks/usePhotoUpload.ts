@@ -179,6 +179,12 @@ export function usePhotoUpload(bookingId: string) {
         if (metadata?.capturedLocation) formData.append("captured_location", metadata.capturedLocation);
         if (metadata?.replacePhotoId) formData.append("replace_photo_id", metadata.replacePhotoId);
 
+        // Customer consent acknowledgment (required server-side for pre_pickup)
+        const consentAcknowledged =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem(`photo-consent-${bookingId}`) === "true";
+        formData.append("consent_acknowledged", consentAcknowledged ? "true" : "false");
+
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "uploading", progress: 50 },

@@ -78,6 +78,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const capturedAtRaw = formData.get("captured_at") as string | null;
     const capturedLocation = formData.get("captured_location") as string | null;
     const replacePhotoId = formData.get("replace_photo_id") as string | null;
+    const consentAcknowledgedRaw = formData.get("consent_acknowledged") as string | null;
+    const consentAcknowledged = consentAcknowledgedRaw === "true";
 
     if (!file) {
       return NextResponse.json({ error: "Photo file is required" }, { status: 400 });
@@ -86,6 +88,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!checkpointType || !CHECKPOINT_TYPES.includes(checkpointType as CheckpointType)) {
       return NextResponse.json(
         { error: `Invalid checkpoint type. Must be one of: ${CHECKPOINT_TYPES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Customer consent must be acknowledged before pre-pickup photos
+    if (checkpointType === "pre_pickup" && !consentAcknowledged) {
+      return NextResponse.json(
+        { error: "Customer consent must be acknowledged before taking photos" },
         { status: 400 }
       );
     }
@@ -197,6 +207,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         gpsLongitude: gpsLng ? parseFloat(gpsLng) : undefined,
         capturedAt: capturedAtRaw ? new Date(capturedAtRaw) : undefined,
         capturedLocation: capturedLocation?.trim() || undefined,
+        consentAcknowledged,
         fileSize: buffer.length,
         mimeType,
       });

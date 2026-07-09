@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
   const status = searchParams.get("status");
+  const search = (searchParams.get("search") || "").trim().slice(0, 100);
 
   try {
     await connectDB();
@@ -39,6 +40,21 @@ export async function GET(request: NextRequest) {
       filter.status = { $in: OPEN_REQUEST_STATUSES };
     } else if (status && status !== "all") {
       filter.status = status;
+    }
+
+    if (search) {
+      // Escape special regex characters to prevent ReDoS
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchConditions: Record<string, unknown>[] = [
+        { userName: { $regex: escapedSearch, $options: "i" } },
+        { userEmail: { $regex: escapedSearch, $options: "i" } },
+        { vehicleRegistration: { $regex: escapedSearch, $options: "i" } },
+      ];
+      // Exact _id match when the search string is a valid ObjectId
+      if (/^[0-9a-fA-F]{24}$/.test(search)) {
+        searchConditions.push({ _id: search });
+      }
+      filter.$or = searchConditions;
     }
 
     const [requests, total, stats] = await Promise.all([

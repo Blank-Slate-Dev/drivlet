@@ -42,13 +42,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This payment link is no longer valid" }, { status: 400 });
     }
 
+    // Charge the request's quoted amount (server-side source of truth — admins can
+    // edit it before the customer pays). Fall back to base price + surcharge for
+    // legacy requests without a stored quote.
     const surcharge = ZONE_SURCHARGES[bookingRequest.distanceZone] ?? 0;
-    const serverAmount = isTestMode ? 100 : DRIVLET_PRICE + surcharge;
+    const quotedAmount =
+      typeof bookingRequest.quotedAmount === "number" && bookingRequest.quotedAmount > 0
+        ? bookingRequest.quotedAmount
+        : DRIVLET_PRICE + surcharge;
+    const serverAmount = isTestMode ? 100 : quotedAmount;
 
     if (bookingRequest.paymentIntentId) {
       try {
         const existingPI = await stripe.paymentIntents.retrieve(bookingRequest.paymentIntentId);
         if (existingPI.status !== "succeeded" && existingPI.status !== "canceled") {
+          // If the admin edited the quoted amount after this intent was created,
+          // bring the intent in line so the customer is charged the current quote.
+          if (existingPI.amount !== serverAmount) {
+            const updatedPI = await stripe.paymentIntents.update(existingPI.id, {
+              amount: serverAmount,
+            });
+            return NextResponse.json({
+              clientSecret: updatedPI.client_secret,
+              amount: serverAmount,
+            });
+          }
           return NextResponse.json({
             clientSecret: existingPI.client_secret,
             amount: serverAmount,

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // in one request. Other callers pass their own (smaller) limits, so this is additive.
     const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const status = searchParams.get("status");
-    const search = searchParams.get("search");
+    const search = (searchParams.get("search") || "").trim().slice(0, 100);
     const stage = searchParams.get("stage");
     const ALLOWED_SORT_FIELDS = ["createdAt", "updatedAt", "pickupTime", "status", "vehicleRegistration", "userName"];
     const sortByParam = searchParams.get("sortBy") || "createdAt";
@@ -46,12 +46,18 @@ export async function GET(request: NextRequest) {
     if (search) {
       // Escape special regex characters to prevent ReDoS
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      query.$or = [
+      const searchConditions: Record<string, unknown>[] = [
         { userName: { $regex: escapedSearch, $options: "i" } },
         { userEmail: { $regex: escapedSearch, $options: "i" } },
         { vehicleRegistration: { $regex: escapedSearch, $options: "i" } },
+        { trackingCode: { $regex: escapedSearch, $options: "i" } },
         { serviceType: { $regex: escapedSearch, $options: "i" } },
       ];
+      // Exact _id match when the search string is a valid ObjectId
+      if (/^[0-9a-fA-F]{24}$/.test(search)) {
+        searchConditions.push({ _id: search });
+      }
+      query.$or = searchConditions;
     }
 
     // Execute query with pagination

@@ -109,11 +109,11 @@ export interface IDriver extends Document {
   superannuationFund?: string;
   superannuationMemberNumber?: string;
 
-  // Banking for Payments
-  bankDetails: {
-    accountName: string;
-    bsb: string;
-    accountNumber: string;
+  // Banking for Payments — OPTIONAL at registration, collected securely after approval
+  bankDetails?: {
+    accountName?: string;
+    bsb?: string;
+    accountNumber?: string;
   };
 
   // Emergency Contact
@@ -394,12 +394,12 @@ const DriverSchema = new Schema<IDriver>(
       trim: true,
     },
 
-    // Banking
+    // Banking — OPTIONAL at registration, collected securely after approval.
+    // Format validators still apply whenever a value IS provided.
     bankDetails: {
-      accountName: { type: String, required: true, trim: true },
+      accountName: { type: String, trim: true },
       bsb: {
         type: String,
-        required: true,
         validate: {
           validator: function (v: string) {
             return /^\d{3}-?\d{3}$/.test(v.replace(/\s/g, ""));
@@ -409,7 +409,6 @@ const DriverSchema = new Schema<IDriver>(
       },
       accountNumber: {
         type: String,
-        required: true,
         validate: {
           validator: function (v: string) {
             return /^\d{6,10}$/.test(v.replace(/\s/g, ""));

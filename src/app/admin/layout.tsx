@@ -3,7 +3,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -23,8 +23,132 @@ import {
   AlertTriangle,
   Shield,
   CalendarDays,
+  Bell,
   // FileText, // Requests nav item merged into Bookings (2026-07-07)
 } from "lucide-react";
+
+interface AdminNotificationItem {
+  _id: string;
+  type: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+function timeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function NotificationBell({
+  notifications,
+  unreadCount,
+  onMarkAllRead,
+  onNotificationClick,
+  align,
+}: {
+  notifications: AdminNotificationItem[];
+  unreadCount: number;
+  onMarkAllRead: () => void;
+  onNotificationClick: (notification: AdminNotificationItem) => void;
+  align: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        aria-label="Notifications"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className={`absolute top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-lg ${
+            align === "left" ? "left-0" : "right-0"
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-900">Notifications</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={onMarkAllRead}
+                className="text-xs font-medium text-emerald-600 hover:text-emerald-500"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">
+                No notifications yet
+              </p>
+            ) : (
+              notifications.map((notification) => (
+                <button
+                  key={notification._id}
+                  onClick={() => {
+                    setOpen(false);
+                    onNotificationClick(notification);
+                  }}
+                  className={`flex w-full items-start gap-2 border-b border-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+                    notification.isRead ? "" : "bg-emerald-50/40"
+                  }`}
+                >
+                  <span
+                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                      notification.isRead ? "bg-transparent" : "bg-emerald-500"
+                    }`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-900">
+                      {notification.title}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-500">
+                      {notification.message}
+                    </span>
+                    <span className="mt-1 block text-[11px] text-slate-400">
+                      {timeAgo(notification.createdAt)}
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminLayout({
   children,
@@ -35,6 +159,9 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [openIncidentCount, setOpenIncidentCount] = useState(0);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -48,6 +175,63 @@ export default function AdminLayout({
       router.push("/dashboard");
     }
   }, [session, status, router]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/notifications");
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unreadCount || 0);
+      setOpenIncidentCount(data.openIncidentCount || 0);
+    } catch {
+      // Ignore polling errors — retry on next interval.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated" || session?.user?.role !== "admin") return;
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [status, session, fetchNotifications]);
+
+  const handleMarkAllRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_all_read" }),
+      });
+    } catch {
+      // Ignore — state will resync on next poll.
+    }
+  }, []);
+
+  const handleNotificationClick = useCallback(
+    async (notification: AdminNotificationItem) => {
+      if (!notification.isRead) {
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((count) => Math.max(0, count - 1));
+        try {
+          await fetch("/api/admin/notifications", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "mark_read", id: notification._id }),
+          });
+        } catch {
+          // Ignore — state will resync on next poll.
+        }
+      }
+      router.push("/admin/bookings");
+    },
+    [router]
+  );
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
@@ -66,6 +250,15 @@ export default function AdminLayout({
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
     { href: "/admin/testimonials", label: "Testimonials", icon: Star },
   ];
+
+  const renderNavBadge = (href: string) => {
+    if (href !== "/admin/incidents" || openIncidentCount <= 0) return null;
+    return (
+      <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+        {openIncidentCount > 99 ? "99+" : openIncidentCount}
+      </span>
+    );
+  };
 
   // Loading state - simple centered spinner
   if (status === "loading") {
@@ -102,7 +295,7 @@ export default function AdminLayout({
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-56 border-r border-slate-200 bg-white lg:block">
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="border-b border-slate-100 px-4 py-4">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
             <Link href="/" className="block">
               <div className="relative h-8 w-24">
                 <Image
@@ -114,6 +307,13 @@ export default function AdminLayout({
                 />
               </div>
             </Link>
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkAllRead={handleMarkAllRead}
+              onNotificationClick={handleNotificationClick}
+              align="left"
+            />
           </div>
 
           {/* Navigation */}
@@ -133,6 +333,7 @@ export default function AdminLayout({
                 >
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
+                  {renderNavBadge(item.href)}
                 </Link>
               );
             })}
@@ -165,17 +366,26 @@ export default function AdminLayout({
               />
             </div>
           </Link>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkAllRead={handleMarkAllRead}
+              onNotificationClick={handleNotificationClick}
+              align="right"
+            />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -227,6 +437,7 @@ export default function AdminLayout({
                     >
                       <Icon className="h-4 w-4" />
                       <span>{item.label}</span>
+                      {renderNavBadge(item.href)}
                     </Link>
                   );
                 })}

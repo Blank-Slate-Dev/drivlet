@@ -156,6 +156,9 @@ export async function GET(request: NextRequest) {
       status: booking.status,
       currentStage: booking.currentStage,
       overallProgress: booking.overallProgress,
+      // Incident visibility (no internal details exposed)
+      hasActiveIncident: booking.hasActiveIncident || false,
+      incidentExceptionState: booking.incidentExceptionState || 'none',
       updates: booking.updates,
       createdAt: booking.createdAt,
       // Service payment fields (if applicable)

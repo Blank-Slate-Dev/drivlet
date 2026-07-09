@@ -37,6 +37,18 @@ export interface IGarageResponse {
   notes?: string;
 }
 
+// Extra charges requested by admins (custom Stripe Checkout payment links)
+export interface IExtraCharge {
+  description: string;
+  amount: number; // cents
+  status: 'pending' | 'paid';
+  checkoutSessionId?: string;
+  paymentUrl?: string;
+  createdBy: string;
+  createdAt: Date;
+  paidAt?: Date;
+}
+
 // Signed form reference (lightweight pointer to SignedForm collection)
 export interface ISignedFormRef {
   formId: Types.ObjectId;
@@ -130,7 +142,7 @@ export interface IBooking extends Document {
   servicePaymentUrl?: string;
   servicePaymentId?: string;
   servicePaymentIntentId?: string;
-  servicePaymentStatus?: 'pending' | 'paid' | 'failed';
+  servicePaymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
 
   // Vehicle details
   transmissionType: 'automatic' | 'manual';
@@ -165,6 +177,29 @@ export interface IBooking extends Document {
     refundId?: string;
     refundStatus?: 'pending' | 'succeeded' | 'failed' | 'not_applicable';
   };
+
+  // Customer-initiated cancellation request (admin approves/denies; refunds are manual)
+  cancellationRequest?: {
+    status: 'pending' | 'approved' | 'denied';
+    reason?: string;
+    requestedAt: Date;
+    resolvedAt?: Date;
+    resolvedBy?: string;
+    denyReason?: string;
+  };
+
+  // Manual refunds processed by admins (transport or service payment)
+  refunds?: Array<{
+    target: 'transport' | 'service';
+    amount: number; // cents
+    refundId?: string;
+    reason?: string;
+    processedBy: string;
+    processedAt: Date;
+  }>;
+
+  // Extra charges requested by admins (custom Stripe Checkout payment links)
+  extraCharges?: IExtraCharge[];
 
   // Vehicle photo checkpoint tracking
   checkpointStatus: ICheckpointStatus;
@@ -287,7 +322,8 @@ const BookingSchema = new Schema<IBooking>(
     },
     pickupTimeSlot: {
       type: String,
-      enum: ['8am-9am', '9am-10am', '10am-11am'],
+      // Keep in sync with PICKUP_SLOTS in src/config/timeSlots.ts
+      enum: ['8am-9am', '9am-10am', '10am-11am', '11am-12pm'],
       required: false,
       index: true,
     },
@@ -512,7 +548,7 @@ const BookingSchema = new Schema<IBooking>(
     },
     servicePaymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed"],
+      enum: ["pending", "paid", "failed", "refunded"],
     },
 
     // Vehicle details
@@ -585,6 +621,57 @@ const BookingSchema = new Schema<IBooking>(
         type: String,
         enum: ["pending", "succeeded", "failed", "not_applicable"],
       },
+    },
+
+    // Customer-initiated cancellation request (admin approves/denies; refunds are manual)
+    cancellationRequest: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "denied"],
+      },
+      reason: { type: String },
+      requestedAt: { type: Date },
+      resolvedAt: { type: Date },
+      resolvedBy: { type: String },
+      denyReason: { type: String },
+    },
+
+    // Manual refunds processed by admins (transport or service payment)
+    refunds: {
+      type: [
+        new Schema(
+          {
+            target: { type: String, enum: ["transport", "service"], required: true },
+            amount: { type: Number, required: true },
+            refundId: { type: String },
+            reason: { type: String },
+            processedBy: { type: String, required: true },
+            processedAt: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
+    // Extra charges requested by admins (custom Stripe Checkout payment links)
+    extraCharges: {
+      type: [
+        new Schema<IExtraCharge>(
+          {
+            description: { type: String, required: true },
+            amount: { type: Number, required: true, min: 0 },
+            status: { type: String, enum: ["pending", "paid"], required: true, default: "pending" },
+            checkoutSessionId: { type: String },
+            paymentUrl: { type: String },
+            createdBy: { type: String, required: true },
+            createdAt: { type: Date, required: true },
+            paidAt: { type: Date },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
     },
 
     // Vehicle photo checkpoint tracking

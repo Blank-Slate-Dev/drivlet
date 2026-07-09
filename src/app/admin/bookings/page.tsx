@@ -3,11 +3,12 @@
 // AND paid bookings (all lifecycle stages) in one auto-refreshing, filterable view.
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Search,
   RefreshCw,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   CheckCircle2,
   Inbox,
@@ -56,6 +57,7 @@ interface UnifiedRow {
   statusLabel: string;
   stageLabel?: string; // bookings only
   paidAt?: string; // bookings only (= createdAt)
+  cancelRequested?: boolean; // bookings only — pending cancellation request
   createdAt: string;
   raw: Booking | BookingRequestItem;
 }
@@ -105,6 +107,7 @@ function normalizeBooking(b: Booking): UnifiedRow {
     statusLabel,
     stageLabel: stageLabelFor(b.currentStage),
     paidAt: b.createdAt, // bookings only exist after payment → createdAt is the paid time
+    cancelRequested: b.cancellationRequest?.status === "pending",
     createdAt: b.createdAt,
     raw: b,
   };
@@ -185,6 +188,8 @@ export default function AdminBookingsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const [search, setSearch] = useState("");
+  // Server-side search term (debounced) — threaded through BOTH list fetches.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tab, setTab] = useState<TabKey>("all");
   const [dateFilter, setDateFilter] = useState("");
 
@@ -196,12 +201,17 @@ export default function AdminBookingsPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   // ONE fetch for the whole page: bookings + all open requests, in parallel, uncached.
+  // The single search input is threaded through BOTH endpoints (server-side matching
+  // covers trackingCode/rego/name/email/exact _id — more than the client-side filter can).
   const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     try {
+      const q = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : "";
+      // When searching, widen requests to ALL statuses so declined/expired matches surface too.
+      const reqStatus = debouncedSearch ? "all" : "all_open";
       const [bRes, rRes] = await Promise.all([
-        fetch("/api/admin/bookings?limit=500", { cache: "no-store" }),
-        fetch("/api/admin/booking-requests?status=all_open&limit=500", { cache: "no-store" }),
+        fetch(`/api/admin/bookings?limit=500${q}`, { cache: "no-store" }),
+        fetch(`/api/admin/booking-requests?status=${reqStatus}&limit=500${q}`, { cache: "no-store" }),
       ]);
       if (!bRes.ok) throw new Error("Failed to fetch bookings");
       const bData = await bRes.json();
@@ -215,11 +225,21 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearch]);
+
+  // Debounce keystrokes → server search (client filter below gives instant feedback).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   // Single refresh loop for the ENTIRE page: 30s interval + visibility + focus.
+  // Re-runs when the debounced search changes (fetchAll identity changes) — silent
+  // after the first load so typing a search doesn't flash the whole list.
+  const didInitialLoad = useRef(false);
   useEffect(() => {
-    fetchAll();
+    fetchAll({ silent: didInitialLoad.current });
+    didInitialLoad.current = true;
     const interval = setInterval(() => fetchAll({ silent: true }), 30_000);
     const onVisible = () => { if (document.visibilityState === "visible") fetchAll({ silent: true }); };
     const onFocus = () => fetchAll({ silent: true });
@@ -279,7 +299,8 @@ export default function AdminBookingsPage() {
       if (tab !== "all" && row.statusKey !== tab) return false;
       if (dateFilter && toLocalYmd(row.serviceDate) !== dateFilter) return false;
       if (q) {
-        const hay = `${row.reference} ${row.customerName} ${row.rego} ${row.email}`.toLowerCase();
+        // Includes row.id so exact-_id server matches aren't hidden client-side.
+        const hay = `${row.reference} ${row.customerName} ${row.rego} ${row.email} ${row.id}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -421,6 +442,12 @@ export default function AdminBookingsPage() {
         {row.statusKey === "active" && <CheckCircle2 className="h-3 w-3" />}
         {row.statusLabel}
       </span>
+      {row.cancelRequested && (
+        <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold leading-tight text-amber-700">
+          <AlertTriangle className="h-3 w-3" />
+          Cancel requested
+        </span>
+      )}
       {row.kind === "booking" && row.statusKey === "active" && row.stageLabel && (
         <span className="text-[11px] text-slate-500">{row.stageLabel}</span>
       )}
@@ -650,6 +677,11 @@ export default function AdminBookingsPage() {
             request={selectedRequest}
             onClose={() => setSelectedRequest(null)}
             onRefresh={() => { fetchAll({ silent: true }); setSelectedRequest(null); }}
+            onRequestUpdated={(updated) => {
+              // Edit-in-place: keep the modal open, sync the row list underneath.
+              setRequests((prev) => prev.map((r) => (r._id === updated._id ? updated : r)));
+              setSelectedRequest(updated);
+            }}
           />
         )}
       </div>

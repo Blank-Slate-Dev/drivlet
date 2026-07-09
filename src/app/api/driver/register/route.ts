@@ -4,8 +4,8 @@ import { put, del } from "@vercel/blob";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Driver from "@/models/Driver";
-import Contact from "@/models/Contact";
 import bcrypt from "bcryptjs";
+import { notifyAdmin } from "@/lib/notifications";
 import { validatePassword, validateEmail as validateEmailLib, validateBSB as validateBSBLib } from "@/lib/validation";
 
 // Validate Australian phone number (relaxed for initial registration)
@@ -181,15 +181,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Visa subclass is required for visa holders" }, { status: 400 });
     }
 
-    // Bank details validation
-    if (!bsb || !validateBSB(bsb)) {
-      return NextResponse.json({ error: "Valid BSB (6 digits) is required" }, { status: 400 });
-    }
-    if (!accountNumber || accountNumber.trim().length < 6) {
-      return NextResponse.json({ error: "Valid account number is required" }, { status: 400 });
-    }
-    if (!accountName || accountName.trim().length < 2) {
-      return NextResponse.json({ error: "Account holder name is required" }, { status: 400 });
+    // Bank details validation — OPTIONAL at registration.
+    // Payment details are collected securely after the application is approved,
+    // but if any banking field is supplied it must still be valid and complete.
+    const hasBankDetails = Boolean(bsb.trim() || accountNumber.trim() || accountName.trim());
+    if (hasBankDetails) {
+      if (!bsb || !validateBSB(bsb)) {
+        return NextResponse.json({ error: "Valid BSB (6 digits) is required" }, { status: 400 });
+      }
+      if (!accountNumber || accountNumber.trim().length < 6) {
+        return NextResponse.json({ error: "Valid account number is required" }, { status: 400 });
+      }
+      if (!accountName || accountName.trim().length < 2) {
+        return NextResponse.json({ error: "Account holder name is required" }, { status: 400 });
+      }
     }
 
     // Police check details
@@ -375,11 +380,14 @@ export async function POST(request: Request) {
       preferredAreas: ["Newcastle", "Lake Macquarie", "Maitland"],
       // ENFORCED: All drivers are employees, not contractors
       employmentType: "employee",
-      bankDetails: {
-        accountName: accountName.trim(),
-        bsb: bsb.replace(/[\s-]/g, ""),
-        accountNumber: accountNumber.replace(/\s/g, ""),
-      },
+      // Banking is optional at registration — collected securely after approval
+      ...(hasBankDetails && {
+        bankDetails: {
+          accountName: accountName.trim(),
+          bsb: bsb.replace(/[\s-]/g, ""),
+          accountNumber: accountNumber.replace(/\s/g, ""),
+        },
+      }),
       emergencyContact: {
         name: emergencyContactName.trim(),
         relationship: emergencyContactRelationship.trim(),
@@ -408,14 +416,13 @@ export async function POST(request: Request) {
     // Link driver profile to user
     await User.findByIdAndUpdate(user._id, { driverProfile: driver._id });
 
-    // Create inquiry for admin review
-    await Contact.create({
-      name: `${firstName.trim()} ${lastName.trim()}`,
-      email: email.toLowerCase(),
-      phone: formattedPhone,
-      message: `🚗 NEW DRIVER APPLICATION\n\nDriver: ${firstName.trim()} ${lastName.trim()}\nEmail: ${email.toLowerCase()}\nPhone: ${formattedPhone}\nDOB: ${dateOfBirth}\nAddress: ${addressStreet.trim()}, ${addressSuburb.trim()} ${addressState} ${addressPostcode.trim()}\nLicense: ${licenseNumber.trim().toUpperCase()} (${licenseState})\nLicense Expiry: ${licenseExpiry}\nManual capable: ${canDriveManual ? "Yes" : "No"}\nRight to work: ${rightToWorkStatus}${rightToWorkStatus === "visa_with_work_rights" ? ` (subclass ${visaSubclass.trim()})` : ""}\nPolice check: ${policeCheckCertificateNumber.trim()} (issued ${policeCheckIssueDate})\nBank Account: ${accountName.trim()} (BSB: ${bsb})\n\nDocuments uploaded: licence front/back + police check.\n\nDriver ID: ${driver._id}`,
-      status: "new",
-    });
+    // Notify admins of the new application (non-blocking — never fails registration)
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    notifyAdmin({
+      type: "system",
+      title: `New driver application — ${fullName}`,
+      message: `${fullName} applied to drive (${email.toLowerCase()}, ${formattedPhone}). Review in the Drivers section.`,
+    }).catch(console.error);
 
     return NextResponse.json(
       {

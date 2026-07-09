@@ -2,6 +2,9 @@
 // Email service using Mailjet
 
 import Mailjet from 'node-mailjet';
+import { CANCELLATION_POLICY_TEXT, SUPPORT_PHONE, SUPPORT_EMAIL } from './policy';
+
+const EMAIL_DEBUG = process.env.NODE_ENV !== 'production';
 
 // Only initialize Mailjet if credentials are present
 const mailjet = process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY
@@ -36,7 +39,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   }
 
   const fromEmail = process.env.EMAIL_FROM || 'noreply@drivlet.com.au';
-  console.log(`[EMAIL_DEBUG] sendEmail called — from=${fromEmail}, to=${options.to}, subject="${options.subject}"`); // [EMAIL_DEBUG]
+  if (EMAIL_DEBUG) console.log(`[EMAIL_DEBUG] sendEmail called — from=${fromEmail}, to=${options.to}, subject="${options.subject}"`);
 
   try {
     const result = await mailjet.post('send', { version: 'v3.1' }).request({
@@ -59,17 +62,100 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       ],
     });
 
-    const statusCode = (result as { response?: { status?: number } }).response?.status; // [EMAIL_DEBUG]
-    const body = result.body; // [EMAIL_DEBUG]
-    console.log(`[EMAIL_DEBUG] Mailjet success — status=${statusCode}, body=${JSON.stringify(body)}`); // [EMAIL_DEBUG]
-    console.log('✅ Email sent successfully to:', options.to);
+    if (EMAIL_DEBUG) {
+      const statusCode = (result as { response?: { status?: number } }).response?.status;
+      console.log(`[EMAIL_DEBUG] Mailjet success — status=${statusCode}, body=${JSON.stringify(result.body)}`);
+      console.log('✅ Email sent successfully to:', options.to);
+    }
     return true;
   } catch (error: unknown) {
-    const err = error as { statusCode?: number; ErrorMessage?: string; message?: string; response?: { status?: number; data?: unknown } }; // [EMAIL_DEBUG]
-    console.error(`[EMAIL_DEBUG] Mailjet FAILED — statusCode=${err.statusCode}, message=${err.ErrorMessage || err.message}, responseStatus=${err.response?.status}, responseData=${JSON.stringify(err.response?.data)}`); // [EMAIL_DEBUG]
-    console.error('❌ Failed to send email:', error);
+    const err = error as { statusCode?: number; ErrorMessage?: string; message?: string; response?: { status?: number } };
+    console.error(`❌ Failed to send email — statusCode=${err.statusCode}, message=${err.ErrorMessage || err.message}, responseStatus=${err.response?.status}`);
     return false;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Shared building blocks — every customer email should include the booking
+// details block and the policy footer so customers always have full context.
+// ════════════════════════════════════════════════════════════════════════
+
+export interface BookingEmailDetails {
+  vehicleRegistration?: string;
+  vehicleDescription?: string;
+  serviceType?: string;
+  serviceDate?: Date | string;
+  pickupTime?: string;
+  dropoffTime?: string;
+  pickupAddress?: string;
+  garageName?: string;
+  trackingCode?: string;
+  amount?: number; // cents
+}
+
+function formatServiceDate(date?: Date | string): string | undefined {
+  if (!date) return undefined;
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return typeof date === 'string' ? date : undefined;
+  return d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function detailPairs(d: BookingEmailDetails): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  if (d.vehicleRegistration) pairs.push(['Vehicle', d.vehicleDescription ? `${d.vehicleRegistration} — ${d.vehicleDescription}` : d.vehicleRegistration]);
+  if (d.serviceType) pairs.push(['Service', d.serviceType]);
+  const dateStr = formatServiceDate(d.serviceDate);
+  if (dateStr) pairs.push(['Date', dateStr]);
+  if (d.pickupTime) pairs.push(['Pickup window', d.pickupTime]);
+  if (d.dropoffTime) pairs.push(['Return window', d.dropoffTime]);
+  if (d.pickupAddress) pairs.push(['Pickup address', d.pickupAddress]);
+  if (d.garageName) pairs.push(['Service centre', d.garageName]);
+  if (typeof d.amount === 'number') pairs.push(['Amount', `$${(d.amount / 100).toFixed(2)} AUD`]);
+  if (d.trackingCode) pairs.push(['Tracking code', d.trackingCode]);
+  return pairs;
+}
+
+/** HTML table of booking details for embedding in any email template. */
+export function bookingDetailsHtml(d: BookingEmailDetails): string {
+  const pairs = detailPairs(d);
+  if (pairs.length === 0) return '';
+  const rows = pairs
+    .map(
+      ([label, value]) => `
+      <tr>
+        <td style="padding: 6px 12px 6px 0; color: #64748b; font-size: 13px; white-space: nowrap; vertical-align: top;">${escapeHtml(label)}</td>
+        <td style="padding: 6px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${escapeHtml(value)}</td>
+      </tr>`
+    )
+    .join('');
+  return `
+  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin: 0 0 24px;">
+    <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Booking details</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%;">${rows}</table>
+  </div>`;
+}
+
+/** Plain-text booking details for the text part of any email. */
+export function bookingDetailsText(d: BookingEmailDetails): string {
+  const pairs = detailPairs(d);
+  if (pairs.length === 0) return '';
+  return ['Booking details:', ...pairs.map(([label, value]) => `  ${label}: ${value}`)].join('\n');
+}
+
+/** Standard footer: cancellation policy disclaimer + support contact. */
+export function emailPolicyFooterHtml(): string {
+  return `
+  <div style="margin-top: 8px; padding: 14px 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;">
+    <p style="margin: 0; color: #92400e; font-size: 12px; line-height: 1.6;">${escapeHtml(CANCELLATION_POLICY_TEXT)}</p>
+  </div>
+  <p style="margin: 12px 0 0; color: #94a3b8; font-size: 12px; text-align: center;">
+    Need help? Call <a href="tel:${SUPPORT_PHONE.replace(/\s/g, '')}" style="color: #059669; text-decoration: none;">${SUPPORT_PHONE}</a>
+    or email <a href="mailto:${SUPPORT_EMAIL}" style="color: #059669; text-decoration: none;">${SUPPORT_EMAIL}</a>
+  </p>`;
+}
+
+export function emailPolicyFooterText(): string {
+  return `${CANCELLATION_POLICY_TEXT}\n\nNeed help? Call ${SUPPORT_PHONE} or email ${SUPPORT_EMAIL}`;
 }
 
 // Get app URL at runtime (not at module load time)
@@ -213,40 +299,51 @@ Newcastle, Australia
   });
 }
 
-// Service payment ready email
+// Service payment ready email — sent when the garage has finished and the
+// service invoice is ready. The primary link points at the tracking page
+// (embedded payment, never expires) rather than the raw Stripe Checkout URL,
+// which Stripe expires after 24 hours.
 export async function sendServicePaymentEmail(
   customerEmail: string,
   customerName: string,
   vehicleRego: string,
   amount: number, // in cents
   paymentUrl: string,
-  garageName?: string
+  garageName?: string,
+  trackingCode?: string
 ): Promise<boolean> {
   const amountFormatted = (amount / 100).toFixed(2);
   const safeCustomerName = escapeHtml(customerName);
-  const safeVehicleRego = escapeHtml(vehicleRego);
-  const safeGarageName = garageName ? escapeHtml(garageName) : undefined;
+  const appUrl = getAppUrl();
+  // Prefer the tracking page (durable, embedded payment); fall back to the
+  // Stripe Checkout URL for legacy bookings without a tracking code.
+  const payLink = trackingCode ? `${appUrl}/track?code=${trackingCode}` : paymentUrl;
 
-  const subject = `Your car is ready! Pay $${amountFormatted} to get it back - ${vehicleRego}`;
+  const details: BookingEmailDetails = {
+    vehicleRegistration: vehicleRego,
+    garageName,
+    amount,
+    trackingCode,
+  };
+
+  const subject = `Your car is ready — service payment of $${amountFormatted} due (${vehicleRego})`;
 
   const textContent = `
 Hi ${customerName},
 
-Great news! Your car service is complete.
+Good news — the service on your car is complete.
 
-Vehicle: ${vehicleRego}
-${garageName ? `Service at: ${garageName}` : ''}
-Amount due: $${amountFormatted} AUD
+${bookingDetailsText(details)}
 
-Pay now to have your car delivered back to you:
-${paymentUrl}
+How to pay and get your car back:
+1. Open your tracking page: ${payLink}
+2. Review the service amount and pay securely by card.
+3. Once payment is confirmed, our driver will return your car to you.
 
-Our driver is ready and waiting to bring your car home as soon as you pay.
-
-Questions? Reply to this email or call us.
+${emailPolicyFooterText()}
 
 Thanks,
-The drivlet Team
+The drivlet team
   `.trim();
 
   const htmlContent = `
@@ -257,47 +354,34 @@ The drivlet Team
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+  <div style="max-width: 520px; margin: 0 auto; padding: 40px 20px;">
     <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #059669 0%, #0d9488 100%); padding: 32px; text-align: center;">
-        <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">Your car is ready! 🚗</h1>
+        <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">Your car is ready 🚗</h1>
+        <p style="margin: 8px 0 0; color: #d1fae5; font-size: 14px;">Service payment of $${amountFormatted} due</p>
       </div>
-      
+
       <!-- Content -->
       <div style="padding: 32px;">
         <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${safeCustomerName},</p>
 
-        <p style="margin: 0 0 24px; color: #475569; font-size: 16px;">Great news! Your car service is complete and ready for delivery.</p>
+        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">Good news — the service on your car is complete. Once the service payment below is confirmed, our driver will return your car to you.</p>
 
-        <!-- Details Box -->
-        <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-          <div style="margin-bottom: 12px;">
-            <span style="color: #64748b; font-size: 14px;">Vehicle</span>
-            <div style="color: #1e293b; font-size: 18px; font-weight: 600;">${safeVehicleRego}</div>
-          </div>
-          ${safeGarageName ? `
-          <div style="margin-bottom: 12px;">
-            <span style="color: #64748b; font-size: 14px;">Service at</span>
-            <div style="color: #1e293b; font-size: 16px;">${safeGarageName}</div>
-          </div>
-          ` : ''}
-          <div>
-            <span style="color: #64748b; font-size: 14px;">Amount due</span>
-            <div style="color: #059669; font-size: 28px; font-weight: 700;">$${amountFormatted}</div>
-          </div>
-        </div>
-        
+        ${bookingDetailsHtml(details)}
+
         <!-- CTA Button -->
-        <a href="${paymentUrl}" style="display: block; background: #059669; color: white; text-decoration: none; text-align: center; padding: 16px 32px; border-radius: 9999px; font-size: 16px; font-weight: 600; margin-bottom: 24px;">
-          Pay Now & Get Your Car
+        <a href="${payLink}" style="display: block; background: #059669; color: white; text-decoration: none; text-align: center; padding: 16px 32px; border-radius: 9999px; font-size: 16px; font-weight: 600; margin-bottom: 16px;">
+          Pay $${amountFormatted} securely
         </a>
-        
-        <p style="margin: 0; color: #64748b; font-size: 14px; text-align: center;">
-          Our driver is ready to bring your car home as soon as you pay.
+
+        <p style="margin: 0 0 24px; color: #64748b; font-size: 13px; text-align: center; line-height: 1.6;">
+          The link opens your tracking page, where you can review the amount and pay by card. Payment is processed securely by Stripe.
         </p>
+
+        ${emailPolicyFooterHtml()}
       </div>
-      
+
       <!-- Footer -->
       <div style="background: #f8fafc; padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
         <p style="margin: 0; color: #94a3b8; font-size: 12px;">
@@ -405,6 +489,12 @@ export interface BookingStageEmailData {
   garageName?: string;
   /** Optional override message (e.g. from admin custom message) */
   customMessage?: string;
+  // Booking details included in every stage email
+  serviceType?: string;
+  serviceDate?: Date | string;
+  pickupTime?: string;
+  dropoffTime?: string;
+  pickupAddress?: string;
 }
 
 export async function sendBookingStageEmail(
@@ -418,6 +508,11 @@ export async function sendBookingStageEmail(
     trackingCode,
     garageName,
     customMessage,
+    serviceType,
+    serviceDate,
+    pickupTime,
+    dropoffTime,
+    pickupAddress,
   } = data;
 
   const content = STAGE_EMAIL_CONTENT[currentStage];
@@ -433,7 +528,6 @@ export async function sendBookingStageEmail(
   // Escape user-supplied values for HTML templates
   const safeCustomerName = escapeHtml(customerName);
   const safeVehicleRegistration = escapeHtml(vehicleRegistration);
-  const safeGarageName = garageName ? escapeHtml(garageName) : undefined;
   const safeMessage = escapeHtml(message);
 
   // Build tracking URL if tracking code exists
@@ -443,6 +537,17 @@ export async function sendBookingStageEmail(
 
   const subject = `${content.emoji} ${content.subject} — ${vehicleRegistration}`;
 
+  const details: BookingEmailDetails = {
+    vehicleRegistration,
+    serviceType,
+    serviceDate,
+    pickupTime,
+    dropoffTime,
+    pickupAddress,
+    garageName,
+    trackingCode,
+  };
+
   // ── Plain text version ──
   const textContent = `
 ${content.heading}
@@ -451,17 +556,15 @@ Hi ${customerName},
 
 ${message}
 
-Vehicle: ${vehicleRegistration}
-${garageName ? `Service at: ${garageName}` : ''}
+${bookingDetailsText(details)}
 Progress: ${progress}%
 
 Track your booking: ${trackingUrl}
 
-Questions? Reply to this email or visit drivlet.com.au
+${emailPolicyFooterText()}
 
 ---
 drivlet - Car service made simple
-Newcastle, Australia
 `.trim();
 
   // ── HTML version ──
@@ -508,39 +611,20 @@ Newcastle, Australia
               </p>
 
               <!-- Details Box -->
-              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td style="padding: 0 0 12px;">
-                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Vehicle</span>
-                      <div style="color: #1e293b; font-size: 16px; font-weight: 600; margin-top: 2px;">${safeVehicleRegistration}</div>
-                    </td>
-                    <td style="padding: 0 0 12px; text-align: right;">
-                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Progress</span>
-                      <div style="color: ${content.color}; font-size: 16px; font-weight: 700; margin-top: 2px;">${progress}%</div>
-                    </td>
-                  </tr>
-                  ${safeGarageName ? `
-                  <tr>
-                    <td colspan="2" style="padding: 12px 0 0; border-top: 1px solid #e2e8f0;">
-                      <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Service Centre</span>
-                      <div style="color: #1e293b; font-size: 15px; margin-top: 2px;">${safeGarageName}</div>
-                    </td>
-                  </tr>
-                  ` : ''}
-                </table>
-              </div>
+              ${bookingDetailsHtml(details)}
 
               <!-- CTA Button -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td align="center" style="padding: 0 0 8px;">
+                  <td align="center" style="padding: 0 0 20px;">
                     <a href="${trackingUrl}" style="display: inline-block; background-color: ${content.color}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 14px 40px; border-radius: 9999px; box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.15);">
                       Track Your Booking
                     </a>
                   </td>
                 </tr>
               </table>
+
+              ${emailPolicyFooterHtml()}
             </td>
           </tr>
 

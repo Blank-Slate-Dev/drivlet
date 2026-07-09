@@ -7,7 +7,6 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { calculateRefund, formatRefundAmount } from "@/lib/refund-calculator";
-import { processRefund } from "@/lib/stripe-refund";
 import { requireValidOrigin } from "@/lib/validation";
 import { notifyGarageOfCancellation } from "@/lib/notifications";
 
@@ -57,50 +56,16 @@ export async function POST(
       );
     }
 
-    // Determine if user is authorized to cancel
+    // Direct cancellation is an admin-only action. Customers file a
+    // cancellation request via /api/bookings/[id]/cancel-request instead
+    // (>3h before pickup), or call support inside the cutoff.
     const isAdmin = session?.user?.role === "admin";
-    const isOwner =
-      (session?.user?.id && booking.userId?.toString() === session.user.id) ||
-      (session?.user?.email &&
-        booking.userEmail.toLowerCase() === session.user.email.toLowerCase());
-
-    // Guest cancellation - MUST verify both email AND phone match the booking
-    // This prevents unauthorized users from cancelling other guests' bookings
-    let isGuestOwner = false;
-    if (!session?.user && booking.isGuest) {
-      const providedEmail = body.guestEmail?.toLowerCase().trim();
-      const providedPhone = body.guestPhone?.replace(/[\s\-()]/g, "");
-      const bookingEmail = booking.userEmail?.toLowerCase();
-      const bookingPhone = booking.guestPhone?.replace(/[\s\-()]/g, "");
-
-      // Verify email match (required) and second factor (phone or vehicle rego)
-      if (providedEmail && bookingEmail && providedEmail === bookingEmail) {
-        if (bookingPhone) {
-          // Phone exists on booking — require phone match too
-          isGuestOwner = !!(providedPhone && providedPhone === bookingPhone);
-        } else {
-          // No phone on booking — require vehicle registration as second factor
-          const providedRego = body.guestVehicleRego?.toUpperCase().replace(/\s/g, "");
-          const bookingRego = booking.vehicleRegistration?.toUpperCase().replace(/\s/g, "");
-          isGuestOwner = !!(providedRego && bookingRego && providedRego === bookingRego);
-        }
-      }
-
-      // If guest credentials don't match, return specific error
-      if (!isGuestOwner) {
-        return NextResponse.json(
-          {
-            error:
-              "Guest verification failed. Please provide the email and phone number (or vehicle registration) used when booking.",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
-    if (!isAdmin && !isOwner && !isGuestOwner) {
+    if (!isAdmin) {
       return NextResponse.json(
-        { error: "You are not authorized to cancel this booking" },
+        {
+          error:
+            "Bookings can no longer be cancelled directly. Please use the cancellation request option on your dashboard, or call support.",
+        },
         { status: 403 }
       );
     }
@@ -113,96 +78,28 @@ export async function POST(
       );
     }
 
-    // Calculate refund eligibility
-    const refundCalc = calculateRefund(
-      booking.pickupTime,
-      booking.paymentAmount || 0,
-      booking.status,
-      booking.currentStage
-    );
-
-    // If can't cancel and not admin, block
-    if (!refundCalc.canCancel && !isAdmin) {
-      return NextResponse.json(
-        {
-          error: refundCalc.reason,
-          canCancel: false,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Admin override for full refund
-    let finalRefundAmount = refundCalc.amount;
-    let finalRefundPercentage = refundCalc.percentage;
-
-    if (isAdmin && body.forceFullRefund && booking.paymentAmount) {
-      finalRefundAmount = booking.paymentAmount;
-      finalRefundPercentage = 100;
-    }
-
-    // Process Stripe refund if applicable
-    let refundResult: {
-      success: boolean;
-      refundId?: string;
-      estimatedArrival?: string;
-      error?: string;
-    } = {
-      success: true,
-    };
-
-    if (finalRefundAmount > 0 && booking.paymentId) {
-      refundResult = await processRefund(
-        booking.paymentId,
-        finalRefundAmount,
-        body.cancellationReason || "Customer requested cancellation"
-      );
-
-      if (!refundResult.success) {
-        // Log refund failure but still cancel the booking
-        console.error("Refund failed for booking:", bookingId, refundResult);
-      }
-    }
-
-    // Determine refund status
-    let refundStatus: "pending" | "succeeded" | "failed" | "not_applicable" =
-      "not_applicable";
-    if (finalRefundAmount > 0) {
-      refundStatus = refundResult.success ? "succeeded" : "failed";
-    }
-
-    // Update booking status
+    // Cancelling never moves money — refunds are a separate manual admin
+    // action via /api/admin/bookings/[id]/refund.
     const cancellationDetails = {
       cancelledAt: new Date(),
-      cancelledBy: session?.user?.id || "guest",
-      cancelledByRole: isAdmin ? "admin" : "customer",
+      cancelledBy: session?.user?.id || "admin",
+      cancelledByRole: "admin",
       reason: body.cancellationReason || undefined,
-      refundAmount: finalRefundAmount,
-      refundPercentage: finalRefundPercentage,
-      refundId: refundResult.refundId,
-      refundStatus,
+      refundAmount: 0,
+      refundPercentage: 0,
+      refundStatus: "not_applicable" as const,
     };
 
-    // Build cancellation update message
-    let cancellationMessage = "Booking cancelled";
-    if (finalRefundAmount > 0 && refundResult.success) {
-      cancellationMessage = `Booking cancelled. A refund of ${formatRefundAmount(finalRefundAmount)} (${finalRefundPercentage}%) has been processed.`;
-    } else if (finalRefundAmount > 0 && !refundResult.success) {
-      cancellationMessage = `Booking cancelled. Refund processing failed - our team will process this manually.`;
-    } else {
-      cancellationMessage =
-        "Booking cancelled. No refund applicable based on cancellation policy.";
-    }
+    const cancellationMessage =
+      booking.paymentStatus === "paid"
+        ? "Booking cancelled by drivlet. Any refund will be processed separately by our team."
+        : "Booking cancelled by drivlet.";
 
     await Booking.findByIdAndUpdate(bookingId, {
       $set: {
         status: "cancelled",
         currentStage: "cancelled",
         cancellation: cancellationDetails,
-        paymentStatus:
-          refundStatus === "succeeded"
-            ? "refunded"
-            : booking.paymentStatus,
         updatedAt: new Date(),
       },
       $push: {
@@ -210,7 +107,7 @@ export async function POST(
           stage: "cancelled",
           timestamp: new Date(),
           message: cancellationMessage,
-          updatedBy: isAdmin ? "admin" : "customer",
+          updatedBy: "admin",
         },
       },
     });
@@ -236,18 +133,6 @@ export async function POST(
         _id: booking._id,
         vehicleRegistration: booking.vehicleRegistration,
         status: "cancelled",
-      },
-      refund: {
-        amount: finalRefundAmount,
-        amountFormatted: formatRefundAmount(finalRefundAmount),
-        percentage: finalRefundPercentage,
-        refundId: refundResult.refundId,
-        status: refundStatus,
-        estimatedArrival: refundResult.estimatedArrival,
-      },
-      policy: {
-        reason: refundCalc.reason,
-        hoursUntilPickup: refundCalc.hoursUntilPickup,
       },
     };
 

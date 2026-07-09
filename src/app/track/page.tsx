@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import RegistrationPlate, { StateCode } from "@/components/homepage/RegistrationPlate";
+import { SUPPORT_PHONE, SUPPORT_PHONE_HREF } from "@/lib/policy";
 import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 import PickupConsentForm from "@/components/forms/PickupConsentForm";
 import ReturnConfirmationForm from "@/components/forms/ReturnConfirmationForm";
@@ -95,6 +96,9 @@ interface Booking {
   servicePaymentStatus?: 'pending' | 'paid';
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
+  // Incident visibility
+  hasActiveIncident?: boolean;
+  incidentExceptionState?: 'none' | 'continue' | 'hold' | 'stop';
   // Driver info
   driver?: DriverInfo | null;
   // Signed forms
@@ -1201,6 +1205,27 @@ function TrackingContent() {
                         <p className="font-semibold text-emerald-800">Service Payment Complete</p>
                         <p className="text-sm text-emerald-600">
                           ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)} paid
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Incident Notice */}
+                  {(booking.hasActiveIncident ||
+                    booking.incidentExceptionState === 'hold' ||
+                    booking.incidentExceptionState === 'stop') && (
+                    <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                      <div className="shrink-0 h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                        <AlertCircle className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-amber-800">An incident has been logged on this booking</p>
+                        <p className="text-sm text-amber-700 mt-0.5">
+                          Our team is reviewing it and will contact you. If you have any questions, call{" "}
+                          <a href={SUPPORT_PHONE_HREF} className="font-medium underline underline-offset-2 hover:text-amber-900">
+                            {SUPPORT_PHONE}
+                          </a>
+                          .
                         </p>
                       </div>
                     </div>

@@ -765,14 +765,20 @@ export async function POST(request: NextRequest) {
         await booking.save();
         notifyBookingUpdate(booking);
 
-        // Send email notification (async)
+        // Send email notification (async). Link to the tracking page (embedded
+        // payment, never expires) instead of the checkout URL where possible —
+        // Stripe expires checkout sessions after 24 hours.
+        const durablePayUrl = booking.trackingCode
+          ? `${appUrl}/track?code=${booking.trackingCode}`
+          : checkoutSession.url!;
         sendServicePaymentEmail(
           booking.userEmail,
           booking.userName,
           booking.vehicleRegistration,
           serviceAmount,
           checkoutSession.url!,
-          booking.garageName
+          booking.garageName,
+          booking.trackingCode
         ).then(sent => {
           if (sent) console.log('Payment email sent to:', booking.userEmail);
         });
@@ -785,7 +791,7 @@ export async function POST(request: NextRequest) {
             booking.userName,
             booking.vehicleRegistration,
             serviceAmount,
-            checkoutSession.url!
+            durablePayUrl
           ).then(sent => {
             if (sent) console.log('Payment SMS sent to:', phoneNumber);
           });

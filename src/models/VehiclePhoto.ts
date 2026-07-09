@@ -49,6 +49,7 @@ export interface IVehiclePhoto extends Document {
   capturedLocation?: string;
   superseded?: boolean;
   supersededAt?: Date;
+  consentAcknowledged?: boolean; // Driver confirmed customer consent (pre_pickup)
   fileSize: number; // in bytes
   mimeType: string;
   createdAt: Date;
@@ -119,6 +120,10 @@ const VehiclePhotoSchema = new Schema<IVehiclePhoto>(
     },
     supersededAt: {
       type: Date,
+    },
+    consentAcknowledged: {
+      type: Boolean,
+      default: false,
     },
     fileSize: {
       type: Number,

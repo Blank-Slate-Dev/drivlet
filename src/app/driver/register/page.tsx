@@ -18,7 +18,6 @@ import {
   Eye,
   EyeOff,
   FileText,
-  CreditCard,
   AlertCircle,
   Loader2,
   IdCard,
@@ -31,14 +30,13 @@ import {
   X,
 } from "lucide-react";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const steps = [
   { number: 1 as Step, label: "Personal" },
   { number: 2 as Step, label: "Licence" },
   { number: 3 as Step, label: "Documents" },
-  { number: 4 as Step, label: "Banking" },
-  { number: 5 as Step, label: "Review" },
+  { number: 4 as Step, label: "Review" },
 ];
 
 const AU_STATES = ["NSW", "QLD", "VIC", "SA", "WA", "TAS", "NT", "ACT"];
@@ -135,7 +133,6 @@ export default function DriverRegisterPage() {
     policeCheckCertificateNumber: "", policeCheckIssueDate: "",
     rightToWorkStatus: "", visaSubclass: "",
     emergencyContactName: "", emergencyContactRelationship: "", emergencyContactPhone: "",
-    bsb: "", accountNumber: "", accountName: "",
   });
   const [canDriveManual, setCanDriveManual] = useState(false);
 
@@ -223,11 +220,6 @@ export default function DriverRegisterPage() {
         if (!formData.emergencyContactRelationship.trim()) { setError("Please enter your emergency contact relationship"); return false; }
         if (!formData.emergencyContactPhone.trim()) { setError("Please enter your emergency contact phone"); return false; }
         return true;
-      case 4:
-        if (!formData.bsb.trim() || formData.bsb.length !== 6) { setError("Please enter a valid 6-digit BSB"); return false; }
-        if (!formData.accountNumber.trim()) { setError("Please enter your account number"); return false; }
-        if (!formData.accountName.trim()) { setError("Please enter the account holder name"); return false; }
-        return true;
       default: return true;
     }
   };
@@ -243,12 +235,12 @@ export default function DriverRegisterPage() {
     scrollToTop();
   };
 
-  const nextStep = () => { if (validateStep(currentStep)) { setCurrentStep((prev) => Math.min(prev + 1, 5) as Step); scrollToTop(); } };
+  const nextStep = () => { if (validateStep(currentStep)) { setCurrentStep((prev) => Math.min(prev + 1, 4) as Step); scrollToTop(); } };
   const prevStep = () => { setError(""); setCurrentStep((prev) => Math.max(prev - 1, 1) as Step); scrollToTop(); };
 
   const handleSubmit = async () => {
     // Re-run all step validations before submitting
-    for (let s = 1 as Step; s <= 4; s = (s + 1) as Step) {
+    for (let s = 1 as Step; s <= 3; s = (s + 1) as Step) {
       if (!validateStep(s)) { setCurrentStep(s); scrollToTop(); return; }
     }
     if (!licenceFront || !licenceBack || !policeDoc) {
@@ -293,7 +285,6 @@ export default function DriverRegisterPage() {
       case 1: return !!(formData.firstName && formData.lastName && formData.email && formData.phone && formData.password && formData.confirmPassword && formData.dateOfBirth && formData.addressStreet && formData.addressSuburb && formData.addressPostcode);
       case 2: return !!(formData.licenseNumber && formData.licenseExpiry && licenceFront && licenceBack);
       case 3: return !!(formData.policeCheckCertificateNumber && formData.policeCheckIssueDate && policeDoc && formData.rightToWorkStatus && formData.emergencyContactName && formData.emergencyContactRelationship && formData.emergencyContactPhone);
-      case 4: return !!(formData.bsb && formData.accountNumber && formData.accountName);
       default: return false;
     }
   };
@@ -673,39 +664,8 @@ export default function DriverRegisterPage() {
                   </motion.div>
                 )}
 
-                {/* Step 4: Banking Details */}
+                {/* Step 4: Review */}
                 {currentStep === 4 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
-                        <CreditCard className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-slate-900">Banking Details</h2>
-                        <p className="text-sm text-slate-500">For receiving your payments</p>
-                      </div>
-                    </div>
-                    <div className="space-y-5">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">BSB *</label>
-                          <input type="text" value={formData.bsb} onChange={(e) => updateField("bsb", e.target.value.replace(/\D/g, "").slice(0, 6))} className={inputCls} placeholder="000000" maxLength={6} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">Account number *</label>
-                          <input type="text" value={formData.accountNumber} onChange={(e) => updateField("accountNumber", e.target.value.replace(/\D/g, ""))} className={inputCls} placeholder="Account number" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Account holder name *</label>
-                        <input type="text" value={formData.accountName} onChange={(e) => updateField("accountName", e.target.value)} className={inputCls} placeholder="Name on account" />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 5: Review */}
-                {currentStep === 5 && (
                   <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                     <div className="flex items-center gap-3 mb-6">
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
@@ -738,11 +698,9 @@ export default function DriverRegisterPage() {
                         {formData.rightToWorkStatus === "visa_with_work_rights" && <ReviewRow label="Visa subclass" value={formData.visaSubclass} />}
                         <ReviewRow label="Emergency" value={`${formData.emergencyContactName} (${formData.emergencyContactRelationship}) · ${formData.emergencyContactPhone}`} />
                       </ReviewBlock>
-                      <ReviewBlock title="Banking">
-                        <ReviewRow label="BSB" value={formData.bsb} />
-                        <ReviewRow label="Account" value={`••••${formData.accountNumber.slice(-4)}`} />
-                        <ReviewRow label="Name" value={formData.accountName} />
-                      </ReviewBlock>
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <p className="text-xs text-emerald-800 leading-relaxed">Payment details are collected securely after your application is approved.</p>
+                      </div>
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                         <p className="text-xs text-slate-500 leading-relaxed">By submitting, you agree to our Terms of Service and Privacy Policy. Your application will be reviewed within 1-2 business days.</p>
                       </div>
@@ -757,7 +715,7 @@ export default function DriverRegisterPage() {
                       <ArrowLeft className="h-4 w-4" /> Back
                     </button>
                   ) : <div />}
-                  {currentStep < 5 ? (
+                  {currentStep < 4 ? (
                     <button type="button" onClick={nextStep} className="group inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition">
                       Continue <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </button>

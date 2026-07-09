@@ -136,6 +136,7 @@ export default function PhotoUploadModal({
 }: PhotoUploadModalProps) {
   const [expandedCheckpoint, setExpandedCheckpoint] = useState<CheckpointType | null>(null);
   const [isOnline, setIsOnline] = useState(true);
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSlot, setSelectedSlot] = useState<{
     checkpoint: CheckpointType;
@@ -181,6 +182,24 @@ export default function PhotoUploadModal({
       fetchPhotos();
     }
   }, [isOpen, fetchPhotos]);
+
+  // Restore consent acknowledgment for this booking (persisted per session)
+  useEffect(() => {
+    if (isOpen) {
+      setConsentAcknowledged(
+        sessionStorage.getItem(`photo-consent-${bookingId}`) === "true"
+      );
+    }
+  }, [isOpen, bookingId]);
+
+  const handleConsentChange = (checked: boolean) => {
+    setConsentAcknowledged(checked);
+    if (checked) {
+      sessionStorage.setItem(`photo-consent-${bookingId}`, "true");
+    } else {
+      sessionStorage.removeItem(`photo-consent-${bookingId}`);
+    }
+  };
 
   // Auto-expand after fetch completes (loading transitions true→false)
   const prevLoadingRef = useRef(false);
@@ -256,6 +275,7 @@ export default function PhotoUploadModal({
 
   const handleCaptureClick = (checkpoint: CheckpointType, photoType: PhotoType) => {
     if (!isCheckpointUnlocked(checkpoint, photos)) return;
+    if (checkpoint === "pre_pickup" && !consentAcknowledged) return;
     setSelectedSlot({ checkpoint, photoType });
     setPreviewUrl(null);
     setNotes("");
@@ -510,6 +530,12 @@ export default function PhotoUploadModal({
                     onViewPhoto={handleViewPhoto}
                     getPhoto={getPhoto}
                     getUploadState={getUploadState}
+                    consentAcknowledged={
+                      checkpoint.type === "pre_pickup" ? consentAcknowledged : undefined
+                    }
+                    onConsentChange={
+                      checkpoint.type === "pre_pickup" ? handleConsentChange : undefined
+                    }
                   />
                 );
               })}
@@ -809,6 +835,8 @@ interface CheckpointSectionProps {
     checkpoint: CheckpointType,
     photoType: PhotoType
   ) => { status: string; progress: number; error?: string };
+  consentAcknowledged?: boolean;
+  onConsentChange?: (checked: boolean) => void;
 }
 
 function CheckpointSection({
@@ -824,7 +852,12 @@ function CheckpointSection({
   onViewPhoto,
   getPhoto,
   getUploadState,
+  consentAcknowledged,
+  onConsentChange,
 }: CheckpointSectionProps) {
+  const requiresConsent = !!onConsentChange;
+  const captureDisabled = requiresConsent && !consentAcknowledged;
+
   return (
     <div
       className={`rounded-2xl border transition-all ${
@@ -898,7 +931,41 @@ function CheckpointSection({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+            {/* Customer consent acknowledgment (pre-pickup only) */}
+            {requiresConsent && (
+              <div
+                className={`mx-4 mb-3 rounded-xl border p-3 ${
+                  consentAcknowledged
+                    ? "border-emerald-200 bg-emerald-50/50"
+                    : "border-amber-200 bg-amber-50"
+                }`}
+              >
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!consentAcknowledged}
+                    onChange={(e) => onConsentChange?.(e.target.checked)}
+                    className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-slate-300 accent-emerald-600"
+                  />
+                  <span className="text-sm text-slate-700">
+                    I confirm the customer has been informed that photos of their
+                    vehicle will be taken for condition records, and they consent.
+                  </span>
+                </label>
+                {!consentAcknowledged && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    Photo capture is disabled until consent is acknowledged
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div
+              className={`grid grid-cols-3 gap-2 px-4 pb-4 ${
+                captureDisabled ? "opacity-50" : ""
+              }`}
+            >
               {PHOTO_TYPES.map((photoType) => (
                 <PhotoSlot
                   key={photoType.type}
@@ -909,6 +976,7 @@ function CheckpointSection({
                   onCapture={() => onCapture(checkpoint.type, photoType.type)}
                   onDelete={onDelete}
                   onViewPhoto={onViewPhoto}
+                  captureDisabled={captureDisabled}
                 />
               ))}
             </div>
@@ -929,6 +997,7 @@ interface PhotoSlotProps {
   onCapture: () => void;
   onDelete: (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => void;
   onViewPhoto: (photo: PhotoData) => void;
+  captureDisabled?: boolean;
 }
 
 function PhotoSlot({
@@ -939,6 +1008,7 @@ function PhotoSlot({
   onCapture,
   onDelete,
   onViewPhoto,
+  captureDisabled = false,
 }: PhotoSlotProps) {
   if (photo) {
     return (
@@ -984,7 +1054,8 @@ function PhotoSlot({
     return (
       <button
         onClick={onCapture}
-        className="relative aspect-square rounded-xl bg-red-50 border-2 border-dashed border-red-200 flex flex-col items-center justify-center hover:bg-red-100 transition"
+        disabled={captureDisabled}
+        className="relative aspect-square rounded-xl bg-red-50 border-2 border-dashed border-red-200 flex flex-col items-center justify-center hover:bg-red-100 transition disabled:cursor-not-allowed disabled:hover:bg-red-50"
       >
         <AlertCircle className="h-5 w-5 text-red-400" />
         <p className="text-[10px] font-medium text-red-600 mt-1">Retry</p>
@@ -1006,7 +1077,8 @@ function PhotoSlot({
   return (
     <button
       onClick={onCapture}
-      className="relative aspect-square rounded-xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center hover:bg-slate-50 hover:border-emerald-300 transition active:scale-95"
+      disabled={captureDisabled}
+      className="relative aspect-square rounded-xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center hover:bg-slate-50 hover:border-emerald-300 transition active:scale-95 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:border-slate-200 disabled:active:scale-100"
     >
       <Camera className="h-6 w-6 text-slate-400" />
       <p className="text-[10px] font-medium text-slate-600 mt-1">{photoType.label}</p>

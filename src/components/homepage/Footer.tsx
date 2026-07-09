@@ -16,7 +16,7 @@ export default function Footer() {
   return (
     <footer className="bg-emerald-900 text-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand column */}
           <div className="lg:col-span-1">
             <div className="relative mb-4 h-10 w-32">
@@ -84,7 +84,7 @@ export default function Footer() {
 
           {/* Service Areas — critical for SEO internal linking */}
           <div>
-            <h4 className="mb-4 font-semibold">Newcastle</h4>
+            <h4 className="mb-4 font-semibold">Areas we serve</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
               <li>
                 <Link href="/newcastle" className="transition hover:text-white">
@@ -92,64 +92,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/newcastle/charlestown" className="transition hover:text-white">
-                  Charlestown
-                </Link>
-              </li>
-              <li>
-                <Link href="/newcastle/merewether" className="transition hover:text-white">
-                  Merewether
-                </Link>
-              </li>
-              <li>
-                <Link href="/newcastle/lambton" className="transition hover:text-white">
-                  Lambton
-                </Link>
-              </li>
-              <li>
-                <Link href="/newcastle/jesmond" className="transition hover:text-white">
-                  Jesmond
-                </Link>
-              </li>
-              <li>
-                <Link href="/newcastle/wallsend" className="transition hover:text-white">
-                  Wallsend
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="mb-4 font-semibold">Canberra</h4>
-            <ul className="space-y-2 text-sm text-emerald-200">
-              <li>
                 <Link href="/canberra" className="transition hover:text-white">
                   Canberra
                 </Link>
               </li>
               <li>
-                <Link href="/canberra/belconnen" className="transition hover:text-white">
-                  Belconnen
-                </Link>
-              </li>
-              <li>
-                <Link href="/canberra/woden" className="transition hover:text-white">
-                  Woden
-                </Link>
-              </li>
-              <li>
-                <Link href="/canberra/gungahlin" className="transition hover:text-white">
-                  Gungahlin
-                </Link>
-              </li>
-              <li>
-                <Link href="/canberra/tuggeranong" className="transition hover:text-white">
-                  Tuggeranong
-                </Link>
-              </li>
-              <li>
-                <Link href="/canberra/braddon" className="transition hover:text-white">
-                  Braddon
+                <Link href="/areas-we-serve" className="transition hover:text-white">
+                  All areas we serve
                 </Link>
               </li>
             </ul>

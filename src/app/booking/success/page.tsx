@@ -5,7 +5,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, Car, Clock, MapPin, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, Car, Clock, MapPin, ArrowRight, Loader2, Mail } from "lucide-react";
 
 interface BookingDetails {
   customerName: string;
@@ -94,8 +94,24 @@ function SuccessContent() {
             Booking Confirmed!
           </h1>
           <p className="mt-2 text-center text-slate-600">
-            Thank you for choosing drivlet. We&apos;ve received your booking and payment.
+            Payment received — your booking is confirmed. Thank you for choosing drivlet.
           </p>
+
+          {/* Tracking code notice */}
+          <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+            <div className="flex items-start gap-3">
+              <Mail className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="font-semibold text-emerald-900">
+                  Check your email for your tracking code
+                </p>
+                <p className="mt-1 text-sm text-emerald-700">
+                  We&apos;ve sent you a confirmation email with your tracking code.
+                  Use it any time on the tracking page to follow your car&apos;s progress.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Booking Details */}
           {booking && (
@@ -166,16 +182,16 @@ function SuccessContent() {
             <h3 className="font-semibold text-slate-900">What happens next?</h3>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
               <li className="flex items-start gap-2">
-                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                You&apos;ll receive a confirmation email with booking details
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                A confirmation email with your tracking code is on its way
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                Track your car&apos;s progress any time on the tracking page
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
                 Our driver will arrive at your pickup location during your selected time window
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                We&apos;ll keep you updated on your car&apos;s status throughout the service
               </li>
             </ul>
           </div>
@@ -183,17 +199,17 @@ function SuccessContent() {
           {/* CTA */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/"
-              className="flex-1 rounded-full bg-emerald-600 px-6 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
-            >
-              Back to Home
-            </Link>
-            <Link
               href="/track"
-              className="group flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="group flex flex-1 items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"
             >
               Track Your Booking
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link
+              href="/"
+              className="flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Back to Home
             </Link>
           </div>
         </div>

@@ -65,8 +65,8 @@ export async function sendServicePaymentSMS(
   paymentUrl: string
 ): Promise<boolean> {
   const amountFormatted = (amount / 100).toFixed(2);
-  
-  const message = `Hi ${customerName}! Your car (${vehicleRego}) service is done. Pay $${amountFormatted} to get it back: ${paymentUrl} - drivlet`;
+
+  const message = `Hi ${customerName}, the service on your car (${vehicleRego}) is complete. Pay the $${amountFormatted} service amount securely and our driver will return it to you: ${paymentUrl} - drivlet`;
 
   return sendSMS(phoneNumber, message);
 }
