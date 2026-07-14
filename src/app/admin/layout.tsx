@@ -24,6 +24,7 @@ import {
   Shield,
   CalendarDays,
   Bell,
+  Radio,
   // FileText, // Requests nav item merged into Bookings (2026-07-07)
 } from "lucide-react";
 
@@ -240,6 +241,7 @@ export default function AdminLayout({
     // Requests merged into the unified Bookings pipeline (2026-07-07):
     // { href: "/admin/booking-requests", label: "Requests", icon: FileText },
     { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
+    { href: "/admin/tracking", label: "Live Tracking", icon: Radio },
     { href: "/admin/dispatch", label: "Dispatch", icon: Truck },
     { href: "/admin/incidents", label: "Incidents", icon: Shield },
     { href: "/admin/users", label: "Users", icon: Users },
