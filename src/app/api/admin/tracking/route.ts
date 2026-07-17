@@ -300,7 +300,14 @@ export async function GET() {
         incidents: incidentsByBooking.get(id) || [],
         hasActiveIncident: !!b.hasActiveIncident || (incidentsByBooking.get(id)?.length ?? 0) > 0,
         incidentExceptionState: b.incidentExceptionState || "none",
-        servicePaymentStatus: b.servicePaymentStatus || null,
+        // "pending" only counts when a link actually exists — customers often
+        // pay the service centre by phone, in which case nothing should show.
+        servicePaymentStatus:
+          b.servicePaymentStatus === "paid"
+            ? "paid"
+            : b.servicePaymentStatus === "pending" && b.servicePaymentUrl
+              ? "pending"
+              : null,
         servicePaymentAmount: b.servicePaymentAmount ?? null,
         createdAt: new Date(b.createdAt).toISOString(),
         updatedAt: new Date(b.updatedAt).toISOString(),

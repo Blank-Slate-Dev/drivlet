@@ -117,11 +117,13 @@ export async function GET(request: NextRequest) {
 
         // Awaiting payment: pickup complete with a payment LINK issued but not
         // yet paid. Payment is optional (backup only) — bookings with no link
-        // fall through to ready_for_return instead.
+        // fall through to ready_for_return instead. The URL check guards
+        // against dangling "pending" statuses from failed link generation.
         Booking.find({
           ...baseFilter,
           "pickupDriver.completedAt": { $exists: true },
           servicePaymentStatus: "pending",
+          servicePaymentUrl: { $exists: true, $nin: [null, ""] },
           status: { $ne: "completed" },
           $or: [
             { assignedDriverId: driverProfileId },
@@ -986,6 +988,13 @@ export async function POST(request: NextRequest) {
 
       } catch (stripeError) {
         console.error('Failed to create payment link:', stripeError);
+        // Release the atomic claim — otherwise the booking is stranded in a
+        // "pending" payment status with no link, which would show phantom
+        // "awaiting payment" states across the app.
+        await Booking.updateOne(
+          { _id: bookingId, servicePaymentStatus: "pending", servicePaymentUrl: { $in: [null, ""] } },
+          { $unset: { servicePaymentStatus: "" } }
+        ).catch((err) => console.error("Failed to release payment claim:", err));
         return NextResponse.json(
           { error: "Failed to create payment link" },
           { status: 500 }
