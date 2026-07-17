@@ -24,12 +24,24 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+interface InlinedAttachment {
+  contentType: string;
+  filename: string;
+  base64Content: string;
+  /** Referenced in HTML as <img src="cid:{contentId}"> */
+  contentId: string;
+}
+
 interface SendEmailOptions {
   to: string;
   toName?: string;
   subject: string;
   textContent: string;
   htmlContent: string;
+  /** Inline images (e.g. signatures) — rendered via cid: references.
+   *  Data-URI <img>s are stripped by most email clients, so inline
+   *  attachments are the only reliable way to embed images. */
+  inlinedAttachments?: InlinedAttachment[];
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
@@ -58,6 +70,16 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
           Subject: options.subject,
           TextPart: options.textContent,
           HTMLPart: options.htmlContent,
+          ...(options.inlinedAttachments?.length
+            ? {
+                InlinedAttachments: options.inlinedAttachments.map((a) => ({
+                  ContentType: a.contentType,
+                  Filename: a.filename,
+                  Base64Content: a.base64Content,
+                  ContentID: a.contentId,
+                })),
+              }
+            : {}),
         },
       ],
     });
@@ -670,6 +692,26 @@ export interface SignedFormEmailData {
   submittedAt: Date;
   /** [label, value] pairs summarising the recorded form fields. */
   fields: Array<[string, string]>;
+  /** Base64 PNG data URIs — embedded in the email as inline images. */
+  signatures?: { customer?: string; driver?: string };
+  /** Driver's name as recorded on the form (labels the driver signature). */
+  driverName?: string;
+}
+
+/** Parse a "data:image/png;base64,..." URI into an inline attachment. */
+function signatureAttachment(
+  dataUri: string | undefined,
+  contentId: string
+): InlinedAttachment | null {
+  if (!dataUri) return null;
+  const match = dataUri.match(/^data:(image\/[\w+.-]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    contentType: match[1],
+    filename: `${contentId}.png`,
+    base64Content: match[2],
+    contentId,
+  };
 }
 
 const FORM_EMAIL_META: Record<
@@ -721,6 +763,54 @@ export async function sendSignedFormEmail(
     .map(([label, value]) => `  ${label}: ${value}`)
     .join("\n");
 
+  // Inline signature images (customer + driver) via cid: references.
+  const customerSig = signatureAttachment(
+    data.signatures?.customer,
+    "signature-customer"
+  );
+  const driverSig = signatureAttachment(
+    data.signatures?.driver,
+    "signature-driver"
+  );
+  const inlinedAttachments = [customerSig, driverSig].filter(
+    (a): a is InlinedAttachment => a !== null
+  );
+
+  const signatureBlock = (
+    cid: string,
+    label: string,
+    name: string
+  ) => `
+              <td style="width: 50%; padding: 8px; vertical-align: top;">
+                <p style="margin: 0 0 6px; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(label)}</p>
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
+                  <img src="cid:${cid}" alt="${escapeHtml(label)}" style="display: block; max-width: 100%; max-height: 90px;" />
+                </div>
+                <p style="margin: 6px 0 0; color: #1e293b; font-size: 13px; font-weight: 600;">${escapeHtml(name)}</p>
+              </td>`;
+
+  const signaturesHtml = inlinedAttachments.length
+    ? `
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; margin: 0 0 24px;">
+                <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Signatures</p>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%;">
+                  <tr>
+                    ${customerSig ? signatureBlock("signature-customer", "Customer", data.customerName) : ""}
+                    ${driverSig ? signatureBlock("signature-driver", "Drivlet driver", data.driverName || "Drivlet driver") : ""}
+                  </tr>
+                </table>
+              </div>`
+    : "";
+
+  const signaturesText = inlinedAttachments.length
+    ? `\nSignatures: ${[
+        customerSig ? `${data.customerName} (customer)` : null,
+        driverSig ? `${data.driverName || "Drivlet driver"} (driver)` : null,
+      ]
+        .filter(Boolean)
+        .join(", ")} — signature images are included in the HTML version of this email.\n`
+    : "";
+
   const textContent = `
 ${meta.title}
 
@@ -731,7 +821,7 @@ ${meta.intro}
 Signed: ${submitted}
 
 ${fieldsText}
-${trackingUrl ? `\nTrack your booking: ${trackingUrl}\n` : ""}
+${signaturesText}${trackingUrl ? `\nTrack your booking: ${trackingUrl}\n` : ""}
 This form was signed digitally and is stored securely with your booking, as set out in our Privacy Policy. Nothing in this form limits your rights under Australian Consumer Law.
 
 ---
@@ -761,6 +851,7 @@ drivlet - Car service made simple
                 <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Recorded details</p>
                 <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%;">${fieldRowsHtml}</table>
               </div>
+              ${signaturesHtml}
               ${trackingUrl ? `
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 24px;">
                 <tr>
@@ -799,5 +890,6 @@ drivlet - Car service made simple
     subject,
     textContent,
     htmlContent,
+    inlinedAttachments,
   });
 }

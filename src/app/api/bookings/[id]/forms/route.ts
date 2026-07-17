@@ -225,6 +225,12 @@ export async function POST(
           trackingCode: booking.trackingCode,
           submittedAt: signedForm.submittedAt,
           fields: fields.filter(([, v]) => typeof v === "string") as Array<[string, string]>,
+          // Include both signatures as inline images in the customer's copy
+          signatures: {
+            customer: signatures?.customer,
+            driver: signatures?.driver,
+          },
+          driverName: typeof fd.driverName === "string" ? fd.driverName : undefined,
         }).then((sent) => {
           if (sent) console.log("Signed form copy emailed to:", booking.userEmail);
         });
