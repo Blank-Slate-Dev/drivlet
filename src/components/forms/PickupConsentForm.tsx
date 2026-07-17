@@ -188,7 +188,7 @@ export default function PickupConsentForm({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="relative w-full max-w-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="rounded-2xl border border-slate-200 bg-white shadow-xl">
           {/* Header */}
@@ -216,7 +216,7 @@ export default function PickupConsentForm({
           </div>
 
           {/* Content */}
-          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+          <div className="max-h-[70dvh] overflow-y-auto px-6 py-5">
             {/* Success */}
             {success && (
               <div className="py-8 text-center">

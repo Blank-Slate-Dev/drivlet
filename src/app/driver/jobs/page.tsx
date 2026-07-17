@@ -336,8 +336,8 @@ export default function DriverJobsPage() {
   const generatePaymentLink = async () => {
     if (!selectedJob) return;
     const amountDollars = parseFloat(serviceAmount);
-    if (isNaN(amountDollars) || amountDollars <= 0) {
-      setPaymentError("Please enter a valid amount");
+    if (isNaN(amountDollars) || amountDollars < 1) {
+      setPaymentError("Please enter a valid amount (minimum $1)");
       return;
     }
     setGeneratingPayment(true);
@@ -576,7 +576,7 @@ export default function DriverJobsPage() {
 
       {/* ═══ PAYMENT MODAL ═══ */}
       {showPaymentModal && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
               <div className="flex items-center gap-3">

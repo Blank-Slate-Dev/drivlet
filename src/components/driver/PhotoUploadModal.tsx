@@ -455,12 +455,14 @@ export default function PhotoUploadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+    // z-[60] renders above the driver bottom tab bar (z-50); dvh (not vh)
+    // excludes iOS Safari's browser chrome so the footer stays tappable.
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50">
       <motion.div
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
-        className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col"
+        className="w-full max-w-lg max-h-[92dvh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col"
       >
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-4">
@@ -543,11 +545,12 @@ export default function PhotoUploadModal({
           )}
         </div>
 
-        {/* Save & Close Footer */}
-        <div className="sticky bottom-0 z-10 bg-white border-t border-slate-200 px-4 py-4">
+        {/* Save & Close Footer — safe-area padding keeps the button clear of
+            the iOS home indicator when the sheet is flush with the bottom. */}
+        <div className="sticky bottom-0 z-10 bg-white border-t border-slate-200 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <button
             onClick={onClose}
-            className="w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 active:scale-[0.98] transition flex items-center justify-center gap-2"
+            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-500 active:scale-[0.98]"
           >
             <Check className="h-5 w-5" />
             Save & Close
@@ -570,7 +573,7 @@ export default function PhotoUploadModal({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/95 flex flex-col overflow-hidden"
+              className="fixed inset-0 z-[70] bg-black/95 flex flex-col overflow-hidden"
             >
               {/* Header */}
               <div className="flex-shrink-0 flex items-center justify-between p-4 text-white">
@@ -598,7 +601,7 @@ export default function PhotoUploadModal({
               </div>
 
               {/* Footer: capture details + actions */}
-              <div className="flex-shrink-0 p-4 space-y-3 overflow-y-auto max-h-[45vh]">
+              <div className="flex-shrink-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-3 overflow-y-auto max-h-[45dvh]">
                 <input
                   type="text"
                   value={notes}
@@ -676,7 +679,7 @@ export default function PhotoUploadModal({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black flex flex-col"
+              className="fixed inset-0 z-[70] bg-black flex flex-col"
             >
               {/* Header */}
               <div className="flex-shrink-0 flex items-center justify-between p-4 text-white">
@@ -706,7 +709,7 @@ export default function PhotoUploadModal({
               </div>
 
               {/* Metadata & Actions */}
-              <div className="flex-shrink-0 p-4 space-y-3 overflow-y-auto max-h-[45vh]">
+              <div className="flex-shrink-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-3 overflow-y-auto max-h-[45dvh]">
                 {isEditingDetails ? (
                   /* --- Edit Mode --- */
                   <div className="space-y-3">

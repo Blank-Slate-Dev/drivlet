@@ -715,13 +715,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate amount range ($150 - $800)
-      const MIN_SERVICE_AMOUNT = 15000;
+      // Validate amount range ($1 - $800)
+      const MIN_SERVICE_AMOUNT = 100;
       const MAX_SERVICE_AMOUNT = 80000;
 
       if (serviceAmount < MIN_SERVICE_AMOUNT) {
         return NextResponse.json(
-          { error: "Please double check the price - it seems too low. Minimum is $150." },
+          { error: "Please double check the price - it seems too low. Minimum is $1." },
           { status: 400 }
         );
       }
