@@ -28,6 +28,7 @@ import {
   Circle,
   Package,
   Truck,
+  ClipboardCheck,
 } from "lucide-react";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 import {
@@ -36,6 +37,15 @@ import {
   type GatedCheckpoint,
   type MinimalPhoto,
 } from "@/lib/photoRequirements";
+import {
+  hasSignedForm,
+  FORM_LABELS,
+  type GatedFormType,
+} from "@/lib/formRequirements";
+import {
+  PickupConsentForm,
+  ReturnConfirmationForm,
+} from "@/components/forms";
 import IncidentReportButton from "@/components/driver/IncidentReportButton";
 import IncidentReportForm, {
   IncidentSubmittedModal,
@@ -57,6 +67,9 @@ interface Job {
   customerPhone?: string;
   vehicleRegistration: string;
   vehicleState: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  transmissionType?: string;
   serviceType: string;
   pickupAddress: string;
   garageName?: string;
@@ -83,6 +96,8 @@ interface Job {
   returnWaitingReason?: string | null;
   hasActiveIncident?: boolean;
   incidentExceptionState?: string | null;
+  /** Handover forms already signed for this booking (gates custody advances). */
+  signedFormTypes?: string[];
 }
 
 interface MyJobs {
@@ -170,7 +185,10 @@ type JobAction =
 // ─── Main Page Component ──────────────────────────────────────
 
 export default function DriverJobsPage() {
-  useSession();
+  const { data: session } = useSession();
+  // Session has no display name — prefill with username; the driver can
+  // correct it in the form's editable "Driver Name" field.
+  const driverName = session?.user?.username || "";
 
   const [myJobs, setMyJobs] = useState<MyJobs>({
     accepted: [],
@@ -194,6 +212,10 @@ export default function DriverJobsPage() {
   // Photo upload modal state
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoJob, setPhotoJob] = useState<Job | null>(null);
+
+  // Consent form modal state (pickup consent / return confirmation)
+  const [consentFormJob, setConsentFormJob] = useState<Job | null>(null);
+  const [consentFormType, setConsentFormType] = useState<GatedFormType | null>(null);
 
   // Per-booking active photos, used to gate custody-checkpoint transitions in the UI.
   // Loaded lazily (only for cards at a gated step) to stay light on 4G.
@@ -360,6 +382,24 @@ export default function DriverJobsPage() {
     setGeneratedLink("");
   };
 
+  // ─── Consent Form Modal ───────────────────────────────────
+
+  const openConsentForm = useCallback((job: Job, formType: GatedFormType) => {
+    setConsentFormJob(job);
+    setConsentFormType(formType);
+  }, []);
+
+  const closeConsentForm = () => {
+    setConsentFormJob(null);
+    setConsentFormType(null);
+  };
+
+  const onConsentFormSuccess = () => {
+    closeConsentForm();
+    // Refresh so signedFormTypes updates and the advance button unlocks.
+    fetchJobs();
+  };
+
   // ─── Photo Modal ──────────────────────────────────────────
 
   const openPhotoModal = (job: Job) => {
@@ -451,6 +491,7 @@ export default function DriverJobsPage() {
                       onOpenPhotos={openPhotoModal}
                       photos={photosByBooking[job._id]}
                       onEnsurePhotos={loadPhotos}
+                      onOpenForm={openConsentForm}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -472,6 +513,7 @@ export default function DriverJobsPage() {
                       onOpenPhotos={openPhotoModal}
                       photos={photosByBooking[job._id]}
                       onEnsurePhotos={loadPhotos}
+                      onOpenForm={openConsentForm}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -493,6 +535,7 @@ export default function DriverJobsPage() {
                       onOpenPhotos={openPhotoModal}
                       photos={photosByBooking[job._id]}
                       onEnsurePhotos={loadPhotos}
+                      onOpenForm={openConsentForm}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -514,6 +557,7 @@ export default function DriverJobsPage() {
                       onOpenPhotos={openPhotoModal}
                       photos={photosByBooking[job._id]}
                       onEnsurePhotos={loadPhotos}
+                      onOpenForm={openConsentForm}
                       onCallCustomer={handleCallCustomer}
                       callingCustomer={callingCustomer}
                       callSuccess={callSuccess}
@@ -681,6 +725,54 @@ export default function DriverJobsPage() {
         />
       )}
 
+      {/* ═══ PICKUP CONSENT FORM ═══ */}
+      {consentFormJob && consentFormType === "pickup_consent" && (
+        <PickupConsentForm
+          booking={{
+            _id: consentFormJob._id,
+            userName: consentFormJob.customerName,
+            userEmail: consentFormJob.customerEmail,
+            vehicleRegistration: consentFormJob.vehicleRegistration,
+            vehicleState: consentFormJob.vehicleState,
+            vehicleModel: consentFormJob.vehicleModel,
+            vehicleYear: consentFormJob.vehicleYear,
+            pickupAddress: consentFormJob.pickupAddress,
+            garageName: consentFormJob.garageName,
+            garageAddress: consentFormJob.garageAddress,
+            transmissionType:
+              consentFormJob.transmissionType ||
+              (consentFormJob.isManualTransmission ? "manual" : "automatic"),
+          }}
+          isOpen={true}
+          onClose={closeConsentForm}
+          onSuccess={onConsentFormSuccess}
+          driverName={driverName}
+        />
+      )}
+
+      {/* ═══ RETURN CONFIRMATION FORM ═══ */}
+      {consentFormJob && consentFormType === "return_confirmation" && (
+        <ReturnConfirmationForm
+          booking={{
+            _id: consentFormJob._id,
+            userName: consentFormJob.customerName,
+            userEmail: consentFormJob.customerEmail,
+            vehicleRegistration: consentFormJob.vehicleRegistration,
+            vehicleState: consentFormJob.vehicleState,
+            vehicleModel: consentFormJob.vehicleModel,
+            vehicleYear: consentFormJob.vehicleYear,
+            pickupAddress: consentFormJob.pickupAddress,
+            garageName: consentFormJob.garageName,
+            garageAddress: consentFormJob.garageAddress,
+          }}
+          isOpen={true}
+          onClose={closeConsentForm}
+          onSuccess={onConsentFormSuccess}
+          driverName={driverName}
+          allowRefusal={true}
+        />
+      )}
+
       {/* ═══ INCIDENT REPORT FORM ═══ */}
       {showIncidentForm && incidentBookingId && (
         <IncidentReportForm
@@ -712,10 +804,11 @@ export default function DriverJobsPage() {
 // ─── MyJobCard Component ───────────────────────────────────────
 // Shows a paired card with both pickup and return legs visible
 
-// ─── Compulsory-photo gated advance button ─────────────────────
-// Disables the custody status-advance until the checkpoint's required photos exist,
-// and shows an inline checklist of what's still missing. Same rules as the API
-// (src/lib/photoRequirements.ts) so UI and server can never disagree.
+// ─── Compulsory-photo (and consent-form) gated advance button ──
+// Disables the custody status-advance until the checkpoint's required photos exist
+// — and, where required, the signed handover form — with an inline checklist of
+// what's still missing. Same rules as the API (src/lib/photoRequirements.ts +
+// src/lib/formRequirements.ts) so UI and server can never disagree.
 function GatedAdvanceButton({
   job,
   action,
@@ -727,6 +820,8 @@ function GatedAdvanceButton({
   onAction,
   onOpenPhotos,
   onEnsurePhotos,
+  requiredForm,
+  onOpenForm,
 }: {
   job: Job;
   action: JobAction;
@@ -738,6 +833,9 @@ function GatedAdvanceButton({
   onAction: (jobId: string, action: JobAction) => void;
   onOpenPhotos: (job: Job) => void;
   onEnsurePhotos: (bookingId: string) => void;
+  /** When set, a signed form of this type must exist before advancing. */
+  requiredForm?: GatedFormType;
+  onOpenForm?: (job: Job, formType: GatedFormType) => void;
 }) {
   const photosLoaded = photos !== undefined;
 
@@ -748,6 +846,8 @@ function GatedAdvanceButton({
 
   const v = validateCheckpointPhotos(photos ?? [], checkpoint);
   const pct = v.required > 0 ? Math.min(100, Math.round((v.present / v.required) * 100)) : 0;
+  const formDone =
+    !requiredForm || hasSignedForm(job.signedFormTypes, requiredForm);
 
   // REPLACED — old amber photo-requirements box, now a flat sub-section with a
   // slim progress bar and a strict one-primary action hierarchy. cleanup 2026-07-08
@@ -800,7 +900,23 @@ function GatedAdvanceButton({
         </div>
       )}
 
-      {/* Action hierarchy — exactly one primary at a time */}
+      {/* Consent form requirement row (same checklist style as photo slots) */}
+      {requiredForm && (
+        <div className="flex items-center gap-2 text-sm">
+          {formDone ? (
+            <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+          ) : (
+            <Circle className="h-4 w-4 flex-shrink-0 text-slate-300" />
+          )}
+          <span className={formDone ? "text-slate-700" : "text-slate-500"}>
+            {FORM_LABELS[requiredForm]}
+            {formDone && <span className="text-emerald-600"> — signed</span>}
+          </span>
+        </div>
+      )}
+
+      {/* Action hierarchy — exactly one primary at a time:
+          photos → consent form → advance */}
       {!v.valid ? (
         <div className="space-y-2">
           {/* Primary while photos incomplete */}
@@ -822,13 +938,48 @@ function GatedAdvanceButton({
               {label}
             </button>
             <p className="mt-1 text-center text-xs text-slate-400">
-              Complete required photos to continue
+              {requiredForm && !formDone
+                ? "Complete required photos and the consent form to continue"
+                : "Complete required photos to continue"}
             </p>
           </div>
         </div>
+      ) : requiredForm && !formDone && onOpenForm ? (
+        <div className="space-y-2">
+          {/* Primary while the consent form is unsigned */}
+          <button
+            onClick={() => onOpenForm(job, requiredForm)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            Sign consent form
+          </button>
+          {/* Disabled secondary — never green (green implies go) */}
+          <div>
+            <button
+              onClick={() => onAction(job._id, action)}
+              disabled
+              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-medium text-slate-400 disabled:cursor-not-allowed"
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              {label}
+            </button>
+            <p className="mt-1 text-center text-xs text-slate-400">
+              Consent form must be signed to continue
+            </p>
+          </div>
+          {/* Take photos demotes to outline secondary */}
+          <button
+            onClick={() => onOpenPhotos(job)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+          >
+            <Camera className="h-4 w-4" />
+            Take photos
+          </button>
+        </div>
       ) : (
         <div className="space-y-2">
-          {/* Primary once the gate is met */}
+          {/* Primary once every gate is met */}
           <button
             onClick={() => onAction(job._id, action)}
             disabled={isLoading}
@@ -867,6 +1018,7 @@ function MyJobCard({
   onReportIncident,
   photos,
   onEnsurePhotos,
+  onOpenForm,
 }: {
   job: Job;
   actionLoading: string | null;
@@ -883,6 +1035,7 @@ function MyJobCard({
   onReportIncident: (bookingId: string) => void;
   photos?: MinimalPhoto[];
   onEnsurePhotos: (bookingId: string) => void;
+  onOpenForm: (job: Job, formType: GatedFormType) => void;
 }) {
   const isLoading = actionLoading === job._id;
   const isCalling = callingCustomer === job._id;
@@ -1043,6 +1196,8 @@ function MyJobCard({
                   onAction={onAction}
                   onOpenPhotos={onOpenPhotos}
                   onEnsurePhotos={onEnsurePhotos}
+                  requiredForm="pickup_consent"
+                  onOpenForm={onOpenForm}
                 />
               )}
               {pickupState === "collected" && (
@@ -1175,22 +1330,60 @@ function MyJobCard({
               </button>
             </div>
           )}
-          {returnState === "delivering" && (
-            <div className="mt-4">
-              <button
-                onClick={() => onAction(job._id, "delivered")}
-                disabled={isLoading}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-                Delivered to Customer
-              </button>
-            </div>
-          )}
+          {returnState === "delivering" &&
+            (hasSignedForm(job.signedFormTypes, "return_confirmation") ? (
+              <div className="mt-4">
+                <div className="mb-2 flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+                  <span className="text-slate-700">
+                    {FORM_LABELS.return_confirmation}
+                    <span className="text-emerald-600"> — completed</span>
+                  </span>
+                </div>
+                <button
+                  onClick={() => onAction(job._id, "delivered")}
+                  disabled={isLoading}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
+                  Delivered to Customer
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Circle className="h-4 w-4 flex-shrink-0 text-slate-300" />
+                  <span className="text-slate-500">
+                    {FORM_LABELS.return_confirmation}
+                  </span>
+                </div>
+                {/* Primary while the return form is incomplete */}
+                <button
+                  onClick={() => onOpenForm(job, "return_confirmation")}
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Complete return form
+                </button>
+                {/* Disabled secondary — never green (green implies go) */}
+                <div>
+                  <button
+                    disabled
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-medium text-slate-400 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Delivered to Customer
+                  </button>
+                  <p className="mt-1 text-center text-xs text-slate-400">
+                    Return form must be completed with the customer to continue
+                  </p>
+                </div>
+              </div>
+            ))}
           {returnState === "completed" && (
             <div className="mt-3 flex items-center gap-1.5 text-emerald-600">
               <CheckCircle className="h-4 w-4" />

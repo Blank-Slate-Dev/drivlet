@@ -656,3 +656,148 @@ drivlet - Car service made simple
     htmlContent,
   });
 }
+// ════════════════════════════════════════════════════════════════════════
+// Signed handover form copy — emailed to the customer after they sign the
+// pickup consent or return confirmation form on the driver's device.
+// ════════════════════════════════════════════════════════════════════════
+
+export interface SignedFormEmailData {
+  customerEmail: string;
+  customerName: string;
+  formType: "pickup_consent" | "return_confirmation";
+  vehicleRegistration?: string;
+  trackingCode?: string;
+  submittedAt: Date;
+  /** [label, value] pairs summarising the recorded form fields. */
+  fields: Array<[string, string]>;
+}
+
+const FORM_EMAIL_META: Record<
+  SignedFormEmailData["formType"],
+  { title: string; intro: string }
+> = {
+  pickup_consent: {
+    title: "Vehicle Pick-up Condition & Consent Form",
+    intro:
+      "Thanks for signing the pick-up consent form. Here is a copy of what was recorded when our driver collected your vehicle. Photos of your vehicle were also taken and are stored securely against your booking.",
+  },
+  return_confirmation: {
+    title: "Vehicle Return Confirmation & Acceptance Form",
+    intro:
+      "Thanks for confirming the return of your vehicle. Here is a copy of what was recorded at the time of return. Photos taken during the service journey remain stored securely against your booking.",
+  },
+};
+
+export async function sendSignedFormEmail(
+  data: SignedFormEmailData
+): Promise<boolean> {
+  const meta = FORM_EMAIL_META[data.formType];
+  const appUrl = getAppUrl();
+  const trackingUrl = data.trackingCode
+    ? `${appUrl}/track?code=${data.trackingCode}`
+    : null;
+
+  const submitted = data.submittedAt.toLocaleString("en-AU", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "Australia/Sydney",
+  });
+
+  const subject = `Your signed copy — ${meta.title}${data.vehicleRegistration ? ` (${data.vehicleRegistration})` : ""}`;
+
+  const fieldRowsHtml = data.fields
+    .filter(([, value]) => value && value.trim() !== "")
+    .map(
+      ([label, value]) => `
+      <tr>
+        <td style="padding: 6px 12px 6px 0; color: #64748b; font-size: 13px; white-space: nowrap; vertical-align: top;">${escapeHtml(label)}</td>
+        <td style="padding: 6px 0; color: #1e293b; font-size: 14px;">${escapeHtml(value)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const fieldsText = data.fields
+    .filter(([, value]) => value && value.trim() !== "")
+    .map(([label, value]) => `  ${label}: ${value}`)
+    .join("\n");
+
+  const textContent = `
+${meta.title}
+
+Hi ${data.customerName},
+
+${meta.intro}
+
+Signed: ${submitted}
+
+${fieldsText}
+${trackingUrl ? `\nTrack your booking: ${trackingUrl}\n` : ""}
+This form was signed digitally and is stored securely with your booking, as set out in our Privacy Policy. Nothing in this form limits your rights under Australian Consumer Law.
+
+---
+drivlet - Car service made simple
+`.trim();
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color: #059669; padding: 24px 32px;">
+              <p style="margin: 0; color: #a7f3d0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your signed copy</p>
+              <h1 style="margin: 4px 0 0; color: #ffffff; font-size: 20px;">${escapeHtml(meta.title)}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 32px;">
+              <p style="margin: 0 0 16px; color: #1e293b; font-size: 15px;">Hi ${escapeHtml(data.customerName)},</p>
+              <p style="margin: 0 0 20px; color: #475569; font-size: 14px; line-height: 1.6;">${escapeHtml(meta.intro)}</p>
+              <p style="margin: 0 0 16px; color: #64748b; font-size: 13px;">Signed: <strong style="color: #1e293b;">${escapeHtml(submitted)}</strong></p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin: 0 0 24px;">
+                <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Recorded details</p>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%;">${fieldRowsHtml}</table>
+              </div>
+              ${trackingUrl ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 24px;">
+                <tr>
+                  <td style="border-radius: 999px; background-color: #059669;">
+                    <a href="${trackingUrl}" style="display: inline-block; padding: 12px 28px; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none;">Track your booking</a>
+                  </td>
+                </tr>
+              </table>` : ""}
+              <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+                This form was signed digitally and is stored securely with your booking, as set out in our Privacy Policy.
+                Nothing in this form limits your rights under Australian Consumer Law.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f8fafc;">
+              <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px;">
+                Questions? Reply to this email or visit <a href="https://drivlet.com.au" style="color: #059669; text-decoration: none;">drivlet.com.au</a>
+              </p>
+              <p style="margin: 0; color: #cbd5e1; font-size: 11px;">
+                &copy; ${new Date().getFullYear()} drivlet &middot; Newcastle, Australia
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  return sendEmail({
+    to: data.customerEmail,
+    toName: data.customerName,
+    subject,
+    textContent,
+    htmlContent,
+  });
+}

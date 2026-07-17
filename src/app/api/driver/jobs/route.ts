@@ -12,12 +12,14 @@ import { sendServicePaymentSMS } from "@/lib/sms";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 import { requireValidOrigin } from "@/lib/validation";
 import VehiclePhoto from "@/models/VehiclePhoto";
+import SignedForm from "@/models/SignedForm";
 import {
   validateCheckpointPhotos,
   type GatedCheckpoint,
   type MinimalPhoto,
   type CheckpointValidation,
 } from "@/lib/photoRequirements";
+import { FORM_LABELS, type GatedFormType } from "@/lib/formRequirements";
 
 // Get the app URL for Stripe redirects
 function getAppUrl(): string {
@@ -37,6 +39,16 @@ async function runPhotoGate(
     .select("checkpointType photoType superseded")
     .lean();
   return validateCheckpointPhotos(photos as MinimalPhoto[], checkpoint);
+}
+
+// Re-check that the required signed handover form exists for the booking.
+// Single source of truth = src/lib/formRequirements.ts (shared with UI).
+async function runFormGate(
+  bookingId: string,
+  formType: GatedFormType
+): Promise<boolean> {
+  const exists = await SignedForm.exists({ bookingId, formType });
+  return !!exists;
 }
 
 // GET /api/driver/jobs - Get jobs assigned to this driver by admin
@@ -194,6 +206,9 @@ export async function GET(request: NextRequest) {
           customerPhone: job.guestPhone,
           vehicleRegistration: job.vehicleRegistration,
           vehicleState: job.vehicleState,
+          vehicleModel: job.vehicleModel || "",
+          vehicleYear: job.vehicleYear || "",
+          transmissionType: job.transmissionType || (job.isManualTransmission ? "manual" : "automatic"),
           serviceType: job.serviceType,
           pickupAddress: job.pickupAddress,
           garageName: job.garageName,
@@ -223,6 +238,10 @@ export async function GET(request: NextRequest) {
           returnWaitingReason,
           hasActiveIncident: job.hasActiveIncident || false,
           incidentExceptionState: job.incidentExceptionState || null,
+          // Which handover forms are already signed (gates custody advances in the UI —
+          // same rules as the POST handler via src/lib/formRequirements.ts).
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signedFormTypes: (job.signedForms || []).map((f: any) => f.formType),
         };
       };
 
@@ -437,6 +456,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // GATE: signed pickup consent form (customer + driver signatures)
+      const formOk = await runFormGate(bookingId, "pickup_consent");
+      if (!formOk) {
+        console.warn(
+          `[form-gate] booking ${bookingId} pickup_consent missing — blocking 'collected'`
+        );
+        return NextResponse.json(
+          { error: `The ${FORM_LABELS.pickup_consent} must be signed before this step can be completed.` },
+          { status: 400 }
+        );
+      }
+
       booking.currentStage = "car_picked_up";
       booking.overallProgress = 42;
 
@@ -453,7 +484,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: "car_picked_up",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to collected`,
+        message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed — status advanced to collected`,
         updatedBy: "driver",
       });
       await booking.save();
@@ -623,6 +654,18 @@ export async function POST(request: NextRequest) {
       // Must be return driver OR pickup driver (if same driver doing both)
       if (!isReturnDriver && !isPickupDriver) {
         return NextResponse.json({ error: "You are not assigned to this delivery" }, { status: 403 });
+      }
+
+      // GATE: signed return confirmation form (or refused-to-sign dispute record)
+      const returnFormOk = await runFormGate(bookingId, "return_confirmation");
+      if (!returnFormOk) {
+        console.warn(
+          `[form-gate] booking ${bookingId} return_confirmation missing — blocking 'delivered'`
+        );
+        return NextResponse.json(
+          { error: `The ${FORM_LABELS.return_confirmation} must be completed before this step can be completed.` },
+          { status: 400 }
+        );
       }
 
       booking.status = "completed";

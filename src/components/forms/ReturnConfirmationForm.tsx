@@ -32,6 +32,8 @@ interface ReturnConfirmationFormProps {
   onClose: () => void;
   onSuccess: () => void;
   driverName?: string;
+  /** Show the "customer refused to sign" dispute option (driver-facing surfaces only). */
+  allowRefusal?: boolean;
 }
 
 export default function ReturnConfirmationForm({
@@ -40,6 +42,7 @@ export default function ReturnConfirmationForm({
   onClose,
   onSuccess,
   driverName = "",
+  allowRefusal = false,
 }: ReturnConfirmationFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -55,6 +58,7 @@ export default function ReturnConfirmationForm({
   const [fuelLevel, setFuelLevel] = useState("");
   const [returnDamageNotes, setReturnDamageNotes] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
+  const [customerRefused, setCustomerRefused] = useState(false);
   const [declCustomerName, setDeclCustomerName] = useState("");
   const [declCustomerDate, setDeclCustomerDate] = useState("");
   const [driverNameField, setDriverNameField] = useState("");
@@ -95,6 +99,7 @@ export default function ReturnConfirmationForm({
       setError("");
       setSubmitting(false);
       setPrivacyAcknowledged(false);
+      setCustomerRefused(false);
       setCustomerSignature("");
       setDriverSignature("");
     }
@@ -105,9 +110,9 @@ export default function ReturnConfirmationForm({
     if (!customerPhone.trim()) return "Customer phone is required";
     if (!returnAddress.trim()) return "Return address is required";
     if (!odometerKm.trim()) return "Odometer reading is required";
-    if (!privacyAcknowledged) return "Please acknowledge the privacy notice";
+    if (!privacyAcknowledged && !customerRefused) return "Please acknowledge the privacy notice";
     if (!declCustomerName.trim()) return "Declaration name is required";
-    if (!customerSignature) return "Customer signature is required";
+    if (!customerSignature && !customerRefused) return "Customer signature is required";
     if (!driverNameField.trim()) return "Driver name is required";
     if (!driverSignature) return "Driver signature is required";
     return null;
@@ -133,10 +138,11 @@ export default function ReturnConfirmationForm({
           submittedByEmail: customerEmail.trim(),
           privacyAcknowledged,
           signatures: {
-            customer: customerSignature,
+            ...(customerRefused ? {} : { customer: customerSignature }),
             driver: driverSignature,
           },
           formData: {
+            customerRefusedToSign: customerRefused,
             customerName: customerName.trim(),
             customerPhone: customerPhone.trim(),
             customerEmail: customerEmail.trim(),
@@ -415,13 +421,41 @@ export default function ReturnConfirmationForm({
                         />
                       </div>
                     </div>
-                    <SignaturePad
-                      id="return-customer"
-                      label="Customer Signature *"
-                      onChange={setCustomerSignature}
-                      value={customerSignature}
-                      disabled={submitting}
-                    />
+                    {!customerRefused && (
+                      <SignaturePad
+                        id="return-customer"
+                        label="Customer Signature *"
+                        onChange={setCustomerSignature}
+                        value={customerSignature}
+                        disabled={submitting}
+                      />
+                    )}
+
+                    {/* Dispute path — customer refuses to sign (driver-facing only) */}
+                    {allowRefusal && (
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={customerRefused}
+                          onChange={(e) => setCustomerRefused(e.target.checked)}
+                          disabled={submitting}
+                          className="mt-1 h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-sm text-slate-600">
+                          Customer refused to sign — record a dispute
+                        </span>
+                      </label>
+                    )}
+                    {customerRefused && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                        <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-700">
+                          This will be recorded as a dispute and flagged for the
+                          Drivlet team to review. Make sure any concerns or damage
+                          are noted above, and photos are taken before leaving.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3">
@@ -485,6 +519,8 @@ export default function ReturnConfirmationForm({
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Submitting...
                       </span>
+                    ) : customerRefused ? (
+                      "Record Dispute"
                     ) : (
                       "Confirm Return"
                     )}

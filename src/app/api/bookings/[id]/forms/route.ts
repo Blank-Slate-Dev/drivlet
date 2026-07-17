@@ -4,7 +4,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import User from "@/models/User";
 import SignedForm, { FormType } from "@/models/SignedForm";
+import { sendSignedFormEmail } from "@/lib/email";
+
+// A driver may only submit/view forms for bookings they are assigned to
+// (pickup or return leg) — mirrors the photos route.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function isAssignedDriver(sessionUserId: string, booking: any): Promise<boolean> {
+  const user = await User.findById(sessionUserId).select("driverProfile");
+  if (!user?.driverProfile) return false;
+  const profileId = user.driverProfile.toString();
+  return (
+    booking.assignedDriverId?.toString() === profileId ||
+    booking.returnDriverId?.toString() === profileId
+  );
+}
 
 export async function POST(
   request: NextRequest,
@@ -37,7 +52,11 @@ export async function POST(
     const isOwner =
       (session.user.id && booking.userId?.toString() === session.user.id) ||
       (session.user.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
-    const isDriver = session.user.role === "driver";
+    // Drivers must be assigned to this booking (pickup or return leg)
+    const isDriver =
+      session.user.role === "driver" &&
+      !!session.user.id &&
+      (await isAssignedDriver(session.user.id, booking));
 
     if (!isAdmin && !isOwner && !isDriver) {
       return NextResponse.json(
@@ -76,8 +95,14 @@ export async function POST(
       );
     }
 
+    // Dispute path: on the return form the customer can refuse to sign.
+    // The form is still recorded (with the driver's signature) and flagged.
+    const customerRefused =
+      formType === "return_confirmation" &&
+      formData?.customerRefusedToSign === true;
+
     // Validate signatures exist
-    if (!signatures?.customer) {
+    if (!signatures?.customer && !customerRefused) {
       return NextResponse.json(
         { error: "Customer signature is required" },
         { status: 400 }
@@ -87,7 +112,7 @@ export async function POST(
     // For pickup/return forms, driver signature is also required
     if (
       (formType === "pickup_consent" || formType === "return_confirmation") &&
-      !signatures.driver
+      !signatures?.driver
     ) {
       return NextResponse.json(
         { error: "Driver signature is required for this form type" },
@@ -95,7 +120,9 @@ export async function POST(
       );
     }
 
-    if (!privacyAcknowledged) {
+    // Privacy acknowledgement required, except when the customer refused to
+    // sign (dispute path — there is nothing for them to acknowledge).
+    if (!privacyAcknowledged && !customerRefused) {
       return NextResponse.json(
         { error: "Privacy acknowledgement is required" },
         { status: 400 }
@@ -130,7 +157,17 @@ export async function POST(
       userAgent: request.headers.get("user-agent") || "unknown",
     });
 
-    // Add a reference to the booking's signedForms array
+    // Add a reference to the booking's signedForms array + a timeline entry
+    // (visible in the admin detail modal and the live tracking board).
+    const formLabels: Record<FormType, string> = {
+      pickup_consent: "Pick-up Condition & Consent form",
+      return_confirmation: "Return Confirmation & Acceptance form",
+      claim_lodgement: "Claim Lodgement form",
+    };
+    const updateMessage = customerRefused
+      ? `⚠️ Customer refused to sign the ${formLabels[formType]} — dispute recorded. Please review.`
+      : `${formLabels[formType]} signed${signatures?.customer && signatures?.driver ? " by customer and driver" : ""}.`;
+
     await Booking.findByIdAndUpdate(bookingId, {
       $push: {
         signedForms: {
@@ -138,8 +175,61 @@ export async function POST(
           formType,
           submittedAt: signedForm.submittedAt,
         },
+        updates: {
+          stage: booking.currentStage || "booking_confirmed",
+          timestamp: signedForm.submittedAt,
+          message: updateMessage,
+          updatedBy: session.user.role === "driver" ? "driver" : session.user.role === "admin" ? "admin" : "customer",
+        },
       },
     });
+
+    // Email the customer their copy (async — don't block the response).
+    // Skipped when the customer refused to sign (dispute path).
+    if (!customerRefused && booking.userEmail) {
+      const fd = (formData || {}) as Record<string, string>;
+      const fields: Array<[string, string]> =
+        formType === "pickup_consent"
+          ? [
+              ["Customer", fd.customerName],
+              ["Booking reference", booking.trackingCode || bookingId],
+              ["Vehicle", fd.vehicleMakeModel],
+              ["Registration", fd.vehicleRego],
+              ["Pickup location", fd.pickupLocation],
+              ["Odometer at pick-up", fd.odometerPickupKm ? `${fd.odometerPickupKm} km` : ""],
+              ["Fuel level at pick-up", fd.fuelLevelPickup],
+              ["Existing damage noted", fd.existingDamageNotes || "None noted"],
+              ["Service centre", fd.serviceCentreName],
+              ["Service centre address", fd.serviceCentreAddress],
+              ["Special instructions", fd.customerNotes],
+            ]
+          : formType === "return_confirmation"
+            ? [
+                ["Customer", fd.customerName],
+                ["Booking reference", booking.trackingCode || bookingId],
+                ["Vehicle", fd.vehicleMakeModel],
+                ["Registration", fd.vehicleRego],
+                ["Return address", fd.returnAddress],
+                ["Odometer at return", fd.odometerReturnKm ? `${fd.odometerReturnKm} km` : ""],
+                ["Fuel level at return", fd.fuelLevelReturn],
+                ["Damage / concerns noted", fd.returnDamageNotes || "None noted"],
+              ]
+            : [];
+
+      if (fields.length > 0 && (formType === "pickup_consent" || formType === "return_confirmation")) {
+        sendSignedFormEmail({
+          customerEmail: booking.userEmail,
+          customerName: booking.userName || fd.customerName || "there",
+          formType,
+          vehicleRegistration: booking.vehicleRegistration,
+          trackingCode: booking.trackingCode,
+          submittedAt: signedForm.submittedAt,
+          fields: fields.filter(([, v]) => typeof v === "string") as Array<[string, string]>,
+        }).then((sent) => {
+          if (sent) console.log("Signed form copy emailed to:", booking.userEmail);
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -187,7 +277,11 @@ export async function GET(
     const isOwner =
       (session.user.id && booking.userId?.toString() === session.user.id) ||
       (session.user.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
-    const isDriver = session.user.role === "driver";
+    // Drivers must be assigned to this booking (pickup or return leg)
+    const isDriver =
+      session.user.role === "driver" &&
+      !!session.user.id &&
+      (await isAssignedDriver(session.user.id, booking));
 
     if (!isAdmin && !isOwner && !isDriver) {
       return NextResponse.json(
