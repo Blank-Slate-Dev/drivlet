@@ -28,6 +28,7 @@ import {
   Truck,
   History as HistoryIcon,
 } from "lucide-react";
+import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -223,7 +224,8 @@ export default function DriverHistoryPage() {
           </button>
         </div>
 
-        {/* ─── Earnings hero ─── */}
+        {/* ─── Hero (earnings variant behind SHOW_DRIVER_EARNINGS flag —
+             drivers are currently paid hourly on TFN per contract) ─── */}
         {stats && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -232,19 +234,34 @@ export default function DriverHistoryPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-emerald-100">Total earned</p>
-                <p className="mt-1 text-3xl font-bold tracking-tight">
-                  {formatCurrency(stats.totalEarnings)}
-                </p>
+                {SHOW_DRIVER_EARNINGS ? (
+                  <>
+                    <p className="text-sm font-medium text-emerald-100">Total earned</p>
+                    <p className="mt-1 text-3xl font-bold tracking-tight">
+                      {formatCurrency(stats.totalEarnings)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-emerald-100">Legs completed</p>
+                    <p className="mt-1 text-3xl font-bold tracking-tight">{completedLegs}</p>
+                  </>
+                )}
               </div>
               <div className="rounded-xl bg-white/15 p-2.5">
-                <DollarSign className="h-5 w-5" />
+                {SHOW_DRIVER_EARNINGS ? (
+                  <DollarSign className="h-5 w-5" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5" />
+                )}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-emerald-100">
-              <span>
-                <span className="font-semibold text-white">{completedLegs}</span> legs completed
-              </span>
+              {SHOW_DRIVER_EARNINGS && (
+                <span>
+                  <span className="font-semibold text-white">{completedLegs}</span> legs completed
+                </span>
+              )}
               <span>
                 <span className="font-semibold text-white">{stats.completionRate}%</span> completion
               </span>
@@ -423,11 +440,13 @@ export default function DriverHistoryPage() {
                           )}
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-2">
-                          {job.legStatus === "completed" && job.payout > 0 && (
-                            <span className="text-base font-bold text-emerald-600">
-                              +{formatCurrency(job.payout)}
-                            </span>
-                          )}
+                          {SHOW_DRIVER_EARNINGS &&
+                            job.legStatus === "completed" &&
+                            job.payout > 0 && (
+                              <span className="text-base font-bold text-emerald-600">
+                                +{formatCurrency(job.payout)}
+                              </span>
+                            )}
                           {isExpanded ? (
                             <ChevronUp className="h-4 w-4 text-slate-400" />
                           ) : (

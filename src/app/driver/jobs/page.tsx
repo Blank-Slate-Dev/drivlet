@@ -29,7 +29,9 @@ import {
   Package,
   Truck,
   ClipboardCheck,
+  Undo2,
 } from "lucide-react";
+import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
 import {
   validateCheckpointPhotos,
@@ -98,6 +100,8 @@ interface Job {
   incidentExceptionState?: string | null;
   /** Handover forms already signed for this booking (gates custody advances). */
   signedFormTypes?: string[];
+  /** Driver's most recent step on their leg(s) — powers "Undo last step". */
+  lastStep?: { at: string; label: string } | null;
 }
 
 interface MyJobs {
@@ -180,7 +184,8 @@ type JobAction =
   | "collected_from_workshop"
   | "delivering"
   | "delivered"
-  | "generate_payment";
+  | "generate_payment"
+  | "undo_last";
 
 // ─── Main Page Component ──────────────────────────────────────
 
@@ -1062,6 +1067,13 @@ function MyJobCard({
     ? cs.pre_pickup + cs.service_dropoff + cs.service_pickup + cs.final_delivery
     : 0;
 
+  // Undo is offered for 15 minutes after the driver's last step (accidental
+  // taps). The server re-validates the window; photos/forms are preserved.
+  const undoAvailable = !!(
+    job.lastStep &&
+    Date.now() - new Date(job.lastStep.at).getTime() < 15 * 60 * 1000
+  );
+
   // Determine if any leg is actively in progress (for showing photos/call)
   const hasActiveLeg =
     (isMyPickup && !pickupComplete) ||
@@ -1094,9 +1106,11 @@ function MyJobCard({
             )}
           </p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-          ${job.payout}
-        </span>
+        {SHOW_DRIVER_EARNINGS && (
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+            ${job.payout}
+          </span>
+        )}
       </div>
 
       {/* ─── Exception State Banner ─── */}
@@ -1443,10 +1457,11 @@ function MyJobCard({
         </div>
       )}
 
-      {/* Generate payment if pickup complete but no link yet */}
-      {isMyPickup &&
+      {/* Payment link — available to BOTH drivers at every stage after the car
+          reaches the workshop, until paid. It's a backup for customers who
+          can't pay the service centre over the phone, so it's never stage-locked. */}
+      {(isMyPickup || isMyReturn) &&
         pickupComplete &&
-        !job.servicePaymentUrl &&
         job.servicePaymentStatus !== "paid" && (
           <div className="mx-5 mb-3 sm:mx-6">
             <button
@@ -1454,7 +1469,7 @@ function MyJobCard({
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               <DollarSign className="h-4 w-4" />
-              Generate Payment Link
+              {job.servicePaymentUrl ? "Payment Link" : "Generate Payment Link"}
             </button>
           </div>
         )}
@@ -1518,6 +1533,30 @@ function MyJobCard({
           <div className="flex justify-center">
             <IncidentReportButton onClick={() => onReportIncident(job._id)} />
           </div>
+        </div>
+      )}
+
+      {/* Undo last step — quiet correction control for accidental taps.
+          Rendered outside the active-leg footer so it's still available right
+          after a leg-completing tap (e.g. accidental "Dropped at Workshop"). */}
+      {undoAvailable && job.lastStep && (
+        <div className="flex justify-center border-t border-slate-100 px-5 py-3 sm:px-6">
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Undo "${job.lastStep!.label}"? This rolls the job back one step. Photos and signed forms are kept.`
+                )
+              ) {
+                onAction(job._id, "undo_last");
+              }
+            }}
+            disabled={isLoading}
+            className="inline-flex min-h-[36px] items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-slate-600 disabled:opacity-50"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            Tapped by mistake? Undo &ldquo;{job.lastStep.label}&rdquo;
+          </button>
         </div>
       )}
     </motion.div>

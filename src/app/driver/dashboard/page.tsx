@@ -16,6 +16,7 @@ import {
   ChevronRight,
   CheckCircle2,
 } from "lucide-react";
+import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 
 interface ClockStatus {
   isClockedIn: boolean;
@@ -198,19 +199,21 @@ export default function DriverDashboardPage() {
         </div>
       </div>
 
-      {/* Stats row (4 cards) */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Stats row */}
+      <div className={`mb-5 grid grid-cols-2 gap-3 ${SHOW_DRIVER_EARNINGS ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
 
-        {/* Earnings - primary accent card */}
-        <div className="rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 p-4 shadow-sm shadow-emerald-500/20">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">This Week</p>
-          {earningsLoading ? (
-            <div className="mt-1.5 h-8 w-20 bg-emerald-500/40 rounded animate-pulse" />
-          ) : (
-            <p className="mt-1.5 text-2xl font-bold text-white">${weekEarnings}</p>
-          )}
-          <p className="text-xs text-emerald-200 mt-1">Earnings</p>
-        </div>
+        {/* Earnings - primary accent card (hidden — hourly TFN pay) */}
+        {SHOW_DRIVER_EARNINGS && (
+          <div className="rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 p-4 shadow-sm shadow-emerald-500/20">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">This Week</p>
+            {earningsLoading ? (
+              <div className="mt-1.5 h-8 w-20 bg-emerald-500/40 rounded animate-pulse" />
+            ) : (
+              <p className="mt-1.5 text-2xl font-bold text-white">${weekEarnings}</p>
+            )}
+            <p className="text-xs text-emerald-200 mt-1">Earnings</p>
+          </div>
+        )}
 
         {/* Today's jobs */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -306,7 +309,7 @@ export default function DriverDashboardPage() {
 
                   {/* Action */}
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    {(job.payout || job.paymentAmount) && (
+                    {SHOW_DRIVER_EARNINGS && (job.payout || job.paymentAmount) && (
                       <div className="text-right">
                         <p className="text-sm font-bold text-emerald-600">
                           ${job.payout || ((job.paymentAmount ?? 0) / 100).toFixed(0)}
@@ -337,7 +340,10 @@ export default function DriverDashboardPage() {
             <div className="space-y-2">
               {[
                 { href: "/driver/jobs",     label: "My Jobs",     icon: Briefcase,  meta: `${acceptedCount ?? 0} assigned` },
-                { href: "/driver/payments", label: "Payments",    icon: DollarSign,  meta: `$${weekEarnings} this week` },
+                // Payments link hidden with earnings UI (hourly TFN pay)
+                ...(SHOW_DRIVER_EARNINGS
+                  ? [{ href: "/driver/payments", label: "Payments", icon: DollarSign, meta: `$${weekEarnings} this week` }]
+                  : []),
                 { href: "/driver/history",  label: "Job History",  icon: Clock,       meta: `${completedJobs} completed` },
                 { href: "/driver/settings", label: "Settings",     icon: Settings,    meta: "" },
               ].map(({ href, label, icon: Icon, meta }) => (
@@ -359,7 +365,8 @@ export default function DriverDashboardPage() {
             </div>
           </div>
 
-          {/* Earnings summary card */}
+          {/* Earnings summary card (hidden — hourly TFN pay) */}
+          {SHOW_DRIVER_EARNINGS && (
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Earnings Summary</p>
@@ -393,9 +400,10 @@ export default function DriverDashboardPage() {
               </div>
             )}
           </div>
+          )}
 
-          {/* Recent earnings */}
-          {earningsData && earningsData.earnings.length > 0 && (
+          {/* Recent earnings (hidden — hourly TFN pay) */}
+          {SHOW_DRIVER_EARNINGS && earningsData && earningsData.earnings.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                 <div className="flex items-center gap-2">

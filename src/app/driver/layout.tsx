@@ -16,6 +16,7 @@ import {
   Home,
   CalendarDays,
 } from "lucide-react";
+import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 
 interface ClockStatus {
   isClockedIn: boolean;
@@ -240,7 +241,10 @@ export default function DriverLayout({
               { href: "/driver/dashboard", label: "Dashboard" },
               { href: "/driver/roster",    label: "Roster" },
               { href: "/driver/jobs",      label: "Jobs" },
-              { href: "/driver/payments",  label: "Payments" },
+              // Payments hidden with earnings UI (hourly TFN pay)
+              ...(SHOW_DRIVER_EARNINGS
+                ? [{ href: "/driver/payments", label: "Payments" }]
+                : []),
               { href: "/driver/history",   label: "History" },
               { href: "/driver/settings",  label: "Settings" },
             ].map(({ href, label }) => (
@@ -313,15 +317,18 @@ export default function DriverLayout({
           <Briefcase className="h-5 w-5" />
           <span className="text-[10px] font-medium">Jobs</span>
         </Link>
-        <Link
-          href="/driver/payments"
-          className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${
-            isActive("/driver/payments") ? "text-emerald-600" : "text-slate-400"
-          }`}
-        >
-          <DollarSign className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Payments</span>
-        </Link>
+        {/* Payments tab hidden with earnings UI (hourly TFN pay) */}
+        {SHOW_DRIVER_EARNINGS && (
+          <Link
+            href="/driver/payments"
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${
+              isActive("/driver/payments") ? "text-emerald-600" : "text-slate-400"
+            }`}
+          >
+            <DollarSign className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Payments</span>
+          </Link>
+        )}
         <Link
           href="/driver/history"
           className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition active:scale-95 ${

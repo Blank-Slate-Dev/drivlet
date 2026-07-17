@@ -15,6 +15,7 @@ import {
   XCircle,
   Send,
 } from "lucide-react";
+import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 
 interface EarningsData {
   totalEarnings: number;
@@ -82,6 +83,11 @@ const STATUS_CONFIG: Record<
 export default function DriverPaymentsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  // Earnings UI is hidden while drivers are paid hourly on TFN per contract.
+  // Direct visits to this page get a friendly notice instead of the ledger.
+  // (Flip SHOW_DRIVER_EARNINGS in src/lib/featureFlags.ts to restore.)
+  const earningsHidden = !SHOW_DRIVER_EARNINGS;
 
   const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
@@ -210,6 +216,27 @@ export default function DriverPaymentsPage() {
     return (
       <div className="flex min-h-[calc(100vh-52px)] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  // Earnings UI hidden — hourly TFN pay per contract
+  if (earningsHidden) {
+    return (
+      <div className="flex min-h-[calc(100vh-52px)] flex-col items-center justify-center px-4 py-6">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+            <DollarSign className="h-6 w-6 text-emerald-600" />
+          </div>
+          <h1 className="mt-4 text-lg font-semibold text-slate-900">
+            Payments are handled off-app
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            You&apos;re paid hourly as set out in your contract, so there&apos;s
+            nothing to track here. If you have a question about your pay,
+            contact the Drivlet team.
+          </p>
+        </div>
       </div>
     );
   }

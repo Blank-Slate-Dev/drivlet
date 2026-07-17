@@ -188,6 +188,28 @@ export async function GET(request: NextRequest) {
           else returnDriverState = "assigned";
         }
 
+        // Most recent step timestamp on the legs THIS driver owns — powers the
+        // client-side "Undo last step" button (server re-validates the window).
+        const isMyPickupLeg = job.assignedDriverId?.toString() === driverProfileStr;
+        const isMyReturnLeg = job.returnDriverId?.toString() === driverProfileStr;
+        const stepTimes: Array<{ at: Date; label: string }> = [];
+        if (isMyPickupLeg && job.pickupDriver) {
+          if (job.pickupDriver.startedAt) stepTimes.push({ at: job.pickupDriver.startedAt, label: "Started pickup" });
+          if (job.pickupDriver.arrivedAt) stepTimes.push({ at: job.pickupDriver.arrivedAt, label: "Arrived at customer" });
+          if (job.pickupDriver.collectedAt) stepTimes.push({ at: job.pickupDriver.collectedAt, label: "Car collected" });
+          if (job.pickupDriver.completedAt) stepTimes.push({ at: job.pickupDriver.completedAt, label: "Dropped at workshop" });
+        }
+        if (isMyReturnLeg && job.returnDriver) {
+          if (job.returnDriver.startedAt) stepTimes.push({ at: job.returnDriver.startedAt, label: "Started return" });
+          if (job.returnDriver.collectedAt) stepTimes.push({ at: job.returnDriver.collectedAt, label: "Collected from workshop" });
+          if (job.returnDriver.arrivedAt) stepTimes.push({ at: job.returnDriver.arrivedAt, label: "Delivering to customer" });
+          if (job.returnDriver.completedAt) stepTimes.push({ at: job.returnDriver.completedAt, label: "Delivered" });
+        }
+        stepTimes.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+        const lastStep = stepTimes[0]
+          ? { at: stepTimes[0].at, label: stepTimes[0].label }
+          : null;
+
         // Payment is optional (backup link only) — the return leg can start
         // as soon as the pickup leg is complete.
         const canStartReturn = !!job.pickupDriver?.completedAt;
@@ -242,6 +264,7 @@ export async function GET(request: NextRequest) {
           // same rules as the POST handler via src/lib/formRequirements.ts).
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           signedFormTypes: (job.signedForms || []).map((f: any) => f.formType),
+          lastStep,
         };
       };
 
@@ -355,6 +378,8 @@ export async function POST(request: NextRequest) {
       "at_garage",
       "generate_payment",
       "complete",
+      // Correction
+      "undo_last",
     ];
 
     if (!validActions.includes(action)) {
@@ -688,13 +713,134 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // ========== UNDO LAST STATUS CHANGE ==========
+    // Reverts the driver's most recent stage advance (accidental taps).
+    // Window-limited; photos and signed forms are NOT touched, so redoing the
+    // step passes the gates instantly.
+    if (action === "undo_last") {
+      const UNDO_WINDOW_MS = 15 * 60 * 1000;
+
+      type UndoCandidate = {
+        leg: "pickup" | "return";
+        field: "startedAt" | "arrivedAt" | "collectedAt" | "completedAt";
+        at: Date;
+        label: string;
+      };
+      const candidates: UndoCandidate[] = [];
+
+      if (isPickupDriver && booking.pickupDriver) {
+        const pd = booking.pickupDriver;
+        if (pd.startedAt) candidates.push({ leg: "pickup", field: "startedAt", at: pd.startedAt, label: "Started pickup" });
+        if (pd.arrivedAt) candidates.push({ leg: "pickup", field: "arrivedAt", at: pd.arrivedAt, label: "Arrived at customer" });
+        if (pd.collectedAt) candidates.push({ leg: "pickup", field: "collectedAt", at: pd.collectedAt, label: "Car collected" });
+        if (pd.completedAt) candidates.push({ leg: "pickup", field: "completedAt", at: pd.completedAt, label: "Dropped at workshop" });
+      }
+      if (isReturnDriver && booking.returnDriver) {
+        const rd = booking.returnDriver;
+        if (rd.startedAt) candidates.push({ leg: "return", field: "startedAt", at: rd.startedAt, label: "Started return" });
+        if (rd.collectedAt) candidates.push({ leg: "return", field: "collectedAt", at: rd.collectedAt, label: "Collected from workshop" });
+        if (rd.arrivedAt) candidates.push({ leg: "return", field: "arrivedAt", at: rd.arrivedAt, label: "Delivering to customer" });
+        if (rd.completedAt) candidates.push({ leg: "return", field: "completedAt", at: rd.completedAt, label: "Delivered" });
+      }
+
+      if (candidates.length === 0) {
+        return NextResponse.json(
+          { error: "Nothing to undo on this job" },
+          { status: 400 }
+        );
+      }
+
+      candidates.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+      const target = candidates[0];
+
+      if (Date.now() - new Date(target.at).getTime() > UNDO_WINDOW_MS) {
+        return NextResponse.json(
+          { error: "The undo window (15 minutes) for your last step has passed. Contact dispatch to correct the booking." },
+          { status: 400 }
+        );
+      }
+
+      // Revert the timestamp
+      if (target.leg === "pickup" && booking.pickupDriver) {
+        booking.pickupDriver[target.field] = undefined;
+      } else if (target.leg === "return" && booking.returnDriver) {
+        booking.returnDriver[target.field] = undefined;
+      }
+
+      // Roll the booking stage back to match
+      if (target.leg === "pickup") {
+        if (target.field === "startedAt") {
+          booking.currentStage = "booking_confirmed";
+          booking.overallProgress = 14;
+          booking.status = "pending";
+          booking.driverStartedAt = undefined;
+        } else if (target.field === "collectedAt") {
+          booking.currentStage = "driver_en_route";
+          booking.overallProgress = 28;
+        } else if (target.field === "completedAt") {
+          booking.currentStage = "car_picked_up";
+          booking.overallProgress = 42;
+        }
+        // arrivedAt has no stage of its own — nothing further to roll back
+      } else {
+        if (target.field === "startedAt") {
+          // Where the booking sits before the return leg depends on payment state
+          if (booking.servicePaymentStatus === "paid") {
+            booking.currentStage = "ready_for_return";
+            booking.overallProgress = 85;
+          } else if (booking.servicePaymentUrl) {
+            booking.currentStage = "service_in_progress";
+            booking.overallProgress = 72;
+          } else {
+            booking.currentStage = "at_garage";
+            booking.overallProgress = 57;
+          }
+        } else if (target.field === "completedAt") {
+          booking.status = "in_progress";
+          booking.currentStage = "driver_returning";
+          booking.overallProgress = 86;
+          booking.driverCompletedAt = undefined;
+          // Reverse the completed-jobs metric bump from "delivered"
+          if (driver.metrics && driver.metrics.completedJobs > 0) {
+            driver.metrics.completedJobs -= 1;
+            await driver.save();
+          }
+        }
+        // collectedAt / arrivedAt don't change the stage — timestamp revert is enough
+      }
+
+      booking.updates.push({
+        stage: booking.currentStage,
+        timestamp: now,
+        message: `Driver undid their last step ("${target.label}") — accidental tap correction.`,
+        updatedBy: "driver",
+      });
+      await booking.save();
+      // No stage email/SMS for a correction — SSE only
+      notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
+
+      return NextResponse.json({
+        success: true,
+        message: `Undid "${target.label}"`,
+      });
+    }
+
     // ========== GENERATE PAYMENT LINK ==========
     if (action === "generate_payment") {
-      // Can be triggered by pickup driver after workshop drop-off
-      if (!isPickupDriver) {
+      // The backup payment link can be generated by EITHER assigned driver at
+      // any stage until delivery — customers sometimes can't pay the service
+      // centre over the phone, so the link must never be stage-locked.
+      if (!isPickupDriver && !isReturnDriver) {
         return NextResponse.json(
-          { error: "Only the pickup driver can generate payment link" },
+          { error: "Only an assigned driver can generate the payment link" },
           { status: 403 }
+        );
+      }
+
+      if (booking.status === "completed") {
+        return NextResponse.json(
+          { error: "This booking is already completed" },
+          { status: 400 }
         );
       }
 

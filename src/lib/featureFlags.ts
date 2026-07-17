@@ -15,6 +15,14 @@ export const FEATURES = {
   GARAGE_DASHBOARD_QUOTES: process.env.NEXT_PUBLIC_ENABLE_GARAGE_QUOTES === 'true',
 } as const;
 
+/**
+ * Driver earnings displays (total-earned hero, per-job payout, price-per-job,
+ * Payments tab). Hidden for now: drivers are paid hourly on TFN per their
+ * contract, so per-job earnings would be misleading. Flip to true to bring
+ * the earnings UI back — the logic underneath is untouched.
+ */
+export const SHOW_DRIVER_EARNINGS = false;
+
 // Helper to check if marketplace features are enabled
 export const isMarketplaceEnabled = () => {
   return FEATURES.SERVICE_SELECTION || FEATURES.QUOTE_SYSTEM || FEATURES.GARAGE_ASSIGNMENT;
