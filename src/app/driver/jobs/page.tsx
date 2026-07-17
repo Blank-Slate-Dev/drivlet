@@ -618,8 +618,8 @@ export default function DriverJobsPage() {
                       </span>
                     </div>
                     <p className="mb-3 text-sm text-emerald-700">
-                      Send this to the customer. Once they pay, return leg
-                      becomes available.
+                      Send this to the customer as a backup payment option.
+                      Most customers pay the service centre directly.
                     </p>
                     <div className="flex gap-2">
                       <input

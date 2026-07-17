@@ -115,11 +115,13 @@ export async function GET(request: NextRequest) {
           ],
         }).sort({ pickupTime: 1 }).limit(30).lean(),
 
-        // Awaiting payment: pickup complete, not yet paid
+        // Awaiting payment: pickup complete with a payment LINK issued but not
+        // yet paid. Payment is optional (backup only) — bookings with no link
+        // fall through to ready_for_return instead.
         Booking.find({
           ...baseFilter,
           "pickupDriver.completedAt": { $exists: true },
-          servicePaymentStatus: { $ne: "paid" },
+          servicePaymentStatus: "pending",
           status: { $ne: "completed" },
           $or: [
             { assignedDriverId: driverProfileId },
@@ -127,13 +129,14 @@ export async function GET(request: NextRequest) {
           ],
         }).sort({ updatedAt: -1 }).limit(30).lean(),
 
-        // Ready for return: return assigned to me, pickup complete, paid, not started
+        // Ready for return: return assigned to me, pickup complete, not started.
+        // Payment deliberately NOT required — customers usually pay the service
+        // centre directly.
         Booking.find({
           ...baseFilter,
           returnDriverId: driverProfileId,
           "returnDriver.startedAt": { $exists: false },
           "pickupDriver.completedAt": { $exists: true },
-          servicePaymentStatus: "paid",
           status: { $ne: "completed" },
         }).sort({ updatedAt: -1 }).limit(30).lean(),
 
@@ -185,17 +188,14 @@ export async function GET(request: NextRequest) {
           else returnDriverState = "assigned";
         }
 
-        const canStartReturn = !!(
-          job.pickupDriver?.completedAt &&
-          job.servicePaymentStatus === "paid"
-        );
+        // Payment is optional (backup link only) — the return leg can start
+        // as soon as the pickup leg is complete.
+        const canStartReturn = !!job.pickupDriver?.completedAt;
 
         let returnWaitingReason: string | null = null;
         if (job.returnDriver && !job.returnDriver.startedAt) {
           if (!job.pickupDriver?.completedAt) {
             returnWaitingReason = "Waiting for pickup to complete";
-          } else if (job.servicePaymentStatus !== "paid") {
-            returnWaitingReason = "Waiting for customer payment";
           }
         }
 
@@ -552,13 +552,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Gate: service payment must be received
-      if (booking.servicePaymentStatus !== "paid") {
-        return NextResponse.json(
-          { error: "Cannot start return yet - waiting for customer to pay for service" },
-          { status: 400 }
-        );
-      }
+      // NOTE: payment is NOT a gate. The payment link is a backup only —
+      // most customers pay the service centre directly (e.g. over the phone),
+      // so the return leg must be able to proceed regardless. (2026-07-17)
 
       booking.currentStage = "driver_returning";
       booking.overallProgress = 86;
@@ -643,13 +639,8 @@ export async function POST(request: NextRequest) {
 
     // Delivered (completes return leg and booking)
     if (action === "delivered" || action === "complete") {
-      // Check payment status
-      if (booking.servicePaymentStatus !== "paid") {
-        return NextResponse.json(
-          { error: "Cannot complete - customer has not paid for service yet" },
-          { status: 400 }
-        );
-      }
+      // NOTE: payment is NOT a gate here either — customers usually pay the
+      // service centre directly; the payment link is a backup. (2026-07-17)
 
       // Must be return driver OR pickup driver (if same driver doing both)
       if (!isReturnDriver && !isPickupDriver) {

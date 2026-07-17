@@ -32,6 +32,10 @@ interface BookingDocument {
     message: string;
     updatedBy: string;
   }>;
+  signedForms?: Array<{
+    formType: string;
+    submittedAt?: Date;
+  }>;
   // Fields needed for email/SMS notifications
   userEmail?: string;
   userName?: string;
@@ -71,6 +75,10 @@ export function notifyBookingUpdate(booking: BookingDocument, options: NotifyOpt
     latestUpdate: booking.updates && booking.updates.length > 0
       ? booking.updates[booking.updates.length - 1]
       : undefined,
+    signedForms: booking.signedForms?.map((f) => ({
+      formType: f.formType,
+      submittedAt: f.submittedAt,
+    })),
   };
 
   emitBookingUpdate(data);

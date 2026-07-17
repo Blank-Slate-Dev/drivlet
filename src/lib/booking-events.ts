@@ -19,6 +19,12 @@ export interface BookingEventData {
     message: string;
     updatedBy: string;
   };
+  /** Signed handover forms — lets the tracker hide "signature required"
+   *  prompts once the driver has completed the form in person. */
+  signedForms?: Array<{
+    formType: string;
+    submittedAt?: Date | string;
+  }>;
 }
 
 class BookingEventEmitter {

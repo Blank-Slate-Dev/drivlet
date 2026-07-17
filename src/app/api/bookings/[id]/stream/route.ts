@@ -73,9 +73,14 @@ export async function GET(
           servicePaymentAmount: booking.servicePaymentAmount,
           servicePaymentUrl: booking.servicePaymentUrl,
           updatedAt: booking.updatedAt,
-          latestUpdate: booking.updates?.length > 0 
-            ? booking.updates[booking.updates.length - 1] 
+          latestUpdate: booking.updates?.length > 0
+            ? booking.updates[booking.updates.length - 1]
             : undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signedForms: (booking.signedForms || []).map((f: any) => ({
+            formType: f.formType,
+            submittedAt: f.submittedAt,
+          })),
           driver: driverInfo,
         };
         const initialMsg = `data: ${JSON.stringify({ type: 'update', ...initialData })}\n\n`;

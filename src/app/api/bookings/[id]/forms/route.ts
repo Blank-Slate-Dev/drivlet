@@ -7,6 +7,7 @@ import Booking from "@/models/Booking";
 import User from "@/models/User";
 import SignedForm, { FormType } from "@/models/SignedForm";
 import { sendSignedFormEmail } from "@/lib/email";
+import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 
 // A driver may only submit/view forms for bookings they are assigned to
 // (pickup or return leg) — mirrors the photos route.
@@ -168,21 +169,31 @@ export async function POST(
       ? `⚠️ Customer refused to sign the ${formLabels[formType]} — dispute recorded. Please review.`
       : `${formLabels[formType]} signed${signatures?.customer && signatures?.driver ? " by customer and driver" : ""}.`;
 
-    await Booking.findByIdAndUpdate(bookingId, {
-      $push: {
-        signedForms: {
-          formId: signedForm._id,
-          formType,
-          submittedAt: signedForm.submittedAt,
-        },
-        updates: {
-          stage: booking.currentStage || "booking_confirmed",
-          timestamp: signedForm.submittedAt,
-          message: updateMessage,
-          updatedBy: session.user.role === "driver" ? "driver" : session.user.role === "admin" ? "admin" : "customer",
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        $push: {
+          signedForms: {
+            formId: signedForm._id,
+            formType,
+            submittedAt: signedForm.submittedAt,
+          },
+          updates: {
+            stage: booking.currentStage || "booking_confirmed",
+            timestamp: signedForm.submittedAt,
+            message: updateMessage,
+            updatedBy: session.user.role === "driver" ? "driver" : session.user.role === "admin" ? "admin" : "customer",
+          },
         },
       },
-    });
+      { new: true }
+    );
+
+    // Push the updated signedForms over SSE so the customer tracker hides its
+    // "signature required" banner immediately (no stage email — stage unchanged).
+    if (updatedBooking) {
+      notifyBookingUpdate(updatedBooking, { suppressCustomerNotifications: true });
+    }
 
     // Email the customer their copy (async — don't block the response).
     // Skipped when the customer refused to sign (dispute path).

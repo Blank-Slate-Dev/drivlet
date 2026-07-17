@@ -12,6 +12,7 @@ import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
 import { sendEmail } from '@/lib/email';
+import { notifyBookingUpdate } from '@/lib/emit-booking-update';
 
 async function updateBookingAsPaid(
   bookingId: string,
@@ -29,21 +30,20 @@ async function updateBookingAsPaid(
     await client.connect();
     const db = client.db();
 
-    const result = await db.collection('bookings').findOneAndUpdate(
+    // Always record the payment…
+    let result = await db.collection('bookings').findOneAndUpdate(
       { _id: new ObjectId(bookingId) },
       {
         $set: {
           servicePaymentStatus: 'paid',
           servicePaymentId: paymentId,
-          currentStage: 'ready_for_return',
-          overallProgress: 85,
           updatedAt: new Date(),
         },
         $push: {
           updates: {
             stage: 'service_payment_received',
             timestamp: new Date(),
-            message: `Customer paid $${(amount / 100).toFixed(2)} for service. Ready for return delivery.`,
+            message: `Customer paid $${(amount / 100).toFixed(2)} for service.`,
             updatedBy: 'system',
           } as never,
         },
@@ -56,8 +56,35 @@ async function updateBookingAsPaid(
       return false;
     }
 
+    // …but only advance the stage if the booking hasn't already moved past
+    // the service phase. Payment is optional (backup link) so the return leg
+    // may already be underway — never regress driver_returning/delivered.
+    if (['at_garage', 'service_in_progress'].includes(result.currentStage)) {
+      const advanced = await db.collection('bookings').findOneAndUpdate(
+        {
+          _id: new ObjectId(bookingId),
+          currentStage: { $in: ['at_garage', 'service_in_progress'] },
+        },
+        { $set: { currentStage: 'ready_for_return', overallProgress: 85 } },
+        { returnDocument: 'after' }
+      );
+      if (advanced) result = advanced;
+    }
+
     console.log('✅ Booking updated:', bookingId);
-    console.log('📍 New stage: ready_for_return');
+    console.log('📍 Stage after payment:', result.currentStage);
+
+    // Emit SSE so the customer tracker (and any open admin views) reflect the
+    // paid status immediately — without this, the tracker only learns about
+    // the payment on a full page reload. Stage email/SMS suppressed (the
+    // timeline update above is the customer-visible record).
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      notifyBookingUpdate(result as any, { suppressCustomerNotifications: true });
+    } catch (err) {
+      console.error('Failed to emit booking update after payment:', err);
+    }
+
     return true;
   } finally {
     await client.close();

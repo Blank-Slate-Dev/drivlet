@@ -1405,18 +1405,19 @@ function TrackingContent() {
                     <div className="border-t border-slate-200 pt-4">
                       <div className="flex items-center gap-2 mb-4">
                         <CreditCard className="h-5 w-5 text-emerald-600" />
-                        <span className="font-semibold text-slate-900">Service Payment Required</span>
+                        <span className="font-semibold text-slate-900">Service Payment</span>
                       </div>
 
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-amber-800 font-medium">Service Cost</span>
-                          <span className="text-2xl font-bold text-amber-900">
+                          <span className="text-slate-700 font-medium">Service Cost</span>
+                          <span className="text-2xl font-bold text-slate-900">
                             ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-sm text-amber-700 mt-1">
-                          Please pay to have your vehicle returned
+                        <p className="text-sm text-slate-500 mt-1">
+                          Pay securely online below — or pay the service centre
+                          directly if you&apos;ve already arranged it with them.
                         </p>
                       </div>
 

@@ -104,6 +104,9 @@ export interface TrackingCard {
   incidents: TrackingIncident[];
   hasActiveIncident: boolean;
   incidentExceptionState: string;
+  /** Service payment state: null = no link issued, "pending" = link sent, "paid" = paid */
+  servicePaymentStatus: "pending" | "paid" | null;
+  servicePaymentAmount: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -297,6 +300,8 @@ export async function GET() {
         incidents: incidentsByBooking.get(id) || [],
         hasActiveIncident: !!b.hasActiveIncident || (incidentsByBooking.get(id)?.length ?? 0) > 0,
         incidentExceptionState: b.incidentExceptionState || "none",
+        servicePaymentStatus: b.servicePaymentStatus || null,
+        servicePaymentAmount: b.servicePaymentAmount ?? null,
         createdAt: new Date(b.createdAt).toISOString(),
         updatedAt: new Date(b.updatedAt).toISOString(),
       };
