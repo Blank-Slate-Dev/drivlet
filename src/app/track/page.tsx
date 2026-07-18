@@ -96,6 +96,7 @@ interface Booking {
   servicePaymentStatus?: 'pending' | 'paid';
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
+  servicePaymentMethod?: 'stripe_link' | 'phone_direct';
   // Incident visibility
   hasActiveIncident?: boolean;
   incidentExceptionState?: 'none' | 'continue' | 'hold' | 'stop';
@@ -518,6 +519,7 @@ function TrackingContent() {
               servicePaymentStatus: data.servicePaymentStatus,
               servicePaymentAmount: data.servicePaymentAmount,
               servicePaymentUrl: data.servicePaymentUrl,
+              servicePaymentMethod: data.servicePaymentMethod || prev.servicePaymentMethod,
               driver: data.driver || prev.driver,
               signedForms: data.signedForms || prev.signedForms,
               updatedAt: data.updatedAt,
@@ -1204,7 +1206,9 @@ function TrackingContent() {
                       <div>
                         <p className="font-semibold text-emerald-800">Service Payment Complete</p>
                         <p className="text-sm text-emerald-600">
-                          ${((booking.servicePaymentAmount || 0) / 100).toFixed(2)} paid
+                          {booking.servicePaymentMethod === 'phone_direct'
+                            ? 'Paid directly to the service centre'
+                            : `$${((booking.servicePaymentAmount || 0) / 100).toFixed(2)} paid`}
                         </p>
                       </div>
                     </div>

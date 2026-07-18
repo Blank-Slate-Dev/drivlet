@@ -88,6 +88,7 @@ interface Job {
   servicePaymentStatus?: string | null;
   servicePaymentAmount?: number | null;
   servicePaymentUrl?: string | null;
+  servicePaymentMethod?: "stripe_link" | "phone_direct" | null;
   checkpointStatus?: CheckpointStatus;
   // Leg state info
   pickupDriverState?: string | null;
@@ -185,6 +186,7 @@ type JobAction =
   | "delivering"
   | "delivered"
   | "generate_payment"
+  | "mark_paid_phone"
   | "undo_last";
 
 // ─── Main Page Component ──────────────────────────────────────
@@ -1442,16 +1444,19 @@ function MyJobCard({
         </div>
       )}
 
-      {/* Payment received badge */}
+      {/* Payment received badge — shows HOW the customer paid */}
       {job.servicePaymentStatus === "paid" && (
         <div className="mx-5 mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:mx-6">
           <div className="flex items-center gap-2 text-sm text-emerald-800">
             <CheckCircle className="h-4 w-4" />
             <span className="font-medium">
-              Payment received &mdash; $
-              {job.servicePaymentAmount
-                ? (job.servicePaymentAmount / 100).toFixed(2)
-                : "0.00"}
+              {job.servicePaymentMethod === "phone_direct"
+                ? "Paid to service centre by phone"
+                : `Payment received via link — $${
+                    job.servicePaymentAmount
+                      ? (job.servicePaymentAmount / 100).toFixed(2)
+                      : "0.00"
+                  }`}
             </span>
           </div>
         </div>
@@ -1463,13 +1468,30 @@ function MyJobCard({
       {(isMyPickup || isMyReturn) &&
         pickupComplete &&
         job.servicePaymentStatus !== "paid" && (
-          <div className="mx-5 mb-3 sm:mx-6">
+          <div className="mx-5 mb-3 flex flex-wrap gap-2 sm:mx-6">
             <button
               onClick={() => onOpenPayment(job)}
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               <DollarSign className="h-4 w-4" />
               {job.servicePaymentUrl ? "Payment Link" : "Generate Payment Link"}
+            </button>
+            {/* Record that the customer paid the service centre directly */}
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Mark this service as paid directly to the service centre by phone? Only confirm once the service centre has verified the payment."
+                  )
+                ) {
+                  onAction(job._id, "mark_paid_phone");
+                }
+              }}
+              disabled={isLoading}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+            >
+              <Phone className="h-4 w-4" />
+              Paid by Phone
             </button>
           </div>
         )}

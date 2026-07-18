@@ -165,6 +165,7 @@ export async function GET(request: NextRequest) {
       servicePaymentStatus: booking.servicePaymentStatus,
       servicePaymentAmount: booking.servicePaymentAmount,
       servicePaymentUrl: booking.servicePaymentUrl,
+      servicePaymentMethod: booking.servicePaymentMethod,
       // Signed handover forms — the tracker hides "signature required"
       // prompts for forms the driver already completed in person.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -143,6 +143,9 @@ export interface IBooking extends Document {
   servicePaymentId?: string;
   servicePaymentIntentId?: string;
   servicePaymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
+  /** How the service was paid: via the Stripe backup link, or directly to the
+   *  service centre over the phone (marked by the driver). */
+  servicePaymentMethod?: 'stripe_link' | 'phone_direct';
 
   // Vehicle details
   transmissionType: 'automatic' | 'manual';
@@ -549,6 +552,11 @@ const BookingSchema = new Schema<IBooking>(
     servicePaymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
+    },
+    servicePaymentMethod: {
+      type: String,
+      enum: ["stripe_link", "phone_direct"],
+      required: false,
     },
 
     // Vehicle details

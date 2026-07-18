@@ -36,6 +36,7 @@ async function updateBookingAsPaid(
       {
         $set: {
           servicePaymentStatus: 'paid',
+          servicePaymentMethod: 'stripe_link',
           servicePaymentId: paymentId,
           updatedAt: new Date(),
         },

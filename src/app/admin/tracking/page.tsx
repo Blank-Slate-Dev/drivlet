@@ -87,6 +87,7 @@ interface TrackingCard {
   /** null = no payment link issued, "pending" = link sent, "paid" = paid */
   servicePaymentStatus: "pending" | "paid" | null;
   servicePaymentAmount: number | null;
+  servicePaymentMethod: "stripe_link" | "phone_direct" | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -466,12 +467,16 @@ function IdentityBlock({ card }: { card: DisplayCard }) {
               </span>
             )}
           </div>
-          {/* Service payment state (only shown once a payment link exists) */}
+          {/* Service payment state — includes HOW the customer paid */}
           {card.servicePaymentStatus === "paid" && (
             <span className="mt-1.5 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              Paid
-              {typeof card.servicePaymentAmount === "number" &&
-                ` · $${(card.servicePaymentAmount / 100).toFixed(2)}`}
+              {card.servicePaymentMethod === "phone_direct"
+                ? "Paid service centre by phone"
+                : `Paid via Stripe link${
+                    typeof card.servicePaymentAmount === "number"
+                      ? ` · $${(card.servicePaymentAmount / 100).toFixed(2)}`
+                      : ""
+                  }`}
             </span>
           )}
           {card.servicePaymentStatus === "pending" && (

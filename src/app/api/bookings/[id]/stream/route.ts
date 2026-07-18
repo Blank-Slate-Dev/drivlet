@@ -72,6 +72,7 @@ export async function GET(
           servicePaymentStatus: booking.servicePaymentStatus,
           servicePaymentAmount: booking.servicePaymentAmount,
           servicePaymentUrl: booking.servicePaymentUrl,
+          servicePaymentMethod: booking.servicePaymentMethod,
           updatedAt: booking.updatedAt,
           latestUpdate: booking.updates?.length > 0
             ? booking.updates[booking.updates.length - 1]

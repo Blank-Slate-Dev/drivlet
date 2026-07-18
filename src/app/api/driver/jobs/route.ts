@@ -248,6 +248,7 @@ export async function GET(request: NextRequest) {
           servicePaymentStatus: job.servicePaymentStatus || null,
           servicePaymentAmount: job.servicePaymentAmount || null,
           servicePaymentUrl: job.servicePaymentUrl || null,
+          servicePaymentMethod: job.servicePaymentMethod || null,
           checkpointStatus: job.checkpointStatus || {
             pre_pickup: 0, service_dropoff: 0, service_pickup: 0, final_delivery: 0,
           },
@@ -382,6 +383,8 @@ export async function POST(request: NextRequest) {
       "complete",
       // Correction
       "undo_last",
+      // Payment method marking
+      "mark_paid_phone",
     ];
 
     if (!validActions.includes(action)) {
@@ -824,6 +827,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Undid "${target.label}"`,
+      });
+    }
+
+    // ========== MARK PAID DIRECTLY TO SERVICE CENTRE (PHONE) ==========
+    // Customers usually pay the service centre over the phone. The driver
+    // marks it here so admin can see WHICH method was used. Available in the
+    // same window as generate_payment (either assigned driver, until done).
+    if (action === "mark_paid_phone") {
+      if (!isPickupDriver && !isReturnDriver) {
+        return NextResponse.json(
+          { error: "Only an assigned driver can mark the payment method" },
+          { status: 403 }
+        );
+      }
+
+      if (booking.status === "completed") {
+        return NextResponse.json(
+          { error: "This booking is already completed" },
+          { status: 400 }
+        );
+      }
+
+      // Conflict guard: never double-mark a payment
+      if (booking.servicePaymentStatus === "paid") {
+        return NextResponse.json(
+          {
+            error:
+              booking.servicePaymentMethod === "phone_direct"
+                ? "Already marked as paid to the service centre by phone."
+                : "This booking was already paid via the payment link.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const hadPendingLink = booking.servicePaymentStatus === "pending" && !!booking.servicePaymentUrl;
+
+      booking.servicePaymentStatus = "paid";
+      booking.servicePaymentMethod = "phone_direct";
+
+      booking.updates.push({
+        stage: booking.currentStage,
+        timestamp: now,
+        message: hadPendingLink
+          ? "Driver confirmed the customer paid the service centre directly by phone. The unused Stripe payment link has been superseded."
+          : "Driver confirmed the customer paid the service centre directly by phone.",
+        updatedBy: "driver",
+      });
+      await booking.save();
+      // SSE only — closes the payment section on the customer tracker without
+      // sending a stage email (the stage didn't change).
+      notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
+
+      return NextResponse.json({
+        success: true,
+        message: "Marked as paid to service centre by phone",
       });
     }
 

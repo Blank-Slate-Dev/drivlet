@@ -12,6 +12,7 @@ export interface BookingEventData {
   servicePaymentStatus?: string;
   servicePaymentAmount?: number;
   servicePaymentUrl?: string;
+  servicePaymentMethod?: string;
   updatedAt: Date;
   latestUpdate?: {
     stage: string;

@@ -156,6 +156,7 @@ export interface Booking {
   paymentAmount?: number;
   servicePaymentAmount?: number;
   servicePaymentStatus?: string;
+  servicePaymentMethod?: "stripe_link" | "phone_direct";
   servicePaymentIntentId?: string;
   refunds?: RefundEntry[];
   extraCharges?: ExtraCharge[];
@@ -771,12 +772,23 @@ export function ViewDetailsModal({
                       <p className="mt-1 font-medium text-slate-900">
                         {booking.servicePaymentAmount ? formatCurrency(booking.servicePaymentAmount) : "—"}
                       </p>
+                      {booking.servicePaymentStatus === "paid" && (
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {booking.servicePaymentMethod === "phone_direct"
+                            ? "Paid service centre by phone (driver-confirmed)"
+                            : "Paid via Stripe payment link"}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${PAYMENT_STATUS_CHIP[booking.servicePaymentStatus || "pending"] || "bg-slate-100 text-slate-700"}`}>
                         {booking.servicePaymentStatus || "pending"}
                       </span>
-                      {booking.servicePaymentStatus === "paid" && remainingFor("service") > 0 && (
+                      {/* Stripe refunds only apply to link payments — phone
+                          payments were made to the service centre directly */}
+                      {booking.servicePaymentStatus === "paid" &&
+                        booking.servicePaymentMethod !== "phone_direct" &&
+                        remainingFor("service") > 0 && (
                         <button
                           onClick={() => openRefundForm("service")}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"

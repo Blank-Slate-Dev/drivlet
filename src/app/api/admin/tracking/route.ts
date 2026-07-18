@@ -107,6 +107,8 @@ export interface TrackingCard {
   /** Service payment state: null = no link issued, "pending" = link sent, "paid" = paid */
   servicePaymentStatus: "pending" | "paid" | null;
   servicePaymentAmount: number | null;
+  /** How it was paid: Stripe link or directly to the service centre by phone */
+  servicePaymentMethod: "stripe_link" | "phone_direct" | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +311,7 @@ export async function GET() {
               ? "pending"
               : null,
         servicePaymentAmount: b.servicePaymentAmount ?? null,
+        servicePaymentMethod: b.servicePaymentMethod || null,
         createdAt: new Date(b.createdAt).toISOString(),
         updatedAt: new Date(b.updatedAt).toISOString(),
       };
