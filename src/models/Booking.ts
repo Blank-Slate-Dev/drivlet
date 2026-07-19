@@ -146,6 +146,13 @@ export interface IBooking extends Document {
   /** How the service was paid: via the Stripe backup link, or directly to the
    *  service centre over the phone (marked by the driver). */
   servicePaymentMethod?: 'stripe_link' | 'phone_direct';
+  /** Post-delivery customer feedback (one per booking). */
+  feedback?: {
+    rating: number; // 1-5 stars
+    hearAboutUs?: string;
+    comments?: string;
+    submittedAt: Date;
+  };
 
   // Vehicle details
   transmissionType: 'automatic' | 'manual';
@@ -556,6 +563,20 @@ const BookingSchema = new Schema<IBooking>(
     servicePaymentMethod: {
       type: String,
       enum: ["stripe_link", "phone_direct"],
+      required: false,
+    },
+
+    // Post-delivery customer feedback (one per booking)
+    feedback: {
+      type: new Schema(
+        {
+          rating: { type: Number, min: 1, max: 5, required: true },
+          hearAboutUs: { type: String, trim: true },
+          comments: { type: String, trim: true, maxlength: 2000 },
+          submittedAt: { type: Date, required: true, default: Date.now },
+        },
+        { _id: false }
+      ),
       required: false,
     },
 

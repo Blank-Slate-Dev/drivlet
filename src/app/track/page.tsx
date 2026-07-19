@@ -42,6 +42,7 @@ import RegistrationPlate, { StateCode } from "@/components/homepage/Registration
 import { SUPPORT_PHONE, SUPPORT_PHONE_HREF } from "@/lib/policy";
 import GuestPhotosViewer from "@/components/tracking/GuestPhotosViewer";
 import PickupConsentForm from "@/components/forms/PickupConsentForm";
+import BookingFeedbackForm from "@/components/BookingFeedbackForm";
 import ReturnConfirmationForm from "@/components/forms/ReturnConfirmationForm";
 import ClaimLodgementForm from "@/components/forms/ClaimLodgementForm";
 
@@ -384,6 +385,53 @@ function TrackingContent() {
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showClaimForm, setShowClaimForm] = useState(false);
   const autoPromptedRef = useRef<Set<string>>(new Set());
+
+  // Pickup time change request state
+  const [showTimeChange, setShowTimeChange] = useState(false);
+  const [timeChangeValue, setTimeChangeValue] = useState("");
+  const [timeChangeNote, setTimeChangeNote] = useState("");
+  const [timeChangeSubmitting, setTimeChangeSubmitting] = useState(false);
+  const [timeChangeResult, setTimeChangeResult] = useState<string | null>(null);
+
+  const submitTimeChange = async () => {
+    if (!timeChangeValue) {
+      setTimeChangeResult("Please choose your preferred new pickup time");
+      return;
+    }
+    setTimeChangeSubmitting(true);
+    setTimeChangeResult(null);
+    try {
+      const readable = new Date(timeChangeValue).toLocaleString("en-AU", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const res = await fetch("/api/bookings/time-change-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: trackingCode,
+          email: email.toLowerCase().trim(),
+          rego: registration.toUpperCase().trim(),
+          requestedTime: readable,
+          note: timeChangeNote,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit request");
+      setTimeChangeResult("success");
+      setTimeChangeValue("");
+      setTimeChangeNote("");
+    } catch (err) {
+      setTimeChangeResult(
+        err instanceof Error ? err.message : "Failed to submit request"
+      );
+    } finally {
+      setTimeChangeSubmitting(false);
+    }
+  };
 
   // Animated progress counter
   const currentDisplayIndex = booking ?
@@ -1214,6 +1262,15 @@ function TrackingContent() {
                     </div>
                   )}
 
+                  {/* Post-delivery feedback */}
+                  {booking.currentStage === 'delivered' && (
+                    <BookingFeedbackForm
+                      code={trackingCode}
+                      email={email}
+                      rego={registration}
+                    />
+                  )}
+
                   {/* Active Incident Notice */}
                   {(booking.hasActiveIncident ||
                     booking.incidentExceptionState === 'hold' ||
@@ -1341,6 +1398,16 @@ function TrackingContent() {
                       <Clock className="h-4 w-4 text-slate-400" />
                       <span>Pickup: {booking.pickupTime}</span>
                     </div>
+
+                    {/* Pickup time change request — only before the car is collected */}
+                    {["booking_confirmed", "driver_en_route"].includes(booking.currentStage) && (
+                      <button
+                        onClick={() => setShowTimeChange(true)}
+                        className="text-sm font-medium text-emerald-600 underline underline-offset-2 transition hover:text-emerald-700"
+                      >
+                        Need to change your pickup time?
+                      </button>
+                    )}
                   </div>
 
                   {/* Action Buttons — Photos, Forms, Claim */}
@@ -1422,6 +1489,17 @@ function TrackingContent() {
                         <p className="text-sm text-slate-500 mt-1">
                           Pay securely online below — or pay the service centre
                           directly if you&apos;ve already arranged it with them.
+                        </p>
+                      </div>
+
+                      {/* Unpaid = car stays notice (firm but polite) */}
+                      <div className="mb-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                        <p className="text-xs text-slate-500">
+                          Please note: your vehicle can only be returned once the
+                          service is paid for. Until payment is made (online or
+                          directly to the service centre), your car will need to
+                          remain at the service centre.
                         </p>
                       </div>
 
@@ -1523,6 +1601,102 @@ function TrackingContent() {
           isOpen={showPhotos}
           onClose={() => setShowPhotos(false)}
         />
+      )}
+
+      {/* ── Pickup Time Change Modal ── */}
+      {showTimeChange && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                  <Clock className="h-5 w-5 text-emerald-600" />
+                </div>
+                <h2 className="font-semibold text-slate-900">Change pickup time</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTimeChange(false);
+                  setTimeChangeResult(null);
+                }}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              {timeChangeResult === "success" ? (
+                <div className="py-4 text-center">
+                  <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+                  <p className="mt-3 font-semibold text-slate-900">Request received</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    The Drivlet team will confirm your new pickup time shortly.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowTimeChange(false);
+                      setTimeChangeResult(null);
+                    }}
+                    className="mt-4 w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-500">
+                    Let us know when suits you better and we&apos;ll rearrange your
+                    pickup. Your current window: <span className="font-medium text-slate-700">{booking?.pickupTime}</span>
+                  </p>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Preferred new pickup time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={timeChangeValue}
+                      onChange={(e) => setTimeChangeValue(e.target.value)}
+                      disabled={timeChangeSubmitting}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Anything we should know? <span className="font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={timeChangeNote}
+                      onChange={(e) => setTimeChangeNote(e.target.value)}
+                      disabled={timeChangeSubmitting}
+                      placeholder="e.g. any morning after 9am works"
+                      className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                    />
+                  </div>
+                  {timeChangeResult && timeChangeResult !== "success" && (
+                    <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      {timeChangeResult}
+                    </div>
+                  )}
+                  <button
+                    onClick={submitTimeChange}
+                    disabled={timeChangeSubmitting}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {timeChangeSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Clock className="h-4 w-4" />
+                    )}
+                    Request time change
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Form Modals */}

@@ -37,6 +37,7 @@ import {
   Send,
   ShieldAlert,
   XCircle,
+  Star,
 } from "lucide-react";
 import { getCategoryById } from "@/constants/serviceCategories";
 import { FEATURES } from "@/lib/featureFlags";
@@ -157,6 +158,12 @@ export interface Booking {
   servicePaymentAmount?: number;
   servicePaymentStatus?: string;
   servicePaymentMethod?: "stripe_link" | "phone_direct";
+  feedback?: {
+    rating: number;
+    hearAboutUs?: string;
+    comments?: string;
+    submittedAt: string;
+  };
   servicePaymentIntentId?: string;
   refunds?: RefundEntry[];
   extraCharges?: ExtraCharge[];
@@ -1468,6 +1475,51 @@ export function ViewDetailsModal({
               </div>
             </div>
           </div>
+
+          {/* Customer Feedback (post-delivery survey) */}
+          {booking.feedback?.rating && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                Customer Feedback
+              </div>
+              <div className="mt-3 flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-5 w-5 ${
+                      star <= booking.feedback!.rating
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-slate-200"
+                    }`}
+                  />
+                ))}
+                <span className="ml-2 text-sm font-semibold text-slate-700">
+                  {booking.feedback.rating}/5
+                </span>
+              </div>
+              {booking.feedback.hearAboutUs && (
+                <p className="mt-2 text-sm text-slate-600">
+                  <span className="text-slate-400">Heard about us via:</span>{" "}
+                  {booking.feedback.hearAboutUs}
+                </p>
+              )}
+              {booking.feedback.comments && (
+                <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm italic text-slate-600">
+                  &ldquo;{booking.feedback.comments}&rdquo;
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-400">
+                Submitted {new Date(booking.feedback.submittedAt).toLocaleString("en-AU", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          )}
 
           {/* Signed Forms */}
           {booking.signedForms && booking.signedForms.length > 0 && (

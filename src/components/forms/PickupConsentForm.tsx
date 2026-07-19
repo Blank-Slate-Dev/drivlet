@@ -150,6 +150,8 @@ export default function PickupConsentForm({
             driver: driverSignature,
           },
           formData: {
+            // Recorded so the authorisation appears in the PDF and email copy
+            serviceCentreLiaisonAuthorised: "Yes — Drivlet may discuss the vehicle, repairs, quotes and instructions with the service centre on the customer's behalf",
             customerName: customerName.trim(),
             customerPhone: customerPhone.trim(),
             customerEmail: customerEmail.trim(),
@@ -444,6 +446,12 @@ export default function PickupConsentForm({
                       By signing this form, you consent to Drivlet collecting your vehicle for the
                       stated service. You confirm the condition notes above are accurate to the best
                       of your knowledge.
+                    </p>
+                    <p>
+                      You also authorise Drivlet to liaise with the nominated service centre on your
+                      behalf regarding your vehicle — including discussing its condition, the work to
+                      be carried out, repairs, quotes, and instructions for the booked service.
+                      Drivlet will contact you before agreeing to any additional cost on your behalf.
                     </p>
                     <p>
                       Nothing in this form limits your rights under Australian Consumer Law.

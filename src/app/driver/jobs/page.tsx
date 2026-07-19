@@ -30,6 +30,7 @@ import {
   Truck,
   ClipboardCheck,
   Undo2,
+  Search,
 } from "lucide-react";
 import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
@@ -423,9 +424,38 @@ export default function DriverJobsPage() {
     if (id) loadPhotos(id);
   };
 
+  // ─── Search & filter (client-side, over already-fetched jobs) ──
+
+  const [search, setSearch] = useState("");
+  const [legFilter, setLegFilter] = useState<"all" | "pickup" | "return">("all");
+
+  const matchesFilters = useCallback(
+    (job: Job) => {
+      if (legFilter === "pickup" && !job.pickupClaimedByMe) return false;
+      if (legFilter === "return" && !job.returnClaimedByMe) return false;
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return [
+        job.vehicleRegistration,
+        job.customerName,
+        job.pickupAddress,
+        job.garageName,
+      ].some((v) => v?.toLowerCase().includes(q));
+    },
+    [search, legFilter]
+  );
+
   // ─── Computed ─────────────────────────────────────────────
 
   const totalJobs = Object.values(myJobs).flat().length;
+
+  const filteredSections = [
+    { key: "in_progress", label: "In Progress", prefix: "ip", jobs: myJobs.in_progress.filter(matchesFilters) },
+    { key: "awaiting_payment", label: "Awaiting Payment", prefix: "ap", jobs: myJobs.awaiting_payment.filter(matchesFilters) },
+    { key: "ready_for_return", label: "Ready for Return", prefix: "rr", jobs: myJobs.ready_for_return.filter(matchesFilters) },
+    { key: "accepted", label: "Upcoming", prefix: "ac", jobs: myJobs.accepted.filter(matchesFilters) },
+  ];
+  const filteredTotal = filteredSections.reduce((sum, s) => sum + s.jobs.length, 0);
 
   // ─── Render ───────────────────────────────────────────────
 
@@ -483,98 +513,113 @@ export default function DriverJobsPage() {
               </div>
             )}
 
-            {/* ═══ MY JOBS ═══ */}
+            {/* ═══ SEARCH & FILTERS ═══ */}
             {totalJobs > 0 && (
-              <div className="space-y-3">
-                <AnimatePresence mode="popLayout">
-                  {/* In Progress — highest priority */}
-                  {myJobs.in_progress.map((job) => (
-                    <MyJobCard
-                      key={`ip-${job._id}`}
-                      job={job}
-                      actionLoading={actionLoading}
-                      onAction={handleJobAction}
-                      onOpenPayment={openPaymentModal}
-                      onOpenPhotos={openPhotoModal}
-                      photos={photosByBooking[job._id]}
-                      onEnsurePhotos={loadPhotos}
-                      onOpenForm={openConsentForm}
-                      onCallCustomer={handleCallCustomer}
-                      callingCustomer={callingCustomer}
-                      callSuccess={callSuccess}
-                      onReportIncident={(id) => {
-                        setIncidentBookingId(id);
-                        setShowIncidentForm(true);
-                      }}
-                    />
-                  ))}
+              <div className="mb-4 space-y-3">
+                {/* Search by plate / customer / address */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search plate, customer, or address…"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
 
-                  {/* Awaiting Payment */}
-                  {myJobs.awaiting_payment.map((job) => (
-                    <MyJobCard
-                      key={`ap-${job._id}`}
-                      job={job}
-                      actionLoading={actionLoading}
-                      onAction={handleJobAction}
-                      onOpenPayment={openPaymentModal}
-                      onOpenPhotos={openPhotoModal}
-                      photos={photosByBooking[job._id]}
-                      onEnsurePhotos={loadPhotos}
-                      onOpenForm={openConsentForm}
-                      onCallCustomer={handleCallCustomer}
-                      callingCustomer={callingCustomer}
-                      callSuccess={callSuccess}
-                      onReportIncident={(id) => {
-                        setIncidentBookingId(id);
-                        setShowIncidentForm(true);
-                      }}
-                    />
+                {/* Leg filter chips */}
+                <div className="flex items-center gap-2">
+                  {(
+                    [
+                      { key: "all", label: "All" },
+                      { key: "pickup", label: "Pickups" },
+                      { key: "return", label: "Returns" },
+                    ] as const
+                  ).map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setLegFilter(f.key)}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                        legFilter === f.key
+                          ? "bg-emerald-600 text-white"
+                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
                   ))}
+                  <span className="ml-auto text-xs text-slate-400">
+                    {filteredTotal} of {totalJobs} job{totalJobs === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
+            )}
 
-                  {/* Ready for Return */}
-                  {myJobs.ready_for_return.map((job) => (
-                    <MyJobCard
-                      key={`rr-${job._id}`}
-                      job={job}
-                      actionLoading={actionLoading}
-                      onAction={handleJobAction}
-                      onOpenPayment={openPaymentModal}
-                      onOpenPhotos={openPhotoModal}
-                      photos={photosByBooking[job._id]}
-                      onEnsurePhotos={loadPhotos}
-                      onOpenForm={openConsentForm}
-                      onCallCustomer={handleCallCustomer}
-                      callingCustomer={callingCustomer}
-                      callSuccess={callSuccess}
-                      onReportIncident={(id) => {
-                        setIncidentBookingId(id);
-                        setShowIncidentForm(true);
-                      }}
-                    />
-                  ))}
+            {/* ═══ MY JOBS — grouped sections ═══ */}
+            {totalJobs > 0 && filteredTotal === 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center">
+                <Search className="mx-auto h-10 w-10 text-slate-300" />
+                <h3 className="mt-4 text-base font-medium text-slate-900">
+                  No jobs match
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Try a different plate, name, or filter
+                </p>
+              </div>
+            )}
 
-                  {/* Accepted / Upcoming */}
-                  {myJobs.accepted.map((job) => (
-                    <MyJobCard
-                      key={`ac-${job._id}`}
-                      job={job}
-                      actionLoading={actionLoading}
-                      onAction={handleJobAction}
-                      onOpenPayment={openPaymentModal}
-                      onOpenPhotos={openPhotoModal}
-                      photos={photosByBooking[job._id]}
-                      onEnsurePhotos={loadPhotos}
-                      onOpenForm={openConsentForm}
-                      onCallCustomer={handleCallCustomer}
-                      callingCustomer={callingCustomer}
-                      callSuccess={callSuccess}
-                      onReportIncident={(id) => {
-                        setIncidentBookingId(id);
-                        setShowIncidentForm(true);
-                      }}
-                    />
-                  ))}
-                </AnimatePresence>
+            {filteredTotal > 0 && (
+              <div>
+                {filteredSections.map(
+                  (section) =>
+                    section.jobs.length > 0 && (
+                      <div key={section.key} className="mb-5 last:mb-0">
+                        {/* Section header */}
+                        <div className="mb-2 flex items-center gap-2 px-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                            {section.label}
+                          </span>
+                          <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                            {section.jobs.length}
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          <AnimatePresence mode="popLayout">
+                            {section.jobs.map((job) => (
+                              <MyJobCard
+                                key={`${section.prefix}-${job._id}`}
+                                job={job}
+                                actionLoading={actionLoading}
+                                onAction={handleJobAction}
+                                onOpenPayment={openPaymentModal}
+                                onOpenPhotos={openPhotoModal}
+                                photos={photosByBooking[job._id]}
+                                onEnsurePhotos={loadPhotos}
+                                onOpenForm={openConsentForm}
+                                onCallCustomer={handleCallCustomer}
+                                callingCustomer={callingCustomer}
+                                callSuccess={callSuccess}
+                                onReportIncident={(id) => {
+                                  setIncidentBookingId(id);
+                                  setShowIncidentForm(true);
+                                }}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    )
+                )}
               </div>
             )}
           </>

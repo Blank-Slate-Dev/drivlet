@@ -34,6 +34,7 @@ const FIELD_LABELS: Record<string, string> = {
   declCustomerDate: "Declaration — Customer Date",
   driverName: "Driver Name",
   declDriverDate: "Declaration — Driver Date",
+  serviceCentreLiaisonAuthorised: "Service Centre Liaison Authorised",
 
   // Return
   returnAddress: "Return Address",

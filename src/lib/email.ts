@@ -362,6 +362,8 @@ How to pay and get your car back:
 2. Review the service amount and pay securely by card.
 3. Once payment is confirmed, our driver will return your car to you.
 
+Please note: your vehicle can only be returned once the service is paid for. Until payment is made (online or directly to the service centre), your car will need to remain at the service centre.
+
 ${emailPolicyFooterText()}
 
 Thanks,
@@ -400,6 +402,14 @@ The drivlet team
         <p style="margin: 0 0 24px; color: #64748b; font-size: 13px; text-align: center; line-height: 1.6;">
           The link opens your tracking page, where you can review the amount and pay by card. Payment is processed securely by Stripe.
         </p>
+
+        <div style="margin: 0 0 24px; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+            Please note: your vehicle can only be returned once the service is paid for.
+            Until payment is made (online or directly to the service centre), your car
+            will need to remain at the service centre.
+          </p>
+        </div>
 
         ${emailPolicyFooterHtml()}
       </div>
@@ -570,6 +580,10 @@ export async function sendBookingStageEmail(
     trackingCode,
   };
 
+  // Post-delivery feedback CTA (delivered stage only)
+  const feedbackUrl = `${appUrl}/feedback${trackingCode ? `?code=${trackingCode}` : ""}`;
+  const isDelivered = currentStage === "delivered";
+
   // ── Plain text version ──
   const textContent = `
 ${content.heading}
@@ -582,7 +596,7 @@ ${bookingDetailsText(details)}
 Progress: ${progress}%
 
 Track your booking: ${trackingUrl}
-
+${isDelivered ? `\nHow did we do? We'd love a quick rating and a word of feedback (takes under a minute): ${feedbackUrl}\n` : ""}
 ${emailPolicyFooterText()}
 
 ---
@@ -645,6 +659,17 @@ drivlet - Car service made simple
                   </td>
                 </tr>
               </table>
+
+              ${isDelivered ? `
+              <!-- Feedback CTA (post-delivery only) -->
+              <div style="margin: 0 0 24px; padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; text-align: center;">
+                <p style="margin: 0 0 4px; font-size: 18px;">⭐⭐⭐⭐⭐</p>
+                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">How did we do?</p>
+                <p style="margin: 0 0 16px; color: #a16207; font-size: 13px; line-height: 1.6;">We'd love a quick rating and a word of feedback — it takes less than a minute.</p>
+                <a href="${feedbackUrl}" style="display: inline-block; background-color: #d97706; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 28px; border-radius: 9999px;">
+                  Rate your experience
+                </a>
+              </div>` : ""}
 
               ${emailPolicyFooterHtml()}
             </td>

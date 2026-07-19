@@ -213,6 +213,7 @@ export async function POST(
               ["Service centre", fd.serviceCentreName],
               ["Service centre address", fd.serviceCentreAddress],
               ["Special instructions", fd.customerNotes],
+              ["Service centre liaison", fd.serviceCentreLiaisonAuthorised],
             ]
           : formType === "return_confirmation"
             ? [
