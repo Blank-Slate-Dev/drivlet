@@ -31,6 +31,9 @@ import {
   ClipboardCheck,
   Undo2,
   Search,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from "lucide-react";
 import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
 import PhotoUploadModal from "@/components/driver/PhotoUploadModal";
@@ -164,6 +167,112 @@ function getReturnStateInfo(
     default:
       return { label: "Pending", colorKey: "neutral" };
   }
+}
+
+// ─── Stage colour coding ───────────────────────────────────────
+// One colour per booking stage so a driver can tell at a glance where each
+// job is. Rendered as a left accent border + status chip; explained by the
+// collapsible legend on the Jobs tab. (No blue/purple per brand rules.)
+
+interface JobStageMeta {
+  key: string;
+  label: string;
+  accent: string; // left border accent
+  chip: string; // status chip classes
+  dot: string; // legend dot
+}
+
+const JOB_STAGE_META: Record<string, Omit<JobStageMeta, "key">> = {
+  upcoming: { label: "Upcoming", accent: "border-l-slate-300", chip: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+  to_customer: { label: "Heading to customer", accent: "border-l-amber-400", chip: "bg-amber-50 text-amber-700", dot: "bg-amber-400" },
+  at_customer: { label: "At customer", accent: "border-l-amber-500", chip: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
+  collected: { label: "Car collected", accent: "border-l-yellow-400", chip: "bg-yellow-50 text-yellow-700", dot: "bg-yellow-400" },
+  at_workshop: { label: "At workshop", accent: "border-l-lime-500", chip: "bg-lime-50 text-lime-700", dot: "bg-lime-500" },
+  awaiting_payment: { label: "Awaiting payment", accent: "border-l-orange-400", chip: "bg-orange-50 text-orange-700", dot: "bg-orange-400" },
+  returning: { label: "Returning to customer", accent: "border-l-teal-500", chip: "bg-teal-50 text-teal-700", dot: "bg-teal-500" },
+  delivered: { label: "Delivered", accent: "border-l-emerald-500", chip: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  on_hold: { label: "Incident — on hold", accent: "border-l-red-500", chip: "bg-red-50 text-red-700", dot: "bg-red-500" },
+};
+
+// Legend order (mirrors the journey)
+const JOB_STAGE_ORDER = [
+  "upcoming",
+  "to_customer",
+  "at_customer",
+  "collected",
+  "at_workshop",
+  "awaiting_payment",
+  "returning",
+  "delivered",
+  "on_hold",
+];
+
+function getJobStage(job: Job): JobStageMeta {
+  const pick = (key: string): JobStageMeta => ({ key, ...JOB_STAGE_META[key] });
+  if (
+    job.hasActiveIncident &&
+    (job.incidentExceptionState === "hold" || job.incidentExceptionState === "stop")
+  ) {
+    return pick("on_hold");
+  }
+  const p = job.pickupDriverState;
+  const r = job.returnDriverState;
+  if (r === "completed") return pick("delivered");
+  if (r === "started" || r === "collected" || r === "delivering") return pick("returning");
+  if (p === "completed") {
+    if (job.servicePaymentStatus === "pending" && job.servicePaymentUrl) {
+      return pick("awaiting_payment");
+    }
+    return pick("at_workshop");
+  }
+  if (p === "collected") return pick("collected");
+  if (p === "arrived") return pick("at_customer");
+  if (p === "started") return pick("to_customer");
+  return pick("upcoming");
+}
+
+// ─── Collapsible colour legend ────────────────────────────────
+function StageLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left"
+      >
+        <Info className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+        <span className="text-xs font-medium text-slate-500">
+          What do the colours mean?
+        </span>
+        {open ? (
+          <ChevronUp className="ml-auto h-3.5 w-3.5 text-slate-400" />
+        ) : (
+          <ChevronDown className="ml-auto h-3.5 w-3.5 text-slate-400" />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-slate-100 px-3.5 py-3 sm:grid-cols-2">
+              {JOB_STAGE_ORDER.map((key) => (
+                <div key={key} className="flex items-center gap-2 text-xs text-slate-600">
+                  <span
+                    className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${JOB_STAGE_META[key].dot}`}
+                  />
+                  {JOB_STAGE_META[key].label}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function StatusBadge({ colorKey, label }: { colorKey: string; label: string }) {
@@ -471,6 +580,12 @@ export default function DriverJobsPage() {
     return id;
   }, [myJobs]);
 
+  // ─── Accordion: one expanded job at a time ────────────────
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const toggleExpanded = useCallback((jobId: string) => {
+    setExpandedJobId((prev) => (prev === jobId ? null : jobId));
+  }, []);
+
   // ─── Search & filter (client-side, over already-fetched jobs) ──
 
   const [search, setSearch] = useState("");
@@ -620,6 +735,9 @@ export default function DriverJobsPage() {
                     {filteredTotal} of {totalJobs} job{totalJobs === 1 ? "" : "s"}
                   </span>
                 </div>
+
+                {/* Colour legend */}
+                <StageLegend />
               </div>
             )}
 
@@ -659,6 +777,8 @@ export default function DriverJobsPage() {
                                 job={job}
                                 isNew={isNewJob(job)}
                                 isNewest={job._id === newestJobId}
+                                expanded={expandedJobId === job._id}
+                                onToggleExpand={toggleExpanded}
                                 actionLoading={actionLoading}
                                 onAction={handleJobAction}
                                 onOpenPayment={openPaymentModal}
@@ -1122,6 +1242,8 @@ function MyJobCard({
   job,
   isNew = false,
   isNewest = false,
+  expanded = false,
+  onToggleExpand,
   actionLoading,
   onAction,
   onOpenPayment,
@@ -1139,6 +1261,9 @@ function MyJobCard({
   isNew?: boolean;
   /** The single most recently assigned job across the list */
   isNewest?: boolean;
+  /** Accordion state — collapsed cards show only the compact summary row */
+  expanded?: boolean;
+  onToggleExpand: (jobId: string) => void;
   actionLoading: string | null;
   onAction: (
     jobId: string,
@@ -1174,6 +1299,9 @@ function MyJobCard({
     hasReturn
   );
 
+  // Stage colour coding (left accent + chip) — see JOB_STAGE_META
+  const stage = getJobStage(job);
+
   // Photo progress — total uploaded across all checkpoints (20 slots total).
   const cs = job.checkpointStatus;
   const photoCount = cs
@@ -1201,17 +1329,23 @@ function MyJobCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+      className={`overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm ${stage.accent} ${
         isNew ? "border-emerald-300 ring-2 ring-emerald-400/40" : "border-slate-200"
       }`}
     >
-      {/* ─── Vehicle Header ─── */}
-      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Car className="h-5 w-5 flex-shrink-0 text-emerald-600" />
-            <p className="truncate text-lg font-semibold text-slate-900">
-              {job.vehicleRegistration} ({job.vehicleState})
+      {/* ─── Compact summary row (always visible — tap to expand) ─── */}
+      <button
+        onClick={() => onToggleExpand(job._id)}
+        className="w-full px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-base font-semibold text-slate-900">
+              {job.vehicleRegistration}
+              <span className="ml-1 text-xs font-normal text-slate-400">
+                ({job.vehicleState})
+              </span>
             </p>
             {isNew && (
               <span className="flex-shrink-0 animate-pulse rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
@@ -1223,20 +1357,46 @@ function MyJobCard({
                 Latest
               </span>
             )}
-          </div>
-          <p className="mt-0.5 truncate text-sm text-slate-500">
-            {job.customerName} &middot; {job.serviceType}
             {job.isManualTransmission && (
-              <span className="ml-1 text-amber-600">Manual</span>
+              <span className="flex-shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                Manual
+              </span>
             )}
-          </p>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${stage.chip}`}>
+              {stage.label}
+            </span>
+            {expanded ? (
+              <ChevronUp className="h-4 w-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-slate-400" />
+            )}
+          </div>
         </div>
-        {SHOW_DRIVER_EARNINGS && (
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-            ${job.payout}
+
+        <p className="mt-1 truncate text-sm text-slate-500">
+          {job.customerName} &middot; {job.garageName || job.serviceType}
+        </p>
+
+        <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {isMyReturn && !isMyPickup
+              ? `Return ${job.dropoffTime || job.pickupTime}`
+              : `Pickup ${job.pickupTime}`}
           </span>
-        )}
-      </div>
+          {job.servicePaymentStatus === "paid" && (
+            <span className="inline-flex items-center gap-1 text-emerald-600">
+              <CheckCircle className="h-3 w-3" />
+              Paid
+            </span>
+          )}
+          {SHOW_DRIVER_EARNINGS && (
+            <span className="font-medium text-emerald-600">${job.payout}</span>
+          )}
+        </div>
+      </button>
 
       {/* ─── Exception State Banner ─── */}
       {job.hasActiveIncident && job.incidentExceptionState === "hold" && (
@@ -1256,6 +1416,15 @@ function MyJobCard({
         </div>
       )}
 
+      {/* ─── Expandable detail (accordion) ─── */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-slate-100"
+          >
       {/* ─── Pickup Leg ─── */}
       {isMyPickup && (
         <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
@@ -1704,6 +1873,9 @@ function MyJobCard({
           </button>
         </div>
       )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
