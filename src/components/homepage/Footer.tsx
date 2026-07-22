@@ -82,7 +82,11 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Service Areas — critical for SEO internal linking */}
+          {/* HIDDEN FOR NOW (2026-07-22) — "Areas we serve" footer column,
+              matching the hidden header nav entry. The location pages stay
+              live at /areas-we-serve, /newcastle, /canberra (SEO); uncomment
+              to restore. Note: hiding these removes SEO internal links to the
+              location pages — reconsider before launch marketing pushes.
           <div>
             <h4 className="mb-4 font-semibold">Areas we serve</h4>
             <ul className="space-y-2 text-sm text-emerald-200">
@@ -103,6 +107,7 @@ export default function Footer() {
               </li>
             </ul>
           </div>
+          */}
 
           {/* Terms & Partner Links */}
           <div>
