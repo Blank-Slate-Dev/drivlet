@@ -43,6 +43,43 @@ export default function DriverLayout({
   const [clockLoading, setClockLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Notification dot on the Jobs tab: lights up when a job was assigned
+  // after the driver last viewed the Jobs page (the page keeps the
+  // "drivlet-jobs-seen-at" timestamp fresh while it's open).
+  const [hasNewJobs, setHasNewJobs] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      try {
+        const res = await fetch("/api/driver/jobs/latest-assignment");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!active) return;
+        if (!data.latestAssignedAt) {
+          setHasNewJobs(false);
+          return;
+        }
+        const stored = parseInt(
+          localStorage.getItem("drivlet-jobs-seen-at") || "",
+          10
+        );
+        const seenAt = Number.isFinite(stored) ? stored : 0;
+        setHasNewJobs(new Date(data.latestAssignedAt).getTime() > seenAt);
+      } catch {
+        /* silent — dot simply stays as-is */
+      }
+    };
+    check();
+    const interval = setInterval(check, 45000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pathname]);
+
+  // Never show the dot while the driver is already looking at Jobs
+  const showJobsDot = hasNewJobs && !pathname.startsWith("/driver/jobs");
+
   // Don't apply layout to login, register, pending, join, or onboarding pages
   const isAuthPage =
     pathname === "/driver/login" ||
@@ -251,13 +288,16 @@ export default function DriverLayout({
               <Link
                 key={href}
                 href={href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition ${
                   isActive(href)
                     ? "bg-emerald-50 text-emerald-700"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
                 {label}
+                {href === "/driver/jobs" && showJobsDot && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500 ring-2 ring-white" />
+                )}
               </Link>
             ))}
           </nav>
@@ -314,7 +354,12 @@ export default function DriverLayout({
             isActive("/driver/jobs") ? "text-emerald-600" : "text-slate-400"
           }`}
         >
-          <Briefcase className="h-5 w-5" />
+          <span className="relative">
+            <Briefcase className="h-5 w-5" />
+            {showJobsDot && (
+              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500 ring-2 ring-white" />
+            )}
+          </span>
           <span className="text-[10px] font-medium">Jobs</span>
         </Link>
         {/* Payments tab hidden with earnings UI (hourly TFN pay) */}

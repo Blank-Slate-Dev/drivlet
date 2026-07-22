@@ -1,7 +1,7 @@
 // src/app/driver/jobs/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -104,6 +104,8 @@ interface Job {
   signedFormTypes?: string[];
   /** Driver's most recent step on their leg(s) — powers "Undo last step". */
   lastStep?: { at: string; label: string } | null;
+  /** When this driver was most recently assigned to the job (either leg). */
+  assignedAt?: string | null;
 }
 
 interface MyJobs {
@@ -424,6 +426,51 @@ export default function DriverJobsPage() {
     if (id) loadPhotos(id);
   };
 
+  // ─── "New" badge tracking ─────────────────────────────────
+  // Jobs assigned after the driver's PREVIOUS visit get a "New" badge.
+  // The stored last-seen time is refreshed while this tab is open, so the
+  // layout's Jobs-tab notification dot clears once the driver has looked.
+
+  const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
+  useEffect(() => {
+    const LAST_SEEN_KEY = "drivlet-jobs-seen-at";
+    const stored = parseInt(localStorage.getItem(LAST_SEEN_KEY) || "", 10);
+    // First-ever visit: treat everything as seen (no badge noise)
+    setLastSeenAt(Number.isFinite(stored) ? stored : Date.now());
+    const markSeen = () => localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+    markSeen();
+    const iv = setInterval(markSeen, 30000);
+    return () => {
+      clearInterval(iv);
+      markSeen();
+    };
+  }, []);
+
+  const isNewJob = useCallback(
+    (job: Job) =>
+      !!(
+        job.assignedAt &&
+        lastSeenAt !== null &&
+        new Date(job.assignedAt).getTime() > lastSeenAt
+      ),
+    [lastSeenAt]
+  );
+
+  // The single most recently assigned job — gets a "Latest" marker so the
+  // driver can always tell which assignment is freshest.
+  const newestJobId = useMemo(() => {
+    let id: string | null = null;
+    let max = 0;
+    for (const job of Object.values(myJobs).flat() as Job[]) {
+      const t = job.assignedAt ? new Date(job.assignedAt).getTime() : 0;
+      if (t > max) {
+        max = t;
+        id = job._id;
+      }
+    }
+    return id;
+  }, [myJobs]);
+
   // ─── Search & filter (client-side, over already-fetched jobs) ──
 
   const [search, setSearch] = useState("");
@@ -453,7 +500,18 @@ export default function DriverJobsPage() {
     { key: "in_progress", label: "In Progress", prefix: "ip", jobs: myJobs.in_progress.filter(matchesFilters) },
     { key: "awaiting_payment", label: "Awaiting Payment", prefix: "ap", jobs: myJobs.awaiting_payment.filter(matchesFilters) },
     { key: "ready_for_return", label: "Ready for Return", prefix: "rr", jobs: myJobs.ready_for_return.filter(matchesFilters) },
-    { key: "accepted", label: "Upcoming", prefix: "ac", jobs: myJobs.accepted.filter(matchesFilters) },
+    // Upcoming sorted newest-assignment-first so the latest job is on top
+    {
+      key: "accepted",
+      label: "Upcoming",
+      prefix: "ac",
+      jobs: myJobs.accepted
+        .filter(matchesFilters)
+        .sort(
+          (a, b) =>
+            new Date(b.assignedAt || 0).getTime() - new Date(a.assignedAt || 0).getTime()
+        ),
+    },
   ];
   const filteredTotal = filteredSections.reduce((sum, s) => sum + s.jobs.length, 0);
 
@@ -599,6 +657,8 @@ export default function DriverJobsPage() {
                               <MyJobCard
                                 key={`${section.prefix}-${job._id}`}
                                 job={job}
+                                isNew={isNewJob(job)}
+                                isNewest={job._id === newestJobId}
                                 actionLoading={actionLoading}
                                 onAction={handleJobAction}
                                 onOpenPayment={openPaymentModal}
@@ -1060,6 +1120,8 @@ function GatedAdvanceButton({
 
 function MyJobCard({
   job,
+  isNew = false,
+  isNewest = false,
   actionLoading,
   onAction,
   onOpenPayment,
@@ -1073,6 +1135,10 @@ function MyJobCard({
   onOpenForm,
 }: {
   job: Job;
+  /** Assigned since the driver's previous visit to this tab */
+  isNew?: boolean;
+  /** The single most recently assigned job across the list */
+  isNewest?: boolean;
   actionLoading: string | null;
   onAction: (
     jobId: string,
@@ -1135,7 +1201,9 @@ function MyJobCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+        isNew ? "border-emerald-300 ring-2 ring-emerald-400/40" : "border-slate-200"
+      }`}
     >
       {/* ─── Vehicle Header ─── */}
       <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
@@ -1145,6 +1213,16 @@ function MyJobCard({
             <p className="truncate text-lg font-semibold text-slate-900">
               {job.vehicleRegistration} ({job.vehicleState})
             </p>
+            {isNew && (
+              <span className="flex-shrink-0 animate-pulse rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                New
+              </span>
+            )}
+            {!isNew && isNewest && (
+              <span className="flex-shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                Latest
+              </span>
+            )}
           </div>
           <p className="mt-0.5 truncate text-sm text-slate-500">
             {job.customerName} &middot; {job.serviceType}

@@ -212,6 +212,15 @@ export async function GET(request: NextRequest) {
           ? { at: stepTimes[0].at, label: stepTimes[0].label }
           : null;
 
+        // When THIS driver was most recently assigned to the job (either leg) —
+        // powers the "New" badge and newest-first ordering in the Jobs tab.
+        const assignmentTimes: Date[] = [];
+        if (isMyPickupLeg && job.pickupDriver?.assignedAt) assignmentTimes.push(job.pickupDriver.assignedAt);
+        if (isMyReturnLeg && job.returnDriver?.assignedAt) assignmentTimes.push(job.returnDriver.assignedAt);
+        const assignedAt = assignmentTimes.length
+          ? new Date(Math.max(...assignmentTimes.map((d) => new Date(d).getTime())))
+          : null;
+
         // Payment is optional (backup link only) — the return leg can start
         // as soon as the pickup leg is complete.
         const canStartReturn = !!job.pickupDriver?.completedAt;
@@ -268,6 +277,7 @@ export async function GET(request: NextRequest) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           signedFormTypes: (job.signedForms || []).map((f: any) => f.formType),
           lastStep,
+          assignedAt,
         };
       };
 
