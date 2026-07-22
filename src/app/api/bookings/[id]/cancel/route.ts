@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { calculateRefund, formatRefundAmount } from "@/lib/refund-calculator";
+import { releasePromoCodeForUsage } from "@/lib/promoCodes";
 import { requireValidOrigin } from "@/lib/validation";
 import { notifyGarageOfCancellation } from "@/lib/notifications";
 
@@ -94,6 +95,15 @@ export async function POST(
       booking.paymentStatus === "paid"
         ? "Booking cancelled by drivlet. Any refund will be processed separately by our team."
         : "Booking cancelled by drivlet.";
+
+    // Free any redeemed promo code — the cancelled booking never used it
+    if (booking.promoCode) {
+      await releasePromoCodeForUsage({
+        code: booking.promoCode,
+        bookingId: booking._id,
+        requestId: null,
+      });
+    }
 
     await Booking.findByIdAndUpdate(bookingId, {
       $set: {

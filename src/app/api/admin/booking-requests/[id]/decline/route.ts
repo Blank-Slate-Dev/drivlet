@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
+import { releasePromoCodeForUsage } from "@/lib/promoCodes";
 import {
   sendEmail,
   bookingDetailsHtml,
@@ -81,6 +82,14 @@ export async function POST(
     bookingRequest.paymentToken = null;
 
     await bookingRequest.save();
+
+    // Free the promo code — the customer never got the discount
+    if (bookingRequest.promoCode) {
+      await releasePromoCodeForUsage({
+        code: bookingRequest.promoCode,
+        requestId: bookingRequest._id,
+      });
+    }
 
     // Notify the customer (non-blocking result — decline succeeds even if email fails)
     const firstName = bookingRequest.userName.split(" ")[0];

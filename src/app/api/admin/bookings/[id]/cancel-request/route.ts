@@ -9,6 +9,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { notifyGarageOfCancellation } from "@/lib/notifications";
+import { releasePromoCodeForUsage } from "@/lib/promoCodes";
 import { sendEmail, bookingDetailsText } from "@/lib/email";
 import { SUPPORT_PHONE } from "@/lib/policy";
 
@@ -69,6 +70,13 @@ export async function POST(
       booking.cancellationRequest.resolvedBy = adminEmail;
       booking.status = "cancelled";
       booking.currentStage = "cancelled";
+      // Free any redeemed promo code — the cancelled booking never used it
+      if (booking.promoCode) {
+        await releasePromoCodeForUsage({
+          code: booking.promoCode,
+          bookingId: booking._id,
+        });
+      }
       booking.cancellation = {
         cancelledAt: now,
         cancelledBy: adminEmail,

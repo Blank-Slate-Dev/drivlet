@@ -155,6 +155,9 @@ export interface Booking {
   paymentStatus?: string;
   paymentId?: string;
   paymentAmount?: number;
+  promoCode?: string;
+  promoPercentOff?: number;
+  promoDiscountAmount?: number;
   servicePaymentAmount?: number;
   servicePaymentStatus?: string;
   servicePaymentMethod?: "stripe_link" | "phone_direct";
@@ -741,6 +744,18 @@ export function ViewDetailsModal({
                     <p className="mt-1 font-medium text-slate-900">
                       {booking.paymentAmount ? formatCurrency(booking.paymentAmount) : "—"}
                     </p>
+                    {booking.promoCode && (
+                      <p className="mt-0.5 text-xs text-emerald-600">
+                        Promo{" "}
+                        <span className="rounded bg-emerald-50 px-1 py-0.5 font-mono font-semibold">
+                          {booking.promoCode}
+                        </span>
+                        {booking.promoPercentOff ? ` · ${booking.promoPercentOff}% off` : ""}
+                        {typeof booking.promoDiscountAmount === "number" &&
+                          booking.promoDiscountAmount > 0 &&
+                          ` · saved ${formatCurrency(booking.promoDiscountAmount)}`}
+                      </p>
+                    )}
                     <p className="text-xs text-slate-400">
                       Paid {formatDateTime(booking.createdAt)}
                     </p>

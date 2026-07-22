@@ -26,6 +26,7 @@ import {
   Bell,
   Radio,
   FileSignature,
+  Tag,
   // FileText, // Requests nav item merged into Bookings (2026-07-07)
 } from "lucide-react";
 
@@ -251,6 +252,7 @@ export default function AdminLayout({
     { href: "/admin/roster", label: "Roster", icon: CalendarDays },
     // { href: "/admin/garages", label: "Garages", icon: Building2 }, // Hidden — not in use yet
     { href: "/admin/payment-disputes", label: "Payment Disputes", icon: AlertTriangle },
+    { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
     { href: "/admin/testimonials", label: "Testimonials", icon: Star },
   ];

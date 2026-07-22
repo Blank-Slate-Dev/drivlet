@@ -64,6 +64,10 @@ export interface IBookingRequest extends Document {
   distanceSurcharge: number;
   distanceKm: number;
   quotedAmount: number;
+  // Promo code (single-use % off, claimed atomically at submission)
+  promoCode?: string;
+  promoPercentOff?: number;
+  promoDiscountAmount?: number; // cents discounted off the pre-promo total
   pickupLat: number;
   pickupLng: number;
   garageLat: number;
@@ -161,6 +165,9 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     distanceSurcharge: { type: Number, default: 0, min: 0 },
     distanceKm: { type: Number, default: 0, min: 0 },
     quotedAmount: { type: Number, required: true, min: 0 },
+    promoCode: { type: String, uppercase: true, trim: true },
+    promoPercentOff: { type: Number, min: 1, max: 100 },
+    promoDiscountAmount: { type: Number, min: 0 },
     pickupLat: { type: Number, default: 0 },
     pickupLng: { type: Number, default: 0 },
     garageLat: { type: Number, default: 0 },

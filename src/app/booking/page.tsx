@@ -10,7 +10,7 @@ import Image from 'next/image';
 import {
   CheckCircle2, Loader2, AlertCircle, CreditCard, ArrowLeft, ArrowRight,
   MapPin, Clock, Car, Building, User, Mail, Phone, Copy, Calendar, Check,
-  Zap, Wrench, Settings, Info, ShieldCheck, Lock, Sparkles,
+  Zap, Wrench, Settings, Info, ShieldCheck, Lock, Sparkles, Tag, X,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from '@/components/homepage/RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
@@ -116,6 +116,12 @@ export default function BookingPage() {
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Promo code state (optional; validated read-only here, claimed at submit)
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; percentOff: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
   const [quotedAmount, setQuotedAmount] = useState<number | null>(null);
 
@@ -131,6 +137,48 @@ export default function BookingPage() {
 
   const totalPriceCents = TRANSPORT_PRICE + (distanceZoneInfo?.surchargeAmount ?? 0);
   const totalPriceDisplay = `$${(totalPriceCents / 100).toFixed(2)}`;
+
+  // Promo discount (mirrors server-side calculatePromoDiscount incl. the
+  // Stripe 50c-minimum clamp; the server re-validates and re-computes)
+  const promoDiscountCents = appliedPromo
+    ? (() => {
+        const d = Math.round((totalPriceCents * appliedPromo.percentOff) / 100);
+        const remaining = totalPriceCents - d;
+        return remaining > 0 && remaining < 50 ? totalPriceCents - 50 : d;
+      })()
+    : 0;
+  const finalPriceCents = Math.max(0, totalPriceCents - promoDiscountCents);
+  const finalPriceDisplay = `$${(finalPriceCents / 100).toFixed(2)}`;
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoChecking(true);
+    setPromoError(null);
+    try {
+      const res = await fetch('/api/promo-codes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        throw new Error(data.error || "That promo code isn't valid. Please check and try again.");
+      }
+      setAppliedPromo({ code: data.code, percentOff: data.percentOff });
+      setPromoInput('');
+    } catch (err) {
+      setAppliedPromo(null);
+      setPromoError(err instanceof Error ? err.message : 'Failed to check promo code');
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setPromoError(null);
+  };
   const isRedZone = distanceZoneInfo?.zone === 'red';
   const customerName = isAuthenticated ? (session?.user?.username || '') : guestName;
   const customerEmail = isAuthenticated ? (session?.user?.email || '') : guestEmail;
@@ -238,6 +286,7 @@ export default function BookingPage() {
           distanceZone: distanceZoneInfo?.zone || 'green', distanceSurcharge: distanceZoneInfo?.surchargeAmount ?? 0,
           distanceKm: distanceZoneInfo?.distance ?? 0, pickupLat: selectedPlaceDetails?.lat ?? 0, pickupLng: selectedPlaceDetails?.lng ?? 0,
           garageLat: garageLat ?? 0, garageLng: garageLng ?? 0,
+          promoCode: appliedPromo?.code || undefined,
         }),
       });
       const data = await response.json();
@@ -552,14 +601,97 @@ export default function BookingPage() {
           <ReviewCard icon={<MapPin className="h-4 w-4 text-emerald-600" />} title="Locations" editStep="details"><div className="space-y-3"><div><span className="text-slate-500 text-xs">Pickup</span><p className="text-slate-900">{pickupAddress}</p></div><div className="border-t border-slate-200 pt-2"><span className="text-slate-500 text-xs">Garage</span><p className="font-medium text-slate-900">{garageSearch}</p>{garageAddress && <p className="text-xs text-slate-600 mt-0.5">{garageAddress}</p>}<p className="text-xs text-slate-600 mt-1">Appointment: {getTimeLabel(garageBookingTime, garageBookingTimeOptions)}</p></div></div></ReviewCard>
           {distanceZoneInfo && (<div className={`rounded-xl border p-4 ${distanceZoneInfo.zone === 'green' ? 'border-emerald-200 bg-emerald-50' : distanceZoneInfo.zone === 'yellow' ? 'border-yellow-200 bg-yellow-50' : 'border-orange-200 bg-orange-50'}`}><div className="flex items-center gap-3 text-sm"><span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${ZONE_BADGE_STYLES[distanceZoneInfo.zone]}`}><span className={`h-2 w-2 rounded-full ${distanceZoneInfo.zone === 'green' ? 'bg-emerald-500' : distanceZoneInfo.zone === 'yellow' ? 'bg-yellow-500' : 'bg-orange-500'}`} />{distanceZoneInfo.label}</span><span className="text-slate-600">{distanceZoneInfo.distance} km</span>{distanceZoneInfo.surchargeAmount > 0 && (<span className="font-medium text-slate-800">{distanceZoneInfo.surchargeDisplay}</span>)}</div></div>)}
           {additionalNotes && (<div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-700 mb-2">Notes</h3><p className="text-sm text-slate-600">{additionalNotes}</p></div>)}
-          <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4"><div className="space-y-2">{distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0 && (<><div className="flex justify-between text-sm"><span className="text-emerald-700">Transport fee</span><span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span></div><div className="flex justify-between text-sm"><span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span><span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span></div><div className="border-t border-emerald-200" /></>)}<div className="flex items-center justify-between"><span className="text-lg font-semibold text-emerald-800">Total</span><span className="text-2xl font-bold text-emerald-700">{totalPriceDisplay} AUD</span></div></div></div>
+          <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
+            <div className="space-y-2">
+              {(appliedPromo || (distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0)) && (
+                <>
+                  <div className="flex justify-between text-sm"><span className="text-emerald-700">Transport fee</span><span className="font-medium text-emerald-700">{TRANSPORT_PRICE_DISPLAY}</span></div>
+                  {distanceZoneInfo && distanceZoneInfo.surchargeAmount > 0 && (
+                    <div className="flex justify-between text-sm"><span className="text-emerald-700">Distance surcharge ({distanceZoneInfo.label})</span><span className="font-medium text-emerald-700">{distanceZoneInfo.surchargeDisplay}</span></div>
+                  )}
+                  {appliedPromo && (
+                    <div className="flex justify-between text-sm">
+                      <span className="flex items-center gap-1.5 text-emerald-700">
+                        <Tag className="h-3.5 w-3.5" />
+                        Promo {appliedPromo.code} ({appliedPromo.percentOff}% off)
+                      </span>
+                      <span className="font-medium text-emerald-700">−${(promoDiscountCents / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-emerald-200" />
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-semibold text-emerald-800">Total</span>
+                <span className="text-2xl font-bold text-emerald-700">
+                  {appliedPromo && (
+                    <span className="mr-2 text-base font-medium text-emerald-500 line-through">{totalPriceDisplay}</span>
+                  )}
+                  {finalPriceDisplay} AUD
+                </span>
+              </div>
+            </div>
+
+            {/* Promo code entry */}
+            <div className="mt-3 border-t border-emerald-200 pt-3">
+              {appliedPromo ? (
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    Promo code {appliedPromo.code} applied
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removePromo}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-800"
+                  >
+                    <X className="h-3 w-3" />
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="mb-1 block text-xs font-medium text-emerald-700">
+                    Have a promo code? <span className="font-normal text-emerald-600/70">(optional)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoInput}
+                      onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyPromo(); } }}
+                      placeholder="e.g. WELCOME10"
+                      maxLength={24}
+                      disabled={promoChecking}
+                      className="flex-1 rounded-lg border border-emerald-300 bg-white px-3 py-2 font-mono text-sm uppercase text-slate-900 placeholder:font-sans placeholder:normal-case outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyPromo}
+                      disabled={promoChecking || !promoInput.trim()}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {promoChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
+                      Apply
+                    </button>
+                  </div>
+                  {promoError && (
+                    <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                      {promoError}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <h3 className="text-sm font-semibold text-amber-800 mb-1">Changes &amp; cancellations</h3>
             <p className="text-xs text-amber-700 leading-relaxed">{CANCELLATION_POLICY_TEXT}</p>
           </div>
           <div className="flex items-center justify-between pt-2">
             <button type="button" onClick={() => goToStep('schedule')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
-            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request — {totalPriceDisplay}</>)}</button>
+            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request — {finalPriceDisplay}</>)}</button>
           </div>
         </div>
       </div>

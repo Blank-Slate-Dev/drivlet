@@ -38,6 +38,9 @@ interface PaymentData {
   dropoffTimeSlot: string | null;
   amount: number;
   amountDisplay: string;
+  promoCode: string | null;
+  promoPercentOff: number | null;
+  promoDiscountAmount: number | null;
   reference: string;
   status: string;
 }
@@ -550,6 +553,13 @@ export default function PaymentPage() {
                       AUD
                     </span>
                   </p>
+                  {data.promoCode && typeof data.promoDiscountAmount === "number" && data.promoDiscountAmount > 0 && (
+                    <p className="mt-0.5 text-xs text-emerald-600">
+                      Promo {data.promoCode} applied
+                      {data.promoPercentOff ? ` (${data.promoPercentOff}% off)` : ""} — you saved $
+                      {(data.promoDiscountAmount / 100).toFixed(2)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

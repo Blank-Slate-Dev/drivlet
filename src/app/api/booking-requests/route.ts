@@ -6,6 +6,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
+import PromoCode from "@/models/PromoCode";
+import { claimPromoCode, releasePromoCode, calculatePromoDiscount } from "@/lib/promoCodes";
 import { notifyAdminOfNewRequest } from "@/lib/notifications";
 import {
   sendEmail,
@@ -28,6 +30,10 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
+
+  // If a promo code was claimed but the submission then fails, release it so
+  // the customer can try again (see catch block).
+  let promoToRelease: string | null = null;
 
   try {
     const {
@@ -60,6 +66,7 @@ export async function POST(request: NextRequest) {
       pickupLng,
       garageLat,
       garageLng,
+      promoCode,
     } = body;
 
     if (!customerEmail || !customerName || !pickupAddress || !vehicleRegistration) {
@@ -96,7 +103,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const quotedAmount = DRIVLET_PRICE + verifiedSurcharge;
+    const basePriceCents = DRIVLET_PRICE + verifiedSurcharge;
+
+    // ── Promo code: ATOMIC single-use claim ──
+    // findOneAndUpdate(active → used) means two simultaneous submissions can
+    // never both redeem the same code. If anything later fails, the catch
+    // block releases the claim.
+    let claimedPromo: { code: string; percentOff: number } | null = null;
+    let promoDiscount = 0;
+    if (typeof promoCode === "string" && promoCode.trim()) {
+      await connectDB();
+      const promo = await claimPromoCode(promoCode);
+      if (!promo) {
+        return NextResponse.json(
+          { error: "That promo code isn't valid or has already been used. Remove it or try a different code." },
+          { status: 400 }
+        );
+      }
+      claimedPromo = { code: promo.code, percentOff: promo.percentOff };
+      promoToRelease = promo.code;
+      promoDiscount = calculatePromoDiscount(basePriceCents, promo.percentOff);
+    }
+
+    const quotedAmount = Math.max(0, basePriceCents - promoDiscount);
 
     // Build flags
     const flags: { type: "manual_transmission" | "high_value_vehicle" | "other"; reason: string; createdAt: Date }[] = [];
@@ -150,6 +179,9 @@ export async function POST(request: NextRequest) {
       distanceSurcharge: verifiedSurcharge,
       distanceKm: verifiedDistanceKm,
       quotedAmount,
+      promoCode: claimedPromo?.code,
+      promoPercentOff: claimedPromo?.percentOff,
+      promoDiscountAmount: claimedPromo ? promoDiscount : undefined,
       pickupLat: pickupLat || 0,
       pickupLng: pickupLng || 0,
       garageLat: garageLat || 0,
@@ -157,6 +189,22 @@ export async function POST(request: NextRequest) {
       flags,
       status: "pending_review",
     });
+    // Request saved — the claim sticks from here on
+    promoToRelease = null;
+
+    // Record what the claimed promo was redeemed on (audit trail for admin)
+    if (claimedPromo) {
+      await PromoCode.updateOne(
+        { code: claimedPromo.code, status: "used" },
+        {
+          $set: {
+            usedByRequestId: bookingRequest._id,
+            usedByReference: bookingRequest._id.toString().slice(-6).toUpperCase(),
+            discountAmount: promoDiscount,
+          },
+        }
+      ).catch((err) => console.error("Failed to record promo usage:", err));
+    }
 
     // Await notifications so Vercel doesn't kill the function before they complete.
     // Both are non-fatal — the request is already saved.
@@ -261,6 +309,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Booking request error:", error);
+    if (promoToRelease) {
+      await releasePromoCode(promoToRelease);
+    }
     return NextResponse.json({ error: "Failed to submit booking request" }, { status: 500 });
   }
 }

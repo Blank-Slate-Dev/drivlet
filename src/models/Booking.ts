@@ -146,6 +146,10 @@ export interface IBooking extends Document {
   /** How the service was paid: via the Stripe backup link, or directly to the
    *  service centre over the phone (marked by the driver). */
   servicePaymentMethod?: 'stripe_link' | 'phone_direct';
+  // Promo code redeemed on this booking (carried over from the request)
+  promoCode?: string;
+  promoPercentOff?: number;
+  promoDiscountAmount?: number;
   /** Post-delivery customer feedback (one per booking). */
   feedback?: {
     rating: number; // 1-5 stars
@@ -565,6 +569,11 @@ const BookingSchema = new Schema<IBooking>(
       enum: ["stripe_link", "phone_direct"],
       required: false,
     },
+
+    // Promo code redeemed on this booking (carried over from the request)
+    promoCode: { type: String, uppercase: true, trim: true },
+    promoPercentOff: { type: Number, min: 1, max: 100 },
+    promoDiscountAmount: { type: Number, min: 0 },
 
     // Post-delivery customer feedback (one per booking)
     feedback: {

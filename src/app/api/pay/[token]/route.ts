@@ -79,6 +79,10 @@ export async function GET(
       dropoffTimeSlot: bookingRequest.dropoffTimeSlot || null,
       amount: bookingRequest.quotedAmount,
       amountDisplay: `$${(bookingRequest.quotedAmount / 100).toFixed(2)}`,
+      // Promo applied at booking (quotedAmount is already discounted)
+      promoCode: bookingRequest.promoCode || null,
+      promoPercentOff: bookingRequest.promoPercentOff || null,
+      promoDiscountAmount: bookingRequest.promoDiscountAmount || null,
       reference: ref,
       status: bookingRequest.status,
     });

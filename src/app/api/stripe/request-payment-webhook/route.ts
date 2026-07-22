@@ -148,6 +148,10 @@ export async function POST(request: NextRequest) {
       paymentStatus: "paid",
       paymentId: paymentIntent.id,
       paymentAmount: paymentIntent.amount,
+      // Promo code carried over from the request (visible in admin)
+      promoCode: requestDoc.promoCode || undefined,
+      promoPercentOff: requestDoc.promoPercentOff || undefined,
+      promoDiscountAmount: requestDoc.promoDiscountAmount || undefined,
       status: "pending",
       currentStage: "booking_confirmed",
       overallProgress: 14,
@@ -177,6 +181,19 @@ export async function POST(request: NextRequest) {
       console.log("request-payment-webhook: booking already existed (race condition):", booking?._id);
     } else {
       console.log("request-payment-webhook: booking created:", booking?._id, "tracking:", trackingCode);
+    }
+
+    // Point the redeemed promo code at the real booking (admin audit trail)
+    if (requestDoc.promoCode && booking?._id) {
+      await db.collection("promocodes").updateOne(
+        { code: requestDoc.promoCode, status: "used" },
+        {
+          $set: {
+            usedByBookingId: booking._id,
+            usedByReference: booking.trackingCode || trackingCode,
+          },
+        }
+      ).catch((err: unknown) => console.error("Failed to link promo to booking:", err));
     }
 
     // Update the BookingRequest
