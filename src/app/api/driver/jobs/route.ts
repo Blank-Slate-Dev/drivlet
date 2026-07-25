@@ -450,7 +450,10 @@ export async function POST(request: NextRequest) {
         message: "Driver is on the way to pick up the vehicle.",
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "En route to pickup" });
@@ -472,7 +475,10 @@ export async function POST(request: NextRequest) {
         message: "Driver has arrived at the customer location.",
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Arrived at customer" });
@@ -527,7 +533,10 @@ export async function POST(request: NextRequest) {
         message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed — status advanced to collected`,
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Vehicle collected" });
@@ -570,7 +579,10 @@ export async function POST(request: NextRequest) {
         message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to dropped off`,
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Dropped at workshop - pickup complete" });
@@ -609,7 +621,10 @@ export async function POST(request: NextRequest) {
         message: "Return driver is on the way to collect the vehicle.",
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "En route to workshop" });
@@ -649,7 +664,10 @@ export async function POST(request: NextRequest) {
         message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to in transit (return)`,
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Collected from workshop" });
@@ -671,7 +689,10 @@ export async function POST(request: NextRequest) {
         message: "Driver is delivering the vehicle back to the customer.",
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       return NextResponse.json({ success: true, message: "Delivering to customer" });
@@ -714,7 +735,10 @@ export async function POST(request: NextRequest) {
         message: "Vehicle has been delivered. Thanks for choosing drivlet!",
         updatedBy: "driver",
       });
-      await booking.save();
+      // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
+      // entry written by an unvalidated $push elsewhere) must never block a
+      // driver from progressing THIS action. Only what we changed is validated.
+      await booking.save({ validateModifiedOnly: true });
       notifyBookingUpdate(booking);
 
       // Update driver metrics
@@ -830,7 +854,7 @@ export async function POST(request: NextRequest) {
         message: `Driver undid their last step ("${target.label}") — accidental tap correction.`,
         updatedBy: "driver",
       });
-      await booking.save();
+      await booking.save({ validateModifiedOnly: true });
       // No stage email/SMS for a correction — SSE only
       notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
 
@@ -885,7 +909,7 @@ export async function POST(request: NextRequest) {
           : "Driver confirmed the customer paid the service centre directly by phone.",
         updatedBy: "driver",
       });
-      await booking.save();
+      await booking.save({ validateModifiedOnly: true });
       // SSE only — closes the payment section on the customer tracker without
       // sending a stage email (the stage didn't change).
       notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
@@ -1013,7 +1037,7 @@ export async function POST(request: NextRequest) {
           message: `Payment link generated for $${(serviceAmount / 100).toFixed(2)}. Waiting for customer payment.`,
           updatedBy: "driver",
         });
-        await booking.save();
+        await booking.save({ validateModifiedOnly: true });
         notifyBookingUpdate(booking);
 
         // Send email notification (async). Link to the tracking page (embedded
@@ -1074,8 +1098,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
     console.error("Error processing job action:", error);
+
+    // Surface the actual reason for known, safe-to-show error classes instead
+    // of a bare "Failed to process job action" (driver-reported bug 2026-07-24).
+    if (error instanceof Error) {
+      if (error.name === "ValidationError") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const paths = Object.keys((error as any).errors || {}).join(", ");
+        return NextResponse.json(
+          {
+            error: `This booking has invalid data (${paths || "unknown field"}) and couldn't be updated. Please contact dispatch — they can correct the booking.`,
+          },
+          { status: 400 }
+        );
+      }
+      if (error.name === "CastError") {
+        return NextResponse.json(
+          { error: "Invalid booking reference — please refresh and try again." },
+          { status: 400 }
+        );
+      }
+      if (error.name === "VersionError" || error.name === "ParallelSaveError") {
+        return NextResponse.json(
+          { error: "This booking was just updated elsewhere — please try again." },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: "Failed to process job action" },
+      { error: "Failed to process job action — please try again. If this keeps happening, contact dispatch." },
       { status: 500 }
     );
   }

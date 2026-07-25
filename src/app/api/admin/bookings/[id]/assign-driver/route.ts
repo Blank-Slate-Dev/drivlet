@@ -108,7 +108,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           stage: `${leg}_driver_assigned`,
           timestamp: now,
           message: `Admin assigned ${driver.firstName} ${driver.lastName} as ${leg} driver.`,
-          updatedBy: adminCheck.session?.user?.id,
+          // MUST never be undefined: $push skips validation, and an updates
+          // entry missing required fields breaks every later booking.save()
+          // (drivers get "Failed to process job action"). Bug fixed 2026-07-24.
+          updatedBy: adminCheck.session?.user?.id || "admin",
         },
       },
     });
@@ -203,7 +206,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
           stage: `${leg}_driver_unassigned`,
           timestamp: now,
           message: `Admin unassigned ${leg} driver.`,
-          updatedBy: adminCheck.session?.user?.id,
+          // MUST never be undefined: $push skips validation, and an updates
+          // entry missing required fields breaks every later booking.save()
+          // (drivers get "Failed to process job action"). Bug fixed 2026-07-24.
+          updatedBy: adminCheck.session?.user?.id || "admin",
         },
       },
     });
