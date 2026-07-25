@@ -781,7 +781,7 @@ function EmptyState() {
         <Radio className="h-8 w-8 text-emerald-500" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-900">All quiet</h3>
-      <p className="mt-1 text-sm text-slate-500">No active bookings right now — new jobs will appear here live.</p>
+      <p className="mt-1 text-sm text-slate-500">No active bookings right now. New jobs will appear here live.</p>
     </div>
   );
 }

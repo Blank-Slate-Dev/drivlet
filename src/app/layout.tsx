@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: '%s | Drivlet',
   },
   description:
-    'Drivlet picks up your car, delivers it to your chosen service centre, and returns it — so you don\'t have to take time off work. Serving Newcastle and Canberra. From $119.',
+    'Drivlet picks up your car, delivers it to your chosen service centre, and returns it, so you don\'t have to take time off work. Serving Newcastle and Canberra. From $119.',
   keywords: [
     'car service pickup',
     'car service delivery',

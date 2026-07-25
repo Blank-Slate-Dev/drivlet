@@ -28,7 +28,7 @@ function FeedbackPageInner() {
           </div>
           <h1 className="mt-3 text-2xl font-bold">How was your Drivlet experience?</h1>
           <p className="mt-1 text-sm text-emerald-100">
-            Two quick questions — it takes less than a minute.
+            Two quick questions. It takes less than a minute.
           </p>
         </div>
 

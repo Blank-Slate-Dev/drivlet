@@ -442,7 +442,7 @@ export default function ReturnConfirmationForm({
                           className="mt-1 h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
                         />
                         <span className="text-sm text-slate-600">
-                          Customer refused to sign — record a dispute
+                          Customer refused to sign? Record a dispute
                         </span>
                       </label>
                     )}

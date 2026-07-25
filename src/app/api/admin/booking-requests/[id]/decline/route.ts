@@ -43,7 +43,7 @@ export async function POST(
 
     if (!reason || reason.length < 5) {
       return NextResponse.json(
-        { error: "Please provide a decline reason (minimum 5 characters) — it is sent to the customer." },
+        { error: "Please provide a decline reason (minimum 5 characters), as it is sent to the customer." },
         { status: 400 }
       );
     }
@@ -101,7 +101,7 @@ export async function POST(
       pickupAddress: bookingRequest.pickupAddress,
     };
 
-    const subject = `Update on your drivlet booking request — ${bookingRequest.vehicleRegistration}`;
+    const subject = `Update on your drivlet booking request (${bookingRequest.vehicleRegistration})`;
 
     const textContent = [
       `Hi ${firstName},`,
@@ -114,7 +114,7 @@ export async function POST(
       ``,
       `You haven't been charged anything.`,
       ``,
-      `If your plans change — a different date, garage, or pickup address — we'd love to help. You can submit a new request any time at https://drivlet.com.au/booking`,
+      `If your plans change (a different date, garage, or pickup address), we'd love to help. You can submit a new request any time at https://drivlet.com.au/booking`,
       ``,
       emailPolicyFooterText(),
       ``,
@@ -140,7 +140,7 @@ export async function POST(
             <p style="margin:0;color:#991b1b;font-size:14px;line-height:1.6;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>
           </div>
           ${bookingDetailsHtml(details)}
-          <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">You haven't been charged anything. If your plans change — a different date, garage, or pickup address — we'd love to help.</p>
+          <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">You haven't been charged anything. If your plans change (a different date, garage, or pickup address), we'd love to help.</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
             <tr><td align="center" style="padding:0 0 20px;">
               <a href="https://drivlet.com.au/booking" style="display:inline-block;background-color:#059669;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 40px;border-radius:9999px;">Make a new booking</a>

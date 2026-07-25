@@ -433,7 +433,7 @@ export default function AdminRosterPage() {
               {/* Week header */}
               <div className="border-b border-slate-100 bg-slate-50 px-4 py-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Week {weekIdx + 1} —{" "}
+                  Week {weekIdx + 1} ·{" "}
                   {week[0].toLocaleDateString("en-AU", {
                     day: "numeric",
                     month: "short",
@@ -491,7 +491,7 @@ export default function AdminRosterPage() {
                               }`}
                               title={
                                 shift
-                                  ? `${formatShiftTime(shift.startTime, shift.endTime)}${shift.notes ? ` — ${shift.notes}` : ""}`
+                                  ? `${formatShiftTime(shift.startTime, shift.endTime)}${shift.notes ? ` · ${shift.notes}` : ""}`
                                   : `Add shift for ${driver.firstName}`
                               }
                             >
@@ -532,7 +532,7 @@ export default function AdminRosterPage() {
                   {modal.existingShift ? "Edit Shift" : "Add Shift"}
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  {modal.driverName} —{" "}
+                  {modal.driverName} ·{" "}
                   {modal.date.toLocaleDateString("en-AU", {
                     weekday: "long",
                     day: "numeric",

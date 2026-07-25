@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     // Too late once the driver has the car
     if (booking.pickupDriver?.collectedAt) {
       return NextResponse.json(
-        { error: "Your vehicle has already been collected — please call us if you need to change the return arrangements." },
+        { error: "Your vehicle has already been collected. Please call us if you need to change the return arrangements." },
         { status: 400 }
       );
     }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     booking.updates.push({
       stage: booking.currentStage || "booking_confirmed",
       timestamp: now,
-      message: `⏰ Customer requested a pickup time change to: ${cleanTime}${cleanNote ? ` — "${cleanNote}"` : ""}. Awaiting confirmation from the Drivlet team.`,
+      message: `⏰ Customer requested a pickup time change to: ${cleanTime}${cleanNote ? ` (note: "${cleanNote}")` : ""}. Awaiting confirmation from the Drivlet team.`,
       updatedBy: "customer",
     });
     await booking.save({ validateModifiedOnly: true });
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     notifyAdmin({
       type: "system",
       title: "Pickup time change requested",
-      message: `${booking.userName || "A customer"} (${booking.vehicleRegistration}) requested a new pickup time: ${cleanTime}${cleanNote ? ` — "${cleanNote}"` : ""}. Booking ${booking.trackingCode || booking._id}.`,
+      message: `${booking.userName || "A customer"} (${booking.vehicleRegistration}) requested a new pickup time: ${cleanTime}${cleanNote ? ` (note: "${cleanNote}")` : ""}. Booking ${booking.trackingCode || booking._id}.`,
       bookingId: booking._id,
       metadata: {
         vehicleRegistration: booking.vehicleRegistration,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Request received — the Drivlet team will confirm your new pickup time shortly.",
+      message: "Request received. The Drivlet team will confirm your new pickup time shortly.",
     });
   } catch (error) {
     console.error("Error handling time change request:", error);

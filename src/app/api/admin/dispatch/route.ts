@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
     console.error("Error dispatching driver:", error);
     return bookingActionErrorResponse(
       error,
-      "Failed to dispatch driver — please try again."
+      "Failed to dispatch driver. Please try again."
     );
   }
 }
@@ -521,7 +521,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error unassigning driver:", error);
     return bookingActionErrorResponse(
       error,
-      "Failed to unassign driver — please try again."
+      "Failed to unassign driver. Please try again."
     );
   }
 }

@@ -17,7 +17,7 @@ const testTestimonials = [
     customerLocation: "Charlestown, NSW",
     rating: 5,
     review:
-      "Brilliant concept. I was dreading organising a lift to drop my car at the mechanic. Drivlet handled everything — pickup, drop-off, and return. Professional service from start to finish.",
+      "Brilliant concept. I was dreading organising a lift to drop my car at the mechanic. Drivlet handled everything: pickup, drop-off, and return. Professional service from start to finish.",
     vehicleType: "Mazda CX-5",
     serviceType: "Brake Replacement",
   },
@@ -44,7 +44,7 @@ const testTestimonials = [
     customerLocation: "Adamstown, NSW",
     rating: 5,
     review:
-      "Used Drivlet for the first time last week and I'm hooked. The tracking updates were great — I knew exactly where my car was the whole time. Highly recommend.",
+      "Used Drivlet for the first time last week and I'm hooked. The tracking updates were great. I knew exactly where my car was the whole time. Highly recommend.",
     vehicleType: "Kia Sportage",
     serviceType: "General Repair",
   },

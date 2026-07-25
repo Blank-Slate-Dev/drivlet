@@ -151,7 +151,7 @@ export default function PickupConsentForm({
           },
           formData: {
             // Recorded so the authorisation appears in the PDF and email copy
-            serviceCentreLiaisonAuthorised: "Yes — Drivlet may discuss the vehicle, repairs, quotes and instructions with the service centre on the customer's behalf",
+            serviceCentreLiaisonAuthorised: "Yes. Drivlet may discuss the vehicle, repairs, quotes and instructions with the service centre on the customer's behalf.",
             customerName: customerName.trim(),
             customerPhone: customerPhone.trim(),
             customerEmail: customerEmail.trim(),
@@ -449,7 +449,7 @@ export default function PickupConsentForm({
                     </p>
                     <p>
                       You also authorise Drivlet to liaise with the nominated service centre on your
-                      behalf regarding your vehicle — including discussing its condition, the work to
+                      behalf regarding your vehicle, including discussing its condition, the work to
                       be carried out, repairs, quotes, and instructions for the booked service.
                       Drivlet will contact you before agreeing to any additional cost on your behalf.
                     </p>

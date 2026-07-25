@@ -224,7 +224,7 @@ export default function PaymentPage() {
             This booking is already paid and confirmed
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            You&apos;re all set — no need to pay again. We&apos;ve got everything we need and
+            You&apos;re all set. No need to pay again. We&apos;ve got everything we need and
             your car&apos;s in good hands.
           </p>
           {trackingCode ? (
@@ -302,7 +302,7 @@ export default function PaymentPage() {
               Booking confirmed
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Payment received — your booking is confirmed.
+              Payment received. Your booking is confirmed.
             </p>
 
             {/* Tracking code */}
@@ -556,7 +556,7 @@ export default function PaymentPage() {
                   {data.promoCode && typeof data.promoDiscountAmount === "number" && data.promoDiscountAmount > 0 && (
                     <p className="mt-0.5 text-xs text-emerald-600">
                       Promo {data.promoCode} applied
-                      {data.promoPercentOff ? ` (${data.promoPercentOff}% off)` : ""} — you saved $
+                      {data.promoPercentOff ? ` (${data.promoPercentOff}% off)` : ""} , saving you $
                       {(data.promoDiscountAmount / 100).toFixed(2)}
                     </p>
                   )}

@@ -107,7 +107,7 @@ async function markExtraChargeAsPaid(
       sendEmail({
         to: userEmail,
         toName: userName || userEmail,
-        subject: `Payment received — ${vehicleRegistration}`,
+        subject: `Payment received for ${vehicleRegistration}`,
         textContent: [
           `Hi ${firstName},`,
           ``,

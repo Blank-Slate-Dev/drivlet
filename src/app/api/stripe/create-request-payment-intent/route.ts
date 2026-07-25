@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       currency: "aud",
       automatic_payment_methods: { enabled: true },
       receipt_email: bookingRequest.userEmail,
-      description: `Drivlet transport — ${bookingRequest.vehicleRegistration}`,
+      description: `Drivlet transport for ${bookingRequest.vehicleRegistration}`,
       metadata: {
         type: "request_payment",
         bookingRequestId: bookingRequest._id.toString(),

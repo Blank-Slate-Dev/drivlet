@@ -1487,7 +1487,7 @@ function TrackingContent() {
                           </span>
                         </div>
                         <p className="text-sm text-slate-500 mt-1">
-                          Pay securely online below — or pay the service centre
+                          Pay securely online below, or pay the service centre
                           directly if you&apos;ve already arranged it with them.
                         </p>
                       </div>

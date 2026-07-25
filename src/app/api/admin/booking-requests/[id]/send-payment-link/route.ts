@@ -68,12 +68,12 @@ export async function POST(
       amount: bookingRequest.quotedAmount,
     };
 
-    const subject = `Your drivlet booking is approved — pay ${amountDisplay} to confirm (Ref: ${ref})`;
+    const subject = `Your drivlet booking is approved: pay ${amountDisplay} to confirm (Ref: ${ref})`;
 
     const textContent = [
       `Hi ${firstName},`,
       ``,
-      `Good news — your booking request has been approved.`,
+      `Good news: your booking request has been approved.`,
       ``,
       bookingDetailsText(details),
       `  Reference: ${ref}`,
@@ -105,14 +105,14 @@ export async function POST(
         </td></tr>
         <tr><td style="padding:32px;">
           <p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">Hi ${firstName},</p>
-          <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">Good news — your booking request has been approved. Pay the transport amount below to lock in your booking.</p>
+          <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">Good news: your booking request has been approved. Pay the transport amount below to lock in your booking.</p>
           ${bookingDetailsHtml(details)}
           <!-- How to pay -->
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
             <p style="margin:0 0 8px;color:#166534;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">How to pay</p>
             <ol style="margin:0;padding-left:18px;color:#166534;font-size:14px;line-height:1.7;">
               <li>Tap the button below to open your secure payment page.</li>
-              <li>Check your booking details and pay by card — processed securely by Stripe.</li>
+              <li>Check your booking details and pay by card (processed securely by Stripe).</li>
               <li>You'll get a confirmation email with a tracking code to follow your booking.</li>
             </ol>
           </div>

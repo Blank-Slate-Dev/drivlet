@@ -530,7 +530,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: "car_picked_up",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed — status advanced to collected`,
+        message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed. Status advanced to collected.`,
         updatedBy: "driver",
       });
       // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
@@ -576,7 +576,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: "at_garage",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to dropped off`,
+        message: `Photo requirements verified (${gate.present}/${gate.required}). Status advanced to dropped off.`,
         updatedBy: "driver",
       });
       // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
@@ -661,7 +661,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: "collected_from_workshop",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}) — status advanced to in transit (return)`,
+        message: `Photo requirements verified (${gate.present}/${gate.required}). Status advanced to in transit (return).`,
         updatedBy: "driver",
       });
       // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
@@ -851,7 +851,7 @@ export async function POST(request: NextRequest) {
       booking.updates.push({
         stage: booking.currentStage,
         timestamp: now,
-        message: `Driver undid their last step ("${target.label}") — accidental tap correction.`,
+        message: `Driver undid their last step ("${target.label}") to correct an accidental tap.`,
         updatedBy: "driver",
       });
       await booking.save({ validateModifiedOnly: true });
@@ -1121,27 +1121,27 @@ export async function POST(request: NextRequest) {
         const paths = Object.keys((error as any).errors || {}).join(", ");
         return NextResponse.json(
           {
-            error: `This booking has invalid data (${paths || "unknown field"}) and couldn't be updated. Please contact dispatch — they can correct the booking.`,
+            error: `This booking has invalid data (${paths || "unknown field"}) and couldn't be updated. Please contact dispatch, who can correct the booking.`,
           },
           { status: 400 }
         );
       }
       if (error.name === "CastError") {
         return NextResponse.json(
-          { error: "Invalid booking reference — please refresh and try again." },
+          { error: "Invalid booking reference. Please refresh and try again." },
           { status: 400 }
         );
       }
       if (error.name === "VersionError" || error.name === "ParallelSaveError") {
         return NextResponse.json(
-          { error: "This booking was just updated elsewhere — please try again." },
+          { error: "This booking was just updated elsewhere. Please try again." },
           { status: 409 }
         );
       }
     }
 
     return NextResponse.json(
-      { error: "Failed to process job action — please try again. If this keeps happening, contact dispatch." },
+      { error: "Failed to process job action. Please try again. If this keeps happening, contact dispatch." },
       { status: 500 }
     );
   }

@@ -20,10 +20,10 @@ const faqs = [
   {
     question: 'Is my car insured?',
     answer:
-      'Yes — your car is covered while it\'s in Drivlet\'s care during pick-up, delivery to your workshop, and return (subject to our Terms).',
+      'Yes, your car is covered while it\'s in Drivlet\'s care during pick-up, delivery to your workshop, and return (subject to our Terms).',
   },
   {
-    question: 'How do I pay — Drivlet vs the service centre?',
+    question: 'How do I pay: Drivlet or the service centre?',
     answer:
       'You pay Drivlet for transport when you book. You pay the service centre directly for the service/repairs. The service centre will contact you to take payment (often by phone) and confirm the car is ready.',
   },

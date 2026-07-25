@@ -20,7 +20,7 @@ const benefits = [
   { icon: Users, title: "Customers delivered to you", desc: "Car owners book through drivlet. We bring their vehicle straight to your workshop." },
   { icon: TrendingUp, title: "Grow your revenue", desc: "Fill empty bays with a steady stream of bookings. No extra overheads." },
   { icon: Zap, title: "Zero disruption", desc: "Our drivers handle all pick-ups and drop-offs. You focus on servicing." },
-  { icon: BarChart3, title: "Dashboard & analytics", desc: "Track bookings, manage your schedule, and view revenue — all in one place." },
+  { icon: BarChart3, title: "Dashboard & analytics", desc: "Track bookings, manage your schedule, and view revenue, all in one place." },
   { icon: Shield, title: "Fully insured transport", desc: "Every vehicle is covered by commercial insurance during transport." },
   { icon: Handshake, title: "Simple partnership", desc: "No lock-in contracts. No upfront fees. We only succeed when you do." },
 ];
@@ -28,7 +28,7 @@ const benefits = [
 const steps = [
   { num: "1", text: "Customer books a service through drivlet" },
   { num: "2", text: "Our driver picks up and delivers the vehicle to you" },
-  { num: "3", text: "You complete the service — customer pays you directly" },
+  { num: "3", text: "You complete the service, and the customer pays you directly" },
   { num: "4", text: "Our driver returns the vehicle to the customer" },
 ];
 
@@ -80,7 +80,7 @@ export default function GarageJoinPage() {
               More cars through your doors. <span className="text-emerald-300">Zero extra effort.</span>
             </h1>
             <p className="mt-3 text-base text-emerald-100 max-w-xl mx-auto">
-              Join the drivlet partner network and receive a steady stream of customers. We handle pick-up and delivery — you handle the servicing.
+              Join the drivlet partner network and receive a steady stream of customers. We handle pick-up and delivery. You handle the servicing.
             </p>
           </motion.div>
 

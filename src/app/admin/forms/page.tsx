@@ -220,7 +220,7 @@ export default function AdminFormsPage() {
                       {form.customerRefused && (
                         <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
                           <AlertTriangle className="h-3 w-3" />
-                          Refused to sign — dispute
+                          Refused to sign · dispute
                         </span>
                       )}
                       {form.trackingCode && (

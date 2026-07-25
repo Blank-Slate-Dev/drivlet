@@ -90,28 +90,28 @@ const SEVERITY_OPTIONS: {
   {
     value: "low",
     label: "Low",
-    desc: "Minor — job can continue",
+    desc: "Minor, job can continue",
     color: "text-emerald-700 bg-emerald-50",
     borderColor: "border-emerald-300",
   },
   {
     value: "medium",
     label: "Medium",
-    desc: "Notable — may need follow-up",
+    desc: "Notable, may need follow-up",
     color: "text-yellow-700 bg-yellow-50",
     borderColor: "border-yellow-300",
   },
   {
     value: "high",
     label: "High",
-    desc: "Significant — HOLD for Ops",
+    desc: "Significant: HOLD for Ops",
     color: "text-orange-700 bg-orange-50",
     borderColor: "border-orange-300",
   },
   {
     value: "critical",
     label: "Critical",
-    desc: "Serious — STOP immediately",
+    desc: "Serious: STOP immediately",
     color: "text-red-700 bg-red-50",
     borderColor: "border-red-300",
   },
@@ -381,7 +381,7 @@ export default function IncidentReportForm({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Description — Facts only
+                  Description (facts only)
                 </label>
                 <textarea
                   value={form.description}
@@ -492,7 +492,7 @@ export default function IncidentReportForm({
               </label>
 
               <p className="text-xs text-slate-400 text-center">
-                JPEG, PNG, HEIC — max 10MB per photo
+                JPEG, PNG or HEIC, max 10MB per photo
               </p>
             </div>
           )}
@@ -668,7 +668,7 @@ export default function IncidentReportForm({
                   <div className="px-4 py-3">
                     <span className="text-[10px] uppercase tracking-wide text-slate-400">Police</span>
                     <p className="text-sm text-slate-600">
-                      Yes{form.policeReference && ` — Ref: ${form.policeReference}`}
+                      Yes{form.policeReference && ` (Ref: ${form.policeReference})`}
                     </p>
                   </div>
                 )}
@@ -761,14 +761,14 @@ export function IncidentSubmittedModal({
       icon: AlertTriangle,
       iconColor: "text-amber-600",
       bg: "bg-amber-50 border-amber-200",
-      title: "Incident Logged — HOLD",
+      title: "Incident Logged: HOLD",
       message: "Please wait for Ops instructions before proceeding.",
     },
     stop: {
       icon: AlertTriangle,
       iconColor: "text-red-600",
       bg: "bg-red-50 border-red-200",
-      title: "Incident Logged — STOP",
+      title: "Incident Logged: STOP",
       message: "DO NOT proceed. Ops will contact you shortly.",
     },
   }[exceptionState] || {

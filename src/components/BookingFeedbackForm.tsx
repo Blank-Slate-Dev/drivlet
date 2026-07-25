@@ -85,7 +85,7 @@ export default function BookingFeedbackForm({
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <h3 className="font-semibold text-slate-900">How did we do?</h3>
       <p className="mt-1 text-sm text-slate-500">
-        Your car&apos;s back home — we&apos;d love a quick word on how it went.
+        Your car&apos;s back home, and we&apos;d love a quick word on how it went.
       </p>
 
       {/* Stars */}

@@ -72,7 +72,7 @@ export function getDistanceZone(distanceKm: number): ZoneInfo {
       surchargeAmount: ZONE_SURCHARGE_CENTS.green,
       surchargeDisplay: 'No extra fee',
       label: 'Standard Zone',
-      description: 'Within 12 km — no additional fees',
+      description: 'Within 12 km: no additional fees',
     };
   }
 
@@ -83,7 +83,7 @@ export function getDistanceZone(distanceKm: number): ZoneInfo {
       surchargeAmount: ZONE_SURCHARGE_CENTS.yellow,
       surchargeDisplay: '+$29.00',
       label: 'Extended Zone',
-      description: '12–15 km — additional $29 surcharge',
+      description: '12–15 km: additional $29 surcharge',
     };
   }
 
@@ -94,7 +94,7 @@ export function getDistanceZone(distanceKm: number): ZoneInfo {
       surchargeAmount: ZONE_SURCHARGE_CENTS.orange,
       surchargeDisplay: '+$49.00',
       label: 'Far Zone',
-      description: '15–18 km — additional $49 surcharge',
+      description: '15–18 km: additional $49 surcharge',
     };
   }
 
@@ -104,6 +104,6 @@ export function getDistanceZone(distanceKm: number): ZoneInfo {
     surchargeAmount: ZONE_SURCHARGE_CENTS.red,
     surchargeDisplay: 'Contact us',
     label: 'Out of Range',
-    description: 'Beyond 18 km — please contact our team',
+    description: 'Beyond 18 km: please contact our team',
   };
 }

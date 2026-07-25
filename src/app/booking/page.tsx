@@ -691,7 +691,7 @@ export default function BookingPage() {
           </div>
           <div className="flex items-center justify-between pt-2">
             <button type="button" onClick={() => goToStep('schedule')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
-            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request — {finalPriceDisplay}</>)}</button>
+            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request · {finalPriceDisplay}</>)}</button>
           </div>
         </div>
       </div>

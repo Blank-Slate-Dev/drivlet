@@ -199,7 +199,7 @@ export function CancelBookingModal({
                       How cancellation works
                     </p>
                     <p className="mt-1 text-xs text-amber-700">
-                      Your request goes to our team for review — we&apos;ll confirm by
+                      Your request goes to our team for review. We&apos;ll confirm by
                       email. Cancellations can be requested up to {eligibility.cutoffHours}{" "}
                       hours before pickup. If you&apos;ve paid, any refund is processed by
                       our team after the cancellation is confirmed.

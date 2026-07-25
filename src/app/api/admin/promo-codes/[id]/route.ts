@@ -41,7 +41,7 @@ export async function PATCH(
 
     if (promo.status === "used") {
       return NextResponse.json(
-        { error: "This code has been redeemed — it can't be changed. It frees up automatically if the related booking is cancelled." },
+        { error: "This code has been redeemed and can't be changed. It frees up automatically if the related booking is cancelled." },
         { status: 400 }
       );
     }

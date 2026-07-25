@@ -30,10 +30,10 @@ const FIELD_LABELS: Record<string, string> = {
   serviceCentreContact: "Service Centre Contact",
   serviceCentreAddress: "Service Centre Address",
   customerNotes: "Special Instructions",
-  declCustomerName: "Declaration — Customer Name",
-  declCustomerDate: "Declaration — Customer Date",
+  declCustomerName: "Declaration: Customer Name",
+  declCustomerDate: "Declaration: Customer Date",
   driverName: "Driver Name",
-  declDriverDate: "Declaration — Driver Date",
+  declDriverDate: "Declaration: Driver Date",
   serviceCentreLiaisonAuthorised: "Service Centre Liaison Authorised",
 
   // Return
@@ -123,7 +123,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} — drivlet</title>
+  <title>${title} | drivlet</title>
   <style>
     @media print {
       body { margin: 0; }

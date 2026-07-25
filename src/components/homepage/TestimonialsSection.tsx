@@ -79,7 +79,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Adamstown, Newcastle",
     rating: 5,
     review:
-      "Tom was great — on time, polite, and my car came back spotless. Easiest service experience I've ever had.",
+      "Tom was great. On time, polite, and my car came back spotless. Easiest service experience I've ever had.",
     vehicleType: "Volkswagen Golf",
     serviceType: "Regular Service",
   },
@@ -101,7 +101,7 @@ const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
     customerLocation: "Woden, Canberra",
     rating: 5,
     review:
-      "Picked up my car early and had it back ahead of schedule — Abdul was incredibly professional. Can't wait for Drivlet to grow here!",
+      "Picked up my car early and had it back ahead of schedule. Abdul was incredibly professional. Can't wait for Drivlet to grow here!",
     vehicleType: "Subaru Outback",
     serviceType: "Major Service",
   },

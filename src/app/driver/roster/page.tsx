@@ -227,7 +227,7 @@ export default function DriverRosterPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Next Shift</p>
                 <p className="text-sm font-semibold text-slate-900">
                   {new Date(nextShift.date).toLocaleDateString("en-AU", { weekday: "long" })}
-                  {" — "}
+                  {", "}
                   {new Date(nextShift.date).toLocaleDateString("en-AU", { day: "numeric", month: "long" })}
                 </p>
               </div>

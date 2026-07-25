@@ -22,7 +22,7 @@ export default function Footer() {
             <div className="relative mb-4 h-10 w-32">
               <Image
                 src="/logo.png"
-                alt="Drivlet – car service pickup and delivery"
+                alt="Drivlet car service pickup and delivery"
                 fill
                 className="object-contain brightness-0 invert"
               />

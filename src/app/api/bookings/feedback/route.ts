@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (booking.feedback?.rating) {
       return NextResponse.json(
-        { error: "Thanks — feedback for this booking has already been submitted." },
+        { error: "Thanks! Feedback for this booking has already been submitted." },
         { status: 409 }
       );
     }
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     booking.updates.push({
       stage: "delivered",
       timestamp: new Date(),
-      message: `Customer left feedback: ${numericRating}/5 stars${cleanHearAbout ? ` · heard about us via ${cleanHearAbout}` : ""}${cleanComments ? ` — "${cleanComments.slice(0, 140)}${cleanComments.length > 140 ? "…" : ""}"` : ""}`,
+      message: `Customer left feedback: ${numericRating}/5 stars${cleanHearAbout ? ` · heard about us via ${cleanHearAbout}` : ""}${cleanComments ? ` · "${cleanComments.slice(0, 140)}${cleanComments.length > 140 ? "…" : ""}"` : ""}`,
       updatedBy: "customer",
     });
     await booking.save({ validateModifiedOnly: true });

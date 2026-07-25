@@ -184,14 +184,14 @@ export async function POST(
         `</div>`,
         bookingDetailsHtml(details),
         `<a href="${checkoutSession.url}" style="display: block; background: #059669; color: white; text-decoration: none; text-align: center; padding: 16px 32px; border-radius: 9999px; font-size: 16px; font-weight: 600; margin-bottom: 16px;">Pay ${amountDisplay} securely</a>`,
-        `<p style="margin: 0 0 24px; color: #64748b; font-size: 13px; text-align: center; line-height: 1.6;">Payment is processed securely by Stripe. This link is valid for 24 hours — if it expires, just get in touch and we'll send you a new one.</p>`,
+        `<p style="margin: 0 0 24px; color: #64748b; font-size: 13px; text-align: center; line-height: 1.6;">Payment is processed securely by Stripe. This link is valid for 24 hours. If it expires, just get in touch and we'll send you a new one.</p>`,
         emailPolicyFooterHtml(),
       ].join("");
 
       sendEmail({
         to: booking.userEmail,
         toName: booking.userName || booking.userEmail,
-        subject: `Additional payment requested — ${booking.vehicleRegistration}`,
+        subject: `Additional payment requested (${booking.vehicleRegistration})`,
         textContent,
         htmlContent,
       }).catch((err) => console.error("Failed to send extra charge email:", err));

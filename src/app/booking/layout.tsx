@@ -2,7 +2,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Book a Car Service Pickup | Drivlet – Newcastle & Canberra',
+  title: 'Book a Car Service Pickup | Drivlet | Newcastle & Canberra',
   description:
     'Book a car service pickup and delivery online. We pick up your car, deliver it to your mechanic, and return it. From $119. Serving Newcastle and Canberra.',
   keywords: [
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     canonical: 'https://drivlet.com.au/booking',
   },
   openGraph: {
-    title: 'Book a Car Service Pickup – Drivlet',
+    title: 'Book a Car Service Pickup | Drivlet',
     description:
       'Book online in minutes. We pick up your car, take it to the mechanic, and return it. From $119.',
     url: 'https://drivlet.com.au/booking',

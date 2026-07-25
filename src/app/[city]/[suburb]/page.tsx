@@ -161,8 +161,8 @@ export default async function SuburbPage({
                 href="/booking"
                 className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
               >
-                <span className="sm:hidden">Book a pickup — $119</span>
-                <span className="hidden sm:inline">Book a pickup in {suburb.name} — $119</span>
+                <span className="sm:hidden">Book a pickup · $119</span>
+                <span className="hidden sm:inline">Book a pickup in {suburb.name} · $119</span>
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
@@ -229,7 +229,7 @@ export default async function SuburbPage({
         <section className="border-b border-slate-200 bg-slate-50 py-16 sm:py-20">
           <div className="mx-auto max-w-3xl px-5 sm:px-6">
             <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              FAQs — {suburb.name} car service pickup
+              FAQs: {suburb.name} car service pickup
             </h2>
             <div className="mt-8 divide-y divide-slate-200">
               {faqs.slice(0, 5).map((faq, i) => (

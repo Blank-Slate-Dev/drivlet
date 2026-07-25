@@ -290,7 +290,7 @@ export async function notifyAdminOfNewRequest(request: {
   // 2. Send admin email(s) — supports comma-separated list
   try {
     const adminEmails = rawEmails.split(",").map((e) => e.trim()).filter(Boolean);
-    const subject = `New booking request — ${request.vehicleRegistration} (${pickupSuburb})`;
+    const subject = `New booking request: ${request.vehicleRegistration} (${pickupSuburb})`;
     const textContent = [
       `Hi team,`,
       ``,

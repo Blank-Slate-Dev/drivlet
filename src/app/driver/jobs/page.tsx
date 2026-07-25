@@ -191,7 +191,7 @@ const JOB_STAGE_META: Record<string, Omit<JobStageMeta, "key">> = {
   awaiting_payment: { label: "Awaiting payment", accent: "border-l-orange-400", chip: "bg-orange-50 text-orange-700", dot: "bg-orange-400" },
   returning: { label: "Returning to customer", accent: "border-l-teal-500", chip: "bg-teal-50 text-teal-700", dot: "bg-teal-500" },
   delivered: { label: "Delivered", accent: "border-l-emerald-500", chip: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
-  on_hold: { label: "Incident — on hold", accent: "border-l-red-500", chip: "bg-red-50 text-red-700", dot: "bg-red-500" },
+  on_hold: { label: "Incident (on hold)", accent: "border-l-red-500", chip: "bg-red-50 text-red-700", dot: "bg-red-500" },
 };
 
 // Legend order (mirrors the journey)
@@ -1142,7 +1142,7 @@ function GatedAdvanceButton({
           )}
           <span className={formDone ? "text-slate-700" : "text-slate-500"}>
             {FORM_LABELS[requiredForm]}
-            {formDone && <span className="text-emerald-600"> — signed</span>}
+            {formDone && <span className="text-emerald-600"> · signed</span>}
           </span>
         </div>
       )}
@@ -1403,7 +1403,7 @@ function MyJobCard({
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600" />
           <span className="text-xs font-semibold text-amber-800">
-            Job on hold — Waiting for Ops instructions
+            Job on hold. Waiting for Ops instructions.
           </span>
         </div>
       )}
@@ -1411,7 +1411,7 @@ function MyJobCard({
         <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-600" />
           <span className="text-xs font-semibold text-red-800">
-            Job stopped — Do not proceed. Ops will contact you.
+            Job stopped. Do not proceed. Ops will contact you.
           </span>
         </div>
       )}
@@ -1645,7 +1645,7 @@ function MyJobCard({
                   <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-500" />
                   <span className="text-slate-700">
                     {FORM_LABELS.return_confirmation}
-                    <span className="text-emerald-600"> — completed</span>
+                    <span className="text-emerald-600"> · completed</span>
                   </span>
                 </div>
                 <button
@@ -1744,7 +1744,7 @@ function MyJobCard({
             <span className="font-medium">
               {job.servicePaymentMethod === "phone_direct"
                 ? "Paid to service centre by phone"
-                : `Payment received via link — $${
+                : `Payment received via link: $${
                     job.servicePaymentAmount
                       ? (job.servicePaymentAmount / 100).toFixed(2)
                       : "0.00"

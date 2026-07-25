@@ -240,11 +240,11 @@ export async function POST(request: NextRequest) {
       await sendEmail({
         to: customerEmail,
         toName: customerName,
-        subject: `We've received your booking request — ${bookingRequest.vehicleRegistration} (Ref: ${ref})`,
+        subject: `We've received your booking request for ${bookingRequest.vehicleRegistration} (Ref: ${ref})`,
         textContent: [
           `Hi ${firstName},`,
           ``,
-          `Thanks for booking with drivlet — we've received your request and our team is reviewing it now.`,
+          `Thanks for booking with drivlet. We've received your request and our team is reviewing it now.`,
           ``,
           bookingDetailsText(details),
           `  Reference: ${ref}`,
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
         </td></tr>
         <tr><td style="padding:32px;">
           <p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">Hi ${firstName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")},</p>
-          <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">Thanks for booking with drivlet — we've received your request and our team is reviewing it now.</p>
+          <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">Thanks for booking with drivlet. We've received your request and our team is reviewing it now.</p>
           ${bookingDetailsHtml(details)}
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
             <p style="margin:0 0 8px;color:#166534;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">What happens next</p>

@@ -7,11 +7,11 @@ import { LOCATIONS } from '@/lib/seo-data';
 import { CANBERRA_COVERAGE } from '@/lib/coverage-areas';
 
 export const metadata: Metadata = {
-  title: 'Areas We Serve — Newcastle & Canberra | Drivlet',
+  title: 'Areas We Serve | Newcastle & Canberra | Drivlet',
   description:
     'See every area Drivlet covers for car service pickup and delivery across Newcastle, Canberra and Queanbeyan. From $119. Book online.',
   openGraph: {
-    title: 'Areas We Serve — Newcastle & Canberra | Drivlet',
+    title: 'Areas We Serve | Newcastle & Canberra | Drivlet',
     description:
       'See every area Drivlet covers for car service pickup and delivery across Newcastle, Canberra and Queanbeyan. From $119. Book online.',
   },
@@ -53,7 +53,7 @@ export default function AreasWeServePage() {
             Areas we serve
           </h1>
           <p className="mt-4 text-lg text-slate-600">
-            Car service pickup and delivery across Newcastle and Canberra — here&apos;s
+            Car service pickup and delivery across Newcastle and Canberra. Here&apos;s
             where we cover.
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function AreasWeServePage() {
             </h2>
             <p className="mt-2 text-slate-600">
               Skip the trip to the mechanic. We pick up your car, take it in, and
-              bring it back — from $119.
+              bring it back, all from $119.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link

@@ -37,7 +37,7 @@ export async function POST(
     }
     if (action === "deny" && denyReason.length < 5) {
       return NextResponse.json(
-        { error: "Please provide a reason for denying (minimum 5 characters) — it is sent to the customer." },
+        { error: "Please provide a reason for denying (minimum 5 characters), as it is sent to the customer." },
         { status: 400 }
       );
     }
@@ -89,7 +89,7 @@ export async function POST(
       booking.updates.push({
         stage: "cancelled",
         timestamp: now,
-        message: "Cancellation request approved — booking cancelled.",
+        message: "Cancellation request approved and booking cancelled.",
         updatedBy: "admin",
       });
       await booking.save({ validateModifiedOnly: true });
@@ -112,7 +112,7 @@ export async function POST(
         sendEmail({
           to: booking.userEmail,
           toName: booking.userName || booking.userEmail,
-          subject: `Your booking has been cancelled — ${booking.vehicleRegistration}`,
+          subject: `Your booking has been cancelled (${booking.vehicleRegistration})`,
           textContent: [
             `Hi ${firstName},`,
             ``,
@@ -122,7 +122,7 @@ export async function POST(
             ``,
             `If you've already paid, our team will be in touch about your refund shortly.`,
             ``,
-            `We'd love to help another time — you can make a new booking at https://drivlet.com.au/booking`,
+            `We'd love to help another time. You can make a new booking at https://drivlet.com.au/booking`,
             ``,
             `Cheers,`,
             `The drivlet team`,
@@ -132,13 +132,13 @@ export async function POST(
             `<p>Your cancellation request has been approved and your booking is now cancelled.</p>`,
             `<pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-family:inherit;font-size:14px;white-space:pre-wrap">${detailsText}</pre>`,
             `<p>If you've already paid, our team will be in touch about your refund shortly.</p>`,
-            `<p>We'd love to help another time — <a href="https://drivlet.com.au/booking" style="color:#059669">make a new booking</a> any time.</p>`,
+            `<p>We'd love to help another time. You can <a href="https://drivlet.com.au/booking" style="color:#059669">make a new booking</a> whenever suits.</p>`,
             `<p style="margin-top:24px;color:#94a3b8;font-size:12px">The drivlet team</p>`,
           ].join(""),
         }).catch((err) => console.error("Failed to send cancellation confirmation:", err));
       }
 
-      return NextResponse.json({ success: true, message: "Cancellation approved — booking cancelled. Process any refund from the booking's payment panel." });
+      return NextResponse.json({ success: true, message: "Cancellation approved and booking cancelled. Process any refund from the booking's payment panel." });
     }
 
     // Deny
@@ -158,7 +158,7 @@ export async function POST(
       sendEmail({
         to: booking.userEmail,
         toName: booking.userName || booking.userEmail,
-        subject: `Update on your cancellation request — ${booking.vehicleRegistration}`,
+        subject: `Update on your cancellation request (${booking.vehicleRegistration})`,
         textContent: [
           `Hi ${firstName},`,
           ``,
@@ -184,7 +184,7 @@ export async function POST(
       }).catch((err) => console.error("Failed to send cancellation denial email:", err));
     }
 
-    return NextResponse.json({ success: true, message: "Cancellation request denied — the customer has been emailed." });
+    return NextResponse.json({ success: true, message: "Cancellation request denied. The customer has been emailed." });
   } catch (error) {
     console.error("Failed to resolve cancellation request:", error);
     return NextResponse.json({ error: "Failed to resolve cancellation request" }, { status: 500 });

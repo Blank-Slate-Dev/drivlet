@@ -2,7 +2,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Contact Drivlet – Car Service Pickup & Delivery | Newcastle & Canberra',
+  title: 'Contact Drivlet | Car Service Pickup & Delivery | Newcastle & Canberra',
   description:
     'Get in touch with Drivlet. Questions about our car service pickup and delivery? Call 1300 470 886 or email support@drivlet.com.au. Serving Newcastle and Canberra.',
   keywords: [
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     canonical: 'https://drivlet.com.au/contact',
   },
   openGraph: {
-    title: 'Contact Drivlet – Car Service Pickup & Delivery',
+    title: 'Contact Drivlet | Car Service Pickup & Delivery',
     description:
       'Questions about our car service pickup and delivery? Call 1300 470 886 or email support@drivlet.com.au.',
     url: 'https://drivlet.com.au/contact',

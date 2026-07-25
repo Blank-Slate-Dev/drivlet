@@ -287,8 +287,8 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
       }
       setActionSuccess(
         data.emailSent
-          ? "Request declined — the customer has been emailed."
-          : "Request declined, but the email to the customer failed — check Mailjet config."
+          ? "Request declined. The customer has been emailed."
+          : "Request declined, but the email to the customer failed. Check Mailjet config."
       );
       setShowDeclineForm(false);
       onRefresh();
@@ -312,7 +312,7 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
         return;
       }
       const data = await res.json();
-      setActionSuccess(data.emailSent ? "Payment link sent to customer!" : "Link created but email failed — check Mailjet config.");
+      setActionSuccess(data.emailSent ? "Payment link sent to customer!" : "Link created but email failed. Check Mailjet config.");
       onRefresh();
     } catch {
       setActionError("Failed to send payment link");
@@ -544,7 +544,7 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
           )}
           {amountNotice && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-              <AlertCircle className="mr-1 inline h-4 w-4" /> Amount changed — resend the payment link so the customer sees the new total.
+              <AlertCircle className="mr-1 inline h-4 w-4" /> Amount changed. Resend the payment link so the customer sees the new total.
             </div>
           )}
           {actionError && (

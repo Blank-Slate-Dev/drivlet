@@ -72,7 +72,7 @@ function checkEligibility(booking: {
         ...base,
         hoursUntilPickup,
         canRequest: false,
-        reason: `Your pickup is less than ${CANCELLATION_CUTOFF_HOURS} hours away. Please call ${SUPPORT_PHONE} — changes at this stage are at drivlet's discretion and may not be refundable.`,
+        reason: `Your pickup is less than ${CANCELLATION_CUTOFF_HOURS} hours away. Please call ${SUPPORT_PHONE}. Changes at this stage are at drivlet's discretion and may not be refundable.`,
       };
     }
     return {
@@ -216,7 +216,7 @@ export async function POST(
     const pickupSuburb = booking.pickupAddress?.split(",")[0]?.trim() || "Unknown";
     notifyAdmin({
       type: "cancel_request",
-      title: `Cancellation request — ${booking.vehicleRegistration}`,
+      title: `Cancellation request: ${booking.vehicleRegistration}`,
       message: `${booking.userName || booking.userEmail} requested to cancel the booking for ${booking.vehicleRegistration} (pickup ${pickupSuburb}).${reason ? ` Reason: ${reason}` : ""}`,
       bookingId: booking._id,
       metadata: {
@@ -237,7 +237,7 @@ export async function POST(
       sendEmail({
         to: booking.userEmail,
         toName: booking.userName || booking.userEmail,
-        subject: `We received your cancellation request — ${booking.vehicleRegistration}`,
+        subject: `We received your cancellation request for ${booking.vehicleRegistration}`,
         textContent: [
           `Hi ${(booking.userName || "there").split(" ")[0]},`,
           ``,

@@ -155,7 +155,7 @@ export default async function CityPage({
                 href="/booking"
                 className="group inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-base font-semibold text-slate-900 shadow-lg transition hover:bg-amber-300"
               >
-                Book a pickup — $119
+                Book a pickup · $119
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
               <a
@@ -250,11 +250,11 @@ export default async function CityPage({
                 },
                 {
                   title: 'Fully insured transport',
-                  desc: 'Your car is covered under our commercial insurance while in our care. Employee drivers — not contractors.',
+                  desc: 'Your car is covered under our commercial insurance while in our care. Employee drivers, not contractors.',
                 },
                 {
                   title: 'Real-time tracking',
-                  desc: 'Track your car at every stage — from pickup to workshop drop-off to return delivery.',
+                  desc: 'Track your car at every stage, from pickup to workshop drop-off to return delivery.',
                 },
                 {
                   title: 'Condition photos',
@@ -262,7 +262,7 @@ export default async function CityPage({
                 },
                 {
                   title: 'Flat-rate pricing',
-                  desc: 'Our transport fee starts at $119. No hidden costs — distance surcharges are shown at checkout before you pay.',
+                  desc: 'Our transport fee starts at $119. No hidden costs. Distance surcharges are shown at checkout before you pay.',
                 },
               ].map((item) => (
                 <div key={item.title} className="rounded-xl border border-slate-200 bg-white p-5">
@@ -284,7 +284,7 @@ export default async function CityPage({
                 </h2>
                 <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
                   We cover the greater {location.name} region. Don&apos;t see your
-                  exact suburb? Chances are we&apos;ve still got you — get in touch
+                  exact suburb? Chances are we&apos;ve still got you. Get in touch
                   and we&apos;ll confirm.
                 </p>
                 <div className="mt-10 flex flex-wrap justify-center gap-3">
@@ -341,7 +341,7 @@ export default async function CityPage({
         <section className="border-b border-slate-200 bg-white py-16 sm:py-20">
           <div className="mx-auto max-w-3xl px-5 sm:px-6">
             <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              Frequently asked questions — {location.name}
+              Frequently asked questions: {location.name}
             </h2>
             <div className="mt-8 divide-y divide-slate-200">
               {faqs.map((faq, i) => (

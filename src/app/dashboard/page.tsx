@@ -312,7 +312,7 @@ function BookingsSection({ bookings, activeBooking, loading, onCancelBooking, on
               {(activeBooking.status === 'in_progress' || activeBooking.status === 'completed') && (<button onClick={() => onOpenForm(activeBooking._id, 'claim')} className="inline-flex items-center gap-2 rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-200"><FileWarning className="h-4 w-4" />Lodge a Claim</button>)}
               {activeBooking.status === 'pending' && (<button onClick={() => onCancelBooking(activeBooking._id, activeBooking.vehicleRegistration)} className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"><XCircle className="h-4 w-4" />Request Cancellation</button>)}
             </div>
-            {activeBooking.status === 'pending' && (<p className="mt-2 text-xs text-slate-500">Cancellations can be requested up to {CANCELLATION_CUTOFF_HOURS} hours before pickup — our team reviews each request. Within {CANCELLATION_CUTOFF_HOURS} hours, please call {SUPPORT_PHONE}.</p>)}
+            {activeBooking.status === 'pending' && (<p className="mt-2 text-xs text-slate-500">Cancellations can be requested up to {CANCELLATION_CUTOFF_HOURS} hours before pickup, and our team reviews each request. Within {CANCELLATION_CUTOFF_HOURS} hours, please call {SUPPORT_PHONE}.</p>)}
           </div>
         </motion.div>
       )}

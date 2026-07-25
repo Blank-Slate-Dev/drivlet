@@ -85,7 +85,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // No cloud URL available (legacy photo or upload issue)
     return NextResponse.json(
-      { error: "Photo file not available — no cloud URL stored" },
+      { error: "Photo file not available (no cloud URL stored)" },
       { status: 404 }
     );
   } catch (error) {

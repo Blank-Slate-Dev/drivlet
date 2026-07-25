@@ -4,7 +4,7 @@
 
 import { ImageResponse } from 'next/og';
 
-export const alt = 'Drivlet – Car Service Pickup & Delivery in Newcastle & Canberra';
+export const alt = 'Drivlet | Car Service Pickup & Delivery in Newcastle & Canberra';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

@@ -11,7 +11,7 @@ export const SUPPORT_EMAIL = "support@drivlet.com.au";
 
 export const CANCELLATION_POLICY_TEXT =
   `Changes or cancellations can be requested up to ${CANCELLATION_CUTOFF_HOURS} hours before your scheduled pickup. ` +
-  `Within ${CANCELLATION_CUTOFF_HOURS} hours of pickup, please call ${SUPPORT_PHONE} — changes at this stage are at drivlet's discretion and may not be refundable.`;
+  `Within ${CANCELLATION_CUTOFF_HOURS} hours of pickup, please call ${SUPPORT_PHONE}. Changes at this stage are at drivlet's discretion and may not be refundable.`;
 
 // Returns true while the customer can still request changes/cancellation online.
 export function isBeforeCancellationCutoff(pickupDateTime: Date, now: Date = new Date()): boolean {

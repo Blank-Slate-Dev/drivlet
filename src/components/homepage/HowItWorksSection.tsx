@@ -39,7 +39,7 @@ const marketplaceSteps = [
     step: '4',
     title: 'We return your car',
     description:
-      'Once serviced, we bring your car back to you — safe, sound, and ready to drive.',
+      'Once serviced, we bring your car back to you, safe, sound, and ready to drive.',
     image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',
@@ -78,7 +78,7 @@ const transportSteps = [
     step: '4',
     title: 'Returned to you',
     description:
-      'Once your service is complete, we collect and return your car — hassle-free.',
+      'Once your service is complete, we collect and return your car, hassle-free.',
     image: '/step4_phone.png',
     gradient: 'from-cyan-400 to-teal-500',
     overlayColor: 'to-cyan-400/90',

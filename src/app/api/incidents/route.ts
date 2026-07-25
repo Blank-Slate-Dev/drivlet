@@ -44,16 +44,16 @@ async function sendCustomerIncidentEmail(booking: {
     trackingCode: booking.trackingCode,
   };
 
-  const subject = `An update about your vehicle — ${rego}`;
+  const subject = `An update about your vehicle (${rego})`;
 
   const textContent = `
 Hi ${customerName},
 
-We're writing to let you know we've logged an incident relating to your booking. There's nothing you need to do right now — our team is already on it and will contact you shortly with more information.
+We're writing to let you know we've logged an incident relating to your booking. There's nothing you need to do right now. Our team is already on it and will contact you shortly with more information.
 
 ${bookingDetailsText(details)}
 
-If you have any questions in the meantime, please call us on ${SUPPORT_PHONE} — we're happy to help.
+If you have any questions in the meantime, please call us on ${SUPPORT_PHONE}. We're happy to help.
 
 Thanks,
 The drivlet team
@@ -79,11 +79,11 @@ The drivlet team
       <div style="padding: 32px;">
         <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${escapeHtml(customerName)},</p>
 
-        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">We're writing to let you know we've logged an incident relating to your booking. There's nothing you need to do right now — our team is already on it and will contact you shortly with more information.</p>
+        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">We're writing to let you know we've logged an incident relating to your booking. There's nothing you need to do right now. Our team is already on it and will contact you shortly with more information.</p>
 
         ${bookingDetailsHtml(details)}
 
-        <p style="margin: 0 0 8px; color: #475569; font-size: 15px; line-height: 1.6;">If you have any questions in the meantime, please call us on <a href="tel:${SUPPORT_PHONE.replace(/\s/g, "")}" style="color: #059669; text-decoration: none; font-weight: 600;">${SUPPORT_PHONE}</a> — we're happy to help.</p>
+        <p style="margin: 0 0 8px; color: #475569; font-size: 15px; line-height: 1.6;">If you have any questions in the meantime, please call us on <a href="tel:${SUPPORT_PHONE.replace(/\s/g, "")}" style="color: #059669; text-decoration: none; font-weight: 600;">${SUPPORT_PHONE}</a>. We're happy to help.</p>
       </div>
 
       <!-- Footer -->
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
     const incidentTypeLabel = String(incidentType).replace(/_/g, " ");
     notifyAdmin({
       type: "incident",
-      title: `Incident reported — ${booking.vehicleRegistration || "unknown rego"}`,
+      title: `Incident reported: ${booking.vehicleRegistration || "unknown rego"}`,
       message: `${user.username || "A driver"} reported a ${incidentTypeLabel} incident on booking ${booking.vehicleRegistration || bookingId} (severity: ${severity}, exception state: ${exceptionState}).`,
       bookingId: booking._id,
       metadata: {

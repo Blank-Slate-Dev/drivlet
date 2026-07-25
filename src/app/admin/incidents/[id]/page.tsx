@@ -408,7 +408,7 @@ export default function AdminIncidentDetailPage() {
               <div className="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 className="mb-2 text-sm font-semibold text-slate-900">Police Involvement</h2>
                 <p className="text-sm text-slate-700">
-                  Police involved{incident.policeReference && ` — Reference: ${incident.policeReference}`}
+                  Police involved{incident.policeReference && ` · Reference: ${incident.policeReference}`}
                 </p>
               </div>
             )}
@@ -458,7 +458,7 @@ export default function AdminIncidentDetailPage() {
                   {incident.resolution.insuranceClaim && (
                     <p className="text-xs text-emerald-600">
                       Insurance claim filed{" "}
-                      {incident.resolution.claimReference && `— Ref: ${incident.resolution.claimReference}`}
+                      {incident.resolution.claimReference && `· Ref: ${incident.resolution.claimReference}`}
                     </p>
                   )}
                   <p className="text-xs text-emerald-500">
@@ -647,7 +647,7 @@ export default function AdminIncidentDetailPage() {
                 <div className="flex items-center gap-2 text-emerald-600">
                   <CheckCircle className="h-4 w-4" />
                   <span className="text-sm">
-                    Yes{incident.customerNotifiedAt && ` — ${formatDate(incident.customerNotifiedAt)}`}
+                    Yes{incident.customerNotifiedAt && ` · ${formatDate(incident.customerNotifiedAt)}`}
                   </span>
                 </div>
               ) : (

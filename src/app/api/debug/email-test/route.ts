@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       envCheck,
       result: { success },
       message: success
-        ? "Email sent — check inbox"
-        : "sendEmail returned false — check Vercel logs for [EMAIL_DEBUG] lines",
+        ? "Email sent. Check your inbox."
+        : "sendEmail returned false. Check Vercel logs for [EMAIL_DEBUG] lines.",
     });
   } catch (error: unknown) {
     const err = error as { statusCode?: number; message?: string; ErrorMessage?: string; response?: { status?: number; data?: unknown } };
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
           responseData: err.response?.data,
         },
       },
-      message: "sendEmail threw an exception — see error details",
+      message: "sendEmail threw an exception. See error details.",
     });
   }
 }

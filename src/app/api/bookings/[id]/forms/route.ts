@@ -166,7 +166,7 @@ export async function POST(
       claim_lodgement: "Claim Lodgement form",
     };
     const updateMessage = customerRefused
-      ? `⚠️ Customer refused to sign the ${formLabels[formType]} — dispute recorded. Please review.`
+      ? `⚠️ Customer refused to sign the ${formLabels[formType]}. Dispute recorded. Please review.`
       : `${formLabels[formType]} signed${signatures?.customer && signatures?.driver ? " by customer and driver" : ""}.`;
 
     const updatedBooking = await Booking.findByIdAndUpdate(

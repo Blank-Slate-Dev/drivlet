@@ -82,7 +82,7 @@ export async function POST(
     }
     if (!EDITABLE_STAGES.includes(booking.currentStage)) {
       return NextResponse.json(
-        { error: "This booking can no longer be edited — the car has already been picked up." },
+        { error: "This booking can no longer be edited because the car has already been picked up." },
         { status: 400 }
       );
     }
@@ -256,7 +256,7 @@ export async function POST(
       sendEmail({
         to: booking.userEmail,
         toName: booking.userName || booking.userEmail,
-        subject: `Your booking has been updated — ${booking.vehicleRegistration}`,
+        subject: `Your booking has been updated (${booking.vehicleRegistration})`,
         textContent,
         htmlContent,
       }).catch((err) => console.error("Failed to send booking updated email:", err));

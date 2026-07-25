@@ -238,7 +238,7 @@ const policies: PolicySection[] = [
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Within 3 hours of pick-up:</strong> generally non-refundable, except where required under Australian Consumer Law.</li>
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>No-show / not reachable / car not accessible:</strong> generally non-refundable.</li>
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>If Drivlet cancels:</strong> full refund or reschedule.</li>
-            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Workshop charges:</strong> paid directly to the workshop — their terms are separate.</li>
+            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Workshop charges:</strong> paid directly to the workshop. Their terms are separate.</li>
           </ul>
         </div>
 
@@ -339,7 +339,7 @@ const policies: PolicySection[] = [
           <PolicyClause title="How to Lodge a Claim">
             <ul className="space-y-1.5 text-slate-600">
               <li className="flex gap-2"><span className="text-slate-400">•</span>Submit the online Damage Claim Form via our website (recommended).</li>
-              <li className="flex gap-2"><span className="text-slate-400">•</span>Or email support@drivlet.com.au with subject: Damage Claim – [Booking ID].</li>
+              <li className="flex gap-2"><span className="text-slate-400">•</span>Or email support@drivlet.com.au with subject: Damage Claim - [Booking ID].</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Include: your name, Booking ID, booking date, addresses, and a description.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Attach clear photos/video (wide shot + close-ups) and any supporting documents.</li>
             </ul>

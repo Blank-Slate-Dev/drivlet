@@ -126,7 +126,7 @@ export async function POST(
       sendEmail({
         to: booking.userEmail,
         toName: booking.userName || booking.userEmail,
-        subject: `Your refund of ${amountDisplay} is on its way — ${booking.vehicleRegistration}`,
+        subject: `Your refund of ${amountDisplay} is on its way (${booking.vehicleRegistration})`,
         textContent: [
           `Hi ${firstName},`,
           ``,

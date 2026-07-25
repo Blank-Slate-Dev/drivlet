@@ -94,7 +94,7 @@ function SuccessContent() {
             Booking Confirmed!
           </h1>
           <p className="mt-2 text-center text-slate-600">
-            Payment received — your booking is confirmed. Thank you for choosing drivlet.
+            Payment received. Your booking is confirmed. Thank you for choosing drivlet.
           </p>
 
           {/* Tracking code notice */}

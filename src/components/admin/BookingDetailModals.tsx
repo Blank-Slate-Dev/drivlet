@@ -625,7 +625,7 @@ export function ViewDetailsModal({
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <p className="font-medium text-slate-700">
                 Cancellation request {booking.cancellationRequest.status}
-                {booking.cancellationRequest.resolvedAt && ` — ${formatDateTime(booking.cancellationRequest.resolvedAt)}`}
+                {booking.cancellationRequest.resolvedAt && ` • ${formatDateTime(booking.cancellationRequest.resolvedAt)}`}
               </p>
               {booking.cancellationRequest.denyReason && (
                 <p className="mt-1 text-xs text-slate-500">Deny reason: {booking.cancellationRequest.denyReason}</p>
@@ -777,7 +777,7 @@ export function ViewDetailsModal({
                 </div>
                 {refundedFor("transport") > 0 && booking.paymentStatus !== "refunded" && (
                   <p className="mt-2 text-xs text-purple-600">
-                    {formatCurrency(refundedFor("transport"))} refunded so far — {formatCurrency(remainingFor("transport"))} remaining
+                    {formatCurrency(refundedFor("transport"))} refunded so far • {formatCurrency(remainingFor("transport"))} remaining
                   </p>
                 )}
                 {booking.paymentId && (
@@ -823,7 +823,7 @@ export function ViewDetailsModal({
                   </div>
                   {refundedFor("service") > 0 && booking.servicePaymentStatus !== "refunded" && (
                     <p className="mt-2 text-xs text-purple-600">
-                      {formatCurrency(refundedFor("service"))} refunded so far — {formatCurrency(remainingFor("service"))} remaining
+                      {formatCurrency(refundedFor("service"))} refunded so far • {formatCurrency(remainingFor("service"))} remaining
                     </p>
                   )}
                 </div>
@@ -920,7 +920,7 @@ export function ViewDetailsModal({
                         <div>
                           <p className="font-medium text-slate-900">
                             {formatCurrency(charge.amount)}{" "}
-                            <span className="text-xs font-normal text-slate-600">— {charge.description}</span>
+                            <span className="text-xs font-normal text-slate-600">• {charge.description}</span>
                           </p>
                           <p className="text-[11px] text-slate-400">
                             Created {formatDateTime(charge.createdAt)}

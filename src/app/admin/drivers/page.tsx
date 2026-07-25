@@ -875,7 +875,7 @@ export default function AdminDriversPage() {
                     </div>
                   ) : (
                     <p className="rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">
-                      Not provided — registered before document upload was required
+                      Not provided (registered before document upload was required)
                     </p>
                   )}
 
@@ -891,7 +891,7 @@ export default function AdminDriversPage() {
                           {isPoliceCheckExpired(selectedDriver.policeCheck?.issueDate) && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                               <AlertTriangle className="h-3 w-3" />
-                              Expired — request a new check
+                              Expired, request a new check
                             </span>
                           )}
                         </div>
@@ -1014,7 +1014,7 @@ export default function AdminDriversPage() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-500">Not provided — payment details are collected after approval.</p>
+                    <p className="text-sm text-slate-500">Not provided. Payment details are collected after approval.</p>
                   )}
                   {selectedDriver.abn && (
                     <div className="mt-3 pt-3 border-t border-slate-100">

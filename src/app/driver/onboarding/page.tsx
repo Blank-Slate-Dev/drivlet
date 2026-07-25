@@ -540,7 +540,7 @@ export default function DriverOnboardingPage() {
                         <CheckCircle className="h-8 w-8 text-emerald-600 flex-shrink-0" />
                         <div>
                           <h3 className="font-semibold text-emerald-900">Police Check On File</h3>
-                          <p className="text-emerald-700 text-sm">We already have your National Police Check — no need to upload it again.</p>
+                          <p className="text-emerald-700 text-sm">We already have your National Police Check. No need to upload it again.</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">

@@ -124,7 +124,7 @@ function formatServiceDate(date?: Date | string): string | undefined {
 
 function detailPairs(d: BookingEmailDetails): Array<[string, string]> {
   const pairs: Array<[string, string]> = [];
-  if (d.vehicleRegistration) pairs.push(['Vehicle', d.vehicleDescription ? `${d.vehicleRegistration} — ${d.vehicleDescription}` : d.vehicleRegistration]);
+  if (d.vehicleRegistration) pairs.push(['Vehicle', d.vehicleDescription ? `${d.vehicleRegistration} (${d.vehicleDescription})` : d.vehicleRegistration]);
   if (d.serviceType) pairs.push(['Service', d.serviceType]);
   const dateStr = formatServiceDate(d.serviceDate);
   if (dateStr) pairs.push(['Date', dateStr]);
@@ -348,12 +348,12 @@ export async function sendServicePaymentEmail(
     trackingCode,
   };
 
-  const subject = `Your car is ready — service payment of $${amountFormatted} due (${vehicleRego})`;
+  const subject = `Your car is ready: service payment of $${amountFormatted} due (${vehicleRego})`;
 
   const textContent = `
 Hi ${customerName},
 
-Good news — the service on your car is complete.
+Good news: the service on your car is complete.
 
 ${bookingDetailsText(details)}
 
@@ -390,7 +390,7 @@ The drivlet team
       <div style="padding: 32px;">
         <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${safeCustomerName},</p>
 
-        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">Good news — the service on your car is complete. Once the service payment below is confirmed, our driver will return your car to you.</p>
+        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">Good news: the service on your car is complete. Once the service payment below is confirmed, our driver will return your car to you.</p>
 
         ${bookingDetailsHtml(details)}
 
@@ -496,7 +496,7 @@ const STAGE_EMAIL_CONTENT: Record<string, StageEmailContent> = {
     emoji: "🎉",
     heading: "Delivered!",
     subject: "Your car has been delivered",
-    message: "Your vehicle has been delivered. Thanks for choosing drivlet — we hope to see you again!",
+    message: "Your vehicle has been delivered. Thanks for choosing drivlet. We hope to see you again!",
     color: "#059669",
   },
 };
@@ -567,7 +567,7 @@ export async function sendBookingStageEmail(
     ? `${appUrl}/track?code=${trackingCode}`
     : `${appUrl}/track`;
 
-  const subject = `${content.emoji} ${content.subject} — ${vehicleRegistration}`;
+  const subject = `${content.emoji} ${content.subject} (${vehicleRegistration})`;
 
   const details: BookingEmailDetails = {
     vehicleRegistration,
@@ -665,7 +665,7 @@ drivlet - Car service made simple
               <div style="margin: 0 0 24px; padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; text-align: center;">
                 <p style="margin: 0 0 4px; font-size: 18px;">⭐⭐⭐⭐⭐</p>
                 <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">How did we do?</p>
-                <p style="margin: 0 0 16px; color: #a16207; font-size: 13px; line-height: 1.6;">We'd love a quick rating and a word of feedback — it takes less than a minute.</p>
+                <p style="margin: 0 0 16px; color: #a16207; font-size: 13px; line-height: 1.6;">We'd love a quick rating and a word of feedback. It takes less than a minute.</p>
                 <a href="${feedbackUrl}" style="display: inline-block; background-color: #d97706; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 28px; border-radius: 9999px;">
                   Rate your experience
                 </a>
@@ -770,7 +770,7 @@ export async function sendSignedFormEmail(
     timeZone: "Australia/Sydney",
   });
 
-  const subject = `Your signed copy — ${meta.title}${data.vehicleRegistration ? ` (${data.vehicleRegistration})` : ""}`;
+  const subject = `Your signed copy of ${meta.title}${data.vehicleRegistration ? ` (${data.vehicleRegistration})` : ""}`;
 
   const fieldRowsHtml = data.fields
     .filter(([, value]) => value && value.trim() !== "")
@@ -833,7 +833,7 @@ export async function sendSignedFormEmail(
         driverSig ? `${data.driverName || "Drivlet driver"} (driver)` : null,
       ]
         .filter(Boolean)
-        .join(", ")} — signature images are included in the HTML version of this email.\n`
+        .join(", ")}. Signature images are included in the HTML version of this email.\n`
     : "";
 
   const textContent = `

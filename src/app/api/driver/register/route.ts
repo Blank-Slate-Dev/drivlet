@@ -420,7 +420,7 @@ export async function POST(request: Request) {
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     notifyAdmin({
       type: "system",
-      title: `New driver application — ${fullName}`,
+      title: `New driver application: ${fullName}`,
       message: `${fullName} applied to drive (${email.toLowerCase()}, ${formattedPhone}). Review in the Drivers section.`,
     }).catch(console.error);
 

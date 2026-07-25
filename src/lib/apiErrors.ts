@@ -19,13 +19,13 @@ export function bookingActionErrorResponse(error: unknown, fallback: string) {
     }
     if (error.name === "CastError") {
       return NextResponse.json(
-        { error: "Invalid booking reference — please refresh and try again." },
+        { error: "Invalid booking reference. Please refresh and try again." },
         { status: 400 }
       );
     }
     if (error.name === "VersionError" || error.name === "ParallelSaveError") {
       return NextResponse.json(
-        { error: "This booking was just updated elsewhere — please try again." },
+        { error: "This booking was just updated elsewhere. Please try again." },
         { status: 409 }
       );
     }
