@@ -3,8 +3,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { stripe, DRIVLET_PRICE, ZONE_SURCHARGES } from "@/lib/stripe";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
-
-const isTestMode = process.env.STRIPE_TEST_MODE === "true";
+import { isStripeTestModeActive } from "@/lib/stripeTestMode";
 
 export async function POST(request: NextRequest) {
   const originCheck = requireValidOrigin(request);
@@ -50,7 +49,12 @@ export async function POST(request: NextRequest) {
       typeof bookingRequest.quotedAmount === "number" && bookingRequest.quotedAmount > 0
         ? bookingRequest.quotedAmount
         : DRIVLET_PRICE + surcharge;
+    // $1 test override — production-guarded (see src/lib/stripeTestMode.ts)
+    const isTestMode = isStripeTestModeActive();
     const serverAmount = isTestMode ? 100 : quotedAmount;
+    if (isTestMode) {
+      console.warn(`[stripe] TEST MODE: charging $1.00 instead of $${(quotedAmount / 100).toFixed(2)} for request ${bookingRequest._id}`);
+    }
 
     if (bookingRequest.paymentIntentId) {
       try {

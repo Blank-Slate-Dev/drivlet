@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE, ZONE_SURCHARGES, calculateTotalAmount } from '@/lib/stripe';
 import { requireValidOrigin } from '@/lib/validation';
+import { isStripeTestModeActive } from '@/lib/stripeTestMode';
 import { calculateDistance, getDistanceZone } from '@/lib/distanceZones';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -125,9 +126,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate the total amount using the server-verified zone
-    // ⚠️ TEMPORARY TEST MODE — remove before launch
-    // When STRIPE_TEST_MODE=true, charge $1.00 instead of real price
-    const isTestMode = process.env.STRIPE_TEST_MODE === 'true';
+    // $1 test override — production-guarded (see src/lib/stripeTestMode.ts)
+    const isTestMode = isStripeTestModeActive();
     const totalAmount = isTestMode ? 100 : DRIVLET_PRICE + verifiedSurcharge;
     if (isTestMode) {
       console.warn('⚠️⚠️⚠️ STRIPE TEST MODE ACTIVE — charging $1.00 instead of real price ⚠️⚠️⚠️');
