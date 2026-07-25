@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { MongoClient, ObjectId } from 'mongodb';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 import { sendBookingStageEmail } from '@/lib/email';
+import { markServicePaymentPaid } from '@/lib/servicePayment';
 
 export async function POST(request: NextRequest) {
   console.log('🔔 Webhook received!');
@@ -48,6 +49,24 @@ export async function POST(request: NextRequest) {
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const metadata = paymentIntent.metadata;
+
+      // SERVICE payments (garage invoice) are handled by the shared marker —
+      // delegated here too so paid status lands in the DB even when only THIS
+      // webhook endpoint is registered in the Stripe dashboard (2026-07-25:
+      // driver card + admin tracker stuck on "Payment link sent").
+      if (metadata?.type === 'service_payment' && metadata.bookingId) {
+        console.log('💳 service payment via payment_intent.succeeded — delegating');
+        await markServicePaymentPaid({
+          bookingId: metadata.bookingId,
+          paymentId: paymentIntent.id,
+          amount: paymentIntent.amount,
+        });
+        break;
+      }
+      if (metadata?.type === 'extra_charge') {
+        console.log('ℹ️ extra_charge payment intent — handled via checkout.session.completed');
+        break;
+      }
 
       console.log('💳 payment_intent.succeeded received');
       console.log('📦 Payment Intent ID:', paymentIntent.id);
@@ -363,6 +382,25 @@ export async function POST(request: NextRequest) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       const metadata = session.metadata;
+
+      // SERVICE payments must never fall through into transport-booking
+      // creation — delegate to the shared marker (see note above).
+      if (metadata?.type === 'service_payment' && metadata.bookingId) {
+        console.log('💳 service payment via checkout.session.completed — delegating');
+        await markServicePaymentPaid({
+          bookingId: metadata.bookingId,
+          paymentId:
+            typeof session.payment_intent === 'string'
+              ? session.payment_intent
+              : session.payment_intent?.id || session.id,
+          amount: session.amount_total || 0,
+        });
+        break;
+      }
+      if (metadata?.type === 'extra_charge') {
+        console.log('ℹ️ extra_charge checkout session — handled by the service-payment webhook');
+        break;
+      }
 
       console.log('💳 checkout.session.completed received');
       console.log('📦 Session ID:', session.id);

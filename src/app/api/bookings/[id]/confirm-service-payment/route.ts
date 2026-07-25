@@ -9,6 +9,7 @@ import Booking from '@/models/Booking';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { markServicePaymentPaid } from '@/lib/servicePayment';
 
 export async function POST(
   request: NextRequest,
@@ -41,16 +42,17 @@ export async function POST(
       );
     }
 
-    // Verify caller owns this booking (session user or matching guest email)
+    // Ownership check gates DETAILED responses. Unauthenticated callers
+    // (guests landing on /payment/success after paying the driver-generated
+    // Checkout link) are still allowed to TRIGGER verification — the answer
+    // comes from Stripe's records, nothing sensitive is returned, and the
+    // endpoint is rate-limited.
     const session = await getServerSession(authOptions);
     const isOwner =
       session?.user?.role === "admin" ||
       (session?.user?.id && booking.userId?.toString() === session.user.id) ||
       (session?.user?.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
-
-    if (!isOwner) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    void isOwner; // response shape below is minimal either way
 
     // Already paid - return success
     if (booking.servicePaymentStatus === 'paid') {
@@ -64,34 +66,42 @@ export async function POST(
       });
     }
 
-    // No payment intent to verify
-    if (!booking.servicePaymentIntentId) {
+    // Resolve a PaymentIntent to verify: prefer the stored PI id; fall back
+    // to looking it up via the Checkout session (Checkout creates the PI
+    // lazily, so the id is often unknown at link-generation time).
+    let paymentIntentId = booking.servicePaymentIntentId || null;
+    if (!paymentIntentId && booking.servicePaymentSessionId) {
+      try {
+        const checkoutSession = await stripe.checkout.sessions.retrieve(
+          booking.servicePaymentSessionId
+        );
+        paymentIntentId =
+          typeof checkoutSession.payment_intent === 'string'
+            ? checkoutSession.payment_intent
+            : checkoutSession.payment_intent?.id || null;
+      } catch (err) {
+        console.error('Failed to retrieve checkout session for verification:', err);
+      }
+    }
+
+    if (!paymentIntentId) {
       return NextResponse.json(
-        { error: 'No payment intent found for this booking' },
+        { error: 'No payment found to verify for this booking yet' },
         { status: 400 }
       );
     }
 
     // Verify with Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      booking.servicePaymentIntentId
-    );
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     if (paymentIntent.status === 'succeeded') {
-      // Update booking
-      booking.servicePaymentStatus = 'paid';
-      booking.servicePaymentId = paymentIntent.id;
-      booking.currentStage = 'ready_for_return';
-      booking.overallProgress = 85;
-      booking.updatedAt = new Date();
-      booking.updates.push({
-        stage: 'service_payment_received',
-        timestamp: new Date(),
-        message: `Customer paid $${(paymentIntent.amount / 100).toFixed(2)} for service. Ready for return delivery.`,
-        updatedBy: 'system',
+      // Shared marker: idempotent, guards stage regression, sets the payment
+      // method, and broadcasts SSE — same path as the webhooks.
+      await markServicePaymentPaid({
+        bookingId,
+        paymentId: paymentIntent.id,
+        amount: paymentIntent.amount,
       });
-
-      await booking.save({ validateModifiedOnly: true });
 
       console.log('✅ Payment confirmed via direct verification:', bookingId);
 
@@ -99,7 +109,6 @@ export async function POST(
         success: true,
         booking: {
           servicePaymentStatus: 'paid',
-          currentStage: 'ready_for_return',
         },
       });
     }

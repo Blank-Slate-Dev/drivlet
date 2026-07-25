@@ -1,7 +1,7 @@
 // src/app/payment/success/page.tsx
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,6 +11,31 @@ function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const bookingId = searchParams.get("booking");
   const paymentType = searchParams.get("type");
+
+  // Belt-and-braces: trigger direct Stripe verification for service payments
+  // so the booking is marked paid even if the webhook never fires. Retries a
+  // few times because Checkout can take a moment to attach the PaymentIntent.
+  const confirmAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (paymentType !== "service" || !bookingId || confirmAttemptedRef.current) return;
+    confirmAttemptedRef.current = true;
+
+    let attempts = 0;
+    const confirm = async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}/confirm-service-payment`, {
+          method: "POST",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) return; // marked paid (or already was)
+      } catch {
+        /* network hiccup — retry below */
+      }
+      if (attempts < 4) setTimeout(confirm, 3000);
+    };
+    confirm();
+  }, [paymentType, bookingId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">

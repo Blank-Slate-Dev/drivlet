@@ -142,6 +142,9 @@ export interface IBooking extends Document {
   servicePaymentUrl?: string;
   servicePaymentId?: string;
   servicePaymentIntentId?: string;
+  /** Stripe Checkout session id for the service-payment link — enables
+   *  direct verification when the PaymentIntent id wasn't known at creation */
+  servicePaymentSessionId?: string;
   servicePaymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
   /** How the service was paid: via the Stripe backup link, or directly to the
    *  service centre over the phone (marked by the driver). */
@@ -559,6 +562,10 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       required: false,
       index: true,
+    },
+    servicePaymentSessionId: {
+      type: String,
+      required: false,
     },
     servicePaymentStatus: {
       type: String,

@@ -1020,6 +1020,16 @@ export async function POST(request: NextRequest) {
             vehicleRegistration: booking.vehicleRegistration,
             garageName: booking.garageName || '',
           },
+          // Also stamp the PaymentIntent itself — Checkout does NOT copy
+          // session metadata onto the PI, so without this the
+          // payment_intent.succeeded event can't be matched to the booking.
+          payment_intent_data: {
+            metadata: {
+              bookingId: bookingId,
+              type: 'service_payment',
+              vehicleRegistration: booking.vehicleRegistration,
+            },
+          },
           success_url: `${appUrl}/payment/success?booking=${bookingId}&type=service`,
           cancel_url: `${appUrl}/payment/cancelled?booking=${bookingId}`,
         });
@@ -1028,6 +1038,10 @@ export async function POST(request: NextRequest) {
         booking.servicePaymentAmount = serviceAmount;
         booking.servicePaymentUrl = checkoutSession.url || undefined;
         booking.servicePaymentIntentId = (checkoutSession.payment_intent as string) || undefined;
+        // Checkout often creates the PaymentIntent lazily (payment_intent is
+        // null here) — store the session id so direct verification can still
+        // look the payment up if webhooks fail.
+        booking.servicePaymentSessionId = checkoutSession.id || undefined;
         booking.servicePaymentStatus = "pending";
         booking.currentStage = "service_in_progress";
         booking.overallProgress = 72;
