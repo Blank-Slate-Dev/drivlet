@@ -245,7 +245,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         (booking as any).updates = updates;
       }
 
-      await booking.save();
+      await booking.save({ validateModifiedOnly: true });
 
       return NextResponse.json({
         success: true,
@@ -461,7 +461,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- assigning audit trail
     (booking as any).updates = updates;
 
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     return NextResponse.json({
       success: true,
@@ -550,7 +550,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- assigning audit trail
     (booking as any).updates = updates;
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     return NextResponse.json({
       success: true,

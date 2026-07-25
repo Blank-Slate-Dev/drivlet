@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       message: `Driver ${driver.firstName} initiated a call to the customer.`,
       updatedBy: "driver",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     return NextResponse.json({
       success: true,

@@ -6,6 +6,7 @@ import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 import { requireValidOrigin } from "@/lib/validation";
+import { bookingActionErrorResponse } from "@/lib/apiErrors";
 
 // Atomically decrement a driver's lifetime assigned-jobs counter, never below zero.
 // The { $gt: 0 } guard means the update matches nothing (no-op) once the count is 0.
@@ -375,9 +376,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid leg type" }, { status: 400 });
   } catch (error) {
     console.error("Error dispatching driver:", error);
-    return NextResponse.json(
-      { error: "Failed to dispatch driver" },
-      { status: 500 }
+    return bookingActionErrorResponse(
+      error,
+      "Failed to dispatch driver — please try again."
     );
   }
 }
@@ -462,7 +463,9 @@ export async function DELETE(request: NextRequest) {
         updatedBy: "admin",
       });
 
-      await booking.save();
+      // validateModifiedOnly: legacy-invalid timeline entries (see 2026-07-24
+      // corrupt-entry fix) must never block an admin unassigning a driver.
+      await booking.save({ validateModifiedOnly: true });
 
       // Decrement lifetime job counters for the removed leg(s), never below zero.
       // The { "metrics.totalJobs": { $gt: 0 } } guard makes the $inc a no-op at zero.
@@ -498,7 +501,9 @@ export async function DELETE(request: NextRequest) {
         updatedBy: "admin",
       });
 
-      await booking.save();
+      // validateModifiedOnly: legacy-invalid timeline entries (see 2026-07-24
+      // corrupt-entry fix) must never block an admin unassigning a driver.
+      await booking.save({ validateModifiedOnly: true });
 
       // Decrement the return driver's counter, never below zero.
       await decrementDriverJobs(removedReturnDriverId);
@@ -514,9 +519,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Invalid leg type" }, { status: 400 });
   } catch (error) {
     console.error("Error unassigning driver:", error);
-    return NextResponse.json(
-      { error: "Failed to unassign driver" },
-      { status: 500 }
+    return bookingActionErrorResponse(
+      error,
+      "Failed to unassign driver — please try again."
     );
   }
 }

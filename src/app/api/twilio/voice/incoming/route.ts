@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       message: `Customer called and was connected to driver ${driver.firstName}.`,
       updatedBy: "system",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // Generate TwiML to connect to driver
     const driverPhone = formatPhoneNumber(driver.phone);

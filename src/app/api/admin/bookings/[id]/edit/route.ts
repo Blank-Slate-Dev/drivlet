@@ -199,7 +199,7 @@ export async function POST(
       updatedBy: "admin",
     });
 
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // SSE only — the stage didn't change, so suppress the stage email/SMS
     // (we send our own "booking updated" email below instead).

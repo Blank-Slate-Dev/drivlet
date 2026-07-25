@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       message: `⏰ Customer requested a pickup time change to: ${cleanTime}${cleanNote ? ` — "${cleanNote}"` : ""}. Awaiting confirmation from the Drivlet team.`,
       updatedBy: "customer",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // Timeline entry reaches the admin live tracker + booking modal via the
     // feed; SSE keeps any open views current. No stage email (stage unchanged).

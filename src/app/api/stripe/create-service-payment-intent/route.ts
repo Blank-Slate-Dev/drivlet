@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Save the payment intent ID to the booking
     booking.servicePaymentIntentId = paymentIntent.id;
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,

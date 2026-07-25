@@ -91,7 +91,7 @@ export async function POST(
         updatedBy: 'system',
       });
 
-      await booking.save();
+      await booking.save({ validateModifiedOnly: true });
 
       console.log('✅ Payment confirmed via direct verification:', bookingId);
 

@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       message: `Customer left feedback: ${numericRating}/5 stars${cleanHearAbout ? ` · heard about us via ${cleanHearAbout}` : ""}${cleanComments ? ` — "${cleanComments.slice(0, 140)}${cleanComments.length > 140 ? "…" : ""}"` : ""}`,
       updatedBy: "customer",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     return NextResponse.json({
       success: true,

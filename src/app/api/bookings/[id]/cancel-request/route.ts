@@ -210,7 +210,7 @@ export async function POST(
       message: "Customer requested cancellation. Awaiting review by the drivlet team.",
       updatedBy: "customer",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // Alert the admins (in-app + email) — non-blocking
     const pickupSuburb = booking.pickupAddress?.split(",")[0]?.trim() || "Unknown";

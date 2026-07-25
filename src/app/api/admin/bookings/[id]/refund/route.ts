@@ -117,7 +117,7 @@ export async function POST(
       message: `${target === "transport" ? "Transport" : "Service"} payment refund of $${(amount / 100).toFixed(2)} processed${isFullRefund ? " (full refund)" : " (partial)"}.`,
       updatedBy: "admin",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // Let the customer know — non-blocking
     if (booking.userEmail) {

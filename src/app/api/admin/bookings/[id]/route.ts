@@ -218,7 +218,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     booking.updatedAt = new Date();
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
     
     // Notify connected clients of the update
     notifyBookingUpdate(booking);
@@ -350,7 +350,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     booking.updatedAt = new Date();
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
     
     // Notify connected clients of the update
     notifyBookingUpdate(booking);

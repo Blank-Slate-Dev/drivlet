@@ -142,7 +142,7 @@ export async function POST(
       updatedBy: "admin",
     });
 
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     // ── Email the customer the payment link (non-blocking) ──
     if (booking.userEmail) {

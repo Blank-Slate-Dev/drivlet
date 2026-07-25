@@ -92,7 +92,7 @@ export async function POST(
         message: "Cancellation request approved — booking cancelled.",
         updatedBy: "admin",
       });
-      await booking.save();
+      await booking.save({ validateModifiedOnly: true });
 
       // Tell the garage, if one was assigned
       if (booking.assignedGarageId) {
@@ -152,7 +152,7 @@ export async function POST(
       message: `Cancellation request denied: ${denyReason}`,
       updatedBy: "admin",
     });
-    await booking.save();
+    await booking.save({ validateModifiedOnly: true });
 
     if (booking.userEmail) {
       sendEmail({
