@@ -918,3 +918,83 @@ drivlet - Car service made simple
     inlinedAttachments,
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// Password reset email (forgot-password flow, all account types)
+// ════════════════════════════════════════════════════════════════════════
+
+export async function sendPasswordResetEmail(
+  email: string,
+  name: string,
+  resetUrl: string
+): Promise<boolean> {
+  const safeName = escapeHtml(name || "there");
+  const subject = "Reset your drivlet password";
+
+  const textContent = `
+Hi ${name || "there"},
+
+We received a request to reset the password for your drivlet account.
+
+Reset your password here (link valid for 1 hour, single use):
+${resetUrl}
+
+If you didn't request this, you can safely ignore this email. Your password won't change unless you use the link above.
+
+Thanks,
+The drivlet team
+`.trim();
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color: #059669; padding: 24px 32px;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px;">Reset your password</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 32px;">
+              <p style="margin: 0 0 16px; color: #1e293b; font-size: 15px;">Hi ${safeName},</p>
+              <p style="margin: 0 0 24px; color: #475569; font-size: 14px; line-height: 1.6;">
+                We received a request to reset the password for your drivlet account.
+                Click the button below to choose a new one.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 24px;">
+                <tr>
+                  <td style="border-radius: 999px; background-color: #059669;">
+                    <a href="${resetUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">Reset password</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+                This link is valid for 1 hour and can only be used once.
+              </p>
+              <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+                If you didn't request this, you can safely ignore this email.
+                Your password won't change unless you use the link above.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f8fafc;">
+              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
+                Questions? Reply to this email or visit <a href="https://drivlet.com.au" style="color: #059669; text-decoration: none;">drivlet.com.au</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  return sendEmail({ to: email, toName: name || email, subject, textContent, htmlContent });
+}

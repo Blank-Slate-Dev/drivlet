@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     // NOTE: Using lean() for performance - virtuals like insuranceEligible won't be included
     // We compute derived fields manually in the response
     const drivers = await Driver.find(query)
-      .populate<{ userId: PopulatedUser | null }>("userId", "email username createdAt isApproved")
+      .populate<{ userId: PopulatedUser | null }>("userId", "email username createdAt isApproved accountStatus")
       .sort({ submittedAt: -1 })
       .lean();
 
@@ -96,6 +96,8 @@ export async function GET(request: Request) {
           username: driver.userId.username,
           createdAt: driver.userId.createdAt,
           isApproved: driver.userId.isApproved,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          accountStatus: (driver.userId as any).accountStatus || "active",
         } : null,
       })),
       stats,

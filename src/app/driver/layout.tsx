@@ -43,15 +43,37 @@ export default function DriverLayout({
   const [clockLoading, setClockLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Don't apply layout to login, register, pending, join, or onboarding pages
+  const isAuthPage =
+    pathname === "/driver/login" ||
+    pathname === "/driver/register" ||
+    pathname === "/driver/pending" ||
+    pathname === "/driver/onboarding" ||
+    pathname === "/driver/join";
+
   // Notification dot on the Jobs tab: lights up when a job was assigned
   // after the driver last viewed the Jobs page (the page keeps the
   // "drivlet-jobs-seen-at" timestamp fresh while it's open).
   const [hasNewJobs, setHasNewJobs] = useState(false);
   useEffect(() => {
+    // Public/auth pages render without the driver chrome — don't poll an
+    // authenticated endpoint (or keep intervals alive) there.
+    if (isAuthPage || status !== "authenticated") {
+      setHasNewJobs(false);
+      return;
+    }
     let active = true;
     const check = async () => {
       try {
         const res = await fetch("/api/driver/jobs/latest-assignment");
+        // Account disabled mid-session: force sign-out (session invalidation)
+        if (res.status === 403) {
+          const data = await res.json().catch(() => ({}));
+          if (data.accountDisabled) {
+            signOut({ callbackUrl: "/driver/login" });
+            return;
+          }
+        }
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
@@ -75,18 +97,10 @@ export default function DriverLayout({
       active = false;
       clearInterval(interval);
     };
-  }, [pathname]);
+  }, [pathname, isAuthPage, status]);
 
   // Never show the dot while the driver is already looking at Jobs
   const showJobsDot = hasNewJobs && !pathname.startsWith("/driver/jobs");
-
-  // Don't apply layout to login, register, pending, join, or onboarding pages
-  const isAuthPage =
-    pathname === "/driver/login" ||
-    pathname === "/driver/register" ||
-    pathname === "/driver/pending" ||
-    pathname === "/driver/onboarding" ||
-    pathname === "/driver/join";
 
   // Fetch clock status
   const fetchClockStatus = useCallback(async () => {

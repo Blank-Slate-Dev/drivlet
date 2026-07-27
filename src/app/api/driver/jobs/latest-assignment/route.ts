@@ -24,9 +24,16 @@ export async function GET() {
 
     await connectDB();
 
-    const user = await User.findById(session.user.id).select("driverProfile");
+    const user = await User.findById(session.user.id).select("driverProfile accountStatus");
     if (!user?.driverProfile) {
       return NextResponse.json({ latestAssignedAt: null });
+    }
+    // Disabled accounts: signal the layout to sign the driver out
+    if (user.accountStatus === "suspended") {
+      return NextResponse.json(
+        { error: "Your account has been disabled. Please contact Drivlet.", accountDisabled: true },
+        { status: 403 }
+      );
     }
     const profileId = user.driverProfile;
 

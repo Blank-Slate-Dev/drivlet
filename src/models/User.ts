@@ -57,6 +57,9 @@ export interface IUser extends Document {
   // Auto-login token (for post-verification auto-login)
   autoLoginToken?: string;
   autoLoginTokenExpires?: Date;
+  /** Password reset: sha256 hash of the emailed token, single-use, 1h expiry */
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 
   // Account status fields
   accountStatus: AccountStatus;
@@ -149,6 +152,18 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     autoLoginTokenExpires: {
+      type: Date,
+      default: null,
+    },
+
+    // Password reset (forgot-password flow): sha256 hash of the emailed
+    // token, single-use, cleared on successful reset
+    passwordResetToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    passwordResetExpires: {
       type: Date,
       default: null,
     },

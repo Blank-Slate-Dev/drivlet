@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import ChangePasswordForm from '@/components/ChangePasswordForm';
 import {
   Clock, MapPin, Car, ChevronRight, Loader2, Plus, AlertCircle, Bell, X, XCircle, Home,
   FileText, Calendar, MessageSquare, CheckCircle, Filter, RefreshCw, Sparkles, TrendingUp,
@@ -169,6 +170,11 @@ function OverviewSection({ bookings, quoteRequests, userName, onSectionChange, o
           </div>
         </motion.div>
       )}
+
+      {/* Account: self-serve password change */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+        <ChangePasswordForm />
+      </motion.div>
     </div>
   );
 }

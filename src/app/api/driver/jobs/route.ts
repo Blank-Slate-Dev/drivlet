@@ -74,6 +74,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
     }
 
+    // Disabled accounts lose driver access immediately, even mid-session
+    if (user.accountStatus === "suspended") {
+      return NextResponse.json(
+        { error: "Your account has been disabled. Please contact Drivlet.", accountDisabled: true },
+        { status: 403 }
+      );
+    }
+
     const driver = await Driver.findById(user.driverProfile);
     if (!driver) {
       return NextResponse.json({ error: "Driver not found" }, { status: 404 });
@@ -406,6 +414,14 @@ export async function POST(request: NextRequest) {
     const user = await User.findById(session.user.id);
     if (!user?.driverProfile) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
+    }
+
+    // Disabled accounts lose driver access immediately, even mid-session
+    if (user.accountStatus === "suspended") {
+      return NextResponse.json(
+        { error: "Your account has been disabled. Please contact Drivlet.", accountDisabled: true },
+        { status: 403 }
+      );
     }
 
     const driver = await Driver.findById(user.driverProfile);

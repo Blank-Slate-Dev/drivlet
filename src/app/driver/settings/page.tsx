@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
 import {
   Settings,
   User,
@@ -720,6 +721,9 @@ export default function DriverSettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Change Password */}
+              <ChangePasswordForm />
 
               {/* Sign Out */}
               <div className="rounded-xl border border-red-200 bg-red-50 p-6">

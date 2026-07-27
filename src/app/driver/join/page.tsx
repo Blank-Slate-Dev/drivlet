@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Car,
   DollarSign,
@@ -25,8 +25,23 @@ const highlights = [
 ];
 
 export default function DriverJoinPage() {
+  // Skip entrance animations for users who prefer reduced motion — the
+  // global CSS rule doesn't reach framer-motion's inline styles.
+  const reduceMotion = useReducedMotion();
+  const enter = (delay = 0) =>
+    reduceMotion
+      ? {}
+      : {
+          initial: { opacity: 0, y: 20 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.5, delay },
+        };
+
   return (
-    <main className="h-screen overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative flex flex-col">
+    // min-h-screen (not h-screen + overflow-hidden): on short mobile
+    // viewports the content is taller than the screen, and clipping it made
+    // the CTA unreachable — the page must be allowed to scroll.
+    <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative flex flex-col">
       {/* Pattern overlay */}
       <div className="absolute inset-0 z-0 opacity-10">
         <div
@@ -60,14 +75,9 @@ export default function DriverJoinPage() {
 
       {/* Content - fills remaining viewport */}
       <div className="relative z-10 flex-1 flex flex-col justify-center">
-        <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
           {/* Hero text */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-8"
-          >
+          <motion.div {...enter()} className="text-center mb-8">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
               Drive cars. <span className="text-emerald-300">Earn money.</span>
             </h1>
@@ -93,9 +103,7 @@ export default function DriverJoinPage() {
 
           {/* Benefits grid - compact */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
+            {...enter(0.15)}
             className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8"
           >
             {highlights.map((item) => (
@@ -115,12 +123,7 @@ export default function DriverJoinPage() {
           </motion.div>
 
           {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="text-center"
-          >
+          <motion.div {...enter(0.3)} className="text-center">
             <Link
               href="/driver/register"
               className="group inline-flex items-center justify-center gap-3 py-3.5 px-8 bg-white text-emerald-700 font-bold text-base rounded-2xl shadow-xl shadow-black/10 transition hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98]"

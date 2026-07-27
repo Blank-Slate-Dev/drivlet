@@ -127,6 +127,7 @@ interface Driver {
     email: string;
     username: string;
     createdAt: string;
+    accountStatus?: string;
   };
 }
 
@@ -201,6 +202,65 @@ export default function AdminDriversPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [driverToReject, setDriverToReject] = useState<string | null>(null);
+
+  // Account access actions (password help + disable/enable)
+  const [accountActionLoading, setAccountActionLoading] = useState(false);
+  const [accountActionMessage, setAccountActionMessage] = useState("");
+
+  const handleAccountAction = async (
+    action: "send_reset" | "set_temporary" | "suspend" | "reactivate",
+    extra?: Record<string, unknown>
+  ) => {
+    if (!selectedDriver) return;
+    setAccountActionLoading(true);
+    setAccountActionMessage("");
+    try {
+      const call = async (payload: Record<string, unknown>) => {
+        const res = await fetch(`/api/admin/drivers/${selectedDriver._id}/account`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        return { res, data: await res.json() };
+      };
+
+      let { res, data } = await call({ action, ...extra });
+
+      // Suspend with active jobs: server asks for confirmation first
+      if (res.status === 409 && data.requiresConfirmation) {
+        const proceed = window.confirm(
+          `${data.error}\n\nDisable the account anyway?`
+        );
+        if (!proceed) {
+          setAccountActionMessage("Cancelled. No changes made.");
+          return;
+        }
+        ({ res, data } = await call({ action, ...extra, confirm: true }));
+      }
+
+      if (!res.ok) throw new Error(data.error || "Action failed");
+      setAccountActionMessage(data.message || "Done");
+
+      // Reflect the new account status in the open modal immediately
+      if (action === "suspend" || action === "reactivate") {
+        setSelectedDriver((prev) =>
+          prev
+            ? {
+                ...prev,
+                userId: prev.userId
+                  ? { ...prev.userId, accountStatus: action === "suspend" ? "suspended" : "active" }
+                  : prev.userId,
+              }
+            : prev
+        );
+        fetchDrivers();
+      }
+    } catch (err) {
+      setAccountActionMessage(`Error: ${err instanceof Error ? err.message : "Action failed"}`);
+    } finally {
+      setAccountActionLoading(false);
+    }
+  };
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [driverToDelete, setDriverToDelete] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -854,6 +914,86 @@ export default function AdminDriversPage() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Account access — password help + temporary disable */}
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <Shield className="h-4 w-4 text-emerald-600" />
+                      Account access
+                    </div>
+                    {selectedDriver.userId?.accountStatus === "suspended" ? (
+                      <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                        Disabled
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  {accountActionMessage && (
+                    <p className={`mb-3 rounded-lg p-2.5 text-xs ${accountActionMessage.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+                      {accountActionMessage}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleAccountAction("send_reset")}
+                      disabled={accountActionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Send password reset email
+                    </button>
+                    <button
+                      onClick={() => {
+                        const temp = window.prompt(
+                          "Set a temporary password for this driver (min 8 characters). Read it out to them and ask them to change it in Settings."
+                        );
+                        if (temp) handleAccountAction("set_temporary", { tempPassword: temp });
+                      }}
+                      disabled={accountActionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Set temporary password
+                    </button>
+                    {selectedDriver.userId?.accountStatus === "suspended" ? (
+                      <button
+                        onClick={() => {
+                          if (window.confirm("Re-enable this driver's account? They'll be able to log in again.")) {
+                            handleAccountAction("reactivate");
+                          }
+                        }}
+                        disabled={accountActionLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        Re-enable account
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const reason = window.prompt(
+                            "Temporarily disable this driver's account (e.g. resignation). They won't be able to log in until re-enabled. Reason (optional):"
+                          );
+                          if (reason !== null) {
+                            handleAccountAction("suspend", { reason: reason || undefined });
+                          }
+                        }}
+                        disabled={accountActionLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Disable account
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    Disabling blocks login and driver features immediately. If the
+                    driver has active jobs you&apos;ll be warned first; reassign
+                    them via Dispatch.
+                  </p>
                 </div>
 
                 {/* Documents — shown for EVERY status so they remain accessible permanently, including after approval */}
