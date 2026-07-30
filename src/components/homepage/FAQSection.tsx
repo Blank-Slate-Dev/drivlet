@@ -1,8 +1,8 @@
 // src/components/homepage/FAQSection.tsx
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
 // New FAQs based on Sharjeel's feedback
@@ -81,6 +81,27 @@ const marketplaceFaqs = [
 
 export default function FAQSection() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const prefersReducedMotion = useReducedMotion();
+
+  // One-open-at-a-time is the design intent, but collapsing an item ABOVE the
+  // one being opened shrinks the content overhead and the viewport visually
+  // lurches upward (reported as "scrolls back to the top"). After the expand/
+  // collapse animation settles, gently keep the opened item in view.
+  const handleToggle = (index: number) => {
+    const isOpening = openFaq !== index;
+    setOpenFaq(isOpening ? index : null);
+
+    if (isOpening) {
+      const delay = prefersReducedMotion ? 0 : 240; // just after the 0.2s animation
+      window.setTimeout(() => {
+        itemRefs.current[index]?.scrollIntoView({
+          block: 'nearest',
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        });
+      }, delay);
+    }
+  };
 
   return (
     <section
@@ -96,15 +117,21 @@ export default function FAQSection() {
             </h2>
           </div>
 
-          {/* Right: Accordion */}
-          <div className="divide-y divide-slate-200">
+          {/* Right: Accordion — overflow-anchor:none stops browser scroll
+              anchoring from fighting the height animation (page jumps) */}
+          <div className="divide-y divide-slate-200 [overflow-anchor:none]">
             {faqs.map((faq, index) => (
-              <div key={index} className="py-4">
+              <div
+                key={index}
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
+                className="scroll-mt-24 py-4"
+              >
                 <button
                   type="button"
-                  onClick={() =>
-                    setOpenFaq(openFaq === index ? null : index)
-                  }
+                  onClick={() => handleToggle(index)}
+                  aria-expanded={openFaq === index}
                   className="flex w-full items-center justify-between text-left"
                 >
                   <span className="text-base font-medium text-slate-900 sm:text-lg">
@@ -116,13 +143,13 @@ export default function FAQSection() {
                     }`}
                   />
                 </button>
-                <AnimatePresence>
+                <AnimatePresence initial={false}>
                   {openFaq === index && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
+                      initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
+                      exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
                       className="overflow-hidden"
                     >
                       <p className="mt-3 text-sm leading-relaxed text-slate-600">
