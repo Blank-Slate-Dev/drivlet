@@ -28,6 +28,11 @@ const faqs = [
       'You pay Drivlet for transport when you book. You pay the service centre directly for the service/repairs. The service centre will contact you to take payment (often by phone) and confirm the car is ready.',
   },
   {
+    question: 'Will Drivlet ever send me a payment link?',
+    answer:
+      'Sometimes. If a payment does need to go through Drivlet, we\'ll send you a secure Stripe payment link by email or SMS so you can pay safely by card. For the service itself, you usually pay your service centre directly, most often over the phone.',
+  },
+  {
     question: 'Do I need a service centre booking first?',
     answer:
       'Yes. You book your service with your chosen workshop first, then book Drivlet for the transport.',
