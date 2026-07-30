@@ -983,7 +983,7 @@ function TrackingContent() {
                           </p>
                           {isExpired && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Need help? <Link href="/#contact" className="underline">Contact support</Link>
+                              Need help? <Link href="/contact" className="underline">Contact support</Link>
                             </p>
                           )}
                         </div>
@@ -1134,7 +1134,7 @@ function TrackingContent() {
                     <div className="pt-4 border-t border-slate-100">
                       <p className="text-xs text-slate-500 text-center">
                         Can't find your tracking code?{' '}
-                        <Link href="/#contact" className="text-emerald-600 hover:underline">
+                        <Link href="/contact" className="text-emerald-600 hover:underline">
                           Contact support
                         </Link>
                       </p>
