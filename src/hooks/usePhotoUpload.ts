@@ -48,8 +48,14 @@ interface CheckpointStatus {
   final_delivery: number;
 }
 
+// Client-side upload timeout: on flaky mobile connections a stalled request
+// otherwise hangs indefinitely with no feedback (driver-reported bug 2026-07-28).
+const UPLOAD_TIMEOUT_MS = 30_000;
+
 export function usePhotoUpload(bookingId: string) {
   const [uploadState, setUploadState] = useState<PhotoUploadState>({});
+  /** Human-readable message for the most recent failed upload (null = none). */
+  const [lastUploadError, setLastUploadError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [checkpointStatus, setCheckpointStatus] = useState<CheckpointStatus>({
     pre_pickup: 0,
@@ -139,6 +145,7 @@ export function usePhotoUpload(bookingId: string) {
     ): Promise<UploadedPhoto | null> => {
       const key = getPhotoKey(checkpoint, photoType);
 
+      setLastUploadError(null);
       setUploadState((prev) => ({
         ...prev,
         [key]: { status: "uploading", progress: 0 },
@@ -151,6 +158,12 @@ export function usePhotoUpload(bookingId: string) {
         }));
 
         const compressedBlob = await compressImage(file);
+
+        // A zero-byte compression result must block the upload, not silently
+        // proceed and produce an empty photo in the evidence chain.
+        if (!compressedBlob || compressedBlob.size === 0) {
+          throw new Error("The photo couldn't be processed. Please retake it and try again.");
+        }
 
         setUploadState((prev) => ({
           ...prev,
@@ -190,10 +203,26 @@ export function usePhotoUpload(bookingId: string) {
           [key]: { status: "uploading", progress: 50 },
         }));
 
-        const response = await fetch(`/api/driver/bookings/${bookingId}/photos`, {
-          method: "POST",
-          body: formData,
-        });
+        // Abort stalled uploads after UPLOAD_TIMEOUT_MS so the driver gets a
+        // clear retry prompt instead of an endless spinner.
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+        let response: Response;
+        try {
+          response = await fetch(`/api/driver/bookings/${bookingId}/photos`, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+        } catch (fetchErr) {
+          if (fetchErr instanceof DOMException && fetchErr.name === "AbortError") {
+            throw new Error("Upload timed out. Check your signal and tap Retry.");
+          }
+          throw fetchErr;
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         setUploadState((prev) => ({
           ...prev,
@@ -206,7 +235,12 @@ export function usePhotoUpload(bookingId: string) {
           throw new Error(data.error || "Upload failed");
         }
 
+        // Only treat as success when the server confirms a stored photo with
+        // a real Blob URL. A 2xx without one is still a failure.
         const photo: UploadedPhoto = data.photo;
+        if (!photo?.id || !photo?.url) {
+          throw new Error("The server didn't confirm the photo was saved. Please tap Retry.");
+        }
 
         setUploadState((prev) => ({
           ...prev,
@@ -226,6 +260,7 @@ export function usePhotoUpload(bookingId: string) {
         return photo;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Upload failed";
+        setLastUploadError(errorMsg);
         setUploadState((prev) => ({
           ...prev,
           [key]: { status: "error", progress: 0, error: errorMsg },
@@ -392,6 +427,7 @@ export function usePhotoUpload(bookingId: string) {
     photos,
     checkpointStatus,
     loading,
+    lastUploadError,
     uploadPhoto,
     deletePhoto,
     updatePhotoDetails,

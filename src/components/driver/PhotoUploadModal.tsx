@@ -163,10 +163,17 @@ export default function PhotoUploadModal({
   const [editLocation, setEditLocation] = useState("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
 
+  // Preview upload state: the preview must only close on CONFIRMED success —
+  // closing optimistically was losing photos on flaky connections
+  // (driver-reported bug 2026-07-28).
+  const [previewUploading, setPreviewUploading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
   const {
     photos,
     checkpointStatus,
     loading,
+    lastUploadError,
     uploadPhoto,
     deletePhoto,
     updatePhotoDetails,
@@ -306,18 +313,46 @@ export default function PhotoUploadModal({
   const handleUpload = async () => {
     if (!selectedFile || !selectedSlot) return;
     if (!captureLocation.trim()) return;
+    if (previewUploading) return; // guard double-taps
+
+    setPreviewUploading(true);
+    setPreviewError(null);
 
     const capturedAt = new Date(`${captureDate}T${captureTime}`).toISOString();
 
-    await uploadPhoto(selectedFile, selectedSlot.checkpoint, selectedSlot.photoType, notes, {
-      capturedAt,
-      capturedLocation: captureLocation.trim(),
-      gpsLatitude: gpsCoords?.lat,
-      gpsLongitude: gpsCoords?.lng,
-      replacePhotoId: replacePhotoId || undefined,
-    });
+    const result = await uploadPhoto(
+      selectedFile,
+      selectedSlot.checkpoint,
+      selectedSlot.photoType,
+      notes,
+      {
+        capturedAt,
+        capturedLocation: captureLocation.trim(),
+        gpsLatitude: gpsCoords?.lat,
+        gpsLongitude: gpsCoords?.lng,
+        replacePhotoId: replacePhotoId || undefined,
+      }
+    );
 
-    handleCancelPreview();
+    setPreviewUploading(false);
+
+    if (result) {
+      // Confirmed by the server (2xx + stored photo with a Blob URL)
+      handleCancelPreview();
+      return;
+    }
+
+    if (!navigator.onLine) {
+      // Existing offline behaviour: the photo is queued and auto-uploads when
+      // the connection returns — the slot shows the amber "Queued" chip.
+      handleCancelPreview();
+      return;
+    }
+
+    // Failure while online: KEEP the preview open with the selected file so
+    // the driver can retry without re-selecting the photo. The banner reads
+    // the hook's lastUploadError at render time (fresh by then).
+    setPreviewError("failed");
   };
 
   const handleDelete = async (photoId: string, checkpoint: CheckpointType, photoType: PhotoType) => {
@@ -331,6 +366,8 @@ export default function PhotoUploadModal({
     setPreviewUrl(null);
     setNotes("");
     setSelectedFile(null);
+    setPreviewError(null);
+    setPreviewUploading(false);
     setCaptureDate("");
     setCaptureTime("");
     setCaptureLocation("");
@@ -651,20 +688,47 @@ export default function PhotoUploadModal({
                   </div>
                 </div>
 
+                {/* Upload failure: keep the preview + file, offer Retry */}
+                {previewError && !previewUploading && (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-400/40 bg-red-500/20 p-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-300" />
+                    <p className="text-sm text-red-100">
+                      {lastUploadError ||
+                        "The upload didn't go through. Check your connection and tap Retry."}{" "}
+                      Your photo is still here, so you won't need to re-select it.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={handleCancelPreview}
-                    className="flex-1 rounded-xl border border-white/30 py-3 font-semibold text-white hover:bg-white/10"
+                    disabled={previewUploading}
+                    className="flex-1 rounded-xl border border-white/30 py-3 font-semibold text-white hover:bg-white/10 disabled:opacity-40"
                   >
                     Retake
                   </button>
                   <button
                     onClick={handleUpload}
-                    disabled={!captureLocation.trim()}
+                    disabled={!captureLocation.trim() || previewUploading}
                     className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    <Check className="h-5 w-5" />
-                    Upload
+                    {previewUploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Uploading…
+                      </>
+                    ) : previewError ? (
+                      <>
+                        <RefreshCw className="h-5 w-5" />
+                        Retry upload
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-5 w-5" />
+                        Upload
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

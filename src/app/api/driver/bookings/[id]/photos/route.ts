@@ -180,8 +180,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
         extension
       );
 
+      // Traceability for intermittent upload failures (no PII: booking id,
+      // checkpoint, photo slot, and byte size only). Driver-reported 2026-07-28.
+      console.log(
+        `[photo-upload] start booking=${bookingId} checkpoint=${checkpointType} slot=${photoType} bytes=${buffer.length}`
+      );
+
       const uploadResult = await uploadToCloud(buffer, filePath);
       if (!uploadResult.success) {
+        console.error(
+          `[photo-upload] blob write FAILED booking=${bookingId} checkpoint=${checkpointType} slot=${photoType}: ${uploadResult.error || "unknown"}`
+        );
         // Rollback supersede on upload failure
         if (supersededPhoto) {
           supersededPhoto.superseded = false;
@@ -193,6 +202,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
           { status: 500 }
         );
       }
+
+      console.log(
+        `[photo-upload] blob write ok booking=${bookingId} checkpoint=${checkpointType} slot=${photoType}`
+      );
 
       const vehiclePhoto = await VehiclePhoto.create({
         bookingId: new mongoose.Types.ObjectId(bookingId),
