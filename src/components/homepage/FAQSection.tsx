@@ -33,6 +33,11 @@ const faqs = [
       'Sometimes. If a payment does need to go through Drivlet, we\'ll send you a secure Stripe payment link by email or SMS so you can pay safely by card. For the service itself, you usually pay your service centre directly, most often over the phone.',
   },
   {
+    question: 'Can my service centre take payment over the phone?',
+    answer:
+      'Worth checking when you book your service. Most service centres are happy to take card payment over the phone once the work is done. If yours can\'t, no stress: Drivlet will send you a secure payment link so you can pay by card and your car can head home.',
+  },
+  {
     question: 'Do I need a service centre booking first?',
     answer:
       'Yes. You book your service with your chosen workshop first, then book Drivlet for the transport.',
