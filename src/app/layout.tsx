@@ -1,12 +1,16 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import SessionProvider from '@/components/SessionProvider';
 import TrafficTracker from '@/components/TrafficTracker';
 import { OrganizationJsonLd, WebSiteJsonLd } from '@/components/seo/JsonLd';
 
 const inter = Inter({ subsets: ['latin'] });
+
+// Set NEXT_PUBLIC_GA_ID in Vercel. If it's missing, GA simply doesn't load.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://drivlet.com.au'),
@@ -97,6 +101,24 @@ export default function RootLayout({
 
         {/* Records public page views for /admin/traffic. Renders nothing. */}
         <TrafficTracker />
+
+        {/* Google Analytics 4 */}
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_ID}');
+              `}
+            </Script>
+          </>
+        )}
       </body>
     </html>
   );

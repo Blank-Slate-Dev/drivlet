@@ -241,7 +241,6 @@ export default function AdminLayout({
 
   const navItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
     // Requests merged into the unified Bookings pipeline (2026-07-07):
     // { href: "/admin/booking-requests", label: "Requests", icon: FileText },
     { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
@@ -257,6 +256,7 @@ export default function AdminLayout({
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
     { href: "/admin/testimonials", label: "Testimonials", icon: Star },
+    { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
   ];
 
   const renderNavBadge = (href: string) => {
