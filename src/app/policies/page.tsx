@@ -145,7 +145,7 @@ const policies: PolicySection[] = [
           <PolicyClause number="13" title="Complaints, Changes and Governing Law">
             <p>If you have a complaint, contact us with your booking reference and a clear description of the issue.</p>
             <p className="mt-3">We may update these Terms from time to time. The version published on the Site at the time you place your booking will generally apply to that booking, unless the law requires otherwise.</p>
-            <p className="mt-3">These Terms are governed by the laws of New South Wales, Australia. You submit to the non-exclusive jurisdiction of the courts of New South Wales.</p>
+            <p className="mt-3">These Terms are governed by the laws of New South Wales, Australia. However, nothing in these Terms excludes any mandatory law or consumer right applying in the State or Territory where the Services are provided. The parties submit to the non-exclusive jurisdiction of the courts and tribunals having jurisdiction over the dispute.</p>
           </PolicyClause>
         </div>
       </>
