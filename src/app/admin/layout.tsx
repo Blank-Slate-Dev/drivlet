@@ -325,7 +325,7 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-3">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -333,13 +333,13 @@ export default function AdminLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  className={`flex min-h-[34px] max-h-11 flex-1 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
                     active
                       ? "border-l-2 border-emerald-600 bg-emerald-50 font-medium text-emerald-700"
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
                   {renderNavBadge(item.href)}
                 </Link>
@@ -348,7 +348,7 @@ export default function AdminLayout({
           </nav>
 
           {/* Back to site link */}
-          <div className="border-t border-slate-100 px-3 py-4">
+          <div className="border-t border-slate-100 px-3 py-3">
             <Link
               href="/"
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
@@ -428,7 +428,7 @@ export default function AdminLayout({
               </div>
 
               {/* Mobile Navigation */}
-              <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
+              <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-3">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
@@ -437,13 +437,13 @@ export default function AdminLayout({
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                      className={`flex min-h-[38px] max-h-12 flex-1 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
                         active
                           ? "border-l-2 border-emerald-600 bg-emerald-50 font-medium text-emerald-700"
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-4 w-4 shrink-0" />
                       <span>{item.label}</span>
                       {renderNavBadge(item.href)}
                     </Link>
@@ -452,7 +452,7 @@ export default function AdminLayout({
               </nav>
 
               {/* Mobile back to site */}
-              <div className="border-t border-slate-100 px-3 py-4">
+              <div className="border-t border-slate-100 px-3 py-3">
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
