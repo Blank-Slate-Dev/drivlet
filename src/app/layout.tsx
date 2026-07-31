@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import SessionProvider from '@/components/SessionProvider';
+import TrafficTracker from '@/components/TrafficTracker';
 import { OrganizationJsonLd, WebSiteJsonLd } from '@/components/seo/JsonLd';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -93,6 +94,9 @@ export default function RootLayout({
         <WebSiteJsonLd />
 
         <SessionProvider>{children}</SessionProvider>
+
+        {/* Records public page views for /admin/traffic. Renders nothing. */}
+        <TrafficTracker />
       </body>
     </html>
   );

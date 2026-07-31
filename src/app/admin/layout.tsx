@@ -9,6 +9,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  BarChart3,
   ClipboardList,
   Home,
   Loader2,
@@ -240,6 +241,7 @@ export default function AdminLayout({
 
   const navItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
     // Requests merged into the unified Bookings pipeline (2026-07-07):
     // { href: "/admin/booking-requests", label: "Requests", icon: FileText },
     { href: "/admin/bookings", label: "Bookings", icon: ClipboardList },
