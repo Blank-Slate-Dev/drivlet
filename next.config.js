@@ -1,10 +1,33 @@
 // next.config.js
 
+// Content Security Policy, split into one directive per line so it stays
+// readable. Joined with "; " into a single header value below.
+const cspDirectives = [
+  "default-src 'self'",
+
+  // Google Tag Manager serves the GA4 (gtag.js) script.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://www.googletagmanager.com",
+
+  "style-src 'self' 'unsafe-inline'",
+
+  // GA falls back to a tracking pixel when fetch/beacon is unavailable.
+  "img-src 'self' data: blob: https://*.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com https://lh3.googleusercontent.com https://www.google-analytics.com https://www.googletagmanager.com",
+
+  "font-src 'self'",
+
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+
+  // GA sends hits to google-analytics.com and regional analytics.google.com.
+  "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://*.vercel-storage.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+
+  "worker-src 'self' blob:",
+];
+
 // Security headers to protect against common attacks
 const securityHeaders = [
   {
     key: "Content-Security-Policy",
-    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com https://lh3.googleusercontent.com; font-src 'self'; frame-src https://js.stripe.com https://hooks.stripe.com; connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://*.vercel-storage.com; worker-src 'self' blob:",
+    value: cspDirectives.join("; "),
   },
   {
     key: "X-DNS-Prefetch-Control",
