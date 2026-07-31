@@ -451,7 +451,7 @@ const policies: PolicySection[] = [
           </PolicyClause>
 
           <PolicyClause number="8" title="Escalation">
-            <p>If you are not satisfied with the outcome, you may request escalation for review by a senior team member. If we cannot resolve the complaint, you may seek external dispute resolution options including NSW Fair Trading.</p>
+            <p>If you are not satisfied with the outcome, you may request escalation for review by a senior team member. If we cannot resolve the complaint, you may seek assistance from the consumer protection authority applicable to your location, including NSW Fair Trading for NSW matters or Access Canberra for ACT matters, or pursue any other available court, tribunal or dispute-resolution option.</p>
           </PolicyClause>
 
           <PolicyClause number="9" title="Privacy">
