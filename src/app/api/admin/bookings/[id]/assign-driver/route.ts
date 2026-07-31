@@ -61,17 +61,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const now = new Date();
     const fieldPath = leg === "return" ? "returnDriver" : "pickupDriver";
 
-    // For return leg, check if pickup is complete and payment received
+    // Return leg: match the dispatch board's rules — a pickup driver must be
+    // assigned first, nothing more. The old gates here (pickup completed AND
+    // service payment received) blocked every modal return-assignment once
+    // payment became optional (backup link only, 2026-07-17); the driver app
+    // itself holds the return until pickup completes. Bug fixed 2026-07-29.
     if (leg === "return") {
-      if (!booking.pickupDriver?.completedAt) {
+      if (!booking.assignedDriverId && !booking.pickupDriver) {
         return NextResponse.json(
-          { error: "Cannot assign return driver before pickup is complete" },
-          { status: 400 }
-        );
-      }
-      if (booking.servicePaymentStatus !== "paid") {
-        return NextResponse.json(
-          { error: "Cannot assign return driver before service payment is received" },
+          { error: "Assign a pickup driver before assigning the return driver" },
           { status: 400 }
         );
       }
@@ -99,6 +97,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       updateData.assignedDriverId = driver._id;
       updateData.driverAssignedAt = now;
       updateData.driverAcceptedAt = now;
+    }
+
+    // CRITICAL for the return leg: the driver app, dispatch board, tracking
+    // and undo all key on returnDriverId — without it the assigned driver
+    // never sees the job (missing here until 2026-07-29).
+    if (leg === "return") {
+      updateData.returnDriverId = driver._id;
     }
 
     await Booking.findByIdAndUpdate(id, {
@@ -197,6 +202,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       unsetData.assignedDriverId = 1;
       unsetData.driverAssignedAt = 1;
       unsetData.driverAcceptedAt = 1;
+    }
+
+    // Mirror of the assign fix (2026-07-29): returnDriverId must be cleared
+    // too, or the unassigned driver keeps seeing the job in their app.
+    if (leg === "return") {
+      unsetData.returnDriverId = 1;
     }
 
     await Booking.findByIdAndUpdate(id, {
