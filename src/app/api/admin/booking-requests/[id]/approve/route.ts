@@ -6,6 +6,8 @@ import BookingRequest from "@/models/BookingRequest";
 import Booking from "@/models/Booking";
 import { MAX_BOOKINGS_PER_SLOT } from "@/config/timeSlots";
 import crypto from "crypto";
+import { sendConfirmationWithPayLink } from "@/lib/requestConfirmationEmail";
+import { notifyAdmin } from "@/lib/notifications";
 
 // Statuses (besides live bookings) that already hold a slot for a date.
 const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepted_awaiting_payment"];
@@ -113,8 +115,34 @@ export async function POST(
 
     await bookingRequest.save();
 
+    // Flow change 2026-07-29: the confirmation email (with the payment link
+    // included) goes out automatically at approval — no separate
+    // "send payment link" step/email. The old endpoint remains for resends.
+    const { sent, payLink, ref } = await sendConfirmationWithPayLink(bookingRequest);
+    if (sent) {
+      bookingRequest.status = "payment_link_sent";
+      bookingRequest.paymentLinkSentAt = new Date();
+      bookingRequest.paymentLinkUrl = payLink;
+      await bookingRequest.save();
+
+      // Tell the admin team the customer has the confirmation + link
+      notifyAdmin({
+        type: "system",
+        title: "Booking confirmation sent",
+        message: `${bookingRequest.userName} (${bookingRequest.vehicleRegistration}) has been emailed their booking confirmation with the payment link (Ref ${ref}, $${(bookingRequest.quotedAmount / 100).toFixed(2)}). Awaiting payment.`,
+        bookingId: bookingRequest._id,
+        metadata: {
+          vehicleRegistration: bookingRequest.vehicleRegistration,
+          customerName: bookingRequest.userName,
+        },
+      }).catch((err) => console.error("Failed to notify admin of confirmation email:", err));
+    } else {
+      console.error(`Approve: confirmation email FAILED for request ${bookingRequest._id} — use Resend Payment Link`);
+    }
+
     return NextResponse.json({
       success: true,
+      emailSent: sent,
       request: bookingRequest,
     });
   } catch (error) {
