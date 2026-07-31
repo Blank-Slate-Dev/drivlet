@@ -39,6 +39,7 @@ interface User {
   };
   bookingCount: number;
   isGuest: boolean;
+  hasGuestBookings?: boolean;
   phone?: string;
   createdAt: string;
   updatedAt: string;
@@ -220,7 +221,10 @@ export default function AdminUsersPage() {
     if (filter === "customer" && (user.isGuest || user.role !== "user")) return false;
     if (filter === "driver" && user.role !== "driver") return false;
     if (filter === "garage" && user.role !== "garage") return false;
-    if (filter === "guest" && !user.isGuest) return false;
+    // Guests filter also surfaces registered accounts that have guest
+    // bookings under the same email (their guest entry is merged into the
+    // account, which previously hid them here entirely).
+    if (filter === "guest" && !user.isGuest && !user.hasGuestBookings) return false;
     if (filter === "active" && user.bookingCount === 0) return false;
 
     // Apply search filter

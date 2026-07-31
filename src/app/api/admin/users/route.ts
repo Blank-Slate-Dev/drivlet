@@ -11,6 +11,8 @@ interface CombinedUser {
   username?: string;
   email?: string;
   name?: string;
+  /** Registered account that also has guest bookings under the same email */
+  hasGuestBookings?: boolean;
   role: UserRole | "guest";
   accountStatus: "active" | "suspended" | "deleted";
   suspensionInfo?: {
@@ -75,12 +77,15 @@ export async function GET() {
       };
     });
 
-    // Get unique guest users from bookings (those without userId but with isGuest: true)
+    // Get unique guest users from bookings: no linked account (userId null or
+    // missing) and not explicitly non-guest. Requiring isGuest === true
+    // silently dropped bookings where the flag was never set (guests-only
+    // filter bug, 2026-07-29).
     const guestBookings = await Booking.aggregate([
       {
         $match: {
-          isGuest: true,
-          userId: null,
+          userId: null, // matches null AND missing in a $match
+          isGuest: { $ne: false },
         },
       },
       {
@@ -154,6 +159,9 @@ export async function GET() {
         // Update the registered user's booking count to include any guest bookings with same email
         existingUser.bookingCount += guest.count;
         existingUser.totalSpent = (existingUser.totalSpent || 0) + (guest.totalSpent || 0);
+        // Keep them findable under the Guests filter: this account has guest
+        // bookings (e.g. booked as a guest before/after registering).
+        existingUser.hasGuestBookings = true;
       }
     });
 
