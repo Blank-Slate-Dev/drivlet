@@ -67,7 +67,17 @@ export async function POST(request: NextRequest) {
       garageLat,
       garageLng,
       promoCode,
+      policiesAgreed,
+      marketingOptIn,
     } = body;
+
+    // Required policy agreements (Terms, Privacy + Cancellation, Damage & Claims)
+    if (policiesAgreed !== true) {
+      return NextResponse.json(
+        { error: "Please agree to the Terms, Privacy and Cancellation, and Damage and Claims policies to submit your booking." },
+        { status: 400 }
+      );
+    }
 
     if (!customerEmail || !customerName || !pickupAddress || !vehicleRegistration) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -182,6 +192,8 @@ export async function POST(request: NextRequest) {
       promoCode: claimedPromo?.code,
       promoPercentOff: claimedPromo?.percentOff,
       promoDiscountAmount: claimedPromo ? promoDiscount : undefined,
+      policiesAgreedAt: new Date(),
+      marketingOptIn: marketingOptIn === true,
       pickupLat: pickupLat || 0,
       pickupLng: pickupLng || 0,
       garageLat: garageLat || 0,

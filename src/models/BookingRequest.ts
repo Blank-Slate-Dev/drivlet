@@ -68,6 +68,9 @@ export interface IBookingRequest extends Document {
   promoCode?: string;
   promoPercentOff?: number;
   promoDiscountAmount?: number; // cents discounted off the pre-promo total
+  // Consent captured at submission (Terms, Privacy+Cancellation, Damage & Claims)
+  policiesAgreedAt?: Date;
+  marketingOptIn?: boolean;
   pickupLat: number;
   pickupLng: number;
   garageLat: number;
@@ -168,6 +171,8 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     promoCode: { type: String, uppercase: true, trim: true },
     promoPercentOff: { type: Number, min: 1, max: 100 },
     promoDiscountAmount: { type: Number, min: 0 },
+    policiesAgreedAt: { type: Date },
+    marketingOptIn: { type: Boolean, default: false },
     pickupLat: { type: Number, default: 0 },
     pickupLng: { type: Number, default: 0 },
     garageLat: { type: Number, default: 0 },

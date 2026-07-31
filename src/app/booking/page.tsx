@@ -117,6 +117,13 @@ export default function BookingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Consent checkboxes: three required policy agreements + optional marketing
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePrivacyCancellation, setAgreePrivacyCancellation] = useState(false);
+  const [agreeDamageClaims, setAgreeDamageClaims] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const allConsentsGiven = agreeTerms && agreePrivacyCancellation && agreeDamageClaims;
+
   // Promo code state (optional; validated read-only here, claimed at submit)
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; percentOff: number } | null>(null);
@@ -267,6 +274,10 @@ export default function BookingPage() {
   };
 
   const handleSubmitRequest = async () => {
+    if (!allConsentsGiven) {
+      setSubmitError('Please agree to the Terms, Privacy and Cancellation, and Damage and Claims policies to continue.');
+      return;
+    }
     setIsProcessing(true); setSubmitError(null);
     try {
       const serviceTypeInfo = getServiceTypeByValue(selectedServiceType);
@@ -287,6 +298,8 @@ export default function BookingPage() {
           distanceKm: distanceZoneInfo?.distance ?? 0, pickupLat: selectedPlaceDetails?.lat ?? 0, pickupLng: selectedPlaceDetails?.lng ?? 0,
           garageLat: garageLat ?? 0, garageLng: garageLng ?? 0,
           promoCode: appliedPromo?.code || undefined,
+          policiesAgreed: allConsentsGiven,
+          marketingOptIn,
         }),
       });
       const data = await response.json();
@@ -689,9 +702,90 @@ export default function BookingPage() {
             <h3 className="text-sm font-semibold text-amber-800 mb-1">Changes &amp; cancellations</h3>
             <p className="text-xs text-amber-700 leading-relaxed">{CANCELLATION_POLICY_TEXT}</p>
           </div>
+
+          {/* Consent — three required policy agreements + optional marketing opt-in.
+              Policy links open in a new tab so the form state isn't lost. */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">Before you submit</h3>
+            <div className="space-y-3">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  disabled={isProcessing}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-slate-300 accent-emerald-600"
+                />
+                <span className="text-sm text-slate-700">
+                  I agree to the{' '}
+                  <a href="/policies#terms" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                    Terms and Services
+                  </a>
+                  . <span className="text-red-500">*</span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={agreePrivacyCancellation}
+                  onChange={(e) => setAgreePrivacyCancellation(e.target.checked)}
+                  disabled={isProcessing}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-slate-300 accent-emerald-600"
+                />
+                <span className="text-sm text-slate-700">
+                  I agree to the{' '}
+                  <a href="/policies#privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                    Privacy Policy
+                  </a>{' '}
+                  and{' '}
+                  <a href="/policies#cancellation" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                    Cancellation Policy
+                  </a>
+                  . <span className="text-red-500">*</span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={agreeDamageClaims}
+                  onChange={(e) => setAgreeDamageClaims(e.target.checked)}
+                  disabled={isProcessing}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-slate-300 accent-emerald-600"
+                />
+                <span className="text-sm text-slate-700">
+                  I agree to the{' '}
+                  <a href="/policies#damage-claims" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                    Damage and Claims Policy
+                  </a>
+                  . <span className="text-red-500">*</span>
+                </span>
+              </label>
+              <div className="border-t border-slate-100 pt-3">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={marketingOptIn}
+                    onChange={(e) => setMarketingOptIn(e.target.checked)}
+                    disabled={isProcessing}
+                    className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-slate-300 accent-emerald-600"
+                  />
+                  <span className="text-sm text-slate-600">
+                    Keep me in the loop with promotional offers from Drivlet.{' '}
+                    <span className="text-slate-400">(optional)</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+            {!allConsentsGiven && (
+              <p className="mt-3 text-xs text-slate-400">
+                Please tick the three required boxes above to submit your booking.
+              </p>
+            )}
+          </div>
+
           <div className="flex items-center justify-between pt-2">
             <button type="button" onClick={() => goToStep('schedule')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition"><ArrowLeft className="h-4 w-4" /> Back</button>
-            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request · {finalPriceDisplay}</>)}</button>
+            <button type="button" onClick={handleSubmitRequest} disabled={isProcessing || !allConsentsGiven} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500 disabled:opacity-50">{isProcessing ? (<><Loader2 className="h-5 w-5 animate-spin" /> Please wait...</>) : (<><CheckCircle2 className="h-5 w-5" /> Submit Request · {finalPriceDisplay}</>)}</button>
           </div>
         </div>
       </div>
