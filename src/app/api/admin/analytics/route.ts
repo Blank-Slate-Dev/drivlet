@@ -126,13 +126,19 @@ function buildPeriod(period: Period, now: Date) {
     };
   }
 
-  // Week (from Monday) and month (from the 1st) are both day-bucketed.
+  // Week (Mon–Sun) and month (1st–last) are both day-bucketed. Both render
+  // the FULL period, matching the year view — days still to come show as
+  // empty bars rather than the chart stopping dead at today.
   let startDay: number;
   let startMonth = month;
   let startYear = year;
+  let endDate: Date;
 
   if (period === "month") {
     startDay = 1;
+    // Day 0 of the next month is the last day of this one.
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    endDate = new Date(Date.UTC(year, month - 1, daysInMonth));
   } else {
     // Monday-start week. Pure calendar arithmetic in UTC, so no DST drift.
     const todayUTC = new Date(Date.UTC(year, month - 1, day));
@@ -141,10 +147,11 @@ function buildPeriod(period: Period, now: Date) {
     startYear = monday.getUTCFullYear();
     startMonth = monday.getUTCMonth() + 1;
     startDay = monday.getUTCDate();
+    endDate = new Date(monday.getTime() + 6 * 86400000); // through Sunday
   }
 
   let cursor = new Date(Date.UTC(startYear, startMonth - 1, startDay));
-  const last = new Date(Date.UTC(year, month - 1, day));
+  const last = endDate;
   while (cursor.getTime() <= last.getTime()) {
     buckets.push(
       `${cursor.getUTCFullYear()}-${pad(cursor.getUTCMonth() + 1)}-${pad(
@@ -222,7 +229,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const requested = (searchParams.get("period") || "month") as Period;
+    const requested = (searchParams.get("period") || "today") as Period;
     const period: Period = PERIODS.includes(requested) ? requested : "month";
     const { since, format, buckets, granularity } = buildPeriod(period, now);
 

@@ -76,7 +76,7 @@ const MONTH_NAMES = [
 
 export default function AdminTrafficPage() {
   const [data, setData] = useState<TrafficData | null>(null);
-  const [period, setPeriod] = useState<Period>("month");
+  const [period, setPeriod] = useState<Period>("today");
   const [liveCount, setLiveCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
