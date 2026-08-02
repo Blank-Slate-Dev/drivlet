@@ -108,6 +108,18 @@ export async function GET() {
 
 // POST /api/bookings - Create a new booking (authenticated or guest)
 export async function POST(request: NextRequest) {
+  // RETIRED FOR LAUNCH (2026-08-02): this endpoint created bookings with NO
+  // payment, bypassing the BookingRequest → admin approval → pay-link flow.
+  // Bookings are created exclusively by the request-payment webhook after a
+  // successful Stripe payment. Code below preserved for reference; flip the
+  // env flag only with explicit approval.
+  if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== "true") {
+    return NextResponse.json(
+      { error: "This booking method has been retired. Please book at drivlet.com.au/booking." },
+      { status: 410 }
+    );
+  }
+
   // CSRF protection - validate request origin for state-changing operation
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {

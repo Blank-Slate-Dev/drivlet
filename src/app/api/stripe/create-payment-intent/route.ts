@@ -8,6 +8,18 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+  // RETIRED FOR LAUNCH (2026-08-02): the direct pay-then-book pipeline let
+  // callers pay and receive a confirmed booking that skipped admin review,
+  // slot capacity and policy consent. The live flow is BookingRequest →
+  // approval → /pay/[token] → request-payment-webhook. Preserved for
+  // reference; flip the env flag only with explicit approval.
+  if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== "true") {
+    return NextResponse.json(
+      { error: "This payment method has been retired. Please book at drivlet.com.au/booking." },
+      { status: 410 }
+    );
+  }
+
   // CSRF protection - validate request origin for payment operations
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {

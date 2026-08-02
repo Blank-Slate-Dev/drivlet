@@ -68,6 +68,19 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // LEGACY PATH DISABLED FOR LAUNCH (2026-08-02): transport bookings are
+      // created exclusively by the request-payment-webhook (BookingRequest →
+      // admin approval → pay link). The direct pipeline below allowed paid
+      // bookings that bypassed review, capacity and consent. Preserved for
+      // reference; flip the env flag only with explicit approval. Note:
+      // request-payment PIs (metadata.type === 'request_payment') also land
+      // here harmlessly if both endpoints receive the event — they are
+      // handled by their own webhook.
+      if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== 'true') {
+        console.log('ℹ️ Ignoring non-service payment_intent (legacy direct-booking path disabled)');
+        break;
+      }
+
       console.log('💳 payment_intent.succeeded received');
       console.log('📦 Payment Intent ID:', paymentIntent.id);
       console.log('📦 Webhook received for booking:', metadata?.bookingId, 'type:', metadata?.type);
@@ -399,6 +412,13 @@ export async function POST(request: NextRequest) {
       }
       if (metadata?.type === 'extra_charge') {
         console.log('ℹ️ extra_charge checkout session — handled by the service-payment webhook');
+        break;
+      }
+
+      // LEGACY PATH DISABLED FOR LAUNCH (2026-08-02): see the matching guard
+      // in payment_intent.succeeded above.
+      if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== 'true') {
+        console.log('ℹ️ Ignoring non-service checkout session (legacy direct-booking path disabled)');
         break;
       }
 

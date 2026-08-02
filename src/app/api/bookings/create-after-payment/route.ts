@@ -10,6 +10,16 @@ import { sendBookingStageEmail } from '@/lib/email';
 import { sendBookingConfirmationSMS } from '@/lib/sms';
 
 export async function POST(request: NextRequest) {
+  // RETIRED FOR LAUNCH (2026-08-02): fallback for the legacy direct-payment
+  // flow. Bookings are created exclusively by the request-payment webhook.
+  // Preserved for reference; flip the env flag only with explicit approval.
+  if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== "true") {
+    return NextResponse.json(
+      { error: "This booking method has been retired. Please book at drivlet.com.au/booking." },
+      { status: 410 }
+    );
+  }
+
   console.log('Processing post-payment booking creation');
 
   let body;

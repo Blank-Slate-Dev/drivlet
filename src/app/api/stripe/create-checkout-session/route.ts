@@ -9,6 +9,15 @@ function getAppUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
+  // RETIRED FOR LAUNCH (2026-08-02): unused legacy checkout path (no frontend
+  // callers; garage subscriptions use their own route). See create-payment-intent.
+  if (process.env.ENABLE_LEGACY_DIRECT_BOOKING !== "true") {
+    return NextResponse.json(
+      { error: "This payment method has been retired. Please book at drivlet.com.au/booking." },
+      { status: 410 }
+    );
+  }
+
   // CSRF protection - validate request origin for payment operations
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {
