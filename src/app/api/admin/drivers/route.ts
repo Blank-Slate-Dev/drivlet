@@ -6,6 +6,7 @@ import User from "@/models/User";
 import { requireAdmin } from "@/lib/admin";
 import mongoose from "mongoose";
 import { requireValidOrigin } from "@/lib/validation";
+import { maskDriverDocumentUrls } from "@/lib/driverDocuments";
 
 // GET /api/admin/drivers - Get all driver applications
 export async function GET(request: Request) {
@@ -81,7 +82,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       drivers: drivers.map((driver) => ({
-        ...driver,
+        // Licence/police-check blob URLs are public+permanent — expose only
+        // the authenticated proxy paths (2026-08-02, pre-launch audit LB-3)
+        ...maskDriverDocumentUrls(driver, driver._id.toString()),
         _id: driver._id.toString(),
         // Compute insuranceEligible since it's a virtual and lean() doesn't include it
         insuranceEligible: driver.employmentType === "employee" && driver.onboardingStatus === "active",

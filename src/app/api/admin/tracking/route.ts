@@ -221,7 +221,8 @@ export async function GET() {
         leg: p.checkpointType,
         legLabel: LEG_LABELS[p.checkpointType] || p.checkpointType,
         typeLabel: PHOTO_TYPE_LABELS[p.photoType] || p.photoType,
-        url: p.cloudUrl || `/api/photos/${p._id.toString()}`,
+        // Always the authenticated proxy — raw blob URLs are public/permanent
+        url: `/api/photos/${p._id.toString()}`,
         capturedAt: p.capturedAt ? new Date(p.capturedAt).toISOString() : (p.uploadedAt ? new Date(p.uploadedAt).toISOString() : null),
         capturedLocation: p.capturedLocation || null,
       });

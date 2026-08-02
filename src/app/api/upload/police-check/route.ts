@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Driver from "@/models/Driver";
 import User from "@/models/User";
+import { driverDocumentUrl } from "@/lib/driverDocuments";
 
 export async function POST(request: Request) {
   try {
@@ -99,10 +100,17 @@ export async function POST(request: Request) {
 
     await driver.save();
 
+    // Never return the raw blob URL (public+permanent) — clients get the
+    // authenticated proxy path (2026-08-02, pre-launch audit LB-3)
+    const proxyUrl = driverDocumentUrl(driver._id.toString(), "police-check");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose subdoc vs plain object
+    const pcRaw: any = driver.policeCheck;
+    const pcPlain =
+      typeof pcRaw?.toObject === "function" ? pcRaw.toObject() : { ...pcRaw };
     return NextResponse.json({
       message: "Police check uploaded successfully",
-      url: blob.url,
-      policeCheck: driver.policeCheck,
+      url: proxyUrl,
+      policeCheck: { ...pcPlain, documentUrl: proxyUrl },
     });
   } catch (error) {
     console.error("Error uploading police check:", error);

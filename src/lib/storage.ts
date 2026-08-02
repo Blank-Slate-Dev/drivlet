@@ -78,9 +78,13 @@ export async function uploadToCloud(
   filePath: string
 ): Promise<UploadResult> {
   try {
+    // addRandomSuffix makes the blob URL unguessable. @vercel/blob only
+    // supports public access, so unguessable URLs + serving exclusively via
+    // the authenticated /api/photos/[id] proxy is the access control
+    // (2026-08-02). Never return blob.url to a client.
     const blob = await put(filePath, buffer, {
       access: "public",
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     });
 
     return {
@@ -128,12 +132,10 @@ export function getExtensionFromMimeType(mimeType: string): string {
 }
 
 /**
- * Get public URL for a photo
- * Returns the direct cloud URL if available, otherwise falls back to API route
+ * Get the URL clients should use for a photo. Always the authenticated proxy
+ * route — raw blob URLs are permanent and public, so they must never reach a
+ * client (2026-08-02; previously returned cloudUrl directly).
  */
-export function getPhotoUrl(photoId: string, cloudUrl?: string): string {
-  if (cloudUrl) {
-    return cloudUrl;
-  }
+export function getPhotoUrl(photoId: string, _cloudUrl?: string): string {
   return `/api/photos/${photoId}`;
 }

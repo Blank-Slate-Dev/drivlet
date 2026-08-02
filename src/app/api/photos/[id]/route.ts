@@ -80,9 +80,27 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Redirect to cloud storage URL
+    // Stream the file through this authenticated route. Redirecting handed
+    // the caller the permanent public blob URL, making the ACL one-shot —
+    // anyone the URL ever reached kept access forever (2026-08-02).
     if (photo.cloudUrl) {
-      return NextResponse.redirect(photo.cloudUrl);
+      const blobResponse = await fetch(photo.cloudUrl);
+      if (!blobResponse.ok || !blobResponse.body) {
+        return NextResponse.json(
+          { error: "Photo file not available" },
+          { status: 404 }
+        );
+      }
+      return new NextResponse(blobResponse.body, {
+        headers: {
+          "Content-Type":
+            photo.mimeType ||
+            blobResponse.headers.get("content-type") ||
+            "image/jpeg",
+          // Private: browsers may cache, shared caches must not
+          "Cache-Control": "private, max-age=300",
+        },
+      });
     }
 
     // No cloud URL available (legacy photo or upload issue)

@@ -5,6 +5,24 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Driver from "@/models/Driver";
 import User from "@/models/User";
+import { driverDocumentUrl } from "@/lib/driverDocuments";
+
+// Return the policeCheck subdoc with the raw blob URL replaced by the
+// authenticated proxy path. Subdoc may be a Mongoose document or plain object.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose subdoc vs plain object
+function maskedPoliceCheck(driver: any) {
+  const pcRaw = driver.policeCheck;
+  if (!pcRaw) return undefined;
+  const pcPlain =
+    typeof pcRaw.toObject === "function" ? pcRaw.toObject() : { ...pcRaw };
+  if (pcPlain.documentUrl) {
+    pcPlain.documentUrl = driverDocumentUrl(
+      driver._id.toString(),
+      "police-check"
+    );
+  }
+  return pcPlain;
+}
 
 // GET /api/driver/onboarding - Get current onboarding status
 export async function GET() {
@@ -68,7 +86,9 @@ export async function GET() {
         email: user.email,
         status: driver.status,
         onboardingStatus: driver.onboardingStatus,
-        policeCheck: driver.policeCheck,
+        // Mask the raw blob URL (public+permanent) behind the authenticated
+        // document proxy (2026-08-02, pre-launch audit LB-3)
+        policeCheck: maskedPoliceCheck(driver),
         // Explicitly compute derived field for consistency
         insuranceEligible: driver.employmentType === "employee" && driver.onboardingStatus === "active",
         canAcceptJobs: driver.canAcceptJobs,

@@ -63,9 +63,10 @@ export async function POST(request: NextRequest) {
     const ext = file.type.includes("png") ? "png" : file.type.includes("heic") ? "heic" : "jpg";
     const filePath = `incidents/${session.user.id}/${timestamp}.${ext}`;
 
+    // Unguessable URL (blob storage is public-only) — 2026-08-02, audit LB-3
     const blob = await put(filePath, file, {
       access: "public",
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     });
 
     return NextResponse.json({ url: blob.url });
