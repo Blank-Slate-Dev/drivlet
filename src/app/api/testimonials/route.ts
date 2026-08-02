@@ -7,7 +7,7 @@ import { sanitizeString } from "@/lib/validation";
 
 // GET - Public: fetch displayed testimonials
 export async function GET(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.read, "testimonials-get");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.read, "testimonials-get");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Public: user submits a testimonial
 export async function POST(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "testimonials-post");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "testimonials-post");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

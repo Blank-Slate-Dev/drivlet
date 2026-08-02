@@ -11,7 +11,7 @@ import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { requireValidOrigin } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.auth, "change-password");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "change-password");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again later." },

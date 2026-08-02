@@ -9,7 +9,7 @@ import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 export async function GET(request: NextRequest) {
   // Rate limiting to prevent brute force attacks on tracking code guessing
   // This endpoint requires 3 matching fields, making it a target for enumeration
-  const rateLimitResult = withRateLimit(request, RATE_LIMITS.auth, 'booking-track');
+  const rateLimitResult = await withRateLimit(request, RATE_LIMITS.auth, 'booking-track');
   if (!rateLimitResult.success) {
     return NextResponse.json(
       {

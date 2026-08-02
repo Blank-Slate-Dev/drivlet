@@ -8,7 +8,7 @@ import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 // POST /api/auth/resend-verification - Resend verification code
 export async function POST(request: NextRequest) {
   // Rate limit to prevent email flooding
-  const rateLimit = withRateLimit(request, RATE_LIMITS.auth, "resend-verification");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "resend-verification");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

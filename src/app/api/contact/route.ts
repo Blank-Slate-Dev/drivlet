@@ -9,7 +9,7 @@ import { SUPPORT_EMAIL } from "@/lib/policy";
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting - prevent spam
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "contact");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "contact");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

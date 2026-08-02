@@ -15,7 +15,7 @@ function getAppUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.auth, "forgot-password");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "forgot-password");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

@@ -16,7 +16,7 @@ const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepte
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.read, "slot-availability");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.read, "slot-availability");
   if (!rateLimit.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

@@ -10,7 +10,7 @@ import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   // Rate-limited to prevent brute-force guessing of codes
-  const rateLimitResult = withRateLimit(request, RATE_LIMITS.auth, "promo-validate");
+  const rateLimitResult = await withRateLimit(request, RATE_LIMITS.auth, "promo-validate");
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again shortly." },

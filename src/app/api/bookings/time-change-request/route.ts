@@ -13,7 +13,7 @@ import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 export async function POST(request: NextRequest) {
   // Same auth model as the public track endpoint: code + email + rego must
   // all match. Rate limited to prevent abuse/enumeration.
-  const rateLimitResult = withRateLimit(request, RATE_LIMITS.auth, "time-change-request");
+  const rateLimitResult = await withRateLimit(request, RATE_LIMITS.auth, "time-change-request");
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

@@ -9,7 +9,7 @@ import User from "@/models/User";
 import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
-  const rateLimit = withRateLimit(request, RATE_LIMITS.auth, "reset-password");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "reset-password");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

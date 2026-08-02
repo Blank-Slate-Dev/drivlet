@@ -59,7 +59,7 @@ function extractReferrerHost(
 
 export async function POST(request: NextRequest) {
   try {
-    const rate = withRateLimit(request, RATE_LIMITS.read, "analytics");
+    const rate = await withRateLimit(request, RATE_LIMITS.read, "analytics");
     if (!rate.success) {
       return new NextResponse(null, { status: 204 });
     }

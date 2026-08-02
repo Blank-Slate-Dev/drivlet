@@ -16,7 +16,7 @@ import mongoose from "mongoose";
 // Uses email + registration for verification (same as track endpoint)
 export async function POST(request: NextRequest) {
   // Apply rate limiting - prevent enumeration attacks
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "track-photos");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "track-photos");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

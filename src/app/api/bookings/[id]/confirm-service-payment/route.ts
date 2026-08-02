@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Rate limit to prevent enumeration
-  const rateLimit = withRateLimit(request, RATE_LIMITS.api, "confirm-service-payment");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.api, "confirm-service-payment");
   if (!rateLimit.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

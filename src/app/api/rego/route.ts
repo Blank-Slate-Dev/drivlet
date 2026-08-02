@@ -19,7 +19,7 @@ type StateCode =
 
 export async function GET(request: Request) {
   // Rate limit to prevent abuse of paid API
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "rego-lookup");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "rego-lookup");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

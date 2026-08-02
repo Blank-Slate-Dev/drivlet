@@ -19,7 +19,7 @@ const HEAR_ABOUT_OPTIONS = [
 ];
 
 export async function POST(request: NextRequest) {
-  const rateLimitResult = withRateLimit(request, RATE_LIMITS.auth, "booking-feedback");
+  const rateLimitResult = await withRateLimit(request, RATE_LIMITS.auth, "booking-feedback");
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

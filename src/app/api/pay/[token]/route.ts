@@ -8,7 +8,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  const rateCheck = withRateLimit(request, RATE_LIMITS.form, "pay-verify");
+  const rateCheck = await withRateLimit(request, RATE_LIMITS.form, "pay-verify");
   if (!rateCheck.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

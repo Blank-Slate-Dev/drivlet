@@ -37,7 +37,7 @@ function sanitizeHtml(input: string, maxLength: number = 2000): string {
 // POST /api/reviews - Submit a new review (garage or driver)
 export async function POST(request: NextRequest) {
   // Rate limit review submissions
-  const rateLimit = withRateLimit(request, RATE_LIMITS.form, "review-submit");
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "review-submit");
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
