@@ -28,7 +28,6 @@ interface DriverInfo {
 interface BookingInfo {
   _id: string;
   userName: string;
-  userEmail: string;
   serviceType: string;
   garageName?: string;
   vehicleRegistration: string;
@@ -138,10 +137,19 @@ export default function ReviewPage() {
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
 
-  // Fetch booking info
+  // Fetch booking info. The API requires proof: a logged-in owner session,
+  // or email+rego query params (carried on review links in emails) for
+  // guests (2026-08-02, audit LB-6).
   const fetchBooking = useCallback(async () => {
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/review-info`);
+      const urlParams = new URLSearchParams(window.location.search);
+      const proofEmail = urlParams.get("email");
+      const proofRego = urlParams.get("rego");
+      const proof =
+        proofEmail && proofRego
+          ? `?email=${encodeURIComponent(proofEmail)}&rego=${encodeURIComponent(proofRego)}`
+          : "";
+      const res = await fetch(`/api/bookings/${bookingId}/review-info${proof}`);
       const data = await res.json();
 
       if (!res.ok) {
