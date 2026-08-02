@@ -61,6 +61,28 @@ function getLabelForKey(key: string): string {
   return FIELD_LABELS[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
+// Escape user-supplied values before interpolating into the HTML document.
+// Form values come from drivers/customers — without this, a malicious value
+// executes as script in the admin's browser (stored XSS, audit LB-7).
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Signatures must be image data-URLs; anything else is dropped rather than
+// interpolated into a src attribute
+function safeSignatureSrc(sig: string | undefined): string | null {
+  if (!sig) return null;
+  if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(sig)) {
+    return null;
+  }
+  return sig;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ formId: string }> }
@@ -95,10 +117,10 @@ export async function GET(
     const fieldRows = Object.entries(formData)
       .filter(([, value]) => value !== undefined && value !== null && value !== "")
       .map(([key, value]) => {
-        const label = getLabelForKey(key);
+        const label = escapeHtml(getLabelForKey(key));
         const displayValue = typeof value === "object" ? JSON.stringify(value) : String(value);
         const isLongText = displayValue.length > 80;
-        return { label, value: displayValue, isLongText };
+        return { label, value: escapeHtml(displayValue), isLongText };
       });
 
     const submittedDate = new Date(form.submittedAt).toLocaleString("en-AU", {
@@ -117,6 +139,10 @@ export async function GET(
       claim_lodgement: { primary: "#d97706", light: "#fffbeb", border: "#fde68a" },
     };
     const theme = colors[form.formType] || colors.pickup_consent;
+
+    // Only image data-URLs may enter the src attributes (audit LB-7)
+    const customerSig = safeSignatureSrc(signatures.customer);
+    const driverSig = safeSignatureSrc(signatures.driver);
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -313,11 +339,11 @@ export async function GET(
       <div class="meta-row">
         <div class="meta-item">
           <div class="meta-label">Submitted By</div>
-          <div class="meta-value">${form.submittedByName || "—"}</div>
+          <div class="meta-value">${escapeHtml(form.submittedByName || "—")}</div>
         </div>
         <div class="meta-item">
           <div class="meta-label">Email</div>
-          <div class="meta-value">${form.submittedBy || "—"}</div>
+          <div class="meta-value">${escapeHtml(form.submittedBy || "—")}</div>
         </div>
         <div class="meta-item">
           <div class="meta-label">Submitted At</div>
@@ -354,11 +380,11 @@ export async function GET(
         <div class="signatures-grid">
           <div class="sig-box">
             <div class="sig-label">Customer Signature</div>
-            ${signatures.customer ? `<img src="${signatures.customer}" alt="Customer Signature" />` : '<p style="color:#94a3b8;margin-top:8px">No signature</p>'}
+            ${customerSig ? `<img src="${customerSig}" alt="Customer Signature" />` : '<p style="color:#94a3b8;margin-top:8px">No signature</p>'}
           </div>
           <div class="sig-box">
             <div class="sig-label">Driver Signature</div>
-            ${signatures.driver ? `<img src="${signatures.driver}" alt="Driver Signature" />` : '<p style="color:#94a3b8;margin-top:8px">No signature</p>'}
+            ${driverSig ? `<img src="${driverSig}" alt="Driver Signature" />` : '<p style="color:#94a3b8;margin-top:8px">No signature</p>'}
           </div>
         </div>
       </div>
