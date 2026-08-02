@@ -79,8 +79,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify driver is assigned to this booking
-    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+    // Verify driver is assigned to this booking (either leg — the return
+    // driver needs to reach the customer for the drop-off too)
+    if (
+      booking.assignedDriverId?.toString() !== user.driverProfile.toString() &&
+      booking.returnDriverId?.toString() !== user.driverProfile.toString()
+    ) {
       return NextResponse.json(
         { error: "You are not assigned to this booking" },
         { status: 403 }

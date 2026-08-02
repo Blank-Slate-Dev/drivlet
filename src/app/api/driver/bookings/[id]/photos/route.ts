@@ -61,7 +61,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+    // Either leg qualifies: the return driver needs photo access for their own
+    // gates (collected_from_workshop requires service_pickup photos). Checking
+    // only assignedDriverId broke every two-driver booking. Fixed 2026-08-02.
+    if (
+      booking.assignedDriverId?.toString() !== user.driverProfile.toString() &&
+      booking.returnDriverId?.toString() !== user.driverProfile.toString()
+    ) {
       return NextResponse.json(
         { error: "You are not assigned to this booking" },
         { status: 403 }
@@ -326,7 +332,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+    // Either leg qualifies: the return driver needs photo access for their own
+    // gates (collected_from_workshop requires service_pickup photos). Checking
+    // only assignedDriverId broke every two-driver booking. Fixed 2026-08-02.
+    if (
+      booking.assignedDriverId?.toString() !== user.driverProfile.toString() &&
+      booking.returnDriverId?.toString() !== user.driverProfile.toString()
+    ) {
       return NextResponse.json(
         { error: "You are not assigned to this booking" },
         { status: 403 }
@@ -430,7 +442,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+    // Either leg qualifies: the return driver needs photo access for their own
+    // gates (collected_from_workshop requires service_pickup photos). Checking
+    // only assignedDriverId broke every two-driver booking. Fixed 2026-08-02.
+    if (
+      booking.assignedDriverId?.toString() !== user.driverProfile.toString() &&
+      booking.returnDriverId?.toString() !== user.driverProfile.toString()
+    ) {
       return NextResponse.json(
         { error: "You are not assigned to this booking" },
         { status: 403 }
@@ -520,7 +538,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    if (booking.assignedDriverId?.toString() !== user.driverProfile.toString()) {
+    // Either leg qualifies: the return driver needs photo access for their own
+    // gates (collected_from_workshop requires service_pickup photos). Checking
+    // only assignedDriverId broke every two-driver booking. Fixed 2026-08-02.
+    if (
+      booking.assignedDriverId?.toString() !== user.driverProfile.toString() &&
+      booking.returnDriverId?.toString() !== user.driverProfile.toString()
+    ) {
       return NextResponse.json(
         { error: "You are not assigned to this booking" },
         { status: 403 }

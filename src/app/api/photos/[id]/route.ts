@@ -54,10 +54,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       const isOwner =
         booking.userId?.toString() === session.user.id ||
         booking.userEmail?.toLowerCase() === session.user.email?.toLowerCase();
+      // Both legs: the return driver must be able to view custody photos too.
       const isAssignedDriver = Boolean(
         session.user.role === "driver" &&
         user?.driverProfile &&
-        booking.assignedDriverId?.toString() === user.driverProfile.toString()
+        (booking.assignedDriverId?.toString() === user.driverProfile.toString() ||
+          booking.returnDriverId?.toString() === user.driverProfile.toString())
       );
 
       hasAccess = isAdmin || isOwner || isAssignedDriver;
