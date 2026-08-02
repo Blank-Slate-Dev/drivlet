@@ -5,6 +5,7 @@ import AdminNotification from "@/models/AdminNotification";
 import Garage from "@/models/Garage";
 import { Types } from "mongoose";
 import { sendEmail } from "@/lib/email";
+import { getAppUrl } from "@/lib/appUrl";
 
 interface CreateNotificationParams {
   garageId: Types.ObjectId | string;
@@ -202,7 +203,7 @@ export async function notifyAdmin(params: {
   };
 }) {
   const rawEmails = process.env.ADMIN_NOTIFICATION_EMAIL || "support@drivlet.com.au";
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
 
   try {
     await connectDB();
@@ -266,7 +267,7 @@ export async function notifyAdminOfNewRequest(request: {
 
   const pickupSuburb = request.pickupAddress.split(",")[0]?.trim() || "Unknown";
   const quotedDisplay = `$${(request.quotedAmount / 100).toFixed(2)}`;
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
 
   // 1. Create AdminNotification
   try {

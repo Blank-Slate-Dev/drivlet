@@ -3,6 +3,7 @@
 
 import Mailjet from 'node-mailjet';
 import { CANCELLATION_POLICY_TEXT, SUPPORT_PHONE, SUPPORT_EMAIL } from './policy';
+import { getAppUrl } from "@/lib/appUrl";
 
 const EMAIL_DEBUG = process.env.NODE_ENV !== 'production';
 
@@ -178,11 +179,6 @@ export function emailPolicyFooterHtml(): string {
 
 export function emailPolicyFooterText(): string {
   return `${CANCELLATION_POLICY_TEXT}\n\nNeed help? Call ${SUPPORT_PHONE} or email ${SUPPORT_EMAIL}`;
-}
-
-// Get app URL at runtime (not at module load time)
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
 // Email verification with 6-digit code

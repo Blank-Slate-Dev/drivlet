@@ -11,6 +11,7 @@ import GarageSubscription, {
 } from "@/models/GarageSubscription";
 import { stripe } from "@/lib/stripe";
 import { logger } from "@/lib/logger";
+import { getAppUrl } from "@/lib/appUrl";
 
 // Stripe price IDs (you'll need to create these in Stripe Dashboard)
 const STRIPE_PRICE_IDS: Record<SubscriptionTier, { monthly: string; yearly: string }> = {
@@ -169,8 +170,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/garage/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/garage/subscription/cancelled`,
+      success_url: `${getAppUrl()}/garage/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getAppUrl()}/garage/subscription/cancelled`,
       metadata: {
         garageId: garage._id.toString(),
         userId: session.user.id,

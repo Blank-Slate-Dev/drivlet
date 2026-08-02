@@ -20,11 +20,7 @@ import {
   type CheckpointValidation,
 } from "@/lib/photoRequirements";
 import { FORM_LABELS, type GatedFormType } from "@/lib/formRequirements";
-
-// Get the app URL for Stripe redirects
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-}
+import { getAppUrl } from "@/lib/appUrl";
 
 // Re-fetch the booking's active photos and validate them against a custody
 // checkpoint. Single source of truth = src/lib/photoRequirements.ts (shared with UI).

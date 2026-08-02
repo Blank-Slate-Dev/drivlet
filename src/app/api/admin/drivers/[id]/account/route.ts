@@ -16,10 +16,7 @@ import Driver from "@/models/Driver";
 import User from "@/models/User";
 import Booking from "@/models/Booking";
 import { sendPasswordResetEmail } from "@/lib/email";
-
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function POST(
   request: NextRequest,

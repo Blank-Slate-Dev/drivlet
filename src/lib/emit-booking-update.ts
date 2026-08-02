@@ -5,6 +5,7 @@
 import { emitBookingUpdate, BookingEventData } from './booking-events';
 import { sendBookingStageEmail } from './email';
 import { sendSMS } from './sms';
+import { getAppUrl } from "@/lib/appUrl";
 
 // Stage-specific short SMS messages
 const STAGE_SMS_MESSAGES: Record<string, string> = {
@@ -126,7 +127,7 @@ export function notifyBookingUpdate(booking: BookingDocument, options: NotifyOpt
   if (booking.guestPhone && booking.userName) {
     const smsMessage = STAGE_SMS_MESSAGES[booking.currentStage];
     if (smsMessage) {
-      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const appUrl = getAppUrl();
       const trackingUrl = booking.trackingCode
         ? `${appUrl}/track?code=${booking.trackingCode}`
         : `${appUrl}/track`;

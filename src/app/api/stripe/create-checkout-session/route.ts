@@ -2,11 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, DRIVLET_PRICE } from '@/lib/stripe';
 import { requireValidOrigin } from '@/lib/validation';
-
-// Get the app URL
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-}
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function POST(request: NextRequest) {
   // RETIRED FOR LAUNCH (2026-08-02): unused legacy checkout path (no frontend

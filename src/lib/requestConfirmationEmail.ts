@@ -12,10 +12,7 @@ import {
 } from "@/lib/email";
 import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
 import type { IBookingRequest } from "@/models/BookingRequest";
-
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function sendConfirmationWithPayLink(
   bookingRequest: IBookingRequest

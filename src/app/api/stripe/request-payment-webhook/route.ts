@@ -16,10 +16,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No signature" }, { status: 400 });
   }
 
-  const webhookSecret = process.env.STRIPE_REQUEST_WEBHOOK_SECRET;
+  // Fallback to the main webhook secret so a missed env var can't silently
+  // stop paid requests becoming bookings — works when this endpoint shares
+  // the main endpoint's registration. A loud error either way if neither is
+  // set. (2026-08-02, pre-launch audit LB-8; approved webhook change.)
+  const webhookSecret =
+    process.env.STRIPE_REQUEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error("STRIPE_REQUEST_WEBHOOK_SECRET not configured");
+    console.error(
+      "request-payment-webhook: neither STRIPE_REQUEST_WEBHOOK_SECRET nor STRIPE_WEBHOOK_SECRET is configured — paid requests CANNOT become bookings"
+    );
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+  if (!process.env.STRIPE_REQUEST_WEBHOOK_SECRET) {
+    console.warn(
+      "request-payment-webhook: STRIPE_REQUEST_WEBHOOK_SECRET not set, using STRIPE_WEBHOOK_SECRET fallback — signature verification will fail unless this endpoint shares the main endpoint's signing secret"
+    );
   }
 
   let event: Stripe.Event;

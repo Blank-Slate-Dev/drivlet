@@ -7,12 +7,9 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { getAppUrl } from "@/lib/appUrl";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
 
 export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "forgot-password");

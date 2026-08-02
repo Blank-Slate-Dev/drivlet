@@ -11,6 +11,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { stripe } from "@/lib/stripe";
+import { getAppUrl } from "@/lib/appUrl";
 import {
   sendEmail,
   bookingDetailsHtml,
@@ -24,10 +25,6 @@ const MIN_EXTRA_CHARGE = 1000;   // $10.00
 const MAX_EXTRA_CHARGE = 200000; // $2,000.00
 const MIN_DESCRIPTION_LENGTH = 5;
 const MAX_DESCRIPTION_LENGTH = 200;
-
-function getAppUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
 
 function escapeHtml(str: string): string {
   return str

@@ -8,6 +8,7 @@ import { stripe } from '@/lib/stripe';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 import { sendBookingStageEmail } from '@/lib/email';
 import { sendBookingConfirmationSMS } from '@/lib/sms';
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function POST(request: NextRequest) {
   // RETIRED FOR LAUNCH (2026-08-02): fallback for the legacy direct-payment
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
       // Send confirmation SMS to guests with phone numbers
       if (bookingData.guestPhone) {
         try {
-          const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          const appUrl = getAppUrl();
           const trackingUrl = trackingCode
             ? `${appUrl}/track?code=${trackingCode}`
             : `${appUrl}/track`;

@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import { requireValidOrigin } from "@/lib/validation";
 import { sendBookingStageEmail } from "@/lib/email";
 import { sendBookingConfirmationSMS } from "@/lib/sms";
+import { getAppUrl } from "@/lib/appUrl";
 
 // GET /api/bookings - Get user's own bookings (used by main dashboard)
 export async function GET() {
@@ -267,7 +268,7 @@ export async function POST(request: NextRequest) {
 
     // Send confirmation SMS to guests with phone numbers
     if (isGuest && data.guestPhone) {
-      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const appUrl = getAppUrl();
       const trackingUrl = booking.trackingCode
         ? `${appUrl}/track?code=${booking.trackingCode}`
         : `${appUrl}/track`;
