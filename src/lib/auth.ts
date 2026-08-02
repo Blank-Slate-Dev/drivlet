@@ -3,6 +3,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import User from "@/models/User";
 import Driver from "@/models/Driver";
 import Garage from "@/models/Garage";
@@ -24,7 +25,8 @@ export const authOptions: NextAuthOptions = {
         // Check for auto-login token first (used after email verification)
         if (credentials?.autoLoginToken) {
           const user = await User.findOne({
-            autoLoginToken: credentials.autoLoginToken,
+            // String() guards against object injection in the JSON body
+            autoLoginToken: String(credentials.autoLoginToken),
             autoLoginTokenExpires: { $gt: new Date() },
           });
 
@@ -93,10 +95,25 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.trim().toLowerCase();
         const password = credentials.password.trim();
 
+        // Brute-force throttle, keyed by target email (distributed,
+        // Mongo-backed — see rateLimit.ts). Added 2026-08-02 (audit LB-5):
+        // the credentials callback previously accepted unlimited guesses.
+        const rateCheck = await checkRateLimit(
+          `login:${email}`,
+          RATE_LIMITS.auth
+        );
+        if (!rateCheck.success) {
+          throw new Error(
+            "Too many login attempts. Please wait a minute and try again."
+          );
+        }
+
         const user = await User.findOne({ email });
 
         if (!user) {
-          throw new Error("No user found with this email");
+          // Same message as a wrong password — a distinct message confirmed
+          // which emails have accounts (enumeration oracle, audit LB-5)
+          throw new Error("Invalid email or password");
         }
 
         // Check account status BEFORE password comparison to avoid wasting bcrypt cycles
@@ -115,7 +132,8 @@ export const authOptions: NextAuthOptions = {
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-          throw new Error("Invalid password");
+          // Uniform with the no-user case (see above)
+          throw new Error("Invalid email or password");
         }
 
         // If user is a driver, fetch their onboarding status
