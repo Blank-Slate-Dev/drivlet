@@ -78,12 +78,64 @@ function PaymentPageContent() {
   // flight (the already-paid guard only trips once status flips to "paid").
   const searchParams = useSearchParams();
   const redirectStatus = searchParams.get("redirect_status");
+  // Frozen at first render: the payment form strips Stripe params from the
+  // URL, so read the secret before that can happen.
+  const [redirectClientSecret] = useState(() =>
+    searchParams.get("payment_intent_client_secret")
+  );
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [creatingPI, setCreatingPI] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(redirectStatus === "succeeded");
+  const [success, setSuccess] = useState(false);
+  // NEVER trust ?redirect_status=succeeded by itself — it's a spoofable URL
+  // param that previously rendered the full "Payment received" screen to
+  // anyone who typed it (2026-08-06 review). The redirect outcome is now
+  // verified against Stripe via the PaymentIntent client secret.
+  const [verifyingRedirect, setVerifyingRedirect] = useState(
+    redirectStatus === "succeeded" && Boolean(searchParams.get("payment_intent_client_secret"))
+  );
+
+  useEffect(() => {
+    if (redirectStatus !== "succeeded" || !redirectClientSecret) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const stripe = await stripePromise;
+        if (!stripe) throw new Error("Stripe failed to load");
+        const { paymentIntent } = await stripe.retrievePaymentIntent(
+          redirectClientSecret
+        );
+        if (cancelled) return;
+        if (
+          paymentIntent &&
+          (paymentIntent.status === "succeeded" ||
+            paymentIntent.status === "processing")
+        ) {
+          setSuccess(true);
+        } else {
+          setPaymentError(
+            "We couldn't confirm your payment. If money has left your account it will be released by your bank; otherwise please try again below."
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          // Verification itself failed (network, bad secret). Don't claim
+          // success — the already-paid guard will catch a genuine payment
+          // on reload once the webhook lands.
+          setPaymentError(
+            "We couldn't confirm your payment status. Please refresh this page in a moment — if your payment went through, it will show as paid."
+          );
+        }
+      } finally {
+        if (!cancelled) setVerifyingRedirect(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [redirectStatus, redirectClientSecret]);
 
   // Tracking code lookup after payment (the webhook creates the booking
   // asynchronously, so we poll briefly to pick up the code once it exists).
@@ -92,7 +144,9 @@ function PaymentPageContent() {
   const [copied, setCopied] = useState(false);
 
   // A failed / cancelled 3-D Secure authentication: tell the customer plainly
-  // rather than silently showing the payment form again.
+  // rather than silently showing the payment form again. (A bare
+  // redirect_status=succeeded WITHOUT a client secret is a hand-typed URL —
+  // it gets the normal payment page, no message.)
   useEffect(() => {
     if (redirectStatus && redirectStatus !== "succeeded") {
       setPaymentError(
@@ -223,7 +277,7 @@ function PaymentPageContent() {
     }
   };
 
-  if (loading) {
+  if (loading || verifyingRedirect) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
