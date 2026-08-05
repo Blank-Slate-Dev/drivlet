@@ -73,7 +73,13 @@ export async function GET() {
             ...(linkedGarageName
               ? [
                   {
-                    garageName: { $regex: new RegExp(escapedName, "i") },
+                    // Anchored to "<name>" or "<name> - <suburb>" so this list
+                    // matches exactly what acknowledge-booking will authorise.
+                    // An unanchored regex previously surfaced other garages'
+                    // unassigned bookings (and their customer details).
+                    garageName: {
+                      $regex: new RegExp(`^${escapedName}(\\s*-\\s.*)?$`, "i"),
+                    },
                     $or: [
                       { assignedGarageId: null },
                       { assignedGarageId: { $exists: false } },

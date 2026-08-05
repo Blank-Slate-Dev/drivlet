@@ -61,14 +61,16 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query: Record<string, any> = { ...baseQuery };
 
+    // Keyed on `garageStatus`, not the top-level `status`. The booking stays
+    // `in_progress` from pickup until the driver delivers it, so filtering the
+    // garage's own tabs on it put every acknowledged job in the wrong bucket
+    // and left the Completed tab permanently empty.
     if (statusFilter === "acknowledged") {
-      // Acknowledged but not started yet
       query.garageStatus = "acknowledged";
-      query.status = "pending";
     } else if (statusFilter === "in_progress") {
-      query.status = "in_progress";
+      query.garageStatus = "in_progress";
     } else if (statusFilter === "completed") {
-      query.status = "completed";
+      query.garageStatus = "completed";
     }
     // 'all' or no filter - use baseQuery (everything except new)
 
@@ -85,15 +87,14 @@ export async function GET(request: Request) {
       acknowledged: await Booking.countDocuments({
         assignedGarageId: garage._id,
         garageStatus: "acknowledged",
-        status: "pending",
       }),
       inProgress: await Booking.countDocuments({
         assignedGarageId: garage._id,
-        status: "in_progress",
+        garageStatus: "in_progress",
       }),
       completed: await Booking.countDocuments({
         assignedGarageId: garage._id,
-        status: "completed",
+        garageStatus: "completed",
       }),
     };
 

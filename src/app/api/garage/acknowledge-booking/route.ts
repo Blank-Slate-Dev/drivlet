@@ -77,7 +77,13 @@ export async function POST(request: Request) {
     const isAssigned =
       booking.assignedGarageId?.toString() === garage._id.toString();
 
-    const normalise = (v: string) => v.trim().toLowerCase();
+    // The booking's garageName comes from GarageAutocomplete, which formats it
+    // as "<name> - <suburb>"; the garage's linkedGarageName is the bare Places
+    // display name. Compare the part before the suburb suffix so the fallback
+    // can actually match, while staying an EXACT comparison (a substring match
+    // is what allowed one garage to seize another's bookings).
+    const normalise = (v: string) =>
+      v.split(" - ")[0].replace(/\s+/g, " ").trim().toLowerCase();
     const matchesPlaceId = Boolean(
       linkedPlaceId && booking.garagePlaceId === linkedPlaceId
     );

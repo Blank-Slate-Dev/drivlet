@@ -79,7 +79,32 @@ export async function POST(request: NextRequest) {
     };
 
     // Find and update user atomically
-    const user = await User.findOneAndUpdate(filter, update, { new: true });
+    let user = await User.findOneAndUpdate(filter, update, { new: true });
+    let issuedToken = canAutoLogin;
+
+    // Fallback: the email we were given didn't match, but the code itself may
+    // still be valid. This happens when the customer mistypes their address in
+    // the "resend" box — /api/auth/resend-verification deliberately returns
+    // success for unknown addresses, so they'd get a code in their real inbox
+    // and then be told it was invalid, forever, with no way out.
+    //
+    // We retry on the code alone but do NOT issue an auto-login token, so the
+    // brute-force protection is unchanged: a blind guess can verify an email
+    // address, never obtain a session.
+    if (!user && email) {
+      issuedToken = false;
+      user = await User.findOneAndUpdate(
+        {
+          verificationCode: code,
+          verificationCodeExpires: { $gt: new Date() },
+        },
+        {
+          $set: { emailVerified: true },
+          $unset: { verificationCode: "", verificationCodeExpires: "" },
+        },
+        { new: true }
+      );
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -88,7 +113,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!canAutoLogin) {
+    if (!issuedToken) {
       return NextResponse.json({
         success: true,
         requiresLogin: true,

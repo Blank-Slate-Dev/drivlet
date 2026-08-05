@@ -4,6 +4,7 @@
 import Mailjet from 'node-mailjet';
 import { CANCELLATION_POLICY_TEXT, SUPPORT_PHONE, SUPPORT_EMAIL } from './policy';
 import { getAppUrl } from "@/lib/appUrl";
+import { getServiceTypeByValue } from "@/config/timeSlots";
 
 const EMAIL_DEBUG = process.env.NODE_ENV !== 'production';
 
@@ -126,7 +127,11 @@ function formatServiceDate(date?: Date | string): string | undefined {
 function detailPairs(d: BookingEmailDetails): Array<[string, string]> {
   const pairs: Array<[string, string]> = [];
   if (d.vehicleRegistration) pairs.push(['Vehicle', d.vehicleDescription ? `${d.vehicleRegistration} (${d.vehicleDescription})` : d.vehicleRegistration]);
-  if (d.serviceType) pairs.push(['Service', d.serviceType]);
+  // Map the enum to its human label. Keeping the real serviceType on the
+  // booking (instead of overwriting it with "Existing Booking - <garage>")
+  // means this path now receives values like "regular_service", which must
+  // not reach the customer verbatim.
+  if (d.serviceType) pairs.push(['Service', getServiceTypeByValue(d.serviceType)?.label || d.serviceType]);
   const dateStr = formatServiceDate(d.serviceDate);
   if (dateStr) pairs.push(['Date', dateStr]);
   if (d.pickupTime) pairs.push(['Pickup window', d.pickupTime]);

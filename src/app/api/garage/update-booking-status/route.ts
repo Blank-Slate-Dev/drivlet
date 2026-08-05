@@ -83,12 +83,16 @@ export async function POST(request: Request) {
         );
       }
     } else if (status === "completed") {
-      // Gate on the GARAGE's own state, not the booking's overall status
-      // (audit B-2). The booking stays `in_progress` for the whole job now,
-      // so checking booking.status here would never pass.
-      if (booking.garageStatus !== "in_progress") {
+      // Gate on the GARAGE's own lifecycle, not the booking's overall status
+      // (audit B-2) — the booking now stays `in_progress` for the whole job,
+      // so the old `booking.status !== "in_progress"` check would never pass.
+      //
+      // "acknowledged" is accepted as well as "in_progress": a garage that
+      // finished a quick job without pressing Start must not be trapped with
+      // no way to close it out.
+      if (!["acknowledged", "in_progress"].includes(booking.garageStatus)) {
         return NextResponse.json(
-          { error: "Service must be started before completing" },
+          { error: "Booking must be acknowledged before completing" },
           { status: 400 }
         );
       }
@@ -118,18 +122,36 @@ export async function POST(request: Request) {
     // (D-2). `startedAt`/`completedAt` do not exist at Booking top level and
     // were being silently dropped by Mongoose, which is why the garage's
     // "Completed (Month)" and revenue tiles always read zero.
+    // The garage lifecycle lives entirely in `garageStatus`. Top-level `status`
+    // stays "in_progress" until the driver delivers the car — writing
+    // "completed" here is what previously killed the customer's tracking
+    // (410 from /api/bookings/track) and removed the job from the dispatch
+    // board so no return driver could be assigned.
+    //
+    // We DO set status to "in_progress" on start: the job genuinely is running,
+    // the driver's start_pickup sets the same value, and several garage/admin
+    // queries key off it. What we never do from here is set it to "completed".
+    const nextProgress = status === "completed" ? 85 : 72;
+
+    // Never rewind the customer's tracker. If the return driver has already
+    // departed (driver_returning, 86) a late "mark complete" from the garage
+    // must not drag the customer back to "Service In Progress".
+    const movesForward = (booking.overallProgress ?? 0) < nextProgress;
+
     await Booking.findByIdAndUpdate(bookingId, {
       $set: {
-        // top-level `status` deliberately left untouched
         garageStatus: status === "completed" ? "completed" : "in_progress",
-        // Both map to "service_in_progress" because that is the only stage the
-        // customer tracker, the stage-email map and the SMS map all understand
-        // between drop-off and the return leg. Writing a stage outside that set
-        // (e.g. "service_completed") snaps the tracker back to step 1 — see
-        // audit D-17/D-18. Progress alone conveys "service done, awaiting
-        // return driver".
-        currentStage: "service_in_progress",
-        overallProgress: status === "completed" ? 65 : 50,
+        ...(status === "in_progress" ? { status: "in_progress" } : {}),
+        // "service_in_progress" is the only stage the customer tracker, the
+        // stage-email map and the SMS map all understand between drop-off and
+        // the return leg. Writing anything outside that set (e.g.
+        // "service_completed") snaps the tracker back to step 1 — audit D-17.
+        // Progress alone conveys "service done, awaiting return driver", and
+        // 72/85 match the values the rest of the app already uses for those
+        // two points (src/app/api/driver/jobs/route.ts, lib/servicePayment.ts).
+        ...(movesForward
+          ? { currentStage: "service_in_progress", overallProgress: nextProgress }
+          : {}),
         updatedAt: now,
         ...(status === "in_progress" && { garageAcceptedAt: now }),
         ...(status === "completed" && { garageCompletedAt: now }),

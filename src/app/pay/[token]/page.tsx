@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import StripePaymentForm from "@/components/StripePaymentForm";
@@ -60,7 +60,7 @@ function formatServiceDate(iso: string | null): string | null {
   });
 }
 
-export default function PaymentPage() {
+function PaymentPageContent() {
   const params = useParams();
   const token = params.token as string;
 
@@ -70,17 +70,36 @@ export default function PaymentPage() {
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [paidReference, setPaidReference] = useState<string | null>(null);
 
+  // Stripe appends these when a card needs a redirect-based authentication
+  // step (3-D Secure). The customer lands back HERE, so this page — not the
+  // retired /booking/success — owns the outcome. Without this the page would
+  // re-render the "Pay $X" button to someone who has just been charged, and a
+  // second click creates a SECOND PaymentIntent while the webhook is still in
+  // flight (the already-paid guard only trips once status flips to "paid").
+  const searchParams = useSearchParams();
+  const redirectStatus = searchParams.get("redirect_status");
+
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [creatingPI, setCreatingPI] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(redirectStatus === "succeeded");
 
   // Tracking code lookup after payment (the webhook creates the booking
   // asynchronously, so we poll briefly to pick up the code once it exists).
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
   const [pollingForCode, setPollingForCode] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // A failed / cancelled 3-D Secure authentication: tell the customer plainly
+  // rather than silently showing the payment form again.
+  useEffect(() => {
+    if (redirectStatus && redirectStatus !== "succeeded") {
+      setPaymentError(
+        "Your bank didn't complete the verification step, so the payment wasn't taken. You can try again below."
+      );
+    }
+  }, [redirectStatus]);
 
   useEffect(() => {
     if (!token) return;
@@ -631,5 +650,21 @@ export default function PaymentPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() (added so this page can read Stripe's redirect_status
+// after a 3-D Secure authentication) must sit inside a Suspense boundary.
+export default function PaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        </div>
+      }
+    >
+      <PaymentPageContent />
+    </Suspense>
   );
 }

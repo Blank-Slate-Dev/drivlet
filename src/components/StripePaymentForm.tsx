@@ -38,19 +38,19 @@ export default function StripePaymentForm({
     setIsProcessing(true);
 
     try {
-      // audit B-17: return_url used to be `/booking/success`, which belongs to
-      // the retired Checkout flow. Any card needing a redirect-based
-      // authentication step (3-D Secure) therefore left /pay/[token] and came
-      // back on a page that showed "Booking Confirmed! Payment received."
-      // unconditionally — even when redirect_status was `failed`.
-      //
-      // Returning to the CURRENT page lets the page that started the payment
-      // handle the outcome, poll for the tracking code, and show a real error
-      // when the authentication failed.
+      // Return to THIS page (the retired /booking/success belongs to the old
+      // Checkout flow and reported success unconditionally). Strip any Stripe
+      // params left over from a previous attempt first, so a retry can't
+      // accumulate two sets and leave the page reading a stale value.
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.delete('payment_intent');
+      returnUrl.searchParams.delete('payment_intent_client_secret');
+      returnUrl.searchParams.delete('redirect_status');
+
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: window.location.href,
+          return_url: returnUrl.toString(),
         },
         redirect: 'if_required',
       });

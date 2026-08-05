@@ -488,10 +488,13 @@ export default function GarageBookingsPage() {
               )}
 
               {/* Action Buttons */}
-              {selectedBooking.status !== "completed" && (
+              {selectedBooking.garageStatus !== "completed" && (
                 <div className="flex gap-3 pt-2">
-                  {selectedBooking.garageStatus === "acknowledged" &&
-                    selectedBooking.status === "pending" && (
+                  {/* Keyed on garageStatus only. The driver sets the top-level
+                      status to "in_progress" at pickup — long before the garage
+                      touches the job — so requiring status === "pending" here
+                      hid Start Service on every real booking. */}
+                  {selectedBooking.garageStatus === "acknowledged" && (
                       <button
                         onClick={() => handleStatusUpdate(selectedBooking._id, "in_progress")}
                         disabled={updatingStatus === selectedBooking._id}
@@ -505,7 +508,7 @@ export default function GarageBookingsPage() {
                         Start Service
                       </button>
                     )}
-                  {selectedBooking.status === "in_progress" && (
+                  {selectedBooking.garageStatus === "in_progress" && (
                     <button
                       onClick={() => handleStatusUpdate(selectedBooking._id, "completed")}
                       disabled={updatingStatus === selectedBooking._id}
