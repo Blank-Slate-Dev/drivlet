@@ -5,6 +5,11 @@ import { NextResponse } from "next/server";
 // Check if quote system is enabled (Phase 1: disabled)
 const QUOTE_SYSTEM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_QUOTE_SYSTEM === 'true';
 
+// PHASE 1: the whole garage portal is hidden (signup, login, join page,
+// dashboard, public /garages directory). See src/lib/garagePortal.ts for
+// the MUST-FIX-BEFORE-PHASE-2 checklist gating re-enablement.
+const GARAGE_PORTAL_ENABLED = process.env.NEXT_PUBLIC_ENABLE_GARAGE_PORTAL === 'true';
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
@@ -14,6 +19,17 @@ export default withAuth(
     // Quote routes are disabled until marketplace features are enabled
     if (!QUOTE_SYSTEM_ENABLED && pathname.startsWith("/quotes")) {
       // Redirect to homepage with a message
+      return NextResponse.redirect(new URL("/?feature=coming-soon", req.url));
+    }
+
+    // ========== PHASE 1: BLOCK ALL GARAGE PAGES ==========
+    if (
+      !GARAGE_PORTAL_ENABLED &&
+      (pathname === "/garages" ||
+        pathname.startsWith("/garages/") ||
+        pathname === "/garage" ||
+        pathname.startsWith("/garage/"))
+    ) {
       return NextResponse.redirect(new URL("/?feature=coming-soon", req.url));
     }
 
@@ -123,8 +139,10 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
 
-        // Public garage routes - allow without auth
-        if (pathname === "/garage/login" || pathname === "/garage/register") {
+        // Garage routes: always let the middleware function decide — in
+        // Phase 1 it redirects everything garage-related away, and in
+        // Phase 2 its role checks take over (login/register stay public).
+        if (pathname.startsWith("/garage")) {
           return true;
         }
 
@@ -147,10 +165,11 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/garage/dashboard/:path*",
-    "/garage/bookings/:path*",
-    "/garage/settings/:path*",
-    "/garage/pending",
+    // Phase 1: every garage page (and the public /garages directory) is
+    // intercepted; in Phase 2 the per-path role checks below still apply
+    "/garage/:path*",
+    "/garages",
+    "/garages/:path*",
     "/driver/dashboard/:path*",
     "/driver/jobs/:path*",
     "/driver/payments/:path*",
