@@ -951,6 +951,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Conflict guard (audit C-4): never re-open a payment that has already
+      // been collected. Without this, the atomic claim below — which matches
+      // `servicePaymentStatus: { $ne: "pending" }` — happily matches a PAID
+      // booking, flips it back to pending, overwrites the Stripe references
+      // (destroying the PaymentIntent the refund flow needs), regresses the
+      // customer's tracker, and emails/SMSes them a second demand to pay.
+      // `mark_paid_phone` has always had this guard; this branch did not.
+      if (booking.servicePaymentStatus === "paid") {
+        return NextResponse.json(
+          { error: "This service payment has already been collected." },
+          { status: 409 }
+        );
+      }
+
+      if (booking.servicePaymentStatus === "refunded") {
+        return NextResponse.json(
+          { error: "This service payment was refunded. Please contact the office." },
+          { status: 409 }
+        );
+      }
+
       // Validate service amount
       if (!serviceAmount || typeof serviceAmount !== "number" || serviceAmount <= 0) {
         return NextResponse.json(
@@ -988,9 +1009,12 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Atomically claim the right to generate a payment link
+      // Atomically claim the right to generate a payment link.
+      // The filter excludes "paid"/"refunded" as well as "pending" (audit C-4)
+      // so a concurrent request cannot un-pay a collected payment in the
+      // window between the guard above and this write.
       const claimed = await Booking.findOneAndUpdate(
-        { _id: bookingId, servicePaymentStatus: { $ne: "pending" } },
+        { _id: bookingId, servicePaymentStatus: { $nin: ["pending", "paid", "refunded"] } },
         { $set: { servicePaymentStatus: "pending" } },
         { new: true }
       );

@@ -103,7 +103,7 @@ export default function QuotesDashboardPage() {
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/quotes');
+      router.push('/login?callbackUrl=/quotes');
     }
   }, [sessionStatus, router]);
 

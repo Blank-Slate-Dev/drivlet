@@ -11,9 +11,7 @@ export const dynamic = "force-dynamic";
  * Restricted beyond the normal admin role check. Set ANALYTICS_ADMIN_EMAILS
  * (comma-separated) to change who can see traffic data.
  */
-const ALLOWED_EMAILS = (
-  process.env.ANALYTICS_ADMIN_EMAILS || "support@drivlet.com.au"
-)
+const ALLOWED_EMAILS = (process.env.ANALYTICS_ADMIN_EMAILS || "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
@@ -201,12 +199,23 @@ export async function GET(request: NextRequest) {
     return adminCheck.response;
   }
 
-  const email = adminCheck.session.user?.email?.toLowerCase();
-  if (!email || !ALLOWED_EMAILS.includes(email)) {
-    return NextResponse.json(
-      { error: "This account can't view website traffic." },
-      { status: 403 }
-    );
+  // audit B-22: this extra allow-list is now OPT-IN. Previously it always
+  // applied and defaulted to a single hardcoded address, so the "Website
+  // Traffic" nav item — which is shown to every admin — returned 403 for
+  // everyone except support@drivlet.com.au. It was also the only place in the
+  // app where capability was keyed on an email address rather than the `role`
+  // field on the User document.
+  //
+  // Set ANALYTICS_ADMIN_EMAILS in Vercel to narrow access again; leave it
+  // unset and any admin can view traffic, consistent with every other page.
+  if (ALLOWED_EMAILS.length > 0) {
+    const email = adminCheck.session.user?.email?.toLowerCase();
+    if (!email || !ALLOWED_EMAILS.includes(email)) {
+      return NextResponse.json(
+        { error: "This account can't view website traffic." },
+        { status: 403 }
+      );
+    }
   }
 
   try {

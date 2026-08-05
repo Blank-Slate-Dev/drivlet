@@ -61,15 +61,35 @@ export async function POST(request: Request) {
     const linkedPlaceId = garage.linkedGaragePlaceId || "";
     const linkedGarageName = garage.linkedGarageName || "";
 
+    // SECURITY (audit RISK-1): this authorisation check previously used an
+    // UNANCHORED substring match on the garage name AND did not require the
+    // booking to be unassigned — while the write below overwrites
+    // `assignedGarageId`. A garage whose linked name is a substring of another
+    // garage's name (e.g. "Midas" vs "Midas Tuggeranong") could POST any
+    // booking id and seize a job already assigned to that other garage,
+    // gaining the customer's contact details and the revenue attribution.
+    //
+    // Now: an already-assigned booking may only be acknowledged by the garage
+    // it is assigned to. An unassigned booking may be claimed on an exact
+    // placeId match, or — as a fallback for bookings created before placeIds
+    // were captured — an EXACT (case-insensitive, trimmed) name match.
+    const alreadyAssigned = Boolean(booking.assignedGarageId);
     const isAssigned =
       booking.assignedGarageId?.toString() === garage._id.toString();
-    const matchesPlaceId =
-      linkedPlaceId && booking.garagePlaceId === linkedPlaceId;
-    const matchesName =
-      linkedGarageName &&
-      booking.garageName?.toLowerCase().includes(linkedGarageName.toLowerCase());
 
-    if (!isAssigned && !matchesPlaceId && !matchesName) {
+    const normalise = (v: string) => v.trim().toLowerCase();
+    const matchesPlaceId = Boolean(
+      linkedPlaceId && booking.garagePlaceId === linkedPlaceId
+    );
+    const matchesName = Boolean(
+      linkedGarageName &&
+        booking.garageName &&
+        normalise(booking.garageName) === normalise(linkedGarageName)
+    );
+
+    const authorised = isAssigned || (!alreadyAssigned && (matchesPlaceId || matchesName));
+
+    if (!authorised) {
       return NextResponse.json(
         { error: "This booking is not assigned to your garage" },
         { status: 403 }

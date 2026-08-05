@@ -100,6 +100,13 @@ export async function PUT(request: NextRequest) {
           drivletRadius: body.drivletRadius ?? 15,
           leadTimeHours: body.leadTimeHours ?? 24,
           maxDailyBookings: body.maxDailyBookings ?? 5,
+          // audit B-4: `isPublished` was missing from this $set, so the toggle
+          // on /garage/services could never persist — Mongoose silently dropped
+          // it. Because /api/garages/search and /api/garages/[id] both filter on
+          // `isPublished: true`, NO garage's services or price range could ever
+          // appear on the public directory.
+          isPublished: body.isPublished === true,
+          ...(body.isPublished === true ? { lastPublishedAt: new Date() } : {}),
           updatedAt: new Date(),
         },
       },

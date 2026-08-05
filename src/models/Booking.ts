@@ -102,6 +102,7 @@ export interface IBooking extends Document {
   garagePlaceId?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
+  garageBookingTime?: string | null;
 
   // Distance zone pricing
   distanceZone?: string;       // green | yellow | orange | red
@@ -424,6 +425,11 @@ const BookingSchema = new Schema<IBooking>(
     existingBookingRef: {
       type: String,
       required: false,
+    },
+    // audit B-18: the customer's booked appointment time at the garage.
+    garageBookingTime: {
+      type: String,
+      default: null,
     },
     existingBookingNotes: {
       type: String,
@@ -769,10 +775,35 @@ BookingSchema.index({ returnDriverId: 1, status: 1 });
 BookingSchema.index({ "pickupDriver.driverId": 1 });
 BookingSchema.index({ "returnDriver.driverId": 1 });
 BookingSchema.index({ "pickupDriver.completedAt": 1, servicePaymentStatus: 1 });
-BookingSchema.index({ paymentId: 1 });
+// UNIQUE (audit B-15). Three separate Stripe webhook handlers rely on
+// `findOneAndUpdate({ paymentId }, ..., { upsert: true })` for idempotency and
+// comment that it "prevents race conditions" — but a MongoDB upsert is only
+// race-free when a UNIQUE index forces one of two concurrent inserts to fail
+// with E11000. Without it, a Stripe retry (Stripe retries for up to 3 days)
+// delivered to two warm lambdas could create TWO bookings for one payment:
+// two tracking codes, two confirmation emails, two garage notifications.
+//
+// partialFilterExpression skips documents with no paymentId, so legacy and
+// non-Stripe bookings are unaffected. Same pattern as BookingRequest.paymentToken.
+//
+// ⚠️ DEPLOY NOTE: if production already contains duplicate paymentId values
+// this index will fail to build. Check first with:
+//   db.bookings.aggregate([
+//     { $match: { paymentId: { $type: "string" } } },
+//     { $group: { _id: "$paymentId", n: { $sum: 1 } } },
+//     { $match: { n: { $gt: 1 } } }
+//   ])
+// and merge/remove the duplicates before deploying.
+BookingSchema.index(
+  { paymentId: 1 },
+  { unique: true, partialFilterExpression: { paymentId: { $type: "string" } } }
+);
 BookingSchema.index({ stripeSessionId: 1 });
 BookingSchema.index({ servicePaymentId: 1 });
 BookingSchema.index({ userEmail: 1, createdAt: -1 });
+// audit RISK-24: the customer dashboard queries `$or: [{ userEmail }, { userId }]`
+// and the userId branch had no index.
+BookingSchema.index({ userId: 1, createdAt: -1 });
 
 // Prevent OverwriteModelError by checking if model exists
 const Booking: Model<IBooking> =

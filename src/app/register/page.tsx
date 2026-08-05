@@ -87,7 +87,9 @@ export default function RegisterPage() {
       }
 
       // Redirect to verification page instead of login
-      router.push("/auth/verify");
+      // Carry the email so /api/auth/verify can scope the code to this account
+      // and still auto-login the user (audit C-1).
+      router.push(`/auth/verify?email=${encodeURIComponent(email.trim().toLowerCase())}`);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

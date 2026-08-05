@@ -49,12 +49,20 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get booking counts and totals for registered users
-    const userIds = registeredUsers.map((user) => user._id.toString());
+    // Get booking counts and totals for registered users.
+    //
+    // audit B-12: this used to build the $in list with `_id.toString()`.
+    // Mongoose does NOT cast aggregation pipelines (unlike find()), so it was
+    // comparing hex STRINGS against the ObjectId stored in Booking.userId and
+    // matched zero documents — every registered customer showed 0 bookings and
+    // $0 spent, and the "Active" filter + activeUsers stat only ever counted
+    // guests. The ids are already ObjectIds coming out of .lean(), so pass
+    // them through unchanged.
+    const userIds = registeredUsers.map((user) => user._id);
     const registeredUserBookings = await Booking.aggregate([
       {
         $match: {
-          userId: { $in: userIds.map(id => id) },
+          userId: { $in: userIds },
         },
       },
       {

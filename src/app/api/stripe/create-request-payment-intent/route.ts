@@ -45,10 +45,34 @@ export async function POST(request: NextRequest) {
     // edit it before the customer pays). Fall back to base price + surcharge for
     // legacy requests without a stored quote.
     const surcharge = ZONE_SURCHARGES[bookingRequest.distanceZone] ?? 0;
+    // NOTE (audit C-2): this guard used to be `> 0`. A 100%-off promo code
+    // stores quotedAmount === 0, which is falsy under `> 0`, so the customer
+    // was shown "$0.00" everywhere and then charged the full DRIVLET_PRICE.
+    // `>= 0` makes a stored zero authoritative; the explicit check below then
+    // refuses to charge rather than silently substituting the full price.
     const quotedAmount =
-      typeof bookingRequest.quotedAmount === "number" && bookingRequest.quotedAmount > 0
+      typeof bookingRequest.quotedAmount === "number" && bookingRequest.quotedAmount >= 0
         ? bookingRequest.quotedAmount
         : DRIVLET_PRICE + surcharge;
+
+    // Stripe cannot process an amount below its minimum charge. A fully
+    // discounted request must be converted to a booking by the team rather
+    // than silently re-priced. (New 100% codes are blocked at creation — see
+    // src/app/api/admin/promo-codes/route.ts.)
+    const STRIPE_MIN_CHARGE_CENTS = 50;
+    if (quotedAmount < STRIPE_MIN_CHARGE_CENTS) {
+      console.error(
+        `[stripe] Refusing to charge request ${bookingRequest._id}: quoted amount ${quotedAmount}c is below the Stripe minimum. Requires manual confirmation.`
+      );
+      return NextResponse.json(
+        {
+          error:
+            "This booking is fully discounted and can't be paid online. Our team will confirm it for you — please contact us on 1300 470 886.",
+        },
+        { status: 409 }
+      );
+    }
+
     // $1 test override — production-guarded (see src/lib/stripeTestMode.ts)
     const isTestMode = isStripeTestModeActive();
     const serverAmount = isTestMode ? 100 : quotedAmount;

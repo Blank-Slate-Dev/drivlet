@@ -32,6 +32,14 @@ export default function GaragePendingPage() {
 
   const isGarage = session?.user?.role === "garage";
   const isApproved = Boolean(session?.user?.isApproved);
+  // audit B-23: a rejected or suspended garage was shown "Application Under
+  // Review · 1-2 business days" forever, with a "Check Application Status"
+  // button that could never change anything. Nothing in /garage/** read
+  // garage.status. The session already carries it (refreshed by the
+  // trigger === "update" branch in src/lib/auth.ts), so surface it.
+  const garageStatus = session?.user?.garageStatus;
+  const isRejected = garageStatus === "rejected";
+  const isSuspended = garageStatus === "suspended";
 
   // Minute hand: 3 seconds per full rotation
   // Hour hand: 36 seconds per full rotation
@@ -105,6 +113,48 @@ export default function GaragePendingPage() {
   const handleSignOut = () => {
     signOut({ callbackUrl: "/garage/login" });
   };
+
+  // audit B-23: terminal states get their own screen rather than an endless
+  // "under review" message.
+  if (isRejected || isSuspended) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 relative">
+        <div className="mx-auto flex min-h-screen max-w-2xl items-center px-4 py-12 sm:px-6">
+          <div className="w-full rounded-3xl border border-white/20 bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
+            <h1 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+              {isRejected
+                ? "Your application wasn't approved"
+                : "Your account has been suspended"}
+            </h1>
+            <p className="mt-3 text-center text-slate-600">
+              {isRejected
+                ? "Unfortunately we're not able to onboard your business at this time."
+                : "Your garage account is currently suspended, so you can't accept bookings."}
+            </p>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+              If you think this is a mistake, or you'd like to know more, get in
+              touch and we'll talk it through:
+              <div className="mt-3 font-semibold text-slate-900">
+                <a href="tel:1300470886" className="underline">1300 470 886</a>
+                {" · "}
+                <a href="mailto:support@drivlet.com.au" className="underline">
+                  support@drivlet.com.au
+                </a>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              className="mt-8 w-full rounded-full bg-slate-900 px-6 py-4 text-base font-semibold text-white transition hover:bg-slate-800"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">

@@ -449,6 +449,11 @@ function TrackingContent() {
   const bookingForForms = booking
     ? {
         _id: booking._id,
+        // audit B-10: forwarded to /api/bookings/[id]/forms so a GUEST can
+        // submit the handover forms. The API re-verifies all three factors
+        // against the booking (code + email + rego), exactly as
+        // /api/bookings/track does — no session is required or granted.
+        trackingCode: trackingCode,
         userName: booking.userName || email,
         userEmail: booking.userEmail || email,
         vehicleRegistration: booking.vehicleRegistration,

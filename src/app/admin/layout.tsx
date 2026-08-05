@@ -14,7 +14,8 @@ import {
   Home,
   Loader2,
   Users,
-  // Building2, // Hidden — garages not in use yet
+  Building2,
+  MapPin,
   MessageSquare,
   Star,
   Car,
@@ -251,7 +252,12 @@ export default function AdminLayout({
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/drivers", label: "Drivers", icon: Car },
     { href: "/admin/roster", label: "Roster", icon: CalendarDays },
-    // { href: "/admin/garages", label: "Garages", icon: Building2 }, // Hidden — not in use yet
+    // Restored 2026-08-05 (audit B-1). While these were hidden there was NO
+    // reachable way to approve a garage — every garage registration sat on
+    // /garage/pending forever — and no way to review a garage's location
+    // change request. Both pages and their APIs were already complete.
+    { href: "/admin/garages", label: "Garages", icon: Building2 },
+    { href: "/admin/location-requests", label: "Location Requests", icon: MapPin },
     { href: "/admin/payment-disputes", label: "Payment Disputes", icon: AlertTriangle },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },

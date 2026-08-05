@@ -98,7 +98,7 @@ export default function GarageSubmitQuotePage() {
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
-      router.push(`/auth/signin?callbackUrl=/garage/quotes/submit/${requestId}`);
+      router.push(`/login?callbackUrl=/garage/quotes/submit/${requestId}`);
     } else if (session?.user?.role !== 'garage') {
       router.push('/');
     }
@@ -196,7 +196,8 @@ export default function GarageSubmitQuotePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quoteRequestId: requestId,
-          quotedAmount: parseFloat(quotedAmount),
+          // audit B-5: store cents, matching /garage/quotes and the Quote model.
+          quotedAmount: Math.round(parseFloat(quotedAmount) * 100),
           estimatedDuration: estimatedDuration.trim(),
           includedServices,
           additionalNotes: additionalNotes.trim() || undefined,

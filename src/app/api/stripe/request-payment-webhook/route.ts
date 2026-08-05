@@ -134,9 +134,14 @@ export async function POST(request: NextRequest) {
       vehicleState: requestDoc.vehicleState || "NSW",
       vehicleYear: requestDoc.vehicleYear || null,
       vehicleModel: requestDoc.vehicleModel || null,
-      serviceType: hasExisting
-        ? `Existing Booking - ${requestDoc.garageName}`
-        : (requestDoc.serviceType || "Standard Service"),
+      // audit D-14: this used to overwrite serviceType with
+      // `Existing Booking - <garage>` whenever hasExistingBooking was set —
+      // and the wizard ALWAYS sets it — so every booking lost the customer's
+      // actual service selection (quick_service / regular_service /
+      // major_service), which is also what drives estimatedServiceDuration.
+      // The garage is already carried in `garageName` and the flag in
+      // `hasExistingBooking`, so nothing is lost by keeping the real value.
+      serviceType: requestDoc.serviceType || "Standard Service",
       serviceDate: requestDoc.serviceDate ? new Date(requestDoc.serviceDate) : new Date(),
       pickupAddress: requestDoc.pickupAddress,
       pickupTime: requestDoc.earliestPickup || null,
@@ -150,7 +155,18 @@ export async function POST(request: NextRequest) {
       garageAddress: requestDoc.garageAddress || null,
       garagePlaceId: requestDoc.garagePlaceId || null,
       existingBookingRef: requestDoc.existingBookingRef || null,
-      existingBookingNotes: null,
+      // audit B-18: these were hardcoded to null / never copied, so the
+      // customer's driver instructions and their booked garage appointment
+      // time never reached admin, dispatch or the driver — even though the
+      // admin booking modal already renders existingBookingNotes.
+      existingBookingNotes: requestDoc.additionalNotes || null,
+      garageBookingTime: requestDoc.garageBookingTime || null,
+      // audit D-10: the request stores server-verified distance pricing but
+      // none of it was carried onto the booking, so ops could not see which
+      // zone had been charged.
+      distanceZone: requestDoc.distanceZone || "green",
+      distanceSurcharge: requestDoc.distanceSurcharge || 0,
+      distanceKm: requestDoc.distanceKm || 0,
       transmissionType: requestDoc.transmissionType || "automatic",
       isManualTransmission: isManual,
       selectedServices: requestDoc.selectedServices || [],

@@ -111,6 +111,19 @@ export async function POST(
         type: "extra_charge",
         description,
       },
+      // audit B-16: Checkout does NOT copy session metadata onto the
+      // PaymentIntent. Without this, the resulting payment_intent.succeeded
+      // event carries no `type`, so BOTH webhooks ignore it and the only thing
+      // that can mark the charge paid is checkout.session.completed on the
+      // service-payment endpoint. If that endpoint is unregistered or its
+      // signing secret is wrong, up to $2,000 is collected and never
+      // reconciled. Stamping the PI gives the main webhook a way to recover.
+      payment_intent_data: {
+        metadata: {
+          bookingId: id,
+          type: "extra_charge",
+        },
+      },
       success_url: `${appUrl}/payment/success?booking=${id}&type=extra_charge`,
       cancel_url: `${appUrl}/payment/cancelled?booking=${id}`,
     });

@@ -60,15 +60,19 @@ const BADGE_CONFIG: Record<string, { label: string; icon: React.ElementType; col
 
 const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "NT", "ACT"];
 
+// audit B-9: these values are matched against `services[].category` in
+// /api/garages/search, which stores the ServiceCategory enum from
+// src/models/GarageServicePricing.ts. Six of the nine used short forms
+// ("logbook" vs "logbook_service") and therefore always returned no results.
 const SERVICES = [
   { value: "", label: "All Services" },
-  { value: "logbook", label: "Logbook Service" },
-  { value: "major", label: "Major Service" },
-  { value: "minor", label: "Minor Service" },
-  { value: "brake", label: "Brake Service" },
-  { value: "tyre", label: "Tyre Service" },
+  { value: "logbook_service", label: "Logbook Service" },
+  { value: "major_service", label: "Major Service" },
+  { value: "minor_service", label: "Minor Service" },
+  { value: "brake_service", label: "Brake Service" },
+  { value: "tyre_service", label: "Tyre Service" },
   { value: "battery", label: "Battery" },
-  { value: "aircon", label: "Air Conditioning" },
+  { value: "air_conditioning", label: "Air Conditioning" },
   { value: "diagnostics", label: "Diagnostics" },
   { value: "roadworthy", label: "Roadworthy Certificate" },
 ];

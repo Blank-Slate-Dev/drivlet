@@ -736,7 +736,7 @@ export default function GarageQuoteRequestsPage() {
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/garage/quotes');
+      router.push('/login?callbackUrl=/garage/quotes');
     } else if (session?.user?.role !== 'garage') {
       router.push('/');
     }

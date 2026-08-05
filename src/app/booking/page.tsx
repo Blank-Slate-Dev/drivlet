@@ -229,16 +229,30 @@ export default function BookingPage() {
   const handleAddressSelect = (details: PlaceDetails) => setSelectedPlaceDetails(details);
   const handlePickupAddressChange = (value: string) => { setPickupAddress(value); setSelectedPlaceDetails(null); };
   const handleGarageSelect = (details: GarageDetails) => { setGarageAddress(details.formattedAddress); setGaragePlaceId(details.placeId || ''); setGarageLat(details.lat ?? null); setGarageLng(details.lng ?? null); };
-  const handleGarageSearchChange = (value: string) => { setGarageSearch(value); setGarageLat(null); setGarageLng(null); };
+  // Clear the resolved address AND placeId too (audit D-21): typing over a
+  // previously selected garage used to leave a stale address and placeId
+  // behind, so the job could be auto-dispatched to the wrong garage.
+  const handleGarageSearchChange = (value: string) => { setGarageSearch(value); setGarageAddress(''); setGaragePlaceId(''); setGarageLat(null); setGarageLng(null); };
 
   const validateDetails = (): string | null => {
     if (!isAuthenticated) {
       if (!guestName.trim()) return 'Please enter your full name.';
       if (!guestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) return 'Please enter a valid email address.';
-      if (!guestPhone.trim()) return 'Please enter your phone number.';
     }
+    // Required for everyone (audit D-22): the driver's "Call customer" button
+    // and the dispatch board both rely on this. It was previously only
+    // validated for guests, so signed-in users could book with no phone.
+    if (!guestPhone.trim()) return 'Please enter your phone number.';
     if (!pickupAddress.trim()) return 'Please enter your pick-up address.';
+    // The coordinates are what price the job and enforce the 18 km limit, so
+    // a typed-but-not-selected address must not be accepted (audit C-3).
+    if (!selectedPlaceDetails?.lat || !selectedPlaceDetails?.lng) {
+      return 'Please choose your pick-up address from the suggestions list.';
+    }
     if (!garageSearch.trim()) return 'Please search and select your garage.';
+    if (garageLat === null || garageLng === null) {
+      return 'Please choose your garage from the suggestions list.';
+    }
     if (!garageBookingTime) return 'Please select your garage booking time.';
     return null;
   };

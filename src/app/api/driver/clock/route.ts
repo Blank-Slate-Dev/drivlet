@@ -28,11 +28,26 @@ export async function GET() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Count jobs completed today
+    // Count legs this driver completed today.
+    //
+    // audit B-11: this used to query `driverId`, which is NOT a path on the
+    // Booking schema (the real fields are `assignedDriverId` / `returnDriverId`),
+    // so it always matched zero and the dashboard's "jobs completed" was
+    // permanently 0. We now count the driver's OWN completed legs via the leg
+    // timestamps rather than the booking's overall status — a pickup driver
+    // finishing their leg should count immediately, not only once someone else
+    // completes the return.
     const jobsCompletedToday = await Booking.countDocuments({
-      driverId: driver._id,
-      status: "completed",
-      updatedAt: { $gte: today, $lt: tomorrow },
+      $or: [
+        {
+          assignedDriverId: driver._id,
+          "pickupDriver.completedAt": { $gte: today, $lt: tomorrow },
+        },
+        {
+          returnDriverId: driver._id,
+          "returnDriver.completedAt": { $gte: today, $lt: tomorrow },
+        },
+      ],
     });
 
     // Get today's time entries
@@ -180,10 +195,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check for active jobs
+      // Check for active jobs.
+      //
+      // audit B-11: this used to query `driverId` (not a schema path) and
+      // `status: "accepted"` (not in the status enum), so it always returned
+      // null — the "can't clock out with an active job" guard was dead code
+      // that every clock-out passed. Now: a leg this driver has STARTED but
+      // not finished, on a booking that is still running.
       const activeJob = await Booking.findOne({
-        driverId: driver._id,
-        status: { $in: ["accepted", "in_progress"] },
+        status: "in_progress",
+        $or: [
+          {
+            assignedDriverId: driver._id,
+            "pickupDriver.startedAt": { $exists: true },
+            "pickupDriver.completedAt": { $exists: false },
+          },
+          {
+            returnDriverId: driver._id,
+            "returnDriver.startedAt": { $exists: true },
+            "returnDriver.completedAt": { $exists: false },
+          },
+        ],
       });
 
       if (activeJob) {
@@ -203,11 +235,20 @@ export async function POST(request: NextRequest) {
         const durationMs = now.getTime() - timeEntry.clockIn.getTime();
         timeEntry.durationMinutes = Math.floor(durationMs / (1000 * 60));
 
-        // Count jobs completed during this shift
+        // Count legs this driver completed during this shift (audit B-11 —
+        // see the note above; `driverId` never matched, so every TimeEntry
+        // recorded jobsCompleted: 0 and payroll evidence was empty).
         const jobsInShift = await Booking.countDocuments({
-          driverId: driver._id,
-          status: "completed",
-          updatedAt: { $gte: timeEntry.clockIn, $lte: now },
+          $or: [
+            {
+              assignedDriverId: driver._id,
+              "pickupDriver.completedAt": { $gte: timeEntry.clockIn, $lte: now },
+            },
+            {
+              returnDriverId: driver._id,
+              "returnDriver.completedAt": { $gte: timeEntry.clockIn, $lte: now },
+            },
+          ],
         });
         timeEntry.jobsCompleted = jobsInShift;
 

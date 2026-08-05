@@ -138,7 +138,7 @@ export default function QuoteRequestDetailPage() {
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
-      router.push(`/auth/signin?callbackUrl=/quotes/${requestId}`);
+      router.push(`/login?callbackUrl=/quotes/${requestId}`);
     }
   }, [sessionStatus, router, requestId]);
 
@@ -218,7 +218,11 @@ export default function QuoteRequestDetailPage() {
     });
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amountInCents: number) => {
+    // audit B-5: quotedAmount is stored in CENTS (the garage form multiplies
+    // by 100). These pages used to format the raw value as dollars, so a $450
+    // quote displayed to the customer as $45,000.00.
+    const amount = (amountInCents ?? 0) / 100;
     return new Intl.NumberFormat('en-AU', {
       style: 'currency',
       currency: 'AUD',

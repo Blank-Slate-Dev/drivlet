@@ -12,6 +12,10 @@ function VerifyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlCode = searchParams.get("code");
+  // Supplied by the verification email link (?code=...&email=...). When present
+  // the API scopes the code lookup to this account and can issue an auto-login
+  // token; without it the code still verifies but the user must sign in.
+  const urlEmail = searchParams.get("email");
 
   const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -38,16 +42,31 @@ function VerifyContent() {
     setError("");
 
     try {
+      // Prefer the email from the link; fall back to whatever the user typed
+      // into the "resend" box during this session.
+      const knownEmail = (urlEmail || resendEmail || "").trim();
+
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeString }),
+        body: JSON.stringify(
+          knownEmail ? { code: codeString, email: knownEmail } : { code: codeString }
+        ),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
         setSuccess(true);
+
+        // The API only issues an auto-login token when it knows which account
+        // is being verified. Otherwise the email is verified and we send the
+        // user to sign in normally.
+        if (data.requiresLogin || !data.autoLoginToken) {
+          router.push("/login?verified=true");
+          return;
+        }
+
         setLoggingIn(true);
 
         // Auto-login using the token
@@ -74,7 +93,7 @@ function VerifyContent() {
       setShowResend(true);
       setLoading(false);
     }
-  }, [router]);
+  }, [router, urlEmail, resendEmail]);
 
   // Auto-fill from URL and auto-submit
   useEffect(() => {

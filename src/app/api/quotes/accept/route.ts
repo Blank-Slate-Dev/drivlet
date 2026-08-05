@@ -87,8 +87,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify quote is pending
-    if (quote.status !== "pending") {
+    // audit B-6: this required "pending", but /api/quotes/[quoteId]/track-view
+    // flips a quote to "viewed" the first time the customer opens it — so by
+    // the time they could click Accept, the quote was always rejected here.
+    if (!["pending", "viewed"].includes(quote.status)) {
       return NextResponse.json(
         { error: `This quote is ${quote.status} and cannot be accepted` },
         { status: 400 }

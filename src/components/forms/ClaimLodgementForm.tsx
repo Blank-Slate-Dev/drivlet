@@ -19,6 +19,9 @@ import SignaturePad from "./SignaturePad";
 
 interface BookingData {
   _id: string;
+  // Present when the form is opened from the guest tracker (audit B-10).
+  // Forwarded to the API so a guest can submit without a session.
+  trackingCode?: string;
   userName: string;
   userEmail: string;
   vehicleRegistration: string;
@@ -194,6 +197,10 @@ export default function ClaimLodgementForm({ booking, isOpen, onClose, onSuccess
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           formType: "claim_lodgement",
+          // Guest tracker credentials — ignored when a session exists.
+          trackingCode: booking.trackingCode,
+          guestEmail: booking.userEmail,
+          guestRego: booking.vehicleRegistration,
           submittedByName: fullName.trim(),
           submittedByEmail: email.trim(),
           privacyAcknowledged,

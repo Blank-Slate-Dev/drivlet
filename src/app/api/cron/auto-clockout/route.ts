@@ -51,11 +51,23 @@ export async function GET(request: NextRequest) {
           const durationMs = now.getTime() - timeEntry.clockIn.getTime();
           timeEntry.durationMinutes = Math.floor(durationMs / (1000 * 60));
 
-          // Count jobs completed during this shift
+          // Count legs this driver completed during this shift.
+          //
+          // audit B-11: this used to query `driverId`, which is NOT a path on
+          // the Booking schema (the real fields are `assignedDriverId` /
+          // `returnDriverId`), so every auto-closed shift recorded
+          // jobsCompleted: 0 — the payroll record was always empty.
           const jobsInShift = await Booking.countDocuments({
-            driverId: driver._id,
-            status: "completed",
-            updatedAt: { $gte: timeEntry.clockIn, $lte: now },
+            $or: [
+              {
+                assignedDriverId: driver._id,
+                "pickupDriver.completedAt": { $gte: timeEntry.clockIn, $lte: now },
+              },
+              {
+                returnDriverId: driver._id,
+                "returnDriver.completedAt": { $gte: timeEntry.clockIn, $lte: now },
+              },
+            ],
           });
           timeEntry.jobsCompleted = jobsInShift;
 

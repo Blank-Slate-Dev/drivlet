@@ -40,6 +40,8 @@ export interface IBookingRequest extends Document {
   // Pickup / service
   pickupAddress: string;
   serviceType: string;
+  garageBookingTime?: string | null;
+  additionalNotes?: string;
   serviceDate: Date;
   earliestPickup: string;
   latestDropoff: string;
@@ -157,6 +159,14 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     garageAddress: { type: String, default: null },
     garagePlaceId: { type: String, default: null },
     existingBookingRef: { type: String, default: null },
+    // audit B-18: the wizard has always sent these two, but neither was
+    // destructured by /api/booking-requests nor present here, so Mongoose
+    // silently dropped them. The result: the customer's mandatory garage
+    // appointment time — which is echoed back to them on the review screen —
+    // and their instructions for the driver never reached admin, dispatch or
+    // the driver.
+    garageBookingTime: { type: String, default: null },
+    additionalNotes: { type: String, default: "" },
 
     // Services
     selectedServices: { type: [BookingRequestServiceSchema], default: [] },

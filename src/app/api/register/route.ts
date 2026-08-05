@@ -1,13 +1,25 @@
 // src/app/api/register/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { validatePassword, validateEmail, validateUsername } from "@/lib/validation";
 import { sendVerificationEmail } from "@/lib/email";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit (audit RISK-15): unthrottled registration created unbounded
+    // rows, burned the Mailjet quota, and seeded live verification codes.
+    const rateLimit = await withRateLimit(request, RATE_LIMITS.auth, "register");
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "Too many registration attempts. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)) } }
+      );
+    }
+
     const { username, email, mobile, password } = await request.json();
 
     // Validate input
@@ -80,7 +92,9 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Cryptographically secure (audit C-1): Math.random() is predictable and
+    // can collide, which previously allowed one signup to verify another.
+    const verificationCode = crypto.randomInt(100000, 1000000).toString();
     const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Create new user with explicit role

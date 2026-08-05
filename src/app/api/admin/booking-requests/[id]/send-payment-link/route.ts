@@ -28,7 +28,11 @@ export async function POST(
       return NextResponse.json({ error: "Booking request not found" }, { status: 404 });
     }
 
-    if (!["approved", "payment_link_sent"].includes(bookingRequest.status)) {
+    // audit B-20: "accepted_awaiting_payment" is a live enum value that is
+    // included in OPEN_REQUEST_STATUSES, so those rows render a "Send Link"
+    // button on /admin/bookings — but this route rejected them, making the row
+    // a dead end.
+    if (!["approved", "payment_link_sent", "accepted_awaiting_payment"].includes(bookingRequest.status)) {
       return NextResponse.json(
         { error: `Cannot send payment link for status "${bookingRequest.status}"` },
         { status: 400 }

@@ -40,32 +40,6 @@ export async function POST(
       );
     }
 
-    // Auth check: must be logged in as the booking owner, an assigned driver, or admin
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    const isAdmin = session.user.role === "admin";
-    const isOwner =
-      (session.user.id && booking.userId?.toString() === session.user.id) ||
-      (session.user.email && booking.userEmail?.toLowerCase() === session.user.email.toLowerCase());
-    // Drivers must be assigned to this booking (pickup or return leg)
-    const isDriver =
-      session.user.role === "driver" &&
-      !!session.user.id &&
-      (await isAssignedDriver(session.user.id, booking));
-
-    if (!isAdmin && !isOwner && !isDriver) {
-      return NextResponse.json(
-        { error: "Not authorized to submit forms for this booking" },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const {
       formType,
@@ -74,6 +48,9 @@ export async function POST(
       privacyAcknowledged,
       submittedByName,
       submittedByEmail,
+      trackingCode,
+      guestEmail,
+      guestRego,
     } = body as {
       formType: FormType;
       formData: Record<string, unknown>;
@@ -81,7 +58,55 @@ export async function POST(
       privacyAcknowledged: boolean;
       submittedByName: string;
       submittedByEmail?: string;
+      trackingCode?: string;
+      guestEmail?: string;
+      guestRego?: string;
     };
+
+    // ── Authorisation ──
+    // Logged in as the booking owner, an assigned driver, or an admin — OR a
+    // guest holding the same three-factor tracking credential that
+    // /api/bookings/track requires (tracking code + email + registration).
+    //
+    // audit B-10: this route previously rejected every request without a
+    // session. Because almost every booking from the request→pay flow is a
+    // guest booking, that meant NO customer could submit the pickup consent,
+    // return confirmation or claim form — the tracker opened the form, they
+    // filled in odometer, fuel, damage notes and a signature, and submitting
+    // returned "Authentication required".
+    const session = await getServerSession(authOptions);
+
+    const isAdmin = session?.user?.role === "admin";
+    const isOwner = Boolean(
+      (session?.user?.id && booking.userId?.toString() === session.user.id) ||
+        (session?.user?.email &&
+          booking.userEmail?.toLowerCase() === session.user.email.toLowerCase())
+    );
+    // Drivers must be assigned to this booking (pickup or return leg)
+    const isDriver =
+      session?.user?.role === "driver" &&
+      !!session.user.id &&
+      (await isAssignedDriver(session.user.id, booking));
+
+    const isVerifiedGuest = Boolean(
+      trackingCode &&
+        guestEmail &&
+        guestRego &&
+        booking.trackingCode &&
+        booking.trackingCode.toUpperCase() === String(trackingCode).trim().toUpperCase() &&
+        booking.userEmail?.toLowerCase() === String(guestEmail).trim().toLowerCase() &&
+        booking.vehicleRegistration?.toUpperCase() ===
+          String(guestRego).trim().toUpperCase()
+    );
+
+    if (!isAdmin && !isOwner && !isDriver && !isVerifiedGuest) {
+      return NextResponse.json(
+        session?.user
+          ? { error: "Not authorized to submit forms for this booking" }
+          : { error: "Authentication required" },
+        { status: session?.user ? 403 : 401 }
+      );
+    }
 
     // Validate form type
     const validTypes: FormType[] = [
@@ -130,8 +155,12 @@ export async function POST(
       );
     }
 
+    // audit D-19: this used to prefer session.user.email, and because the
+    // driver is the authenticated session on the in-person flow, EVERY signed
+    // consent form recorded the driver's address as the submitter. The form is
+    // signed by the customer, so their address is the correct value.
     const email =
-      session?.user?.email || submittedByEmail || booking.userEmail;
+      submittedByEmail || booking.userEmail || session?.user?.email;
 
     // Get version string based on form type
     const versionMap: Record<FormType, string> = {
@@ -182,7 +211,10 @@ export async function POST(
             stage: booking.currentStage || "booking_confirmed",
             timestamp: signedForm.submittedAt,
             message: updateMessage,
-            updatedBy: session.user.role === "driver" ? "driver" : session.user.role === "admin" ? "admin" : "customer",
+            // `session` is now optional (guests submit from the tracker —
+            // audit B-10), so this must be null-safe. A guest submission is
+            // recorded as "customer", which is what it is.
+            updatedBy: isDriver ? "driver" : isAdmin ? "admin" : "customer",
           },
         },
       },

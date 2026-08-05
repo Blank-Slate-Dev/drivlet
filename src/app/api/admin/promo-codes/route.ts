@@ -50,10 +50,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
+    // Capped at 99 (audit C-2): a 100% code produces quotedAmount === 0, which
+    // Stripe cannot charge and for which the payment flow has no free-booking
+    // path. Until that path exists a fully free booking must be arranged
+    // manually rather than issued as a code.
     const percentOff = Number(body.percentOff);
-    if (!Number.isInteger(percentOff) || percentOff < 1 || percentOff > 100) {
+    if (!Number.isInteger(percentOff) || percentOff < 1 || percentOff > 99) {
       return NextResponse.json(
-        { error: "Discount must be a whole number between 1 and 100" },
+        { error: "Discount must be a whole number between 1 and 99" },
         { status: 400 }
       );
     }

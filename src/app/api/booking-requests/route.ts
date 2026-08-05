@@ -66,6 +66,8 @@ export async function POST(request: NextRequest) {
       pickupLng,
       garageLat,
       garageLng,
+      garageBookingTime,
+      additionalNotes,
       promoCode,
       policiesAgreed,
       marketingOptIn,
@@ -87,30 +89,60 @@ export async function POST(request: NextRequest) {
     const isGuest = !session?.user?.id;
     const userId = session?.user?.id || null;
 
-    // Server-side distance & zone verification (mirrors create-payment-intent)
-    let verifiedZone = "green";
-    let verifiedSurcharge = 0;
-    let verifiedDistanceKm = 0;
-
-    if (
+    // ── Distance & zone pricing ──
+    //
+    // SECURITY (audit C-3): these coordinates arrive in the request body from
+    // the browser's Google Places lookup. Recomputing the Haversine distance
+    // over attacker-supplied numbers is NOT verification — sending two
+    // identical points (or simply omitting the fields) previously produced
+    // zone "green", $0 surcharge, and bypassed the >18 km hard block entirely.
+    //
+    // Until the addresses are geocoded server-side, we can at least refuse to
+    // price a request whose coordinates are missing or implausible, rather
+    // than silently defaulting to the cheapest zone.
+    //
+    // TODO (proper fix): geocode `pickupAddress` with the Google Geocoding API
+    // using the server key, and read the garage coordinates from the Garage
+    // document / a server-side Places lookup on `garagePlaceId`. Then ignore
+    // these body fields completely.
+    const coordsPresent =
       typeof pickupLat === "number" && pickupLat !== 0 &&
       typeof pickupLng === "number" && pickupLng !== 0 &&
       typeof garageLat === "number" && garageLat !== 0 &&
-      typeof garageLng === "number" && garageLng !== 0
+      typeof garageLng === "number" && garageLng !== 0;
+
+    // Australia's bounding box, generously padded. Rejects the obvious tamper
+    // cases (0,0 / out-of-country / non-finite) as well as genuine mistakes.
+    const inAustralia = (lat: number, lng: number) =>
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat <= -8 && lat >= -45 && lng >= 108 && lng <= 156;
+
+    if (
+      !coordsPresent ||
+      !inAustralia(pickupLat, pickupLng) ||
+      !inAustralia(garageLat, garageLng)
     ) {
-      const serverDistance = calculateDistance(pickupLat, pickupLng, garageLat, garageLng);
-      const serverZoneInfo = getDistanceZone(serverDistance);
+      return NextResponse.json(
+        {
+          error:
+            "Please select both your pickup address and your garage from the suggestions list so we can calculate your price.",
+        },
+        { status: 400 }
+      );
+    }
 
-      verifiedZone = serverZoneInfo.zone;
-      verifiedSurcharge = serverZoneInfo.surchargeAmount;
-      verifiedDistanceKm = serverZoneInfo.distance;
+    const serverDistance = calculateDistance(pickupLat, pickupLng, garageLat, garageLng);
+    const serverZoneInfo = getDistanceZone(serverDistance);
 
-      if (verifiedZone === "red") {
-        return NextResponse.json(
-          { error: "Your pickup address is too far from the selected garage (over 18 km). Please contact our team for assistance." },
-          { status: 400 }
-        );
-      }
+    const verifiedZone = serverZoneInfo.zone;
+    const verifiedSurcharge = serverZoneInfo.surchargeAmount;
+    const verifiedDistanceKm = serverZoneInfo.distance;
+
+    if (verifiedZone === "red") {
+      return NextResponse.json(
+        { error: "Your pickup address is too far from the selected garage (over 18 km). Please contact our team for assistance." },
+        { status: 400 }
+      );
     }
 
     const basePriceCents = DRIVLET_PRICE + verifiedSurcharge;
@@ -182,6 +214,9 @@ export async function POST(request: NextRequest) {
       garageAddress: garageAddress || null,
       garagePlaceId: garagePlaceId || null,
       existingBookingRef: existingBookingRef || null,
+      // audit B-18: the wizard has always sent these; nothing read them.
+      garageBookingTime: garageBookingTime || null,
+      additionalNotes: typeof additionalNotes === "string" ? additionalNotes.trim() : "",
       selectedServices: parsedServices,
       primaryServiceCategory: primaryServiceCategory || null,
       serviceNotes: serviceNotes || "",

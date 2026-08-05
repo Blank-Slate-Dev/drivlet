@@ -188,7 +188,9 @@ export async function sendVerificationEmail(
   code: string
 ): Promise<boolean> {
   const appUrl = getAppUrl();
-  const verificationUrl = `${appUrl}/auth/verify?code=${code}`;
+  // The email is included so /api/auth/verify can scope the code lookup to
+  // this account (audit C-1) and still issue an auto-login token.
+  const verificationUrl = `${appUrl}/auth/verify?code=${code}&email=${encodeURIComponent(email)}`;
 
   // Format code with spaces for readability: "123 456"
   const formattedCode = `${code.slice(0, 3)} ${code.slice(3)}`;

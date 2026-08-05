@@ -103,8 +103,22 @@ export async function GET(request: NextRequest) {
     // Get total count
     const total = await QuoteRequest.countDocuments(query);
 
-    // Fetch quote requests
+    // PRIVACY (audit RISK-2): this used to return the FULL QuoteRequest
+    // document to every approved garage, which includes `customerName`,
+    // `customerEmail`, `customerPhone` and `trackingCode`. The tracking code
+    // plus the email is exactly the credential pair that /api/quotes/track
+    // accepts with no session, so any partner garage could read any customer's
+    // entire quote thread — and had their contact details regardless.
+    //
+    // A garage only needs the vehicle and the job to price it. Contact details
+    // are released once the customer accepts that garage's quote.
     const quoteRequests = await QuoteRequest.find(query)
+      .select(
+        "_id vehicleRegistration vehicleMake vehicleModel vehicleYear " +
+          "serviceCategory serviceDescription urgency preferredDate " +
+          "locationAddress locationCoordinates photos " +
+          "status quotesReceived expiresAt createdAt updatedAt"
+      )
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

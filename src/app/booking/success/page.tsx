@@ -5,7 +5,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, Car, Clock, MapPin, ArrowRight, Loader2, Mail } from "lucide-react";
+import { CheckCircle2, Car, Clock, MapPin, ArrowRight, Loader2, Mail, XCircle } from "lucide-react";
 
 interface BookingDetails {
   customerName: string;
@@ -24,6 +24,14 @@ interface BookingDetails {
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  // audit B-17: this page used to render "Booking Confirmed! Payment received."
+  // unconditionally. Stripe appends redirect_status to the return_url after a
+  // 3-D Secure redirect, and it can be `failed`. Telling a customer whose
+  // payment failed that we've taken their money is the worst possible outcome,
+  // so honour the flag when it is present.
+  const redirectStatus = searchParams.get("redirect_status");
+  const paymentFailed =
+    redirectStatus !== null && redirectStatus !== "succeeded";
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,6 +67,61 @@ function SuccessContent() {
         <div className="text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-white" />
           <p className="mt-2 text-emerald-100">Loading your booking...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // audit B-17: a failed 3-D Secure authentication must never be shown as a
+  // confirmed booking.
+  if (paymentFailed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900">
+        <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-12 w-40 sm:h-14 sm:w-48">
+              <Image
+                src="/logo.png"
+                alt="drivlet"
+                fill
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+          </Link>
+        </header>
+
+        <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-white/20 bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
+              <XCircle className="h-12 w-12 text-red-600" />
+            </div>
+
+            <h1 className="mt-6 text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+              Payment not completed
+            </h1>
+            <p className="mt-2 text-center text-slate-600">
+              Your card was not charged. This usually happens when the bank&apos;s
+              verification step is cancelled or times out.
+            </p>
+
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+              Your booking is still being held. Open the payment link from your
+              confirmation email again to finish paying, or call us on{" "}
+              <a href="tel:1300470886" className="font-semibold underline">
+                1300 470 886
+              </a>{" "}
+              and we&apos;ll sort it out.
+            </div>
+
+            <Link
+              href="/"
+              className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 py-4 text-base font-semibold text-white transition hover:bg-slate-800"
+            >
+              Back to home
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
       </div>
     );

@@ -1,5 +1,6 @@
 // src/app/api/auth/resend-verification/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { sendVerificationEmail } from "@/lib/email";
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate new 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = crypto.randomInt(100000, 1000000).toString();
     const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Update user with new code

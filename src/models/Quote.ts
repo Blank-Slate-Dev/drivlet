@@ -1,7 +1,18 @@
 // src/models/Quote.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type QuoteStatus = "pending" | "viewed" | "expired" | "cancelled";
+// audit B-6: "accepted" / "declined" were missing from this union and from
+// the schema enum, yet /api/quotes/accept writes them. findByIdAndUpdate does
+// not run validators, so an out-of-enum status was written and the companion
+// timestamps (acceptedAt / declinedAt / declineReason) were silently dropped
+// because no such paths existed.
+export type QuoteStatus =
+  | "pending"
+  | "viewed"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "cancelled";
 
 export interface IQuote extends Document {
   quoteRequestId: mongoose.Types.ObjectId;
@@ -15,6 +26,9 @@ export interface IQuote extends Document {
   warrantyOffered?: string;
   availableFrom: Date;
   status: QuoteStatus;
+  acceptedAt?: Date;
+  declinedAt?: Date;
+  declineReason?: string;
   firstViewedAt?: Date;
   expiresAt?: Date;
   validUntil: Date;
@@ -81,11 +95,23 @@ const QuoteSchema = new Schema<IQuote>(
     },
     status: {
       type: String,
-      enum: ["pending", "viewed", "expired", "cancelled"],
+      enum: ["pending", "viewed", "accepted", "declined", "expired", "cancelled"],
       default: "pending",
     },
     firstViewedAt: {
       type: Date,
+    },
+    // audit B-6: written by /api/quotes/accept but previously not declared,
+    // so Mongoose dropped them.
+    acceptedAt: {
+      type: Date,
+    },
+    declinedAt: {
+      type: Date,
+    },
+    declineReason: {
+      type: String,
+      trim: true,
     },
     expiresAt: {
       type: Date,
