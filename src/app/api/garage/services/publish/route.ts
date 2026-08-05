@@ -6,9 +6,14 @@ import { connectDB } from "@/lib/mongodb";
 import Garage from "@/models/Garage";
 import GarageServicePricing from "@/models/GarageServicePricing";
 import { logger } from "@/lib/logger";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // POST /api/garage/services/publish - Toggle publish status
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

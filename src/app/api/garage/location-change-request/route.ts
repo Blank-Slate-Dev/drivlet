@@ -7,9 +7,14 @@ import User from "@/models/User";
 import Garage from "@/models/Garage";
 import LocationChangeRequest from "@/models/LocationChangeRequest";
 import { requireValidOrigin } from "@/lib/validation";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // GET - Fetch location change requests for current garage user
 export async function GET() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -81,6 +86,10 @@ export async function GET() {
 
 // POST - Submit a new location change request
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   // CSRF protection
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {

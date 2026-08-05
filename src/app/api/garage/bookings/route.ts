@@ -1,4 +1,8 @@
 // src/app/api/garage/bookings/route.ts
+// ⚠️ MUST FIX BEFORE PHASE 2 (item 2 in src/lib/garagePortal.ts): this
+// route returns FULL booking documents (customer email/phone/address,
+// payment fields, internal timeline). Add a .select() whitelist — the
+// privacy policy promises workshops never see payment details.
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -6,12 +10,17 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // Force dynamic rendering - this route uses headers via getServerSession
 export const dynamic = 'force-dynamic';
 
 // GET - Fetch acknowledged bookings for the garage (not new/incoming)
 export async function GET(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

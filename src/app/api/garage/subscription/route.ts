@@ -12,6 +12,7 @@ import GarageSubscription, {
 import { stripe } from "@/lib/stripe";
 import { logger } from "@/lib/logger";
 import { getAppUrl } from "@/lib/appUrl";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // Stripe price IDs (you'll need to create these in Stripe Dashboard)
 const STRIPE_PRICE_IDS: Record<SubscriptionTier, { monthly: string; yearly: string }> = {
@@ -28,6 +29,10 @@ const STRIPE_PRICE_IDS: Record<SubscriptionTier, { monthly: string; yearly: stri
 
 // GET /api/garage/subscription - Get current subscription
 export async function GET() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -78,6 +83,10 @@ export async function GET() {
 
 // POST /api/garage/subscription - Create or upgrade subscription
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -217,6 +226,10 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/garage/subscription - Cancel subscription
 export async function DELETE() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

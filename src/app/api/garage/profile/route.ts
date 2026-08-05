@@ -6,9 +6,14 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
 import { requireValidOrigin } from "@/lib/validation";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // GET - Fetch garage profile for current user
 export async function GET() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -44,6 +49,10 @@ export async function GET() {
 
 // PATCH - Update garage profile
 export async function PATCH(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {
     return NextResponse.json({ error: originCheck.error }, { status: 403 });

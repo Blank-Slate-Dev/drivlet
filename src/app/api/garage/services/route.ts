@@ -6,9 +6,14 @@ import { connectDB } from "@/lib/mongodb";
 import Garage from "@/models/Garage";
 import GarageServicePricing from "@/models/GarageServicePricing";
 import { logger } from "@/lib/logger";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // GET /api/garage/services - Get garage's service catalog
 export async function GET() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -57,6 +62,10 @@ export async function GET() {
 
 // PUT /api/garage/services - Update garage's service catalog
 export async function PUT(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -132,6 +141,10 @@ export async function PUT(request: NextRequest) {
 
 // POST /api/garage/services - Add a new service
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

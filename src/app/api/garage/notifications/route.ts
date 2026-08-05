@@ -6,9 +6,14 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
 import GarageNotification from "@/models/GarageNotification";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // GET - Fetch notifications for the garage
 export async function GET(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -84,6 +89,10 @@ export async function GET(request: Request) {
 
 // POST - Mark notification(s) as read
 export async function POST(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

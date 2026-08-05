@@ -6,6 +6,7 @@ import Garage, { ServiceType, VehicleType } from "@/models/Garage";
 import Contact from "@/models/Contact";
 import bcrypt from "bcryptjs";
 import { validatePassword, validateEmail as validateEmailLib, validatePostcode as validatePostcodeLib, validateABN as validateABNLib } from "@/lib/validation";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // Use centralized validation functions
 const validateEmail = validateEmailLib;
@@ -33,6 +34,10 @@ function mapServicesToServiceTypes(services: string[]): ServiceType[] {
 }
 
 export async function POST(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const body = await request.json();
 

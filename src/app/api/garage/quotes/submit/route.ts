@@ -8,9 +8,14 @@ import Quote from "@/models/Quote";
 import Garage from "@/models/Garage";
 import User from "@/models/User";
 import mongoose from "mongoose";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // POST /api/garage/quotes/submit - Submit a quote for a quote request
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

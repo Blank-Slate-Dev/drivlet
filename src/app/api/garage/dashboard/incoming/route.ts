@@ -1,4 +1,7 @@
 // src/app/api/garage/dashboard/incoming/route.ts
+// ⚠️ MUST FIX BEFORE PHASE 2 (item 2 in src/lib/garagePortal.ts): no
+// projection — full booking documents incl. payment fields go to the
+// garage client. Add a .select() whitelist before re-enabling.
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -6,11 +9,16 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // Force dynamic rendering - this route uses headers via getServerSession
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

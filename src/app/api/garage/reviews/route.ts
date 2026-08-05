@@ -8,9 +8,14 @@ import GarageReview, { calculateGarageRatingStats } from "@/models/GarageReview"
 import { sanitizeString } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 import mongoose from "mongoose";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // GET /api/garage/reviews - Get reviews for the garage
 export async function GET(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -120,6 +125,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/garage/reviews - Respond to a review
 export async function POST(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

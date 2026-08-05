@@ -1,4 +1,8 @@
 // src/app/api/garage/booking-action/route.ts
+// ⚠️ MUST FIX BEFORE PHASE 2 (item 3 in src/lib/garagePortal.ts): legacy
+// route, superseded by update-booking-status; still writes top-level
+// status:"completed" which 410s the customer tracker and pulls the
+// booking off dispatch. Retire it properly instead of re-enabling.
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -7,8 +11,13 @@ import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
 import GarageNotification from "@/models/GarageNotification";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 export async function POST(request: Request) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

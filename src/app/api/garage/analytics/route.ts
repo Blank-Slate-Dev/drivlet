@@ -9,12 +9,17 @@ import GarageReview, { calculateGarageRatingStats } from "@/models/GarageReview"
 import GarageSubscription from "@/models/GarageSubscription";
 import { logger } from "@/lib/logger";
 import mongoose from "mongoose";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 // Force dynamic rendering - this route uses headers via getServerSession
 export const dynamic = 'force-dynamic';
 
 // GET /api/garage/analytics - Get analytics data
 export async function GET(request: NextRequest) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
 

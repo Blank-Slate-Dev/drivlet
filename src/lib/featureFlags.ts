@@ -13,6 +13,10 @@ export const FEATURES = {
   QUOTE_SYSTEM: process.env.NEXT_PUBLIC_ENABLE_QUOTE_SYSTEM === 'true',
   GARAGE_ASSIGNMENT: process.env.NEXT_PUBLIC_ENABLE_GARAGE_ASSIGNMENT === 'true',
   GARAGE_DASHBOARD_QUOTES: process.env.NEXT_PUBLIC_ENABLE_GARAGE_QUOTES === 'true',
+  // Entire garage portal (signup, login, dashboard, all /api/garage routes).
+  // Phase 1 has NO garage involvement. Before enabling, read the
+  // MUST-FIX-BEFORE-PHASE-2 list in src/lib/garagePortal.ts.
+  GARAGE_PORTAL: process.env.NEXT_PUBLIC_ENABLE_GARAGE_PORTAL === 'true',
 } as const;
 
 /**

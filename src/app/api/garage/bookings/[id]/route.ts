@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
 import Booking from "@/models/Booking";
+import { garagePortalGate } from "@/lib/garagePortal";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -13,6 +14,10 @@ interface RouteContext {
 
 // GET - Fetch single booking details
 export async function GET(request: Request, context: RouteContext) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
     const { id } = await context.params;
@@ -74,6 +79,10 @@ export async function GET(request: Request, context: RouteContext) {
 
 // PATCH - Update booking status (accept/decline)
 export async function PATCH(request: Request, context: RouteContext) {
+  // PHASE 1: garage portal is inert — see src/lib/garagePortal.ts
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const session = await getServerSession(authOptions);
     const { id } = await context.params;
