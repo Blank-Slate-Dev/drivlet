@@ -1,4 +1,10 @@
 // src/app/admin/dispatch/page.tsx
+// Dispatch board, condensed (2026-08-07 redesign): bookings render as
+// compact colour-coded tiles (emerald = pickup leg, blue = return leg,
+// consistent with the driver app) showing plate / suburb / time window at a
+// glance. Clicking a tile expands it in place to reveal full dispatch detail
+// (customer, route, phone, workshop, assign/unassign). All data flow and
+// actions are unchanged from the previous board.
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -7,7 +13,6 @@ import {
   Users,
   MapPin,
   Clock,
-  Car,
   Loader2,
   RefreshCw,
   AlertTriangle,
@@ -19,6 +24,8 @@ import {
   UserPlus,
   UserMinus,
   Star,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -93,17 +100,51 @@ function getStateLabel(state: string | null | undefined, leg: "pickup" | "return
   }
 }
 
+// Bordered chips, matching the dashboard/bookings palette
 function getStateBadgeColor(state: string | null | undefined): string {
   switch (state) {
-    case "assigned": return "bg-blue-100 text-blue-700";
-    case "started": return "bg-amber-100 text-amber-700";
-    case "arrived": return "bg-purple-100 text-purple-700";
-    case "collected": return "bg-amber-100 text-amber-700";
-    case "delivering": return "bg-blue-100 text-blue-700";
-    case "completed": return "bg-emerald-100 text-emerald-700";
-    default: return "bg-slate-100 text-slate-700";
+    case "assigned": return "border-blue-200 bg-blue-50 text-blue-700";
+    case "started": return "border-amber-200 bg-amber-50 text-amber-700";
+    case "arrived": return "border-purple-200 bg-purple-50 text-purple-700";
+    case "collected": return "border-amber-200 bg-amber-50 text-amber-700";
+    case "delivering": return "border-blue-200 bg-blue-50 text-blue-700";
+    case "completed": return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    default: return "border-slate-200 bg-slate-50 text-slate-600";
   }
 }
+
+/**
+ * Best-effort suburb from a full address: the second comma segment with the
+ * state + postcode stripped ("12 Smith St, Mayfield NSW 2304, Australia" →
+ * "Mayfield"). Falls back to a truncated address.
+ */
+function suburbOf(address: string | undefined): string {
+  if (!address) return "—";
+  const parts = address.split(",").map((p) => p.trim());
+  const candidate = (parts[1] || parts[0] || "")
+    .replace(/\b(NSW|ACT|VIC|QLD|SA|WA|TAS|NT)\b\s*\d{0,4}/i, "")
+    .trim();
+  return candidate || address.slice(0, 24);
+}
+
+const LEG_TILE = {
+  pickup: {
+    tile: "border-emerald-200 bg-emerald-50/70 hover:border-emerald-300",
+    tileOpen: "border-emerald-300 ring-2 ring-emerald-100",
+    chip: "bg-emerald-600 text-white",
+    Icon: ArrowRight,
+    label: "Pickup",
+    button: "bg-emerald-600 hover:bg-emerald-500",
+  },
+  return: {
+    tile: "border-blue-200 bg-blue-50/70 hover:border-blue-300",
+    tileOpen: "border-blue-300 ring-2 ring-blue-100",
+    chip: "bg-blue-600 text-white",
+    Icon: ArrowLeft,
+    label: "Return",
+    button: "bg-blue-600 hover:bg-blue-500",
+  },
+} as const;
 
 // ─── Main Page Component ──────────────────────────────────────
 
@@ -118,6 +159,8 @@ export default function DispatchPage() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
+  // Which tile is expanded: "<kind>-<leg?>-<id>"
+  const [expandedTile, setExpandedTile] = useState<string | null>(null);
 
   // Assign modal state
   const [assignModal, setAssignModal] = useState<{
@@ -226,6 +269,9 @@ export default function DispatchPage() {
     return driver ? `${driver.firstName} ${driver.lastName}` : `Driver ${driverId.slice(-4)}`;
   };
 
+  const toggleTile = (key: string) =>
+    setExpandedTile((current) => (current === key ? null : key));
+
   // ─── Render ───────────────────────────────────────────────
 
   if (loading) {
@@ -236,20 +282,20 @@ export default function DispatchPage() {
     );
   }
 
+  const unassignedTiles: Array<{ booking: DispatchBooking; leg: "pickup" | "return" }> = [
+    ...data.unassignedPickups.map((b) => ({ booking: b, leg: "pickup" as const })),
+    ...data.unassignedReturns.map((b) => ({ booking: b, leg: "return" as const })),
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dispatch Board</h1>
-            <p className="text-sm text-slate-500">
-              Assign drivers to pickups and returns
-            </p>
-          </div>
+        {/* Top bar — dashboard rhythm */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-900">Dispatch Board</h1>
           <button
             onClick={() => { setLoading(true); fetchData(); }}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -258,7 +304,7 @@ export default function DispatchPage() {
 
         {/* Messages */}
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-red-700">
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
             <AlertTriangle className="h-5 w-5 flex-shrink-0" />
             <span className="text-sm">{error}</span>
             <button onClick={() => setError("")} className="ml-auto">
@@ -267,142 +313,364 @@ export default function DispatchPage() {
           </div>
         )}
         {successMsg && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-emerald-700">
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">
             <CheckCircle className="h-5 w-5 flex-shrink-0" />
             <span className="text-sm">{successMsg}</span>
           </div>
         )}
 
-        {/* Stats Row */}
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard
-            label="Unassigned Pickups"
-            value={data.unassignedPickups.length}
-            color="amber"
-          />
-          <StatCard
-            label="Unassigned Returns"
-            value={data.unassignedReturns.length}
-            color="blue"
-          />
-          <StatCard
-            label="Available Drivers"
-            value={data.availableDrivers.filter((d) => d.isClockedIn).length}
-            subtitle={`${data.availableDrivers.length} total`}
-            color="emerald"
-          />
-          <StatCard
-            label="Today's Active"
-            value={data.todaysDispatched.length}
-            color="slate"
-          />
+        {/* Stats row — dashboard card language */}
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {(
+            [
+              { label: "Unassigned Pickups", value: data.unassignedPickups.length, icon: ArrowRight, iconClass: "text-emerald-600" },
+              { label: "Unassigned Returns", value: data.unassignedReturns.length, icon: ArrowLeft, iconClass: "text-blue-600" },
+              { label: "Drivers On Shift", value: data.availableDrivers.filter((d) => d.isClockedIn).length, sub: `${data.availableDrivers.length} total`, icon: Users, iconClass: "text-emerald-600" },
+              { label: "Today's Active", value: data.todaysDispatched.length, icon: Truck, iconClass: "text-slate-500" },
+            ] as const
+          ).map((card) => {
+            const CardIcon = card.icon;
+            return (
+              <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-slate-900">{card.value}</span>
+                  <CardIcon className={`h-4 w-4 ${card.iconClass}`} />
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {card.label}
+                  {"sub" in card && card.sub && (
+                    <span className="text-slate-400"> · {card.sub}</span>
+                  )}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Three-column layout */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Column 1: Unassigned Jobs */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Column 1: Unassigned Jobs — compact tile grid */}
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400">
-              <Truck className="h-4 w-4" />
+            <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <Truck className="h-3.5 w-3.5" />
               Unassigned Jobs
             </h2>
 
-            {data.unassignedPickups.length === 0 &&
-              data.unassignedReturns.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white py-8 text-center">
-                  <CheckCircle className="mx-auto h-8 w-8 text-emerald-400" />
-                  <p className="mt-2 text-sm text-slate-500">
-                    All jobs assigned!
-                  </p>
-                </div>
-              )}
-
-            <div className="space-y-3">
-              {/* Pickups */}
-              {data.unassignedPickups.map((b) => (
-                <UnassignedCard
-                  key={`p-${b._id}`}
-                  booking={b}
-                  leg="pickup"
-                  actionLoading={actionLoading}
-                  onAssign={() => setAssignModal({ booking: b, leg: "pickup" })}
-                />
-              ))}
-
-              {/* Returns */}
-              {data.unassignedReturns.map((b) => (
-                <UnassignedCard
-                  key={`r-${b._id}`}
-                  booking={b}
-                  leg="return"
-                  actionLoading={actionLoading}
-                  onAssign={() => setAssignModal({ booking: b, leg: "return" })}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Column 2: Available Drivers */}
-          <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400">
-              <Users className="h-4 w-4" />
-              Available Drivers
-            </h2>
-
-            {data.availableDrivers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white py-8 text-center">
-                <Users className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm text-slate-500">
-                  No drivers available
-                </p>
+            {unassignedTiles.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-8 text-center">
+                <CheckCircle className="mx-auto h-8 w-8 text-emerald-400" />
+                <p className="mt-2 text-sm text-slate-500">All jobs assigned!</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {data.availableDrivers
-                  .sort((a, b) => {
-                    if (a.isClockedIn && !b.isClockedIn) return -1;
-                    if (!a.isClockedIn && b.isClockedIn) return 1;
-                    return a.todaysJobCount - b.todaysJobCount;
-                  })
-                  .map((driver) => (
-                    <DriverCard key={driver._id} driver={driver} />
-                  ))}
+              <div className="grid grid-cols-2 gap-2">
+                {unassignedTiles.map(({ booking, leg }) => {
+                  const key = `u-${leg}-${booking._id}`;
+                  const open = expandedTile === key;
+                  const style = LEG_TILE[leg];
+                  const LegIcon = style.Icon;
+                  const timeWindow = leg === "pickup" ? booking.pickupTime : booking.dropoffTime;
+                  const slot = leg === "pickup" ? booking.pickupTimeSlot : booking.dropoffTimeSlot;
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-xl border transition ${open ? `col-span-2 bg-white ${style.tileOpen}` : `cursor-pointer ${style.tile}`}`}
+                    >
+                      {/* Collapsed face: plate / suburb / time, leg colour */}
+                      <button
+                        onClick={() => toggleTile(key)}
+                        className="flex w-full flex-col items-start gap-1 p-2.5 text-left"
+                        aria-expanded={open}
+                      >
+                        <div className="flex w-full items-center justify-between gap-1">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${style.chip}`}>
+                            <LegIcon className="h-2.5 w-2.5" />
+                            {style.label.toUpperCase()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {booking.isManualTransmission && (
+                              <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">M</span>
+                            )}
+                            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                          </span>
+                        </div>
+                        <span className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wide text-slate-800">
+                          {booking.vehicleRegistration}
+                        </span>
+                        <span className="truncate text-[11px] text-slate-600">
+                          {suburbOf(booking.pickupAddress)}
+                          {timeWindow && <span className="text-slate-400"> · {timeWindow}</span>}
+                        </span>
+                      </button>
+
+                      {/* Expanded detail */}
+                      {open && (
+                        <div className="space-y-2 border-t border-slate-100 p-3 text-xs text-slate-600">
+                          <p className="text-sm font-medium text-slate-900">
+                            {booking.customerName}
+                            <span className="ml-2 font-normal text-slate-400">{booking.serviceType}</span>
+                          </p>
+                          <div className="flex items-start gap-1.5">
+                            <MapPin className="mt-0.5 h-3 w-3 flex-shrink-0 text-slate-400" />
+                            <span>
+                              {leg === "pickup"
+                                ? `${booking.pickupAddress} → ${booking.garageName || "Workshop"}`
+                                : `${booking.garageName || "Workshop"} → ${booking.pickupAddress}`}
+                            </span>
+                          </div>
+                          {booking.garageAddress && (
+                            <div className="flex items-start gap-1.5">
+                              <Building2 className="mt-0.5 h-3 w-3 flex-shrink-0 text-slate-400" />
+                              <span>{booking.garageAddress}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-slate-400" />
+                            <span>
+                              {timeWindow}
+                              {slot && ` (${slot})`}
+                            </span>
+                          </div>
+                          {booking.customerPhone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3 text-slate-400" />
+                              <a href={`tel:${booking.customerPhone}`} className="text-emerald-700 hover:underline">
+                                {booking.customerPhone}
+                              </a>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setAssignModal({ booking, leg })}
+                            disabled={actionLoading === booking._id}
+                            className={`mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50 ${style.button}`}
+                          >
+                            {actionLoading === booking._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <UserPlus className="h-4 w-4" />
+                            )}
+                            Assign Driver
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Column 3: Today's Dispatched */}
+          {/* Column 2: Available Drivers — condensed rows */}
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400">
-              <CheckCircle className="h-4 w-4" />
+            <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <Users className="h-3.5 w-3.5" />
+              Available Drivers
+            </h2>
+
+            {data.availableDrivers.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-8 text-center">
+                <Users className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm text-slate-500">No drivers available</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <ul className="divide-y divide-slate-100">
+                  {[...data.availableDrivers]
+                    .sort((a, b) => {
+                      if (a.isClockedIn && !b.isClockedIn) return -1;
+                      if (!a.isClockedIn && b.isClockedIn) return 1;
+                      return a.todaysJobCount - b.todaysJobCount;
+                    })
+                    .map((driver) => {
+                      const atLimit = driver.todaysJobCount >= driver.maxJobsPerDay;
+                      return (
+                        <li
+                          key={driver._id}
+                          className={`px-3 py-2 ${driver.isClockedIn ? "" : "opacity-50"}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span
+                                className={`h-2 w-2 flex-shrink-0 rounded-full ${driver.isClockedIn ? "bg-emerald-500" : "bg-slate-300"}`}
+                              />
+                              <span className="truncate text-sm font-medium text-slate-900">
+                                {driver.firstName} {driver.lastName}
+                              </span>
+                              {atLimit && (
+                                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+                                  FULL
+                                </span>
+                              )}
+                            </div>
+                            <span className="flex-shrink-0 text-[11px] text-slate-500">
+                              {driver.todaysJobCount}/{driver.maxJobsPerDay} today
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1 pl-3.5">
+                            <span className="text-[10px] capitalize text-slate-400">
+                              {driver.shiftPreference.replace("_", " ")}
+                            </span>
+                            {driver.preferredAreas.map((area) => (
+                              <span
+                                key={area}
+                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+                              >
+                                {area}
+                              </span>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Column 3: Today's Active — compact tiles */}
+          <div>
+            <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CheckCircle className="h-3.5 w-3.5" />
               {"Today's Active"}
             </h2>
 
             {data.todaysDispatched.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white py-8 text-center">
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-8 text-center">
                 <Truck className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm text-slate-500">
-                  No dispatched jobs today
-                </p>
+                <p className="mt-2 text-sm text-slate-500">No dispatched jobs today</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {data.todaysDispatched.map((b) => (
-                  <DispatchedCard
-                    key={`d-${b._id}`}
-                    booking={b}
-                    getDriverName={getDriverName}
-                    actionLoading={actionLoading}
-                    onUnassign={unassignDriver}
-                  />
-                ))}
+              <div className="grid grid-cols-2 gap-2">
+                {data.todaysDispatched.map((booking) => {
+                  const key = `d-${booking._id}`;
+                  const open = expandedTile === key;
+                  const pickupStarted = booking.pickupDriverState && booking.pickupDriverState !== "assigned";
+                  const returnStarted = booking.returnDriverState && booking.returnDriverState !== "assigned";
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-xl border bg-white transition ${
+                        open
+                          ? "col-span-2 border-slate-300 ring-2 ring-slate-100"
+                          : "cursor-pointer border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {/* Collapsed face: plate + per-leg state dots */}
+                      <button
+                        onClick={() => toggleTile(key)}
+                        className="flex w-full flex-col items-start gap-1 p-2.5 text-left"
+                        aria-expanded={open}
+                      >
+                        <div className="flex w-full items-center justify-between gap-1">
+                          <span className="rounded-md border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wide text-slate-800">
+                            {booking.vehicleRegistration}
+                          </span>
+                          <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {booking.assignedDriverId && (
+                            <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.pickupDriverState)}`}>
+                              <ArrowRight className="h-2.5 w-2.5" />
+                              {getStateLabel(booking.pickupDriverState, "pickup")}
+                            </span>
+                          )}
+                          {booking.returnDriverId && (
+                            <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.returnDriverState)}`}>
+                              <ArrowLeft className="h-2.5 w-2.5" />
+                              {getStateLabel(booking.returnDriverState, "return")}
+                            </span>
+                          )}
+                        </div>
+                        <span className="truncate text-[11px] text-slate-500">
+                          {suburbOf(booking.pickupAddress)}
+                        </span>
+                      </button>
+
+                      {/* Expanded detail: customer + leg rows w/ unassign */}
+                      {open && (
+                        <div className="space-y-2 border-t border-slate-100 p-3 text-xs text-slate-600">
+                          <p className="text-sm font-medium text-slate-900">{booking.customerName}</p>
+                          <div className="flex items-start gap-1.5">
+                            <MapPin className="mt-0.5 h-3 w-3 flex-shrink-0 text-slate-400" />
+                            <span>
+                              {booking.pickupAddress} → {booking.garageName || "Workshop"}
+                            </span>
+                          </div>
+                          {booking.customerPhone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3 text-slate-400" />
+                              <a href={`tel:${booking.customerPhone}`} className="text-emerald-700 hover:underline">
+                                {booking.customerPhone}
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Pickup leg */}
+                          {booking.assignedDriverId && (
+                            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <ArrowRight className="h-3 w-3 text-emerald-600" />
+                                <span className="text-xs text-slate-700">
+                                  {getDriverName(booking.assignedDriverId)}
+                                </span>
+                                <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.pickupDriverState)}`}>
+                                  {getStateLabel(booking.pickupDriverState, "pickup")}
+                                </span>
+                              </div>
+                              {!pickupStarted && (
+                                <button
+                                  onClick={() => unassignDriver(booking._id, "pickup")}
+                                  disabled={actionLoading === booking._id}
+                                  className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                                  title="Unassign pickup driver"
+                                >
+                                  <UserMinus className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Return leg */}
+                          {booking.returnDriverId ? (
+                            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <ArrowLeft className="h-3 w-3 text-blue-600" />
+                                <span className="text-xs text-slate-700">
+                                  {getDriverName(booking.returnDriverId)}
+                                </span>
+                                <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.returnDriverState)}`}>
+                                  {getStateLabel(booking.returnDriverState, "return")}
+                                </span>
+                              </div>
+                              {!returnStarted && (
+                                <button
+                                  onClick={() => unassignDriver(booking._id, "return")}
+                                  disabled={actionLoading === booking._id}
+                                  className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                                  title="Unassign return driver"
+                                >
+                                  <UserMinus className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            booking.assignedDriverId && (
+                              <div className="rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-center text-[10px] text-slate-400">
+                                No return driver assigned
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ═══ ASSIGN MODAL ═══ */}
+      {/* ═══ ASSIGN MODAL (unchanged) ═══ */}
       {assignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
@@ -531,271 +799,6 @@ export default function DispatchPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Stat Card ─────────────────────────────────────────────────
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  color,
-}: {
-  label: string;
-  value: number;
-  subtitle?: string;
-  color: "amber" | "blue" | "emerald" | "slate";
-}) {
-  const colorMap = {
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    slate: "bg-slate-50 text-slate-700 border-slate-200",
-  };
-
-  return (
-    <div className={`rounded-xl border p-4 ${colorMap[color]}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs font-medium opacity-75">{label}</p>
-      {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
-    </div>
-  );
-}
-
-// ─── Unassigned Card ───────────────────────────────────────────
-
-function UnassignedCard({
-  booking,
-  leg,
-  actionLoading,
-  onAssign,
-}: {
-  booking: DispatchBooking;
-  leg: "pickup" | "return";
-  actionLoading: string | null;
-  onAssign: () => void;
-}) {
-  const isPickup = leg === "pickup";
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="mb-2 flex items-center gap-2">
-        {isPickup ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
-            <ArrowRight className="h-3 w-3" />
-            PICKUP
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-            <ArrowLeft className="h-3 w-3" />
-            RETURN
-          </span>
-        )}
-        {booking.isManualTransmission && (
-          <span className="text-xs font-medium text-amber-600">Manual</span>
-        )}
-      </div>
-
-      <p className="font-semibold text-slate-900">
-        {booking.vehicleRegistration} ({booking.vehicleState})
-      </p>
-      <p className="text-sm text-slate-600">
-        {booking.customerName}
-      </p>
-
-      <div className="mt-2 space-y-1 text-xs text-slate-500">
-        <div className="flex items-start gap-1.5">
-          <MapPin className="mt-0.5 h-3 w-3 flex-shrink-0" />
-          <span>
-            {isPickup
-              ? `${booking.pickupAddress} → ${booking.garageName || "Workshop"}`
-              : `${booking.garageName || "Workshop"} → ${booking.pickupAddress}`}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-3 w-3" />
-          <span>
-            {isPickup ? booking.pickupTime : booking.dropoffTime}
-            {booking.pickupTimeSlot && isPickup && ` (${booking.pickupTimeSlot})`}
-            {booking.dropoffTimeSlot && !isPickup && ` (${booking.dropoffTimeSlot})`}
-          </span>
-        </div>
-        {booking.customerPhone && (
-          <div className="flex items-center gap-1.5">
-            <Phone className="h-3 w-3" />
-            <span>{booking.customerPhone}</span>
-          </div>
-        )}
-      </div>
-
-      <button
-        onClick={onAssign}
-        disabled={actionLoading === booking._id}
-        className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-          isPickup
-            ? "bg-emerald-600 hover:bg-emerald-500"
-            : "bg-blue-600 hover:bg-blue-500"
-        }`}
-      >
-        {actionLoading === booking._id ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <UserPlus className="h-4 w-4" />
-        )}
-        Assign Driver
-      </button>
-    </div>
-  );
-}
-
-// ─── Driver Card ───────────────────────────────────────────────
-
-function DriverCard({ driver }: { driver: DispatchDriver }) {
-  const atLimit = driver.todaysJobCount >= driver.maxJobsPerDay;
-
-  return (
-    <div
-      className={`rounded-xl border p-3 ${
-        driver.isClockedIn
-          ? "border-emerald-200 bg-white"
-          : "border-slate-200 bg-slate-50 opacity-60"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-900">
-              {driver.firstName} {driver.lastName}
-            </span>
-            <span
-              className={`h-2 w-2 rounded-full ${
-                driver.isClockedIn ? "bg-emerald-500" : "bg-slate-300"
-              }`}
-            />
-          </div>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-            <span>
-              {driver.todaysJobCount}/{driver.maxJobsPerDay} today
-            </span>
-            <span>&middot;</span>
-            <span className="capitalize">
-              {driver.shiftPreference.replace("_", " ")}
-            </span>
-          </div>
-        </div>
-        {atLimit && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
-            FULL
-          </span>
-        )}
-      </div>
-      {driver.preferredAreas.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {driver.preferredAreas.map((area) => (
-            <span
-              key={area}
-              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-            >
-              {area}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Dispatched Card ───────────────────────────────────────────
-
-function DispatchedCard({
-  booking,
-  getDriverName,
-  actionLoading,
-  onUnassign,
-}: {
-  booking: DispatchBooking;
-  getDriverName: (id: string | null | undefined) => string;
-  actionLoading: string | null;
-  onUnassign: (bookingId: string, leg: "pickup" | "return") => void;
-}) {
-  const pickupStarted = booking.pickupDriverState && booking.pickupDriverState !== "assigned";
-  const returnStarted = booking.returnDriverState && booking.returnDriverState !== "assigned";
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-slate-900">
-            {booking.vehicleRegistration}
-          </p>
-          <p className="text-xs text-slate-500">{booking.customerName}</p>
-        </div>
-        <Car className="h-4 w-4 text-slate-400" />
-      </div>
-
-      <div className="mt-2 space-y-1.5">
-        {/* Pickup leg */}
-        {booking.assignedDriverId && (
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
-            <div className="flex items-center gap-2">
-              <ArrowRight className="h-3 w-3 text-emerald-600" />
-              <span className="text-xs text-slate-700">
-                {getDriverName(booking.assignedDriverId)}
-              </span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.pickupDriverState)}`}
-              >
-                {getStateLabel(booking.pickupDriverState, "pickup")}
-              </span>
-            </div>
-            {!pickupStarted && (
-              <button
-                onClick={() => onUnassign(booking._id, "pickup")}
-                disabled={actionLoading === booking._id}
-                className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
-                title="Unassign pickup driver"
-              >
-                <UserMinus className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Return leg */}
-        {booking.returnDriverId ? (
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
-            <div className="flex items-center gap-2">
-              <ArrowLeft className="h-3 w-3 text-blue-600" />
-              <span className="text-xs text-slate-700">
-                {getDriverName(booking.returnDriverId)}
-              </span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getStateBadgeColor(booking.returnDriverState)}`}
-              >
-                {getStateLabel(booking.returnDriverState, "return")}
-              </span>
-            </div>
-            {!returnStarted && (
-              <button
-                onClick={() => onUnassign(booking._id, "return")}
-                disabled={actionLoading === booking._id}
-                className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
-                title="Unassign return driver"
-              >
-                <UserMinus className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ) : (
-          booking.assignedDriverId && (
-            <div className="rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-center text-[10px] text-slate-400">
-              No return driver assigned
-            </div>
-          )
-        )}
-      </div>
     </div>
   );
 }
