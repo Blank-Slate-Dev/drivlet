@@ -28,7 +28,6 @@ import {
 } from "@/components/admin/BookingDetailModals";
 import {
   RequestDetailModal,
-  StatCard,
   type BookingRequestItem,
 } from "@/components/admin/RequestDetailModal";
 
@@ -155,12 +154,15 @@ function normalizeRequest(r: BookingRequestItem): UnifiedRow {
   };
 }
 
+// Bordered chip palette — matches the dashboard's status chips and the
+// driver app's stage colour coding (amber = waiting on us, blue = waiting on
+// customer payment, emerald = paid/active, slate = done, red = rejected).
 const STATUS_BADGE: Record<StatusKey, string> = {
-  needs_review: "bg-amber-100 text-amber-700",
-  awaiting_payment: "bg-blue-100 text-blue-700",
-  active: "bg-emerald-100 text-emerald-700",
-  completed: "bg-slate-100 text-slate-600",
-  rejected: "bg-red-100 text-red-700",
+  needs_review: "border-amber-200 bg-amber-50 text-amber-700",
+  awaiting_payment: "border-blue-200 bg-blue-50 text-blue-700",
+  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  completed: "border-slate-200 bg-slate-50 text-slate-600",
+  rejected: "border-red-200 bg-red-50 text-red-600",
 };
 
 const formatPaidAt = (iso: string) =>
@@ -438,12 +440,12 @@ export default function AdminBookingsPage() {
 
   const StatusCell = ({ row }: { row: UnifiedRow }) => (
     <div className="flex flex-col gap-0.5">
-      <span className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-tight ${STATUS_BADGE[row.statusKey]}`}>
+      <span className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-medium leading-tight ${STATUS_BADGE[row.statusKey]}`}>
         {row.statusKey === "active" && <CheckCircle2 className="h-3 w-3" />}
         {row.statusLabel}
       </span>
       {row.cancelRequested && (
-        <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold leading-tight text-amber-700">
+        <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold leading-tight text-amber-700">
           <AlertTriangle className="h-3 w-3" />
           Cancel requested
         </span>
@@ -458,7 +460,14 @@ export default function AdminBookingsPage() {
   );
 
   const RefBadge = ({ value }: { value: string }) => (
-    <span className="inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+    <span className="inline-block w-fit whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600">
+      {value}
+    </span>
+  );
+
+  // Plate badge — same treatment as the dashboard's recent-bookings card
+  const PlateBadge = ({ value }: { value: string }) => (
+    <span className="inline-block w-fit whitespace-nowrap rounded-md border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-mono text-xs font-semibold uppercase tracking-wide text-slate-700">
       {value}
     </span>
   );
@@ -473,12 +482,9 @@ export default function AdminBookingsPage() {
           </div>
         )}
 
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Bookings</h1>
-            <p className="mt-1 text-slate-600">Requests and bookings across the full pipeline</p>
-          </div>
+        {/* Top bar — same rhythm as the dashboard */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-900">Bookings</h1>
           <div className="flex items-center gap-3">
             {lastUpdated && (
               <span className="text-xs text-slate-400">
@@ -487,53 +493,75 @@ export default function AdminBookingsPage() {
             )}
             <button
               onClick={() => fetchAll()}
-              className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
-              <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
           </div>
         </div>
 
-        {/* Stat cards (click to filter) */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard icon={Inbox} iconBg="bg-amber-100" iconColor="text-amber-600" value={stats.needs_review} label="Needs Review" active={tab === "needs_review"} onClick={() => setTab(tab === "needs_review" ? "all" : "needs_review")} />
-          <StatCard icon={CreditCard} iconBg="bg-blue-100" iconColor="text-blue-600" value={stats.awaiting_payment} label="Awaiting Payment" active={tab === "awaiting_payment"} onClick={() => setTab(tab === "awaiting_payment" ? "all" : "awaiting_payment")} />
-          <StatCard icon={Truck} iconBg="bg-emerald-100" iconColor="text-emerald-600" value={stats.active} label="Active" active={tab === "active"} onClick={() => setTab(tab === "active" ? "all" : "active")} />
-          <StatCard icon={CheckCircle2} iconBg="bg-slate-100" iconColor="text-slate-600" value={stats.completed} label="Completed" active={tab === "completed"} onClick={() => setTab(tab === "completed" ? "all" : "completed")} />
+        {/* Stat cards (click to filter) — dashboard card language */}
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {(
+            [
+              { key: "needs_review", label: "Needs Review", value: stats.needs_review, icon: Inbox, iconClass: "text-amber-600", activeClass: "border-amber-300 ring-2 ring-amber-100" },
+              { key: "awaiting_payment", label: "Awaiting Payment", value: stats.awaiting_payment, icon: CreditCard, iconClass: "text-blue-600", activeClass: "border-blue-300 ring-2 ring-blue-100" },
+              { key: "active", label: "Active", value: stats.active, icon: Truck, iconClass: "text-emerald-600", activeClass: "border-emerald-300 ring-2 ring-emerald-100" },
+              { key: "completed", label: "Completed", value: stats.completed, icon: CheckCircle2, iconClass: "text-slate-500", activeClass: "border-slate-300 ring-2 ring-slate-200" },
+            ] as const
+          ).map((card) => {
+            const CardIcon = card.icon;
+            const isCardActive = tab === card.key;
+            return (
+              <button
+                key={card.key}
+                onClick={() => setTab(isCardActive ? "all" : card.key)}
+                className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-slate-300 ${
+                  isCardActive ? card.activeClass : "border-slate-200"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-slate-900">{card.value}</span>
+                  <CardIcon className={`h-4 w-4 ${card.iconClass}`} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{card.label}</p>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Controls */}
-        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Controls — free-floating pills, no wrapping card */}
+        <div className="mb-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search reference, name, rego, email…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-400">Service date</label>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              aria-label="Filter by service date"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
           </div>
-          {/* Pill tabs */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  tab === t.key ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                  tab === t.key
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
                 }`}
               >
                 {t.label}
@@ -596,7 +624,7 @@ export default function AdminBookingsPage() {
                           <p className="font-medium text-slate-900">{row.customerName}</p>
                           <p className="text-xs text-slate-500">{row.email}</p>
                         </td>
-                        <td className="px-4 py-4"><span className="font-mono text-sm font-semibold text-slate-900">{row.rego}</span></td>
+                        <td className="px-4 py-4"><PlateBadge value={row.rego} /></td>
                         <td className="px-4 py-4">
                           <p className="text-sm text-slate-900">{serviceDateShort(row.serviceDate)}</p>
                           {compactSlots(row) && <p className="text-xs text-slate-500">{compactSlots(row)}</p>}
@@ -622,11 +650,10 @@ export default function AdminBookingsPage() {
                       <StatusCell row={row} />
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-3">
-                      <div className="text-sm text-slate-600">
-                        <span className="font-mono font-semibold text-slate-900">{row.rego}</span>
-                        <span className="mx-2 text-slate-300">·</span>
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <PlateBadge value={row.rego} />
                         <span>{serviceDateShort(row.serviceDate)}</span>
-                        {compactSlots(row) && <span className="text-slate-400"> · {compactSlots(row)}</span>}
+                        {compactSlots(row) && <span className="text-slate-400">· {compactSlots(row)}</span>}
                       </div>
                       <RowAction row={row} />
                     </div>
