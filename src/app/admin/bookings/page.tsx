@@ -6,6 +6,8 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Search,
+  SlidersHorizontal,
+  ChevronDown,
   RefreshCw,
   AlertCircle,
   AlertTriangle,
@@ -194,6 +196,9 @@ export default function AdminBookingsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tab, setTab] = useState<TabKey>("all");
   const [dateFilter, setDateFilter] = useState("");
+  // Collapsible filter bar (2026-08-07): essentials stay visible, the rest
+  // expands on demand. Active filters surface as chips when collapsed.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -311,6 +316,8 @@ export default function AdminBookingsPage() {
 
   const hasActiveFilters = tab !== "all" || !!dateFilter || !!search.trim();
   const clearFilters = () => { setTab("all"); setDateFilter(""); setSearch(""); };
+  // Filters hidden inside the expandable section (search is always visible)
+  const activeFilterCount = (tab !== "all" ? 1 : 0) + (dateFilter ? 1 : 0);
 
   const handleSendPaymentLink = async (requestId: string) => {
     setSendingLink(requestId);
@@ -532,41 +539,112 @@ export default function AdminBookingsPage() {
           })}
         </div>
 
-        {/* Controls — free-floating pills, no wrapping card */}
-        <div className="mb-4 flex flex-col gap-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
+        {/* Filter bar — slim, expandable. Search always visible; date +
+            status pills live in the expandable section; active filters show
+            as removable chips when collapsed. */}
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2 p-2.5">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search reference, name, rego, email…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-xl border border-transparent bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              aria-label="Filter by service date"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {TABS.map((t) => (
+
+            {/* Collapsed summary chips (hidden on very small screens; the
+                count badge on the Filters button covers those) */}
+            {!filtersOpen && tab !== "all" && (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                  tab === t.key
-                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                }`}
+                onClick={() => setTab("all")}
+                className="hidden shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 sm:inline-flex"
+                title="Clear status filter"
               >
-                {t.label}
+                {TABS.find((t) => t.key === tab)?.label}
+                <X className="h-3 w-3" />
               </button>
-            ))}
+            )}
+            {!filtersOpen && dateFilter && (
+              <button
+                onClick={() => setDateFilter("")}
+                className="hidden shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 sm:inline-flex"
+                title="Clear date filter"
+              >
+                {new Date(`${dateFilter}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-expanded={filtersOpen}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                filtersOpen
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${filtersOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
+
+          {/* Smooth expand/collapse via the grid-rows trick — no JS height math */}
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+              filtersOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="flex flex-col gap-3 border-t border-slate-100 p-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {TABS.map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setTab(t.key)}
+                      className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                        tab === t.key
+                          ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs font-medium text-slate-400">
+                    Service date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    aria-label="Filter by service date"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                    >
+                      <X className="h-3.5 w-3.5" /> Clear all
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
