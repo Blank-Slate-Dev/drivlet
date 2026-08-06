@@ -4,11 +4,10 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Search,
+  SlidersHorizontal,
+  ChevronDown,
   RefreshCw,
   Users,
-  UserCheck,
-  UserPlus,
-  Calendar,
   AlertCircle,
   Eye,
   X,
@@ -17,7 +16,6 @@ import {
   ClipboardList,
   Phone,
   DollarSign,
-  Filter,
   CheckCircle2,
   Ban,
   Trash2,
@@ -47,31 +45,34 @@ interface User {
   totalSpent?: number;
 }
 
-interface Stats {
-  totalUsers: number;
-  registeredUsers: number;
-  guestUsers: number;
-  activeUsers: number;
-  newThisWeek: number;
-  newToday: number;
-}
-
 type UserFilter = "all" | "customer" | "driver" | "garage" | "guest" | "active";
+
+const FILTER_OPTIONS: Array<{ key: UserFilter; label: string }> = [
+  { key: "all", label: "All Users" },
+  { key: "customer", label: "Customers" },
+  { key: "driver", label: "Drivers" },
+  { key: "garage", label: "Garages" },
+  { key: "guest", label: "Guests Only" },
+  { key: "active", label: "With Bookings" },
+];
+
+// Bordered chip palette — consistent with dashboard/bookings/dispatch
+const ROLE_CHIP: Record<string, string> = {
+  admin: "border-purple-200 bg-purple-50 text-purple-700",
+  driver: "border-sky-200 bg-sky-50 text-sky-700",
+  garage: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  guest: "border-amber-200 bg-amber-50 text-amber-700",
+  customer: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    registeredUsers: 0,
-    guestUsers: 0,
-    activeUsers: 0,
-    newThisWeek: 0,
-    newToday: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<UserFilter>("all");
+  // Collapsible filter bar, same pattern as the Bookings page (2026-08-07)
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -91,7 +92,6 @@ export default function AdminUsersPage() {
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
       setUsers(data.users);
-      setStats(data.stats);
       setError("");
     } catch {
       setError("Failed to load users");
@@ -245,137 +245,87 @@ export default function AdminUsersPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Users Management</h1>
-            <p className="mt-1 text-slate-600">
-              View and manage registered users and guests
-            </p>
-          </div>
+        {/* Top bar — dashboard rhythm */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-900">Users</h1>
           <button
             onClick={fetchUsers}
-            className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-6">
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-white">
-                  {stats.totalUsers}
-                </p>
-                <p className="text-xs text-emerald-100">Total Users</p>
-              </div>
+        {/* Filter bar — slim, expandable (same pattern as Bookings) */}
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2 p-2.5">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-transparent bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-                <UserCheck className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {stats.registeredUsers}
-                </p>
-                <p className="text-xs text-slate-500">Registered</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
-                <UserPlus className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {stats.guestUsers}
-                </p>
-                <p className="text-xs text-slate-500">Guests</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                <ClipboardList className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {stats.activeUsers}
-                </p>
-                <p className="text-xs text-slate-500">With Bookings</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
-                <Calendar className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {stats.newThisWeek}
-                </p>
-                <p className="text-xs text-slate-500">This Week</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100">
-                <Clock className="h-5 w-5 text-teal-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {stats.newToday}
-                </p>
-                <p className="text-xs text-slate-500">Today</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter Bar */}
-        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as UserFilter)}
-                className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            {!filtersOpen && filter !== "all" && (
+              <button
+                onClick={() => setFilter("all")}
+                className="hidden shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 sm:inline-flex"
+                title="Clear segment filter"
               >
-                <option value="all">All Users</option>
-                <option value="customer">Customers</option>
-                <option value="driver">Drivers</option>
-                <option value="garage">Garages</option>
-                <option value="guest">Guests Only</option>
-                <option value="active">With Bookings</option>
-              </select>
+                {FILTER_OPTIONS.find((o) => o.key === filter)?.label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-expanded={filtersOpen}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                filtersOpen
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {filter !== "all" && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+                  1
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${filtersOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+              filtersOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="flex flex-wrap gap-1.5 border-t border-slate-100 p-3">
+                {FILTER_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setFilter(option.key)}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                      filter === option.key
+                        ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -413,112 +363,104 @@ export default function AdminUsersPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-100 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-6 py-4">User</th>
-                    <th className="px-6 py-4">Contact</th>
-                    <th className="px-6 py-4">Type</th>
-                    <th className="px-6 py-4">Bookings</th>
-                    <th className="px-6 py-4">Total Spent</th>
-                    <th className="px-6 py-4">Joined</th>
-                    <th className="px-6 py-4">Actions</th>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Bookings</th>
+                    <th className="px-4 py-3">Spent</th>
+                    <th className="px-4 py-3">Joined</th>
+                    <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((user) => (
-                    <tr key={user._id} className="transition hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
-                            user.isGuest 
-                              ? "bg-amber-100 text-amber-700" 
-                              : user.role === "admin"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-emerald-100 text-emerald-700"
-                          }`}>
-                            {getDisplayName(user).charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-900">
-                              {getDisplayName(user)}
-                            </p>
-                            {user.lastBookingDate && (
-                              <p className="text-xs text-slate-400">
-                                Last active: {formatDate(user.lastBookingDate)}
+                  {filteredUsers.map((user) => {
+                    const roleKey =
+                      user.role === "admin" || user.role === "driver" || user.role === "garage"
+                        ? user.role
+                        : user.isGuest
+                          ? "guest"
+                          : "customer";
+                    const roleLabel =
+                      roleKey === "guest"
+                        ? "Guest"
+                        : roleKey.charAt(0).toUpperCase() + roleKey.slice(1);
+                    return (
+                      <tr
+                        key={user._id}
+                        onClick={() => setSelectedUser(user)}
+                        className="cursor-pointer transition hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                              user.isGuest
+                                ? "bg-amber-100 text-amber-700"
+                                : user.role === "admin"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              {getDisplayName(user).charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-900">
+                                {getDisplayName(user)}
                               </p>
+                              {user.lastBookingDate && (
+                                <p className="text-[11px] text-slate-400">
+                                  Last active {formatDate(user.lastBookingDate)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <p className="text-xs text-slate-600">{user.email || "—"}</p>
+                          {user.phone && (
+                            <p className="text-[11px] text-slate-400">{user.phone}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${ROLE_CHIP[roleKey]}`}>
+                              {roleLabel}
+                            </span>
+                            {user.accountStatus === "suspended" && (
+                              <span className="inline-flex w-fit items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">
+                                <Ban className="h-3 w-3" />
+                                Suspended
+                              </span>
                             )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <p className="text-sm text-slate-600">{user.email || "—"}</p>
-                          {user.phone && (
-                            <p className="text-xs text-slate-400">{user.phone}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          {user.role === "admin" ? (
-                            <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
-                              Admin
-                            </span>
-                          ) : user.role === "driver" ? (
-                            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">
-                              Driver
-                            </span>
-                          ) : user.role === "garage" ? (
-                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700">
-                              Garage
-                            </span>
-                          ) : user.isGuest ? (
-                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                              Guest (no account)
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                              Customer
-                            </span>
-                          )}
-                          {/* Account Status Badge */}
-                          {user.accountStatus === "suspended" && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                              <Ban className="h-3 w-3" />
-                              Suspended
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <ClipboardList className="h-4 w-4 text-slate-400" />
+                        </td>
+                        <td className="px-4 py-2.5">
                           <span className="text-sm font-medium text-slate-700">
                             {user.bookingCount}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-medium text-slate-700">
-                          {user.totalSpent ? formatCurrency(user.totalSpent) : "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">
-                          {formatDate(user.createdAt)}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => setSelectedUser(user)}
-                          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-sm text-slate-600">
+                            {user.totalSpent ? formatCurrency(user.totalSpent) : "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <p className="text-xs text-slate-500">
+                            {formatDate(user.createdAt)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedUser(user); }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -526,11 +468,11 @@ export default function AdminUsersPage() {
 
           {/* Results count */}
           {!loading && filteredUsers.length > 0 && (
-            <div className="border-t border-slate-100 px-6 py-4">
-              <p className="text-sm text-slate-500">
+            <div className="border-t border-slate-100 px-4 py-3">
+              <p className="text-xs text-slate-400">
                 Showing {filteredUsers.length} of {users.length} users
                 {search && ` matching "${search}"`}
-                {filter !== "all" && ` (${filter})`}
+                {filter !== "all" && ` (${FILTER_OPTIONS.find((o) => o.key === filter)?.label})`}
               </p>
             </div>
           )}
