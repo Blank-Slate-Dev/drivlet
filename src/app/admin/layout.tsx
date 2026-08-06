@@ -330,6 +330,22 @@ export default function AdminLayout({
             />
           </div>
 
+          {/* Greeting card (2026-08-07 dashboard redesign) */}
+          <div className="px-3 pt-3">
+            <div className="rounded-2xl bg-gradient-to-br from-emerald-700 to-teal-700 px-3.5 py-3 text-white shadow-sm">
+              <p className="truncate text-sm font-semibold">
+                Welcome back, {session.user.username || "admin"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-emerald-100">
+                {new Date().toLocaleDateString("en-AU", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </p>
+            </div>
+          </div>
+
           {/* Navigation */}
           <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-3">
             {navItems.map((item) => {
@@ -353,8 +369,19 @@ export default function AdminLayout({
             })}
           </nav>
 
-          {/* Back to site link */}
+          {/* Pinned footer slot: traffic shortcut + back to site (2026-08-07) */}
           <div className="border-t border-slate-100 px-3 py-3">
+            <Link
+              href="/admin/traffic"
+              className="mb-2 block rounded-2xl border border-emerald-100 bg-emerald-50 px-3.5 py-2.5 transition hover:border-emerald-200"
+            >
+              <p className="text-xs font-semibold text-emerald-800">
+                Website Traffic
+              </p>
+              <p className="mt-0.5 text-[11px] text-emerald-600">
+                See who&apos;s visiting →
+              </p>
+            </Link>
             <Link
               href="/"
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
