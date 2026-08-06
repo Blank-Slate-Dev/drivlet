@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   Search,
   SlidersHorizontal,
@@ -51,7 +52,11 @@ const FILTER_OPTIONS: Array<{ key: UserFilter; label: string }> = [
   { key: "all", label: "All Users" },
   { key: "customer", label: "Customers" },
   { key: "driver", label: "Drivers" },
-  { key: "garage", label: "Garages" },
+  // HIDDEN FOR PHASE 1 (2026-08-08): garage portal is inert — see
+  // src/lib/garagePortal.ts. The segment returns with the flag.
+  ...(FEATURES.GARAGE_PORTAL
+    ? [{ key: "garage" as const, label: "Garages" }]
+    : []),
   { key: "guest", label: "Guests Only" },
   { key: "active", label: "With Bookings" },
 ];

@@ -1,7 +1,10 @@
 // src/app/admin/location-requests/page.tsx
+// HIDDEN FOR PHASE 1 (2026-08-08): renders a Phase 2 notice while
+// NEXT_PUBLIC_ENABLE_GARAGE_PORTAL is off — see src/lib/garagePortal.ts.
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   MapPin,
   Search,
@@ -63,6 +66,29 @@ interface Stats {
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
 export default function AdminLocationRequestsPage() {
+  // PHASE 1 GUARD (2026-08-08): see src/lib/garagePortal.ts
+  if (!FEATURES.GARAGE_PORTAL) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-6 lg:px-8">
+        <div className="mx-auto max-w-2xl">
+          <h1 className="mb-4 text-xl font-semibold text-slate-900">Location Requests</h1>
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-700">
+              The garage portal is part of Phase 2.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Phase 1 runs transport only, with no garage involvement. This
+              page returns when NEXT_PUBLIC_ENABLE_GARAGE_PORTAL is switched on.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return <AdminLocationRequestsPageInner />;
+}
+
+function AdminLocationRequestsPageInner() {
   const [requests, setRequests] = useState<LocationChangeRequest[]>([]);
   const [stats, setStats] = useState<Stats>({
     total: 0,

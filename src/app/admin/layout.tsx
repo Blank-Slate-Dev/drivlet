@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   LayoutDashboard,
   BarChart3,
@@ -252,12 +253,17 @@ export default function AdminLayout({
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/drivers", label: "Drivers", icon: Car },
     { href: "/admin/roster", label: "Roster", icon: CalendarDays },
-    // Restored 2026-08-05 (audit B-1). While these were hidden there was NO
-    // reachable way to approve a garage — every garage registration sat on
-    // /garage/pending forever — and no way to review a garage's location
-    // change request. Both pages and their APIs were already complete.
-    { href: "/admin/garages", label: "Garages", icon: Building2 },
-    { href: "/admin/location-requests", label: "Location Requests", icon: MapPin },
+    // HIDDEN FOR PHASE 1 (2026-08-08): the whole garage portal is inert
+    // behind NEXT_PUBLIC_ENABLE_GARAGE_PORTAL (see src/lib/garagePortal.ts),
+    // so garage approvals and location requests are moot until Phase 2.
+    // (These were previously restored 2026-08-05 because hiding them left no
+    // approval path — that concern returns WITH the flag in Phase 2.)
+    ...(FEATURES.GARAGE_PORTAL
+      ? [
+          { href: "/admin/garages", label: "Garages", icon: Building2 },
+          { href: "/admin/location-requests", label: "Location Requests", icon: MapPin },
+        ]
+      : []),
     { href: "/admin/payment-disputes", label: "Payment Disputes", icon: AlertTriangle },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/inquiries", label: "Inquiries", icon: MessageSquare },
