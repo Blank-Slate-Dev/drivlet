@@ -20,7 +20,8 @@ import {
   Calendar,
   User,
   Users,
-  Filter,
+  SlidersHorizontal,
+  ChevronDown,
   Ban,
   FileText,
   Briefcase,
@@ -131,16 +132,15 @@ interface Driver {
   };
 }
 
-interface Stats {
-  total: number;
-  pending: number;
-  approved: number;
-  rejected: number;
-  suspended: number;
-  clockedIn?: number;
-}
-
 type StatusFilter = "all" | "pending" | "approved" | "rejected" | "suspended";
+
+const STATUS_FILTER_OPTIONS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "rejected", label: "Rejected" },
+  { key: "suspended", label: "Suspended" },
+];
 
 const LICENSE_CLASS_LABELS: Record<string, string> = {
   C: "Car (C)",
@@ -183,14 +183,9 @@ const docKindFromUrl = (url: string): "PDF" | "Image" =>
 
 export default function AdminDriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    total: 0,
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-    suspended: 0,
-  });
   const [loading, setLoading] = useState(true);
+  // Collapsible filter bar, same pattern as Bookings/Users (2026-08-07)
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -275,7 +270,6 @@ export default function AdminDriversPage() {
       if (!response.ok) throw new Error("Failed to fetch drivers");
       const data = await response.json();
       setDrivers(data.drivers);
-      setStats(data.stats);
       setError("");
     } catch {
       setError("Failed to load driver applications");
@@ -381,18 +375,19 @@ export default function AdminDriversPage() {
     });
   };
 
+  // Bordered chip palette — consistent with the other admin pages
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-amber-100 text-amber-700";
+        return "border-amber-200 bg-amber-50 text-amber-700";
       case "approved":
-        return "bg-green-100 text-green-700";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
       case "rejected":
-        return "bg-red-100 text-red-700";
+        return "border-red-200 bg-red-50 text-red-600";
       case "suspended":
-        return "bg-slate-100 text-slate-700";
+        return "border-slate-200 bg-slate-50 text-slate-600";
       default:
-        return "bg-slate-100 text-slate-700";
+        return "border-slate-200 bg-slate-50 text-slate-600";
     }
   };
 
@@ -436,140 +431,87 @@ export default function AdminDriversPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Driver Applications</h1>
-            <p className="mt-1 text-slate-600">
-              Review and manage driver partner submissions
-            </p>
-          </div>
+        {/* Top bar — dashboard rhythm */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-900">Drivers</h1>
           <button
             onClick={fetchDrivers}
-            className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                <Car className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-white">{stats.total}</p>
-                <p className="text-xs text-emerald-100">Total</p>
-              </div>
+        {/* Filter bar — slim, expandable (same pattern as Bookings/Users) */}
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2 p-2.5">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by name, email, phone, licence, or suburb…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-transparent bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
             </div>
-          </div>
 
-          <button
-            onClick={() => setStatusFilter("pending")}
-            className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md text-left ${
-              statusFilter === "pending"
-                ? "border-amber-300 bg-amber-50"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
-                <Clock className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">{stats.pending}</p>
-                <p className="text-xs text-slate-500">Pending</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter("approved")}
-            className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md text-left ${
-              statusFilter === "approved"
-                ? "border-green-300 bg-green-50"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">{stats.approved}</p>
-                <p className="text-xs text-slate-500">Approved</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter("rejected")}
-            className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md text-left ${
-              statusFilter === "rejected"
-                ? "border-red-300 bg-red-50"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100">
-                <XCircle className="h-5 w-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">{stats.rejected}</p>
-                <p className="text-xs text-slate-500">Rejected</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter("suspended")}
-            className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md text-left ${
-              statusFilter === "suspended"
-                ? "border-slate-400 bg-slate-100"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200">
-                <Ban className="h-5 w-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">{stats.suspended}</p>
-                <p className="text-xs text-slate-500">Suspended</p>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Search and Filter Bar */}
-        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, phone, license, or suburb..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            {!filtersOpen && statusFilter !== "all" && (
+              <button
+                onClick={() => setStatusFilter("all")}
+                className="hidden shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 sm:inline-flex"
+                title="Clear status filter"
               >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="suspended">Suspended</option>
-              </select>
+                {STATUS_FILTER_OPTIONS.find((o) => o.key === statusFilter)?.label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-expanded={filtersOpen}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                filtersOpen
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {statusFilter !== "all" && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+                  1
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${filtersOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+              filtersOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="flex flex-wrap gap-1.5 border-t border-slate-100 p-3">
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setStatusFilter(option.key)}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                      statusFilter === option.key
+                        ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -607,24 +549,24 @@ export default function AdminDriversPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-100 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-6 py-4">Driver</th>
-                    <th className="px-6 py-4">Location</th>
-                    <th className="px-6 py-4">License</th>
-                    <th className="px-6 py-4">Type</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Clock</th>
-                    <th className="px-6 py-4">Submitted</th>
-                    <th className="px-6 py-4">Actions</th>
+                    <th className="px-4 py-2.5">Driver</th>
+                    <th className="px-4 py-2.5">Location</th>
+                    <th className="px-4 py-2.5">License</th>
+                    <th className="px-4 py-2.5">Type</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">Clock</th>
+                    <th className="px-4 py-2.5">Submitted</th>
+                    <th className="px-4 py-2.5">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredDrivers.map((driver) => (
-                    <tr key={driver._id} className="transition hover:bg-slate-50">
-                      <td className="px-6 py-4">
+                    <tr key={driver._id} onClick={() => setSelectedDriver(driver)} className="cursor-pointer transition hover:bg-slate-50">
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
                             {driver.firstName.charAt(0)}{driver.lastName.charAt(0)}
                           </div>
                           <div>
@@ -637,8 +579,8 @@ export default function AdminDriversPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-slate-900">
+                      <td className="px-4 py-2.5">
+                        <p className="text-xs text-slate-800">
                           {driver.address.suburb}, {driver.address.state}
                         </p>
                         <p className="text-xs text-slate-500">
@@ -646,39 +588,39 @@ export default function AdminDriversPage() {
                           {driver.preferredAreas.length > 2 && ` +${driver.preferredAreas.length - 2}`}
                         </p>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-slate-900">{driver.license.number}</p>
+                      <td className="px-4 py-2.5">
+                        <p className="text-xs text-slate-800">{driver.license.number}</p>
                         <p className="text-xs text-slate-500">
                           {LICENSE_CLASS_LABELS[driver.license.class] || driver.license.class} • {driver.license.state}
                         </p>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                           driver.employmentType === "contractor"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-blue-100 text-blue-700"
+                            ? "border-purple-200 bg-purple-50 text-purple-700"
+                            : "border-blue-200 bg-blue-50 text-blue-700"
                         }`}>
                           {driver.employmentType === "contractor" ? "Contractor" : "Employee"}
                         </span>
                         {driver.hasOwnVehicle && (
-                          <span className="ml-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          <span className="ml-1 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
                             <Car className="mr-1 h-3 w-3" />
                             Own car
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(driver.status)}`}>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${getStatusColor(driver.status)}`}>
                           {getStatusIcon(driver.status)}
                           {driver.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-2.5">
                         {driver.status === "approved" ? (
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                             driver.isClockedIn
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-600"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-slate-50 text-slate-600"
                           }`}>
                             <span className={`w-2 h-2 rounded-full ${driver.isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
                             {driver.isClockedIn ? "Active" : "Off"}
@@ -687,14 +629,14 @@ export default function AdminDriversPage() {
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">{formatDate(driver.submittedAt)}</p>
+                      <td className="px-4 py-2.5">
+                        <p className="text-xs text-slate-500">{formatDate(driver.submittedAt)}</p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setSelectedDriver(driver)}
-                            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
+                            onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             View
@@ -702,7 +644,7 @@ export default function AdminDriversPage() {
                           {driver.status === "pending" && (
                             <>
                               <button
-                                onClick={() => handleAction(driver._id, "approve")}
+                                onClick={(e) => { e.stopPropagation(); handleAction(driver._id, "approve"); }}
                                 disabled={actionLoading}
                                 className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
                               >
@@ -710,7 +652,7 @@ export default function AdminDriversPage() {
                                 Approve
                               </button>
                               <button
-                                onClick={() => openRejectModal(driver._id)}
+                                onClick={(e) => { e.stopPropagation(); openRejectModal(driver._id); }}
                                 disabled={actionLoading}
                                 className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
                               >
@@ -742,8 +684,8 @@ export default function AdminDriversPage() {
 
           {/* Results count */}
           {!loading && filteredDrivers.length > 0 && (
-            <div className="border-t border-slate-100 px-6 py-4">
-              <p className="text-sm text-slate-500">
+            <div className="border-t border-slate-100 px-4 py-3">
+              <p className="text-xs text-slate-400">
                 Showing {filteredDrivers.length} of {drivers.length} applications
                 {search && ` matching "${search}"`}
                 {statusFilter !== "all" && ` (${statusFilter})`}
