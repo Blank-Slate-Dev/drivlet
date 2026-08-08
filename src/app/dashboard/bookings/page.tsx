@@ -5,12 +5,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
-  ClipboardList,
   Car,
   Loader2,
-  Home,
   Calendar,
   RefreshCw,
   AlertCircle,
@@ -161,107 +158,34 @@ export default function BookingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-700">
-        <div className="absolute inset-0 z-0 opacity-10">
-          <div
-            className="h-full w-full"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            }}
-          />
-        </div>
-        <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="relative h-12 w-40 sm:h-14 sm:w-48">
-                <Image
-                  src="/logo.png"
-                  alt="drivlet"
-                  fill
-                  className="object-contain brightness-0 invert"
-                  priority
-                />
-              </div>
-            </Link>
-            <span className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-xs font-medium text-white">
-              <ClipboardList className="h-3.5 w-3.5" />
-              Booking History
-            </span>
-          </div>
-          <nav className="flex items-center gap-2">
+      {/* Slim top bar — matches the customer dashboard (2026-08-08 redesign;
+          the old gradient hero header and four stat boxes are gone) */}
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base font-semibold text-slate-900">Booking history</h1>
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-white/10 hover:text-white"
+              className="hidden text-xs font-medium text-slate-400 transition hover:text-emerald-600 sm:block"
             >
-              <Car className="h-4 w-4" />
-              <span className="hidden sm:inline">Active Booking</span>
+              ← Dashboard
             </Link>
-            <Link
-              href="/"
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-white/10 hover:text-white"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Home</span>
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Page Title */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Booking History
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              View and track all your past and current bookings
-            </p>
           </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 rounded-full bg-white border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw
-              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
+      </header>
 
-        {/* Stats Summary */}
-        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
-            <div className="text-2xl font-bold text-slate-900">
-              {stats.total}
-            </div>
-            <div className="text-sm text-slate-500">Total Bookings</div>
-          </div>
-          <div className="rounded-xl bg-blue-50 border border-blue-200 p-4">
-            <div className="text-2xl font-bold text-blue-700">
-              {stats.in_progress}
-            </div>
-            <div className="text-sm text-blue-600">In Progress</div>
-          </div>
-          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-            <div className="text-2xl font-bold text-emerald-700">
-              {stats.completed}
-            </div>
-            <div className="text-sm text-emerald-600">Completed</div>
-          </div>
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-            <div className="text-2xl font-bold text-amber-700">
-              {stats.pending}
-            </div>
-            <div className="text-sm text-amber-600">Pending</div>
-          </div>
-        </div>
-
+      {/* Main Content */}
+      <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6">
         {/* Filters */}
-        <div className="mb-6">
+        <div className="mb-4">
           <BookingFilters
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}

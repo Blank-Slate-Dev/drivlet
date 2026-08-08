@@ -15,7 +15,6 @@ import {
   Loader2,
   AlertTriangle,
   Wrench,
-  Building2,
   Camera,
   Star,
   User,
@@ -28,6 +27,8 @@ import VehiclePhotosViewer from "@/components/customer/VehiclePhotosViewer";
 import PickupConsentForm from "@/components/forms/PickupConsentForm";
 import ReturnConfirmationForm from "@/components/forms/ReturnConfirmationForm";
 import ClaimLodgementForm from "@/components/forms/ClaimLodgementForm";
+import SignedFormViewer from "@/components/dashboard/SignedFormViewer";
+import { customerCanSignForm } from "@/lib/formRequirements";
 
 interface IUpdate {
   stage: string;
@@ -144,6 +145,9 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
   const [showPickupForm, setShowPickupForm] = useState(false);
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showClaimForm, setShowClaimForm] = useState(false);
+  const [viewSignedForm, setViewSignedForm] = useState<
+    "pickup_consent" | "return_confirmation" | null
+  >(null);
   const config = statusConfig[booking.status];
   const StatusIcon = config.icon;
 
@@ -156,6 +160,16 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
   const hasClaimLodged = booking.signedForms?.some(
     (f) => f.formType === "claim_lodgement"
   );
+
+  // Leg gating (2026-08-08): forms are signed WITH THE DRIVER at each leg —
+  // the sign buttons only appear once that leg is underway (mirrors the
+  // server-side rule in the forms POST route via the shared helper).
+  const canSignPickup =
+    !hasPickupConsent &&
+    customerCanSignForm("pickup_consent", booking.currentStage, booking.status);
+  const canSignReturn =
+    !hasReturnConfirmation &&
+    customerCanSignForm("return_confirmation", booking.currentStage, booking.status);
 
   const bookingForForms = {
     _id: booking._id,
@@ -175,8 +189,14 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
     createdAt: booking.createdAt,
   };
 
-  const formatDate = (dateString: string) => {
+  // Date-safe formatters (2026-08-08): pickupTime/dropoffTime on request-flow
+  // bookings hold human window strings ("8:00 AM - 10:00 AM"), NOT ISO dates —
+  // new Date(...) produced the "Invalid Date / Invalid Date" card bug. Parse
+  // when parseable, otherwise show the raw string / fall back gracefully.
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return null;
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
     return date.toLocaleDateString("en-AU", {
       weekday: "short",
       day: "numeric",
@@ -185,16 +205,18 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
     });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-AU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  /** Time-or-window: ISO dates render as clock time, window strings verbatim */
+  const formatTimeish = (value: string | undefined) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value;
+    return date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
   };
 
-  const formatDateTime = (dateString: string) => {
+  const formatDateTime = (dateString: string | undefined) => {
+    if (!dateString) return "—";
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
     return date.toLocaleString("en-AU", {
       day: "numeric",
       month: "short",
@@ -202,6 +224,15 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
       minute: "2-digit",
     });
   };
+
+  // Workshop names arrive as free text ("broadmedow") — present them tidily
+  const titleCase = (value: string) =>
+    value.replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Card date line: the booking's service/pickup date when parseable,
+  // otherwise the booked-on date (never "Invalid Date")
+  const cardDate = formatDate(booking.pickupTime) || formatDate(booking.createdAt);
+  const cardWindow = formatTimeish(booking.pickupTime);
 
   const handleFormSuccess = () => {
     setShowPickupForm(false);
@@ -211,72 +242,63 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
   };
 
   return (
-    <div
-      className={`rounded-2xl border ${config.borderColor} ${config.bgColor} overflow-hidden transition-all`}
-    >
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all">
       {/* Main Card Content */}
       <div className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           {/* Left Side - Booking Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {/* Plate badge — matches the dashboard */}
+              <span className="inline-block w-fit whitespace-nowrap rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-center font-mono text-xs font-semibold uppercase tracking-wide text-slate-800">
+                {booking.vehicleRegistration}
+              </span>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${config.bgColor} ${config.color} border ${config.borderColor}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${config.bgColor} ${config.color} ${config.borderColor}`}
               >
                 <StatusIcon
-                  className={`h-3.5 w-3.5 ${
+                  className={`h-3 w-3 ${
                     booking.status === "in_progress" ? "animate-spin" : ""
                   }`}
                 />
                 {config.label}
               </span>
               {booking.isManualTransmission && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-xs font-medium text-amber-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                   <AlertTriangle className="h-3 w-3" />
                   Manual
                 </span>
               )}
-              {booking.hasExistingBooking && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 border border-purple-300 px-2 py-0.5 text-xs font-medium text-purple-700">
-                  <Building2 className="h-3 w-3" />
-                  Garage Booking
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 text-slate-900">
-              <Car className="h-4 w-4 text-slate-500 flex-shrink-0" />
-              <span className="font-semibold truncate">
-                {booking.vehicleRegistration}
-              </span>
-              <span className="text-slate-400">•</span>
-              <span className="text-sm text-slate-600 truncate">
-                {booking.vehicleState}
-              </span>
+              {/* "Garage Booking" chip removed 2026-08-08 — garages are a
+                  Phase 2 concept, hidden from customers */}
             </div>
 
             <div className="mt-2 flex items-start gap-2 text-sm text-slate-600">
-              <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
               <span className="truncate">{booking.pickupAddress}</span>
             </div>
 
-            <div className="mt-2 flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1.5 text-slate-600">
-                <Calendar className="h-4 w-4 text-slate-400" />
-                <span>{formatDate(booking.pickupTime)}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-600">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <span>{formatTime(booking.pickupTime)}</span>
-              </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              {cardDate && (
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <Calendar className="h-4 w-4 text-slate-400" />
+                  <span>{cardDate}</span>
+                </div>
+              )}
+              {cardWindow && cardWindow !== cardDate && (
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <Clock className="h-4 w-4 text-slate-400" />
+                  <span>{cardWindow}</span>
+                </div>
+              )}
             </div>
 
             {booking.garageName && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-purple-600">
-                <Wrench className="h-4 w-4" />
-                <span>{booking.garageName}</span>
+              <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-600">
+                <Wrench className="h-4 w-4 text-slate-400" />
+                <span>{titleCase(booking.garageName)}</span>
                 {booking.existingBookingRef && (
-                  <span className="text-purple-400">
+                  <span className="text-slate-400">
                     (Ref: {booking.existingBookingRef})
                   </span>
                 )}
@@ -341,35 +363,44 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
                   View Photos
                 </button>
 
-                {!hasPickupConsent ? (
+                {/* Pickup form: sign only while that leg is underway (with
+                    the driver present); signed → view-only. Hidden before
+                    the leg is reached. Server enforces the same rule. */}
+                {hasPickupConsent ? (
+                  <button
+                    onClick={() => setViewSignedForm("pickup_consent")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 transition hover:border-emerald-300"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Pickup Signed · View
+                  </button>
+                ) : canSignPickup ? (
                   <button
                     onClick={() => setShowPickupForm(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 transition"
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
                   >
                     <ClipboardCheck className="h-4 w-4" />
-                    Pickup Form
+                    Sign Pickup Form
                   </button>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Pickup Signed
-                  </span>
-                )}
+                ) : null}
 
-                {!hasReturnConfirmation ? (
+                {hasReturnConfirmation ? (
+                  <button
+                    onClick={() => setViewSignedForm("return_confirmation")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:border-blue-300"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Return Signed · View
+                  </button>
+                ) : canSignReturn ? (
                   <button
                     onClick={() => setShowReturnForm(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-100 hover:bg-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition"
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
                   >
                     <PackageCheck className="h-4 w-4" />
-                    Return Form
+                    Sign Return Form
                   </button>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-medium text-blue-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Return Signed
-                  </span>
-                )}
+                ) : null}
 
                 <button
                   onClick={() => setShowClaimForm(true)}
@@ -615,6 +646,16 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
         onClose={() => setShowClaimForm(false)}
         onSuccess={handleFormSuccess}
       />
+
+      {/* Read-only viewer for already-signed handover forms */}
+      {viewSignedForm && (
+        <SignedFormViewer
+          bookingId={booking._id}
+          formType={viewSignedForm}
+          isOpen={true}
+          onClose={() => setViewSignedForm(null)}
+        />
+      )}
     </div>
   );
 }
