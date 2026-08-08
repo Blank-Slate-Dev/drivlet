@@ -8,6 +8,7 @@ import User from "@/models/User";
 import SignedForm, { FormType } from "@/models/SignedForm";
 import { sendSignedFormEmail } from "@/lib/email";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
+import { customerCanSignForm } from "@/lib/formRequirements";
 
 // A driver may only submit/view forms for bookings they are assigned to
 // (pickup or return leg) — mirrors the photos route.
@@ -119,6 +120,35 @@ export async function POST(
         { error: "Invalid form type" },
         { status: 400 }
       );
+    }
+
+    // ── Leg gating + duplicate guard (2026-08-08) ──
+    // Handover forms are signed with the driver present at that leg, so they
+    // must not be signable before the leg is underway — and never twice.
+    // Admins bypass (edge cleanup); drivers are already sequenced by their
+    // own status machine but the same rule holds for them too.
+    if (formType === "pickup_consent" || formType === "return_confirmation") {
+      const alreadySigned = booking.signedForms?.some(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- signedForms subdoc refs
+        (f: any) => f.formType === formType
+      );
+      if (alreadySigned) {
+        return NextResponse.json(
+          { error: "This form has already been signed. You can view your signed copy from your booking." },
+          { status: 409 }
+        );
+      }
+      if (!isAdmin && !customerCanSignForm(formType, booking.currentStage, booking.status)) {
+        return NextResponse.json(
+          {
+            error:
+              formType === "pickup_consent"
+                ? "The pickup form is signed with your driver at collection. It becomes available once your driver is on the way."
+                : "The return form is signed with your driver at delivery. It becomes available once your car is on its way back.",
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Dispute path: on the return form the customer can refuse to sign.

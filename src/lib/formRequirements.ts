@@ -48,3 +48,39 @@ export function hasSignedForm(
     typeof f === "string" ? f === required : f.formType === required
   );
 }
+
+// ── Customer-side leg gating (2026-08-08) ──────────────────────────────────
+// Signing happens WITH THE DRIVER PRESENT at each leg, so a customer must not
+// be able to open/sign a form before that leg is underway. Shared by the
+// booking-history UI and the forms POST API so the rules can't drift.
+//
+// Pickup consent: signable from the moment the driver is en route (the driver
+// flow gates 'collected' on it, so it must be signable BEFORE car_picked_up),
+// and stays signable afterwards as a catch-up.
+export const PICKUP_SIGNABLE_STAGES = [
+  "driver_en_route",
+  "car_picked_up",
+  "at_garage",
+  "service_in_progress",
+  "ready_for_return",
+  "driver_returning",
+  "delivered",
+];
+
+// Return confirmation: signable only once the car is on its way back (the
+// driver flow gates 'delivered' on it, so driver_returning must qualify).
+export const RETURN_SIGNABLE_STAGES = ["driver_returning", "delivered"];
+
+/** Can the customer sign this form at the booking's current point? */
+export function customerCanSignForm(
+  formType: GatedFormType,
+  currentStage: string | undefined,
+  status: string | undefined
+): boolean {
+  if (status === "cancelled") return false;
+  const stage = currentStage || "booking_confirmed";
+  if (formType === "pickup_consent") {
+    return PICKUP_SIGNABLE_STAGES.includes(stage) || status === "completed";
+  }
+  return RETURN_SIGNABLE_STAGES.includes(stage) || status === "completed";
+}
