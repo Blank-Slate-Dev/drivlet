@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import Header from '@/components/Header';
 import Footer from '@/components/homepage/Footer';
 import {
@@ -512,6 +513,7 @@ function PolicyCard({
         {/* Header — always visible */}
         <button
           onClick={onToggle}
+          aria-expanded={isExpanded}
           className="w-full flex items-start gap-4 p-6 sm:p-8 text-left cursor-pointer"
         >
           <div className="rounded-xl bg-emerald-100 p-2.5 flex-shrink-0">
@@ -533,14 +535,18 @@ function PolicyCard({
           </div>
         </button>
 
-        {/* Expandable content */}
+        {/* Expandable content — grid-rows trick animates to the TRUE height
+            (max-h-[10000px] overshot by thousands of px, making the collapse
+            of a tall section wildly jumpy); motion-reduce skips it */}
         <div
-          className={`overflow-hidden transition-all duration-500 ease-in-out ${
-            isExpanded ? 'max-h-[10000px] opacity-100' : 'max-h-0 opacity-0'
+          className={`grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${
+            isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
           }`}
         >
-          <div className="px-6 sm:px-8 pb-8 pt-0">
-            <div className="border-t border-slate-100 pt-6">{policy.content}</div>
+          <div className="overflow-hidden">
+            <div className="px-6 sm:px-8 pb-8 pt-0">
+              <div className="border-t border-slate-100 pt-6">{policy.content}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -554,15 +560,37 @@ function PolicyCard({
 
 export default function PoliciesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
+  // One-open-at-a-time: opening a section while another (above) is open
+  // collapses the first, and the shrinking content + browser scroll
+  // anchoring lurched the viewport to the bottom of the page (same bug
+  // class as the homepage FAQ, fixed 33c2864). After the collapse/expand
+  // animation settles, gently bring the opened section into view under the
+  // sticky header (scroll-mt-28 on each section).
   const togglePolicy = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedId((prev) => {
+      const isOpening = prev !== id;
+      if (isOpening) {
+        const delay = prefersReducedMotion ? 0 : 320; // just after the 300ms animation
+        window.setTimeout(() => {
+          document.getElementById(id)?.scrollIntoView({
+            block: 'start',
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          });
+        }, delay);
+      }
+      return isOpening ? id : null;
+    });
   };
 
   const scrollToPolicy = (id: string) => {
     setExpandedId(id);
     setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById(id)?.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
     }, 100);
   };
 
@@ -594,9 +622,10 @@ export default function PoliciesPage() {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content — overflow-anchor:none stops browser scroll anchoring
+            fighting the collapse animation (see togglePolicy) */}
         <div className="mx-auto max-w-4xl px-4 sm:px-6 -mt-8">
-          <div className="space-y-4">
+          <div className="space-y-4 [overflow-anchor:none]">
             {policies.map((policy) => (
               <PolicyCard
                 key={policy.id}

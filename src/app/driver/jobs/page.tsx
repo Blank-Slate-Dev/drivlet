@@ -581,9 +581,22 @@ export default function DriverJobsPage() {
   }, [myJobs]);
 
   // ─── Accordion: one expanded job at a time ────────────────
+  // Same viewport-lurch class as the policies/FAQ accordions (opening a
+  // card collapses the one above; scroll anchoring fights the shrink):
+  // after the toggle settles, keep the opened card gently in view.
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const toggleExpanded = useCallback((jobId: string) => {
-    setExpandedJobId((prev) => (prev === jobId ? null : jobId));
+    setExpandedJobId((prev) => {
+      const isOpening = prev !== jobId;
+      if (isOpening) {
+        window.setTimeout(() => {
+          document
+            .getElementById(`job-card-${jobId}`)
+            ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }, 260);
+      }
+      return isOpening ? jobId : null;
+    });
   }, []);
 
   // ─── Search & filter (client-side, over already-fetched jobs) ──
@@ -769,7 +782,7 @@ export default function DriverJobsPage() {
                             {section.jobs.length}
                           </span>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-3 [overflow-anchor:none]">
                           <AnimatePresence mode="popLayout">
                             {section.jobs.map((job) => (
                               <MyJobCard
@@ -1326,10 +1339,11 @@ function MyJobCard({
   return (
     <motion.div
       layout
+      id={`job-card-${job._id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm ${stage.accent} ${
+      className={`scroll-mt-20 overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm ${stage.accent} ${
         isNew ? "border-emerald-300 ring-2 ring-emerald-400/40" : "border-slate-200"
       }`}
     >
