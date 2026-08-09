@@ -46,7 +46,8 @@ export default function HomeContent() {
             Areas we serve
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
-            Drivlet currently operates across NSW and Canberra.
+            Drivlet currently operates across NSW and Canberra, with Queensland
+            on the way.
           </p>
 
           {/* HIDDEN FOR CURRENT PHASE — location page links. Re-enable when expanding launch areas.
@@ -65,8 +66,10 @@ export default function HomeContent() {
           </div>
           */}
 
-          {/* Non-clickable current-service-area badges */}
-          <div className="mx-auto mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
+          {/* Non-clickable current-service-area badges. Queensland is a
+              coming-soon card only (2026-08-08) — no booking flow, and the
+              booking form's service-area validation is untouched. */}
+          <div className="mx-auto mt-10 grid max-w-4xl gap-4 sm:grid-cols-3">
             {[
               { label: 'New South Wales' },
               { label: 'Canberra (ACT)' },
@@ -79,6 +82,13 @@ export default function HomeContent() {
                 <span className="text-lg font-semibold">{area.label}</span>
               </div>
             ))}
+            <div className="relative flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500 shadow-sm">
+              <MapPin className="h-5 w-5 shrink-0 text-slate-400" />
+              <span className="text-lg font-semibold">Queensland</span>
+              <span className="absolute -top-2.5 right-4 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                Coming soon
+              </span>
+            </div>
           </div>
         </div>
       </section>
