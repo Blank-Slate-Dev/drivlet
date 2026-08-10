@@ -54,6 +54,9 @@ export interface IBookingRequest extends Document {
   garageName: string | null;
   garageAddress: string | null;
   garagePlaceId: string | null;
+  /** Customer typed the workshop themselves (not from the picker) — the
+   *  ops team should verify it. Just a destination, no garage account. */
+  garageManualEntry?: boolean;
   existingBookingRef: string | null;
 
   // Services
@@ -158,6 +161,7 @@ const BookingRequestSchema = new Schema<IBookingRequest>(
     garageName: { type: String, default: null },
     garageAddress: { type: String, default: null },
     garagePlaceId: { type: String, default: null },
+    garageManualEntry: { type: Boolean, default: false },
     existingBookingRef: { type: String, default: null },
     // audit B-18: the wizard has always sent these two, but neither was
     // destructured by /api/booking-requests nor present here, so Mongoose

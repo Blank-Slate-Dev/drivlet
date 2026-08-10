@@ -154,6 +154,8 @@ export async function POST(request: NextRequest) {
       garageName: requestDoc.garageName || null,
       garageAddress: requestDoc.garageAddress || null,
       garagePlaceId: requestDoc.garagePlaceId || null,
+      // Manual workshop entry (2026-08-08): flagged so admin can verify
+      garageManualEntry: requestDoc.garageManualEntry === true,
       existingBookingRef: requestDoc.existingBookingRef || null,
       // audit B-18: these were hardcoded to null / never copied, so the
       // customer's driver instructions and their booked garage appointment
@@ -237,8 +239,12 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Auto-assign to matching garage
-    if (requestDoc.garagePlaceId) {
+    // Auto-assign to matching garage. NEVER for manual workshop entries
+    // (2026-08-08): they are free-text destinations with no garage account,
+    // and name-matching could false-positive onto a registered garage.
+    if (requestDoc.garageManualEntry === true) {
+      console.log("request-payment-webhook: manual workshop entry — skipping garage auto-assign");
+    } else if (requestDoc.garagePlaceId) {
       const matchingGarage = await db.collection("garages").findOne({
         linkedGaragePlaceId: requestDoc.garagePlaceId,
         status: "approved",

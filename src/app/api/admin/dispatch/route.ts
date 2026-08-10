@@ -127,6 +127,7 @@ export async function GET() {
       pickupAddress: b.pickupAddress,
       garageName: b.garageName,
       garageAddress: b.garageAddress,
+      garageManualEntry: b.garageManualEntry === true,
       pickupTime: b.pickupTime,
       dropoffTime: b.dropoffTime,
       pickupTimeSlot: b.pickupTimeSlot,

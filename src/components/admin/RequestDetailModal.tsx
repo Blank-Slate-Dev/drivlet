@@ -50,6 +50,7 @@ export interface BookingRequestItem {
   dropoffTimeSlot: string;
   garageName: string | null;
   garageAddress: string | null;
+  garageManualEntry?: boolean;
   distanceZone: string;
   distanceSurcharge: number;
   distanceKm: number;
@@ -605,7 +606,14 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
               </div>
               {req.garageName && (
                 <div className="border-t border-slate-200 pt-2">
-                  <span className="text-xs text-slate-500">Garage</span>
+                  <span className="flex items-center gap-2 text-xs text-slate-500">
+                    Garage
+                    {req.garageManualEntry && (
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        Entered manually — please verify
+                      </span>
+                    )}
+                  </span>
                   <p className="font-medium text-slate-900">{req.garageName}</p>
                   {req.garageAddress && <p className="text-xs text-slate-600">{req.garageAddress}</p>}
                 </div>

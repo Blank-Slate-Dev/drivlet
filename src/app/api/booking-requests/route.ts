@@ -71,7 +71,32 @@ export async function POST(request: NextRequest) {
       promoCode,
       policiesAgreed,
       marketingOptIn,
+      garageManualEntry,
     } = body;
+
+    // ── Manual workshop entry (2026-08-08) ──
+    // A free-text destination, NOT a garage account. Coordinates still come
+    // from a Places address selection, so the distance/zone validation below
+    // applies identically. Sanitise the name and never accept a placeId for
+    // a manual entry (nothing may auto-match it to a registered garage).
+    const isManualGarage = garageManualEntry === true;
+    if (isManualGarage) {
+      const cleanName = typeof garageName === "string"
+        ? garageName.replace(/[<>]/g, "").trim()
+        : "";
+      if (cleanName.length < 2 || cleanName.length > 80 || !/[a-zA-Z]/.test(cleanName)) {
+        return NextResponse.json(
+          { error: "Please enter a valid workshop name (2 to 80 characters)." },
+          { status: 400 }
+        );
+      }
+      if (typeof garageAddress !== "string" || !garageAddress.trim()) {
+        return NextResponse.json(
+          { error: "Please choose your workshop address from the suggestions list." },
+          { status: 400 }
+        );
+      }
+    }
 
     // Required policy agreements (Terms, Privacy + Cancellation, Damage & Claims)
     if (policiesAgreed !== true) {
@@ -210,9 +235,13 @@ export async function POST(request: NextRequest) {
       dropoffTimeSlot: dropoffTimeSlot || "",
       estimatedServiceDuration: estimatedServiceDuration ? parseInt(String(estimatedServiceDuration)) : null,
       hasExistingBooking: !!hasExistingBooking,
-      garageName: garageName || null,
+      garageName: isManualGarage
+        ? String(garageName).replace(/[<>]/g, "").trim()
+        : garageName || null,
       garageAddress: garageAddress || null,
-      garagePlaceId: garagePlaceId || null,
+      // Manual entries must never carry a placeId (no auto-matching)
+      garagePlaceId: isManualGarage ? null : garagePlaceId || null,
+      garageManualEntry: isManualGarage,
       existingBookingRef: existingBookingRef || null,
       // audit B-18: the wizard has always sent these; nothing read them.
       garageBookingTime: garageBookingTime || null,
@@ -262,7 +291,7 @@ export async function POST(request: NextRequest) {
         vehicleRegistration: bookingRequest.vehicleRegistration,
         pickupAddress: bookingRequest.pickupAddress,
         quotedAmount,
-        garageName: garageName || null,
+        garageName: bookingRequest.garageName || null,
       });
     } catch (notifyErr) {
       console.error("notifyAdminOfNewRequest threw (non-fatal):", notifyErr);

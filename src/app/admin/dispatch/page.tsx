@@ -41,6 +41,8 @@ interface DispatchBooking {
   pickupAddress: string;
   garageName?: string;
   garageAddress?: string;
+  /** Workshop typed manually by the customer — verify before dispatch */
+  garageManualEntry?: boolean;
   pickupTime: string;
   dropoffTime: string;
   pickupTimeSlot?: string;
@@ -422,6 +424,11 @@ export default function DispatchPage() {
                               <Building2 className="mt-0.5 h-3 w-3 flex-shrink-0 text-slate-400" />
                               <span>{booking.garageAddress}</span>
                             </div>
+                          )}
+                          {booking.garageManualEntry && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                              Workshop entered manually — verify before dispatch
+                            </span>
                           )}
                           <div className="flex items-center gap-1.5">
                             <Clock className="h-3 w-3 text-slate-400" />

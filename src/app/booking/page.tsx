@@ -100,6 +100,12 @@ export default function BookingPage() {
   const [garagePlaceId, setGaragePlaceId] = useState('');
   const [garageLat, setGarageLat] = useState<number | null>(null);
   const [garageLng, setGarageLng] = useState<number | null>(null);
+  // Manual workshop entry (2026-08-08): free-text destination for workshops
+  // not in the picker. Address comes via the same Places autocomplete as the
+  // pickup address, so coordinates (and therefore distance pricing and the
+  // service-area check) work exactly like a listed workshop. No garage
+  // account involvement — this is just a booking destination.
+  const [manualGarageMode, setManualGarageMode] = useState(false);
   const [garageBookingTime, setGarageBookingTime] = useState('09:00');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [serviceDate, setServiceDate] = useState('');
@@ -234,6 +240,27 @@ export default function BookingPage() {
   // behind, so the job could be auto-dispatched to the wrong garage.
   const handleGarageSearchChange = (value: string) => { setGarageSearch(value); setGarageAddress(''); setGaragePlaceId(''); setGarageLat(null); setGarageLng(null); };
 
+  // Manual mode: workshop address selected from the Places ADDRESS
+  // autocomplete → coordinates captured, placeId deliberately left empty so
+  // nothing can auto-match it to a registered garage.
+  const handleManualGarageAddressSelect = (details: PlaceDetails) => {
+    setGarageAddress(details.formattedAddress);
+    setGaragePlaceId('');
+    setGarageLat(details.lat ?? null);
+    setGarageLng(details.lng ?? null);
+  };
+
+  const toggleManualGarage = (manual: boolean) => {
+    setManualGarageMode(manual);
+    // Switching modes resets all workshop fields so stale coords from the
+    // other mode can never price the job
+    setGarageSearch('');
+    setGarageAddress('');
+    setGaragePlaceId('');
+    setGarageLat(null);
+    setGarageLng(null);
+  };
+
   const validateDetails = (): string | null => {
     if (!isAuthenticated) {
       if (!guestName.trim()) return 'Please enter your full name.';
@@ -249,9 +276,18 @@ export default function BookingPage() {
     if (!selectedPlaceDetails?.lat || !selectedPlaceDetails?.lng) {
       return 'Please choose your pick-up address from the suggestions list.';
     }
-    if (!garageSearch.trim()) return 'Please search and select your garage.';
-    if (garageLat === null || garageLng === null) {
-      return 'Please choose your garage from the suggestions list.';
+    if (manualGarageMode) {
+      const name = garageSearch.trim();
+      if (name.length < 2 || name.length > 80) return 'Please enter your workshop name (2 to 80 characters).';
+      if (!/[a-zA-Z]/.test(name)) return 'Please enter a valid workshop name.';
+      if (!garageAddress.trim() || garageLat === null || garageLng === null) {
+        return 'Please choose your workshop address from the suggestions list.';
+      }
+    } else {
+      if (!garageSearch.trim()) return 'Please search and select your garage.';
+      if (garageLat === null || garageLng === null) {
+        return 'Please choose your garage from the suggestions list.';
+      }
     }
     if (!garageBookingTime) return 'Please select your garage booking time.';
     return null;
@@ -304,7 +340,9 @@ export default function BookingPage() {
           pickupTimeSlot: selectedPickupSlot, dropoffTimeSlot: selectedDropoffSlot,
           earliestPickup: getPickupSlotLabel(selectedPickupSlot), latestDropoff: getDropoffSlotLabel(selectedDropoffSlot),
           estimatedServiceDuration: serviceTypeInfo?.estimatedHours || 4, hasExistingBooking: true,
-          garageName: garageSearch.trim(), garageAddress: garageAddress.trim(), garagePlaceId,
+          garageName: garageSearch.trim(), garageAddress: garageAddress.trim(),
+          garagePlaceId: manualGarageMode ? '' : garagePlaceId,
+          garageManualEntry: manualGarageMode,
           garageBookingTime: getTimeLabel(garageBookingTime, garageBookingTimeOptions), additionalNotes: additionalNotes.trim(),
           transmissionType, isManualTransmission: transmissionType === 'manual',
           selectedServices: JSON.stringify(selectedServices), primaryServiceCategory, serviceNotes: serviceNotes.trim(),
@@ -489,14 +527,62 @@ export default function BookingPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Your Garage / Mechanic *</label>
-              <p className="text-xs text-slate-500 mb-2">Search for the garage where you&apos;ve already booked your service</p>
-              <GarageAutocomplete
-                value={garageSearch}
-                onChange={handleGarageSearchChange}
-                onSelect={handleGarageSelect}
-                placeholder="e.g. Ultra Tune Jesmond"
-                disabled={isProcessing}
-              />
+              {!manualGarageMode ? (
+                <>
+                  <p className="text-xs text-slate-500 mb-2">Search for the garage where you&apos;ve already booked your service</p>
+                  <GarageAutocomplete
+                    value={garageSearch}
+                    onChange={handleGarageSearchChange}
+                    onSelect={handleGarageSelect}
+                    placeholder="e.g. Ultra Tune Jesmond"
+                    disabled={isProcessing}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleManualGarage(true)}
+                    className="mt-2 text-xs font-medium text-emerald-600 underline underline-offset-2 transition hover:text-emerald-500"
+                  >
+                    Can&apos;t find your workshop? Enter it manually
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                  <p className="text-xs text-slate-600">
+                    Enter your workshop&apos;s name and address. We&apos;ll deliver your
+                    car there just the same, and our team will confirm the
+                    details with you.
+                  </p>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Workshop name *</label>
+                    <input
+                      type="text"
+                      value={garageSearch}
+                      onChange={(e) => setGarageSearch(e.target.value.slice(0, 80))}
+                      placeholder="e.g. Joe's Mechanical"
+                      maxLength={80}
+                      disabled={isProcessing}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Workshop address *</label>
+                    <AddressAutocomplete
+                      value={garageAddress}
+                      onChange={(value) => { setGarageAddress(value); setGarageLat(null); setGarageLng(null); }}
+                      onSelect={handleManualGarageAddressSelect}
+                      placeholder="Start typing the workshop address..."
+                      disabled={isProcessing}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleManualGarage(false)}
+                    className="text-xs font-medium text-slate-500 underline underline-offset-2 transition hover:text-slate-700"
+                  >
+                    Back to workshop search
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Your Booking Time at Garage *</label>

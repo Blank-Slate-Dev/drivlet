@@ -100,6 +100,8 @@ export interface IBooking extends Document {
   garageName?: string;
   garageAddress?: string;
   garagePlaceId?: string;
+  /** Workshop was typed manually by the customer — ops should verify */
+  garageManualEntry?: boolean;
   existingBookingRef?: string;
   existingBookingNotes?: string;
   garageBookingTime?: string | null;
@@ -421,6 +423,11 @@ const BookingSchema = new Schema<IBooking>(
     garagePlaceId: {
       type: String,
       required: false,
+    },
+    // Customer typed the workshop manually (2026-08-08) — flagged in admin
+    garageManualEntry: {
+      type: Boolean,
+      default: false,
     },
     existingBookingRef: {
       type: String,

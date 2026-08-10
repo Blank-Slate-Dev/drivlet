@@ -149,6 +149,7 @@ export interface Booking {
   trackingCode?: string;
   hasExistingBooking: boolean;
   garageName?: string;
+  garageManualEntry?: boolean;
   garageAddress?: string;
   existingBookingRef?: string;
   existingBookingNotes?: string;
@@ -1017,6 +1018,11 @@ export function ViewDetailsModal({
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                 <MapPin className="h-4 w-4 text-emerald-600" />
                 Service Centre
+                {booking.garageManualEntry && (
+                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    Entered manually — please verify
+                  </span>
+                )}
               </div>
               <div className="mt-3">
                 <p className="font-medium text-slate-900">{booking.garageName}</p>
