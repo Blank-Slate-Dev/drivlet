@@ -84,6 +84,15 @@ export default function BookingPage() {
   const router = useRouter();
 
   const [currentStep, setCurrentStep] = useState<Step>('details');
+  // Sticky stepper: transparent at rest, frosted once scrolled so the icons
+  // and labels never collide illegibly with page content (2026-08-09).
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setHeaderScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
@@ -413,7 +422,14 @@ export default function BookingPage() {
     <main className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700 relative">
       <div className="absolute inset-0 z-0 opacity-10"><div className="h-full w-full" style={{ backgroundImage: BG_PATTERN }} /></div>
 
-      <header className="sticky top-0 z-50">
+      {/* Frosted glass only once scrolled — clean at the top of the page */}
+      <header
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          headerScrolled
+            ? 'border-b border-white/10 bg-emerald-900/70 shadow-lg shadow-emerald-950/20 backdrop-blur-md supports-[not(backdrop-filter:blur(0))]:bg-emerald-900/95'
+            : 'border-b border-transparent'
+        }`}
+      >
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2"><div className="relative h-12 w-40 sm:h-14 sm:w-48"><Image src="/logo.png" alt="drivlet" fill className="object-contain brightness-0 invert" priority /></div></Link>
