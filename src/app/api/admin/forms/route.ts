@@ -65,49 +65,102 @@ export async function GET(request: NextRequest) {
     }
 
     const skip = (page - 1) * limit;
-    const [forms, total] = await Promise.all([
-      SignedForm.find(query)
-        // Exclude the heavy base64 signatures from the list payload —
-        // the per-form PDF route serves the full record.
-        .select("bookingId formType formVersion submittedBy submittedByName submittedAt formData.customerRefusedToSign")
-        .sort({ submittedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      SignedForm.countDocuments(query),
+
+    // Grouped by booking (2026-08-09): the pickup and return forms of one
+    // booking travel together as a group. Grouping + pagination happen in
+    // the SAME aggregate so a booking's forms can never split across pages.
+    // Forms without a bookingId become single-form groups keyed by form id.
+    // Groups sort by their most recent activity; forms within a group sort
+    // chronologically (pickup naturally precedes return).
+    // The heavy base64 signatures are excluded — the per-form PDF route
+    // serves the full record.
+    const [result] = await SignedForm.aggregate([
+      { $match: query },
+      { $sort: { submittedAt: 1 } },
+      {
+        $project: {
+          formType: 1,
+          formVersion: 1,
+          submittedBy: 1,
+          submittedByName: 1,
+          submittedAt: 1,
+          bookingId: 1,
+          customerRefused: { $eq: ["$formData.customerRefusedToSign", true] },
+        },
+      },
+      {
+        $group: {
+          _id: { $ifNull: ["$bookingId", "$_id"] },
+          bookingId: { $first: "$bookingId" },
+          forms: { $push: "$$ROOT" },
+          lastActivity: { $max: "$submittedAt" },
+          hasDispute: { $max: { $cond: ["$customerRefused", 1, 0] } },
+        },
+      },
+      { $sort: { lastActivity: -1 } },
+      {
+        $facet: {
+          groups: [{ $skip: skip }, { $limit: limit }],
+          meta: [{ $count: "total" }],
+        },
+      },
     ]);
 
-    // Attach booking context (tracking code, rego, customer) for each form.
+    const rawGroups: Array<{
+      bookingId: Types.ObjectId | null;
+      forms: Array<{
+        _id: Types.ObjectId;
+        formType: FormType;
+        formVersion: string;
+        submittedBy: string;
+        submittedByName: string;
+        submittedAt: Date;
+        customerRefused: boolean;
+      }>;
+      lastActivity: Date;
+      hasDispute: number;
+    }> = result?.groups || [];
+    const total: number = result?.meta?.[0]?.total || 0;
+
+    // Attach booking context (tracking code, rego, customer) per group.
+    // Type guard so ObjectId $in gets string[] (undefined filtered out)
     const bookingIds = Array.from(
-      new Set(forms.map((f) => f.bookingId?.toString()).filter(Boolean))
+      new Set(
+        rawGroups
+          .map((g) => g.bookingId?.toString())
+          .filter((id): id is string => Boolean(id))
+      )
     );
     const bookings = await Booking.find({ _id: { $in: bookingIds } })
       .select("trackingCode vehicleRegistration vehicleState userName status")
       .lean();
     const bookingMap = new Map(bookings.map((b) => [b._id.toString(), b]));
 
-    const rows = forms.map((f) => {
-      const b = bookingMap.get(f.bookingId?.toString() || "");
-      const fd = (f.formData || {}) as Record<string, unknown>;
+    const groups = rawGroups.map((g) => {
+      const b = bookingMap.get(g.bookingId?.toString() || "");
       return {
-        _id: f._id.toString(),
-        formType: f.formType,
-        formVersion: f.formVersion,
-        submittedByName: f.submittedByName,
-        submittedBy: f.submittedBy,
-        submittedAt: f.submittedAt,
-        customerRefused: fd.customerRefusedToSign === true,
-        bookingId: f.bookingId?.toString() || null,
+        bookingId: g.bookingId?.toString() || null,
         trackingCode: b?.trackingCode || null,
         vehicleRegistration: b?.vehicleRegistration || null,
         vehicleState: b?.vehicleState || null,
         customerName: b?.userName || null,
         bookingStatus: b?.status || null,
+        lastActivity: g.lastActivity,
+        hasDispute: g.hasDispute === 1,
+        forms: g.forms.map((f) => ({
+          _id: f._id.toString(),
+          formType: f.formType,
+          formVersion: f.formVersion,
+          submittedByName: f.submittedByName,
+          submittedBy: f.submittedBy,
+          submittedAt: f.submittedAt,
+          customerRefused: f.customerRefused === true,
+        })),
       };
     });
 
     return NextResponse.json({
-      forms: rows,
+      groups,
       total,
       page,
       pages: Math.max(1, Math.ceil(total / limit)),
