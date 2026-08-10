@@ -17,6 +17,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { SHOW_DRIVER_EARNINGS } from "@/lib/featureFlags";
+import PreJobAlert from "@/components/driver/PreJobAlert";
 
 interface ClockStatus {
   isClockedIn: boolean;
@@ -228,6 +229,10 @@ export default function DriverLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Pre-job alert: pops up when a leg window starts within 30 minutes.
+          Lives in the layout so it shows across the whole driver portal. */}
+      <PreJobAlert />
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-0 sm:px-6 lg:px-8 h-14">

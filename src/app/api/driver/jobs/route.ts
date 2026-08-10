@@ -252,6 +252,11 @@ export async function GET(request: NextRequest) {
           garageAddress: job.garageAddress,
           pickupTime: job.pickupTime,
           dropoffTime: job.dropoffTime,
+          // Pre-job alert (2026-08-09): the leg window start is computed
+          // client-side from serviceDate + the slot's start hour
+          serviceDate: job.serviceDate || null,
+          pickupTimeSlot: job.pickupTimeSlot || null,
+          dropoffTimeSlot: job.dropoffTimeSlot || null,
           isManualTransmission: job.isManualTransmission || false,
           hasExistingBooking: job.hasExistingBooking,
           status: job.status,
