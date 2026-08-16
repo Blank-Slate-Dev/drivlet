@@ -496,7 +496,10 @@ export async function POST(request: NextRequest) {
       // entry written by an unvalidated $push elsewhere) must never block a
       // driver from progressing THIS action. Only what we changed is validated.
       await booking.save({ validateModifiedOnly: true });
-      notifyBookingUpdate(booking);
+      // Sub-step: currentStage unchanged — suppress the customer stage
+      // email/SMS or they receive the SAME stage message twice
+      // (re-audit S-3, fixed 2026-08-16). SSE still updates all views.
+      notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
 
       return NextResponse.json({ success: true, message: "Arrived at customer" });
     }
@@ -685,7 +688,10 @@ export async function POST(request: NextRequest) {
       // entry written by an unvalidated $push elsewhere) must never block a
       // driver from progressing THIS action. Only what we changed is validated.
       await booking.save({ validateModifiedOnly: true });
-      notifyBookingUpdate(booking);
+      // Sub-step: currentStage unchanged — suppress the customer stage
+      // email/SMS or they receive the SAME stage message twice
+      // (re-audit S-3, fixed 2026-08-16). SSE still updates all views.
+      notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
 
       return NextResponse.json({ success: true, message: "Collected from workshop" });
     }
@@ -710,7 +716,10 @@ export async function POST(request: NextRequest) {
       // entry written by an unvalidated $push elsewhere) must never block a
       // driver from progressing THIS action. Only what we changed is validated.
       await booking.save({ validateModifiedOnly: true });
-      notifyBookingUpdate(booking);
+      // Sub-step: currentStage unchanged — suppress the customer stage
+      // email/SMS or they receive the SAME stage message twice
+      // (re-audit S-3, fixed 2026-08-16). SSE still updates all views.
+      notifyBookingUpdate(booking, { suppressCustomerNotifications: true });
 
       return NextResponse.json({ success: true, message: "Delivering to customer" });
     }
@@ -813,6 +822,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "The undo window (15 minutes) for your last step has passed. Contact dispatch to correct the booking." },
           { status: 400 }
+        );
+      }
+
+      // Cross-leg guard (re-audit S-2): a pickup-leg undo must not fire once
+      // the return leg has started — it would regress the stage from
+      // driver_returning back to car_picked_up mid-return.
+      if (target.leg === "pickup" && booking.returnDriver?.startedAt) {
+        return NextResponse.json(
+          { error: "The return leg has already started, so the pickup steps can no longer be undone. Contact dispatch to correct the booking." },
+          { status: 409 }
         );
       }
 
