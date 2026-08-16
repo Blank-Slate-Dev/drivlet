@@ -407,7 +407,9 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
                   className="inline-flex items-center gap-2 rounded-lg bg-amber-100 hover:bg-amber-200 px-3 py-2 text-sm font-medium text-amber-700 transition"
                 >
                   <FileWarning className="h-4 w-4" />
-                  {hasClaimLodged ? "View / New Claim" : "Lodge Claim"}
+                  {/* Honest label (re-audit): this only ever opens a NEW
+                      claim — lodged claims are emailed to the customer */}
+                  {hasClaimLodged ? "Lodge Another Claim" : "Lodge Claim"}
                 </button>
               </div>
             )}
@@ -431,7 +433,9 @@ export default function BookingCard({ booking, onFormsUpdated }: BookingCardProp
                 </div>
               </div>
             )}
-            {booking.paymentAmount && (
+            {/* Explicit > 0 check: `amount &&` rendered a stray literal "0"
+                for 100%-promo bookings (re-audit) */}
+            {booking.paymentAmount != null && booking.paymentAmount > 0 && (
               <div className="text-sm font-medium text-slate-700">
                 ${(booking.paymentAmount / 100).toFixed(2)}
               </div>
