@@ -9,6 +9,7 @@ import SignedForm, { FormType } from "@/models/SignedForm";
 import { sendSignedFormEmail } from "@/lib/email";
 import { notifyBookingUpdate } from "@/lib/emit-booking-update";
 import { customerCanSignForm } from "@/lib/formRequirements";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 // A driver may only submit/view forms for bookings they are assigned to
 // (pickup or return leg) — mirrors the photos route.
@@ -29,18 +30,21 @@ export async function POST(
 ) {
   const { id: bookingId } = await params;
 
+  // Rate limit form submissions (re-audit NEW-S3): a verified guest could
+  // previously create unlimited SignedForm docs with multi-hundred-KB
+  // signature payloads.
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "forms-submit");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 }
+    );
+  }
+
   try {
     await connectDB();
 
-    // Verify booking exists first
     const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      return NextResponse.json(
-        { error: "Booking not found" },
-        { status: 404 }
-      );
-    }
-
     const body = await request.json();
     const {
       formType,
@@ -77,20 +81,28 @@ export async function POST(
     // returned "Authentication required".
     const session = await getServerSession(authOptions);
 
+    // Auth is evaluated BEFORE existence is revealed (re-audit NEW-S4: the
+    // old 404-before-auth confirmed which booking ObjectIds exist). A missing
+    // booking fails every check below, producing the same 401/403 as an
+    // unauthorised caller; only authenticated admins can learn a 404.
     const isAdmin = session?.user?.role === "admin";
     const isOwner = Boolean(
-      (session?.user?.id && booking.userId?.toString() === session.user.id) ||
-        (session?.user?.email &&
-          booking.userEmail?.toLowerCase() === session.user.email.toLowerCase())
+      booking &&
+        ((session?.user?.id && booking.userId?.toString() === session.user.id) ||
+          (session?.user?.email &&
+            booking.userEmail?.toLowerCase() === session.user.email.toLowerCase()))
     );
     // Drivers must be assigned to this booking (pickup or return leg)
-    const isDriver =
-      session?.user?.role === "driver" &&
-      !!session.user.id &&
-      (await isAssignedDriver(session.user.id, booking));
+    const isDriver = Boolean(
+      booking &&
+        session?.user?.role === "driver" &&
+        !!session.user.id &&
+        (await isAssignedDriver(session.user.id, booking))
+    );
 
     const isVerifiedGuest = Boolean(
-      trackingCode &&
+      booking &&
+        trackingCode &&
         guestEmail &&
         guestRego &&
         booking.trackingCode &&
@@ -107,6 +119,11 @@ export async function POST(
           : { error: "Authentication required" },
         { status: session?.user ? 403 : 401 }
       );
+    }
+
+    if (!booking) {
+      // Only reachable by authenticated admins
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
     // Validate form type
@@ -139,15 +156,48 @@ export async function POST(
         );
       }
       if (!isAdmin && !customerCanSignForm(formType, booking.currentStage, booking.status)) {
+        // Neutral wording — this message can reach the DRIVER's screen too
         return NextResponse.json(
           {
             error:
               formType === "pickup_consent"
-                ? "The pickup form is signed with your driver at collection. It becomes available once your driver is on the way."
-                : "The return form is signed with your driver at delivery. It becomes available once your car is on its way back.",
+                ? "The pickup form opens once the pickup leg is underway (driver on the way)."
+                : "The return form opens once the return leg is underway (car on its way back).",
           },
           { status: 409 }
         );
+      }
+    } else if (formType === "claim_lodgement") {
+      // Claims are repeatable by design, but capped so a verified guest
+      // can't flood the archive (re-audit NEW-S3)
+      const claimCount = await SignedForm.countDocuments({
+        bookingId: booking._id,
+        formType: "claim_lodgement",
+      });
+      if (claimCount >= 5) {
+        return NextResponse.json(
+          { error: "The claim limit for this booking has been reached. Please contact support@drivlet.com.au." },
+          { status: 429 }
+        );
+      }
+    }
+
+    // Signatures must be image data-URLs — validated at WRITE time, not just
+    // at display (re-audit NEW-S3). Size-capped to keep documents sane.
+    const SIGNATURE_RX = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/;
+    const MAX_SIGNATURE_LENGTH = 500_000; // ~375KB decoded
+    for (const sig of [signatures?.customer, signatures?.driver]) {
+      if (sig !== undefined && sig !== null) {
+        if (
+          typeof sig !== "string" ||
+          sig.length > MAX_SIGNATURE_LENGTH ||
+          !SIGNATURE_RX.test(sig)
+        ) {
+          return NextResponse.json(
+            { error: "Invalid signature format" },
+            { status: 400 }
+          );
+        }
       }
     }
 
