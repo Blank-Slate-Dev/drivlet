@@ -16,8 +16,10 @@ const mailjet = process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY
     })
   : null;
 
-// Escape HTML special characters to prevent injection in email templates
-function escapeHtml(str: string): string {
+// Escape HTML special characters to prevent injection in email templates.
+// Exported: notification/confirmation builders escape user names too
+// (re-audit NEW-S2, 2026-08-16).
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

@@ -8,8 +8,7 @@ import {
   bookingDetailsHtml,
   bookingDetailsText,
   emailPolicyFooterHtml,
-  emailPolicyFooterText,
-} from "@/lib/email";
+  emailPolicyFooterText, escapeHtml } from "@/lib/email";
 import { getPickupSlotLabel, getDropoffSlotLabel, getServiceTypeByValue } from "@/config/timeSlots";
 import type { IBookingRequest } from "@/models/BookingRequest";
 import { getAppUrl } from "@/lib/appUrl";
@@ -81,7 +80,7 @@ export async function sendConfirmationWithPayLink(
           <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Ref: ${ref}</p>
         </td></tr>
         <tr><td style="padding:32px;">
-          <p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">Hi ${firstName},</p>
+          <p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">Hi ${escapeHtml(firstName)},</p>
           <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">Good news: your booking has been confirmed. Pay the transport amount below to lock it in.</p>
           ${bookingDetailsHtml(details)}
           <!-- How to pay -->

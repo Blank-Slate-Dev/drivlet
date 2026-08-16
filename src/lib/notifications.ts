@@ -4,7 +4,7 @@ import GarageNotification, { NotificationType, NotificationUrgency } from "@/mod
 import AdminNotification from "@/models/AdminNotification";
 import Garage from "@/models/Garage";
 import { Types } from "mongoose";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
 import { getAppUrl } from "@/lib/appUrl";
 
 interface CreateNotificationParams {
@@ -312,11 +312,11 @@ export async function notifyAdminOfNewRequest(request: {
       `<p>Hi team,</p>`,
       `<p>A new booking request has come through:</p>`,
       `<table style="border-collapse:collapse;font-size:14px">`,
-      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Customer</td><td style="padding:4px 0;font-weight:600">${request.userName}</td></tr>`,
-      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Vehicle</td><td style="padding:4px 0;font-weight:600">${request.vehicleRegistration}</td></tr>`,
-      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Pickup</td><td style="padding:4px 0">${pickupSuburb}</td></tr>`,
+      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Customer</td><td style="padding:4px 0;font-weight:600">${escapeHtml(request.userName)}</td></tr>`,
+      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Vehicle</td><td style="padding:4px 0;font-weight:600">${escapeHtml(request.vehicleRegistration)}</td></tr>`,
+      `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Pickup</td><td style="padding:4px 0">${escapeHtml(pickupSuburb)}</td></tr>`,
       request.garageName
-        ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Garage</td><td style="padding:4px 0">${request.garageName}</td></tr>`
+        ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Garage</td><td style="padding:4px 0">${escapeHtml(request.garageName)}</td></tr>`
         : "",
       `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Quoted</td><td style="padding:4px 0;font-weight:600">${quotedDisplay} AUD</td></tr>`,
       `</table>`,
