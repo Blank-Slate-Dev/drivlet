@@ -1,5 +1,6 @@
 // src/app/api/garages/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { garagePortalGate } from "@/lib/garagePortal";
 import { connectDB } from "@/lib/mongodb";
 import Garage from "@/models/Garage";
 import GarageServicePricing from "@/models/GarageServicePricing";
@@ -42,6 +43,11 @@ export interface GarageSearchResult {
 
 // GET /api/garages/search - Public garage search
 export async function GET(request: NextRequest) {
+  // PHASE 1: public garage directory is part of the garage portal — inert
+  // until NEXT_PUBLIC_ENABLE_GARAGE_PORTAL (re-audit NEW-S1, 2026-08-16)
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const { searchParams } = new URL(request.url);
 

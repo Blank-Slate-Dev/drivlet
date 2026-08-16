@@ -1,5 +1,6 @@
 // src/app/api/garages/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { garagePortalGate } from "@/lib/garagePortal";
 import { connectDB } from "@/lib/mongodb";
 import Garage from "@/models/Garage";
 import GarageServicePricing, {
@@ -18,6 +19,11 @@ interface RouteContext {
 
 // GET /api/garages/[id] - Get public garage profile
 export async function GET(request: NextRequest, context: RouteContext) {
+  // PHASE 1: public garage directory is part of the garage portal — inert
+  // until NEXT_PUBLIC_ENABLE_GARAGE_PORTAL (re-audit NEW-S1, 2026-08-16)
+  const gate = garagePortalGate();
+  if (gate) return gate;
+
   try {
     const { id } = await context.params;
 
