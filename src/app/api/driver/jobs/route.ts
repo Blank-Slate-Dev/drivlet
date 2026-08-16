@@ -937,6 +937,19 @@ export async function POST(request: NextRequest) {
       booking.servicePaymentStatus = "paid";
       booking.servicePaymentMethod = "phone_direct";
 
+      // Mirror the Stripe-link path (markServicePaymentPaid): payment
+      // received while at the workshop advances to ready_for_return, so
+      // phone-paid bookings no longer sit visually behind link-paid ones
+      // (re-audit S-6). Same stage guard — never regress a started return.
+      if (
+        !booking.returnDriver?.startedAt &&
+        (booking.currentStage === "at_garage" ||
+          booking.currentStage === "service_in_progress")
+      ) {
+        booking.currentStage = "ready_for_return";
+        booking.overallProgress = 85;
+      }
+
       booking.updates.push({
         stage: booking.currentStage,
         timestamp: now,

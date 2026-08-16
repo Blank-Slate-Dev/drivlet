@@ -25,7 +25,11 @@ const QUOTES_ENABLED = false;
 const STAGES = [
   { id: 'booking_confirmed', label: 'Confirmed' }, { id: 'driver_en_route', label: 'En Route' },
   { id: 'car_picked_up', label: 'Picked Up' }, { id: 'at_garage', label: 'At Garage' },
-  { id: 'service_in_progress', label: 'In Progress' }, { id: 'driver_returning', label: 'Returning' },
+  { id: 'service_in_progress', label: 'In Progress' },
+  // Backend-only stage (payment received, awaiting return dispatch) — needs
+  // a label or the chip shows the raw id (re-audit S-6)
+  { id: 'ready_for_return', label: 'Ready for Return' },
+  { id: 'driver_returning', label: 'Returning' },
   { id: 'delivered', label: 'Delivered' },
 ];
 

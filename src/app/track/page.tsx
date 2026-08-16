@@ -121,9 +121,17 @@ const STAGES = [
 // Stages where pickup form is relevant (from car_picked_up onwards)
 const PICKUP_FORM_STAGES = ["car_picked_up", "at_garage", "service_in_progress", "driver_returning", "delivered"];
 
+// Stages that exist in the backend but not as their own display step —
+// mapped to the nearest visible step (re-audit S-6: ready_for_return used
+// to fall through to index 0, showing "Booking Confirmed" at 85%).
+const STAGE_ALIASES: Record<string, string> = {
+  ready_for_return: "service_in_progress",
+};
+
 // Helper to get stage index for progress display
 const getDisplayStageIndex = (stageId: string): number => {
-  const index = STAGES.findIndex((s) => s.id === stageId);
+  const resolved = STAGE_ALIASES[stageId] || stageId;
+  const index = STAGES.findIndex((s) => s.id === resolved);
   return index >= 0 ? index : 0;
 };
 
