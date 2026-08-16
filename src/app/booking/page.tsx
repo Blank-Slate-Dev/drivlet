@@ -8,9 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  CheckCircle2, Loader2, AlertCircle, CreditCard, ArrowLeft, ArrowRight,
-  MapPin, Clock, Car, Building, User, Mail, Phone, Copy, Calendar, Check,
-  Zap, Wrench, Settings, Info, ShieldCheck, Lock, Sparkles, Tag, X,
+  CheckCircle2, Loader2, AlertCircle, ArrowLeft, ArrowRight,
+  MapPin, Clock, Car, User, Mail, Phone, Copy, Calendar, Check,
+  Zap, Wrench, Settings, Info, ShieldCheck, Tag, X,
 } from 'lucide-react';
 import RegistrationPlate, { StateCode } from '@/components/homepage/RegistrationPlate';
 import AddressAutocomplete, { PlaceDetails } from '@/components/AddressAutocomplete';
@@ -18,7 +18,7 @@ import GarageAutocomplete, { GarageDetails } from '@/components/GarageAutocomple
 import ServiceSelector from '@/components/booking/ServiceSelector';
 import DistanceZoneMap from '@/components/booking/DistanceZoneMap';
 import {
-  SERVICE_CATEGORIES, SelectedServiceCategory, getTotalSelectedCount, getCategoryById,
+  SelectedServiceCategory, getTotalSelectedCount,
 } from '@/constants/serviceCategories';
 import { FEATURES, TRANSPORT_PRICE_DISPLAY, TRANSPORT_PRICE } from '@/lib/featureFlags';
 import { CANCELLATION_POLICY_TEXT } from '@/lib/policy';
@@ -65,7 +65,9 @@ const STEPS: { key: Step; label: string; icon: React.ElementType }[] = [
   { key: 'vehicle', label: 'Vehicle', icon: Car },
   { key: 'schedule', label: 'Schedule', icon: Calendar },
   { key: 'review', label: 'Review', icon: CheckCircle2 },
-  { key: 'payment', label: 'Pay', icon: CreditCard },
+  // HIDDEN: the live request flow ends at Review (payment happens later via
+  // the emailed pay link). Restore when a direct-pay flow returns.
+  // { key: 'payment', label: 'Pay', icon: CreditCard }, // (re-import CreditCard from lucide-react)
 ];
 
 const getServiceIcon = (value: string) => {
@@ -127,8 +129,10 @@ export default function BookingPage() {
   const [selectedServices, setSelectedServices] = useState<SelectedServiceCategory[]>([]);
   const [primaryServiceCategory, setPrimaryServiceCategory] = useState<string | null>(null);
   const [serviceNotes, setServiceNotes] = useState('');
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  // Legacy direct-payment flow state — values still read by the retained
+  // (unreachable) payment render; setters lived only in commented-out code
+  const [clientSecret] = useState<string | null>(null);
+  const [paymentIntentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
