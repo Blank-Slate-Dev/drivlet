@@ -284,8 +284,11 @@ export default function AdminDriversPage() {
 
   // Reset the review-confirmation gate whenever the modal opens/closes or the
   // selected driver changes, so each application must be confirmed independently.
+  // Also clears the account-action message, which previously leaked from one
+  // driver's modal into the next (re-audit).
   useEffect(() => {
     setReviewConfirmed(false);
+    setAccountActionMessage("");
   }, [selectedDriver?._id]);
 
   const handleAction = async (driverId: string, action: string, reason?: string) => {
@@ -643,13 +646,17 @@ export default function AdminDriversPage() {
                           </button>
                           {driver.status === "pending" && (
                             <>
+                              {/* Approve opens the detail modal (re-audit):
+                                  approving from the row bypassed the
+                                  "I confirm I have reviewed" gate that the
+                                  modal enforces before showing the button */}
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleAction(driver._id, "approve"); }}
+                                onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}
                                 disabled={actionLoading}
                                 className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
                               >
                                 <CheckCircle className="h-3.5 w-3.5" />
-                                Approve
+                                Review & Approve
                               </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); openRejectModal(driver._id); }}
