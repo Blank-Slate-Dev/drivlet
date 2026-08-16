@@ -1084,8 +1084,20 @@ export async function POST(request: NextRequest) {
         // look the payment up if webhooks fail.
         booking.servicePaymentSessionId = checkoutSession.id || undefined;
         booking.servicePaymentStatus = "pending";
-        booking.currentStage = "service_in_progress";
-        booking.overallProgress = 72;
+        // Stage: only advance FROM at_garage — never rewrite unconditionally.
+        // The old unconditional set regressed driver_returning back to
+        // service_in_progress, which deadlocked delivery: the return form is
+        // only signable during driver_returning/delivered, and 'delivered' is
+        // gated on that form (re-audit NB-1, fixed 2026-08-16). Same guard
+        // family as markServicePaymentPaid.
+        if (
+          !booking.returnDriver?.startedAt &&
+          (booking.currentStage === "at_garage" ||
+            booking.currentStage === "service_in_progress")
+        ) {
+          booking.currentStage = "service_in_progress";
+          booking.overallProgress = 72;
+        }
         booking.updates.push({
           stage: "payment_link_generated",
           timestamp: now,
