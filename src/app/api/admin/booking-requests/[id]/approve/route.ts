@@ -129,7 +129,7 @@ export async function POST(
       notifyAdmin({
         type: "system",
         title: "Booking confirmation sent",
-        message: `${bookingRequest.userName} (${bookingRequest.vehicleRegistration}) has been emailed their booking confirmation with the payment link (Ref ${ref}, $${(bookingRequest.quotedAmount / 100).toFixed(2)}). Awaiting payment.`,
+        message: `${bookingRequest.userName} (${bookingRequest.vehicleRegistration}) has been emailed their booking confirmation with the payment link (Ref ${ref}${typeof bookingRequest.quotedAmount === "number" ? `, $${(bookingRequest.quotedAmount / 100).toFixed(2)}` : ""}). Awaiting payment.`,
         bookingId: bookingRequest._id,
         metadata: {
           vehicleRegistration: bookingRequest.vehicleRegistration,

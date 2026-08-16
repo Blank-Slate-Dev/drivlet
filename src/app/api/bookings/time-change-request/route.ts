@@ -36,7 +36,14 @@ export async function POST(request: NextRequest) {
     note?: string;
   };
 
-  if (!code || !email || !rego || !requestedTime) {
+  // Type guards: truthy non-strings previously threw on .toUpperCase()
+  // (unhandled 500 — re-audit)
+  if (
+    typeof code !== "string" || !code ||
+    typeof email !== "string" || !email ||
+    typeof rego !== "string" || !rego ||
+    !requestedTime
+  ) {
     return NextResponse.json(
       { error: "Tracking code, email, registration, and the new pickup time are required" },
       { status: 400 }

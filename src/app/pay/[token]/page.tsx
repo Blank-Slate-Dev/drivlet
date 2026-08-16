@@ -108,12 +108,14 @@ function PaymentPageContent() {
           redirectClientSecret
         );
         if (cancelled) return;
-        if (
-          paymentIntent &&
-          (paymentIntent.status === "succeeded" ||
-            paymentIntent.status === "processing")
-        ) {
+        if (paymentIntent && paymentIntent.status === "succeeded") {
           setSuccess(true);
+        } else if (paymentIntent && paymentIntent.status === "processing") {
+          // Processing can still fail — don't claim success (re-audit).
+          // The webhook creates the booking once it truly settles.
+          setPaymentError(
+            "Your payment is still processing with your bank. You'll receive your confirmation email as soon as it completes — no need to pay again."
+          );
         } else {
           setPaymentError(
             "We couldn't confirm your payment. If money has left your account it will be released by your bank; otherwise please try again below."

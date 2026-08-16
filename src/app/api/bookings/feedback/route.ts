@@ -43,7 +43,13 @@ export async function POST(request: NextRequest) {
     comments?: string;
   };
 
-  if (!code || !email || !rego) {
+  // Type guards: a truthy non-string (e.g. {} in the JSON body) passed the
+  // falsy check then threw on .toUpperCase() — unhandled 500 (re-audit)
+  if (
+    typeof code !== "string" || !code ||
+    typeof email !== "string" || !email ||
+    typeof rego !== "string" || !rego
+  ) {
     return NextResponse.json(
       { error: "Tracking code, email, and registration are required" },
       { status: 400 }
