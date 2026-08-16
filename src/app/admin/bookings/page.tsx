@@ -210,27 +210,38 @@ export default function AdminBookingsPage() {
   // ONE fetch for the whole page: bookings + all open requests, in parallel, uncached.
   // The single search input is threaded through BOTH endpoints (server-side matching
   // covers trackingCode/rego/name/email/exact _id — more than the client-side filter can).
+  // Abort any in-flight fetch when a new one starts (re-audit): a slow
+  // pre-search response could land AFTER the search response and repopulate
+  // the list with stale rows.
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     if (!opts?.silent) setLoading(true);
     try {
       const q = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : "";
       // When searching, widen requests to ALL statuses so declined/expired matches surface too.
       const reqStatus = debouncedSearch ? "all" : "all_open";
       const [bRes, rRes] = await Promise.all([
-        fetch(`/api/admin/bookings?limit=500${q}`, { cache: "no-store" }),
-        fetch(`/api/admin/booking-requests?status=${reqStatus}&limit=500${q}`, { cache: "no-store" }),
+        fetch(`/api/admin/bookings?limit=500${q}`, { cache: "no-store", signal: controller.signal }),
+        fetch(`/api/admin/booking-requests?status=${reqStatus}&limit=500${q}`, { cache: "no-store", signal: controller.signal }),
       ]);
       if (!bRes.ok) throw new Error("Failed to fetch bookings");
       const bData = await bRes.json();
       const rData = rRes.ok ? await rRes.json() : { requests: [] };
+      if (controller.signal.aborted) return;
       setBookings(bData.bookings || []);
       setRequests(rData.requests || []);
       setLastUpdated(new Date());
       setError("");
-    } catch {
+    } catch (err) {
+      // Aborted fetches are expected, not errors
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError("Failed to load the bookings pipeline");
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current === controller) setLoading(false);
     }
   }, [debouncedSearch]);
 
