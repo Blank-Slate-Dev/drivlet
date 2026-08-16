@@ -102,6 +102,9 @@ export interface IBooking extends Document {
   garagePlaceId?: string;
   /** Workshop was typed manually by the customer — ops should verify */
   garageManualEntry?: boolean;
+  /** Consent carried over from the BookingRequest at conversion */
+  policiesAgreedAt?: Date;
+  marketingOptIn?: boolean;
   existingBookingRef?: string;
   existingBookingNotes?: string;
   garageBookingTime?: string | null;
@@ -426,6 +429,17 @@ const BookingSchema = new Schema<IBooking>(
     },
     // Customer typed the workshop manually (2026-08-08) — flagged in admin
     garageManualEntry: {
+      type: Boolean,
+      default: false,
+    },
+    // Consent record carried over from the BookingRequest at conversion
+    // (re-audit S-7, 2026-08-16): previously consent lived ONLY on the
+    // request doc, so purging requests would orphan the proof of agreement
+    policiesAgreedAt: {
+      type: Date,
+      required: false,
+    },
+    marketingOptIn: {
       type: Boolean,
       default: false,
     },

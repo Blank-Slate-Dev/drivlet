@@ -178,6 +178,10 @@ export async function POST(request: NextRequest) {
       garagePlaceId: requestDoc.garagePlaceId || null,
       // Manual workshop entry (2026-08-08): flagged so admin can verify
       garageManualEntry: requestDoc.garageManualEntry === true,
+      // Consent record travels WITH the booking (re-audit S-7) — the
+      // request doc is no longer the only proof of agreement
+      policiesAgreedAt: requestDoc.policiesAgreedAt || null,
+      marketingOptIn: requestDoc.marketingOptIn === true,
       existingBookingRef: requestDoc.existingBookingRef || null,
       // audit B-18: these were hardcoded to null / never copied, so the
       // customer's driver instructions and their booked garage appointment
