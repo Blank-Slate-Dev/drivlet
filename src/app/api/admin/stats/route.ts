@@ -12,22 +12,30 @@ import { requireAdmin } from "@/lib/admin";
 type RangeKey = "week" | "month" | "year";
 
 function resolveRange(key: RangeKey, now: Date) {
+  // Deltas compare LIKE with LIKE: the previous window is capped at the same
+  // elapsed length as the current period-to-date (re-audit: comparing the
+  // 5th of a month against the FULL previous month read as a fake drop).
   if (key === "week") {
     const start = new Date(now);
     start.setDate(now.getDate() - 6);
     start.setHours(0, 0, 0, 0);
     const prevStart = new Date(start);
     prevStart.setDate(start.getDate() - 7);
+    // Rolling 7-day window is always "complete" — full previous window
     return { start, prevStart, prevEnd: start };
   }
   if (key === "year") {
     const start = new Date(now.getFullYear(), 0, 1);
     const prevStart = new Date(now.getFullYear() - 1, 0, 1);
-    return { start, prevStart, prevEnd: start };
+    const elapsed = now.getTime() - start.getTime();
+    const prevEnd = new Date(Math.min(prevStart.getTime() + elapsed, start.getTime()));
+    return { start, prevStart, prevEnd };
   }
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return { start, prevStart, prevEnd: start };
+  const elapsed = now.getTime() - start.getTime();
+  const prevEnd = new Date(Math.min(prevStart.getTime() + elapsed, start.getTime()));
+  return { start, prevStart, prevEnd };
 }
 
 // GET /api/admin/stats?range=week|month|year - Get dashboard statistics

@@ -6,7 +6,7 @@
 // honest empty state when data is thin.
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -269,19 +269,26 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Guards the range-switch race (re-audit): a slow response for the OLD
+  // range must never overwrite widgets after the user has switched
+  const requestedRangeRef = useRef<RangeKey>("month");
+
   const fetchStats = useCallback(
     async (rangeKey: RangeKey) => {
+      requestedRangeRef.current = rangeKey;
       try {
         setLoading(true);
         const response = await fetch(`/api/admin/stats?range=${rangeKey}`);
         if (!response.ok) throw new Error("Failed to fetch stats");
         const data = await response.json();
+        // Drop stale responses: only apply if this is still the active range
+        if (data?.range?.key !== requestedRangeRef.current) return;
         setStats(data);
         setError("");
       } catch {
-        setError("Failed to load statistics");
+        if (rangeKey === requestedRangeRef.current) setError("Failed to load statistics");
       } finally {
-        setLoading(false);
+        if (rangeKey === requestedRangeRef.current) setLoading(false);
       }
     },
     []
@@ -450,7 +457,10 @@ export default function AdminDashboardPage() {
             </p>
             <div className="mt-4 flex-1">
               {hasRevenue && r ? (
-                <MiniBarChart series={r.series} rangeKey={range} />
+                // rangeKey must come from the FETCHED data, not UI state —
+                // during a switch the old series briefly renders and the
+                // bucket labels would parse with the wrong format
+                <MiniBarChart series={r.series} rangeKey={r.key} />
               ) : (
                 <div className="flex h-20 items-center justify-center rounded-xl bg-slate-50 text-xs text-slate-400">
                   No paid bookings in this period yet
