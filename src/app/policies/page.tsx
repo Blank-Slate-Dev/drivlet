@@ -1,7 +1,7 @@
 // src/app/policies/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import Header from '@/components/Header';
 import Footer from '@/components/homepage/Footer';
@@ -356,7 +356,7 @@ const policies: PolicySection[] = [
 
           <PolicyClause title="How We Investigate">
             <ul className="space-y-1.5 text-slate-600">
-              <li className="flex gap-2"><span className="text-slate.400">•</span>Review pick-up and return condition photos and sign-offs.</li>
+              <li className="flex gap-2"><span className="text-slate-400">•</span>Review pick-up and return condition photos and sign-offs.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Check timestamps and job status logs.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Speak with the driver(s) involved and review notes.</li>
               <li className="flex gap-2"><span className="text-slate-400">•</span>Where relevant, confirm handover details with your nominated workshop.</li>
@@ -593,6 +593,17 @@ export default function PoliciesPage() {
       });
     }, 100);
   };
+
+  // Deep links (#terms, #privacy, #cancellation, #damage-claims — used by
+  // the booking consent checkboxes) must open the card they point at, not
+  // land on a collapsed header (re-audit NB-3, fixed 2026-08-16).
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id && policies.some((p) => p.id === id)) {
+      scrollToPolicy(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   return (
     <>
