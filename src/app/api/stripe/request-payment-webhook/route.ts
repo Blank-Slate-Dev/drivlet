@@ -83,6 +83,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    // Declined requests must NEVER convert (re-audit S-1): a customer with
+    // the pay page already open could complete the PI after an admin
+    // declined. Decline now cancels the PI too, but if the payment slipped
+    // through first, refuse conversion and flag for a manual refund.
+    if (requestDoc.status === "declined") {
+      console.error(
+        "request-payment-webhook: payment received for DECLINED request — manual refund needed",
+        bookingRequestId, paymentIntent.id
+      );
+      await db.collection("bookingrequests").updateOne(
+        { _id: new ObjectId(bookingRequestId) },
+        {
+          $set: {
+            paymentIntentId: paymentIntent.id,
+            adminNotes: `${requestDoc.adminNotes || ""}\nPayment ${paymentIntent.id} received AFTER decline — refund manually in Stripe.`.trim(),
+            updatedAt: new Date(),
+          },
+        }
+      );
+      return NextResponse.json({ received: true });
+    }
+
     // Idempotency: check if a booking already exists for this paymentIntentId
     const existingBooking = await db.collection("bookings").findOne({
       paymentId: paymentIntent.id,

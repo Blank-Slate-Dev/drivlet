@@ -4,6 +4,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 import { releasePromoCodeForUsage } from "@/lib/promoCodes";
+import { stripe } from "@/lib/stripe";
 import {
   sendEmail,
   bookingDetailsHtml,
@@ -82,6 +83,20 @@ export async function POST(
     bookingRequest.paymentToken = null;
 
     await bookingRequest.save();
+
+    // Cancel the live PaymentIntent too (re-audit S-1): nulling the token
+    // doesn't stop a customer whose /pay page is ALREADY open (client secret
+    // loaded) from completing the payment after decline. Best effort — a
+    // PI that's already succeeded/cancelled throws and is ignored; the
+    // webhook's declined-status refusal is the backstop.
+    if (bookingRequest.paymentIntentId) {
+      try {
+        await stripe.paymentIntents.cancel(bookingRequest.paymentIntentId);
+      } catch {
+        // Already succeeded, already cancelled, or transient — webhook guard
+        // handles the residual case
+      }
+    }
 
     // Free the promo code — the customer never got the discount
     if (bookingRequest.promoCode) {
