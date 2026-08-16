@@ -353,7 +353,7 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-3">
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -467,7 +467,7 @@ export default function AdminLayout({
               </div>
 
               {/* Mobile Navigation */}
-              <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-3">
+              <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
