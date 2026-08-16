@@ -24,6 +24,7 @@ interface JobLite {
   _id: string;
   vehicleRegistration: string;
   pickupAddress?: string;
+  garageName?: string;
   serviceDate?: string;
   pickupTimeSlot?: string | null;
   dropoffTimeSlot?: string | null;
@@ -104,7 +105,13 @@ export default function PreJobAlert() {
             jobId: job._id,
             leg: c.leg,
             plate: job.vehicleRegistration,
-            suburb: suburbOf(job.pickupAddress),
+            // Where the driver is HEADED first: the customer for pickups,
+            // the workshop for returns (re-audit: showing the customer's
+            // suburb next to "collect from the workshop" read wrong)
+            suburb:
+              c.leg === "pickup"
+                ? suburbOf(job.pickupAddress)
+                : job.garageName || suburbOf(job.pickupAddress),
             windowLabel: win.label,
             windowStart: win.start.getTime(),
           });
@@ -166,9 +173,10 @@ export default function PreJobAlert() {
 
   return (
     <>
-      {/* Prominent pop-up: all imminent legs, dismiss once */}
+      {/* Prominent pop-up: all imminent legs, dismiss once. z-40 so open
+          form modals (z-50) always sit above it. */}
       {undismissed.length > 0 && (
-        <div className="fixed inset-x-0 top-16 z-[60] px-4">
+        <div className="fixed inset-x-0 top-16 z-40 px-4">
           <div className="mx-auto max-w-md rounded-2xl border border-amber-300 bg-white shadow-xl">
             <div className="flex items-center justify-between rounded-t-2xl bg-amber-50 px-4 py-2.5">
               <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
@@ -220,11 +228,13 @@ export default function PreJobAlert() {
         </div>
       )}
 
-      {/* Subtle persistent chip after dismissal, until the window starts */}
+      {/* Subtle persistent chip after dismissal, until the window starts.
+          Bottom offset clears the driver tab bar + iOS safe-area inset;
+          z-40 keeps the chip UNDER open form modals (z-50). */}
       {undismissed.length === 0 && dismissedCount > 0 && (
         <Link
           href="/driver/jobs"
-          className="fixed bottom-20 right-4 z-[60] inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-md transition hover:border-amber-400"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-md transition hover:border-amber-400"
         >
           <AlarmClock className="h-3.5 w-3.5" />
           {dismissedCount === 1
