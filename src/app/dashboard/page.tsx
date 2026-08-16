@@ -336,6 +336,12 @@ function DashboardContent() {
   const previousBookingsRef = useRef<Booking[]>([]);
   const isInitialLoadRef = useRef(true);
   const autoPromptedRef = useRef<Set<string>>(new Set());
+  // Mirrors formModal so the polling auto-prompt can never replace a form
+  // the customer is mid-way through (re-audit NB-4, fixed 2026-08-16)
+  const formModalOpenRef = useRef(false);
+  useEffect(() => {
+    formModalOpenRef.current = formModal !== null;
+  }, [formModal]);
 
   // Navigate to /booking instead of opening a modal
   const handleBookingClick = useCallback(() => { router.push('/booking'); }, [router]);
@@ -344,6 +350,8 @@ function DashboardContent() {
   const handleFormSuccess = useCallback(() => { setFormModal(null); fetchBookings(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const checkAutoPrompt = useCallback((newBookings: Booking[]) => {
+    // Never stomp an open form modal (the customer may be mid-claim)
+    if (formModalOpenRef.current) return;
     for (const b of newBookings) {
       if (b.status !== 'in_progress' && b.status !== 'pending') continue;
       const pending = getPendingForms(b);
@@ -371,7 +379,10 @@ function DashboardContent() {
       const response = await fetch('/api/bookings');
       if (!response.ok) throw new Error('Failed to fetch bookings');
       const data = await response.json();
-      if (isPolling) { const changeMessage = detectBookingChanges(data); if (changeMessage) setUpdateNotification(changeMessage); checkAutoPrompt(data); }
+      if (isPolling) { const changeMessage = detectBookingChanges(data); if (changeMessage) setUpdateNotification(changeMessage); }
+      // Auto-prompt on FIRST load too, not just on polls — a customer landing
+      // with a pending signature previously waited 30s for the modal
+      checkAutoPrompt(data);
       previousBookingsRef.current = data; setBookings(data); setError('');
       if (!isPolling) isInitialLoadRef.current = false;
     } catch { if (!isPolling) setError('Failed to load your bookings'); }
