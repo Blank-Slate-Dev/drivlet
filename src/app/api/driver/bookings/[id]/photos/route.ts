@@ -20,6 +20,7 @@ import {
   uploadToCloud,
   getExtensionFromMimeType,
 } from "@/lib/storage";
+import { driverSuspensionResponse } from "@/lib/driverAccess";
 import mongoose from "mongoose";
 
 interface RouteContext {
@@ -50,6 +51,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!user?.driverProfile) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
     }
+
+    // Suspended drivers lose photo access immediately (re-audit 2026-08-30)
+    const suspended = driverSuspensionResponse(user);
+    if (suspended) return suspended;
 
     const driver = await Driver.findById(user.driverProfile);
     if (!driver) {
@@ -327,6 +332,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
     }
 
+    // Suspended drivers lose photo access immediately (re-audit 2026-08-30)
+    const suspended = driverSuspensionResponse(user);
+    if (suspended) return suspended;
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -437,6 +446,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
     }
 
+    // Suspended drivers lose photo access immediately (re-audit 2026-08-30)
+    const suspended = driverSuspensionResponse(user);
+    if (suspended) return suspended;
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -455,22 +468,27 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
+    // Only an ACTIVE photo can be removed — a superseded one is already out
+    // of every live view and must stay archived.
     const photo = await VehiclePhoto.findOne({
       _id: new mongoose.Types.ObjectId(photoId),
       bookingId: new mongoose.Types.ObjectId(bookingId),
+      superseded: { $ne: true },
     });
 
     if (!photo) {
       return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
 
-    const { deleteFromStorage } = await import("@/lib/storage");
-    const deleteUrl = photo.cloudUrl || photo.photoPath;
-    deleteFromStorage(deleteUrl).catch((err) => {
-      console.error("Failed to delete photo file:", err);
-    });
-
-    await VehiclePhoto.deleteOne({ _id: photo._id });
+    // Chain-of-custody (re-audit 2026-08-30): drivers could previously
+    // hard-delete condition photos (document AND blob) at any time, even
+    // after delivery — destroying the dispute/claim evidence the photo
+    // system exists to provide. "Delete" now supersedes instead, exactly
+    // like the replace flow: the photo vanishes from all live views and
+    // frees its slot, but the image and document survive for the archive.
+    photo.superseded = true;
+    photo.supersededAt = new Date();
+    await photo.save();
 
     // Update booking checkpoint status
     const checkpointKey = photo.checkpointType as keyof typeof booking.checkpointStatus;
@@ -486,7 +504,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     updates.push({
       stage: booking.currentStage || "photo_audit",
       timestamp: new Date(),
-      message: `Photo deleted: ${cpLabel} - ${ptLabel}`,
+      message: `Photo removed by driver (retained in archive): ${cpLabel} - ${ptLabel}`,
       updatedBy: session.user.id,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- assigning audit trail
@@ -532,6 +550,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!user?.driverProfile) {
       return NextResponse.json({ error: "Driver profile not found" }, { status: 404 });
     }
+
+    // Suspended drivers lose photo access immediately (re-audit 2026-08-30)
+    const suspended = driverSuspensionResponse(user);
+    if (suspended) return suspended;
 
     const booking = await Booking.findById(bookingId);
     if (!booking) {

@@ -12,11 +12,14 @@ import { customerCanSignForm } from "@/lib/formRequirements";
 import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 // A driver may only submit/view forms for bookings they are assigned to
-// (pickup or return leg) — mirrors the photos route.
+// (pickup or return leg) — mirrors the photos route. Suspended drivers fail
+// this check outright (re-audit 2026-08-30): suspension must also cut off
+// form signing, not just the jobs list.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function isAssignedDriver(sessionUserId: string, booking: any): Promise<boolean> {
-  const user = await User.findById(sessionUserId).select("driverProfile");
+  const user = await User.findById(sessionUserId).select("driverProfile accountStatus");
   if (!user?.driverProfile) return false;
+  if (user.accountStatus === "suspended") return false;
   const profileId = user.driverProfile.toString();
   return (
     booking.assignedDriverId?.toString() === profileId ||

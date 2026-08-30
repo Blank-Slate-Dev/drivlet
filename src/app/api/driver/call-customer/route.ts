@@ -6,10 +6,11 @@ import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import Driver from "@/models/Driver";
 import User from "@/models/User";
-import { 
-  initiateDriverToCustomerCall, 
-  isValidPhoneNumber 
+import {
+  initiateDriverToCustomerCall,
+  isValidPhoneNumber
 } from "@/lib/twilio-voice";
+import { driverSuspensionResponse } from "@/lib/driverAccess";
 
 // POST /api/driver/call-customer - Initiate a masked call to customer
 export async function POST(request: NextRequest) {
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Suspended drivers cannot place masked (Twilio-billed) calls
+    // (re-audit 2026-08-30)
+    const suspended = driverSuspensionResponse(user);
+    if (suspended) return suspended;
 
     const driver = await Driver.findById(user.driverProfile);
     if (!driver) {
