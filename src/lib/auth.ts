@@ -116,7 +116,23 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        // Check account status BEFORE password comparison to avoid wasting bcrypt cycles
+        // Password comparison FIRST (re-audit 2026-08-30): the status errors
+        // below used to fire before bcrypt, so any garbage password revealed
+        // for free whether an email was suspended/deleted/unverified — an
+        // enumeration oracle that undercut the uniform invalid-credentials
+        // message. Status details are only surfaced to someone who has
+        // proven they know the password.
+        // Guard: an account without a stored hash (defensive — e.g. scrubbed
+        // on deletion) must fail like a wrong password, not throw in bcrypt.
+        const isPasswordValid = user.password
+          ? await bcrypt.compare(password, user.password)
+          : false;
+
+        if (!isPasswordValid) {
+          // Uniform with the no-user case (see above)
+          throw new Error("Invalid email or password");
+        }
+
         if (user.accountStatus === "suspended") {
           throw new Error("Your account has been suspended. Please contact support.");
         }
@@ -127,13 +143,6 @@ export const authOptions: NextAuthOptions = {
         // Check email verification for regular users
         if (user.role === "user" && !user.emailVerified) {
           throw new Error("Please verify your email before signing in. Check your inbox for the verification link.");
-        }
-
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-
-        if (!isPasswordValid) {
-          // Uniform with the no-user case (see above)
-          throw new Error("Invalid email or password");
         }
 
         // If user is a driver, fetch their onboarding status
