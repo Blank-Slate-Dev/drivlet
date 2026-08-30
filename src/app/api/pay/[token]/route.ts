@@ -3,6 +3,9 @@ import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 import Booking from "@/models/Booking";
 import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { isPaymentLinkExpired } from "@/lib/paymentLinkExpiry";
+import { releasePromoCodeForUsage } from "@/lib/promoCodes";
+import { stripe } from "@/lib/stripe";
 
 export async function GET(
   request: NextRequest,
@@ -62,6 +65,50 @@ export async function GET(
 
     if (!["approved", "payment_link_sent"].includes(bookingRequest.status)) {
       return NextResponse.json({ error: "Invalid link" }, { status: 404 });
+    }
+
+    // Lazy expiry (re-audit 2026-08-30): links older than the TTL are marked
+    // expired on first use — mirroring decline: token nulled, PI cancelled,
+    // promo released, slot freed. Admins revive via "Resend Payment Link".
+    // The atomic status filter means a request the webhook just converted can
+    // never be clobbered to "expired".
+    if (isPaymentLinkExpired(bookingRequest)) {
+      const expiredRequest = await BookingRequest.findOneAndUpdate(
+        {
+          _id: bookingRequest._id,
+          status: { $in: ["approved", "payment_link_sent"] },
+        },
+        {
+          $set: {
+            status: "expired",
+            paymentToken: null,
+            adminNotes: [bookingRequest.adminNotes, "Payment link expired (7-day TTL)"]
+              .filter(Boolean)
+              .join("\n"),
+            updatedAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+      if (expiredRequest) {
+        if (expiredRequest.paymentIntentId) {
+          try {
+            await stripe.paymentIntents.cancel(expiredRequest.paymentIntentId);
+          } catch {
+            // Already succeeded/cancelled or transient — the webhook's
+            // expired-status refusal is the backstop
+          }
+        }
+        if (expiredRequest.promoCode) {
+          await releasePromoCodeForUsage({
+            code: expiredRequest.promoCode,
+            requestId: expiredRequest._id,
+          });
+        }
+      }
+      // If the atomic update matched nothing the request was just paid —
+      // the generic invalid response is fine; a refresh shows already-paid.
+      return NextResponse.json({ error: "expired" }, { status: 404 });
     }
 
     const firstName = bookingRequest.userName.split(" ")[0];

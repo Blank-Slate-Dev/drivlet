@@ -4,6 +4,7 @@ import { stripe, DRIVLET_PRICE, ZONE_SURCHARGES } from "@/lib/stripe";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 import { isStripeTestModeActive } from "@/lib/stripeTestMode";
+import { isPaymentLinkExpired } from "@/lib/paymentLinkExpiry";
 
 export async function POST(request: NextRequest) {
   const originCheck = requireValidOrigin(request);
@@ -39,6 +40,17 @@ export async function POST(request: NextRequest) {
 
     if (!["approved", "payment_link_sent"].includes(bookingRequest.status)) {
       return NextResponse.json({ error: "This payment link is no longer valid" }, { status: 400 });
+    }
+
+    // TTL check (re-audit 2026-08-30): never mint a PaymentIntent for an
+    // expired link. The pay page's GET performs the full lazy expiry
+    // (status flip, PI cancel, promo release); this is the backstop for a
+    // client that skips the GET.
+    if (isPaymentLinkExpired(bookingRequest)) {
+      return NextResponse.json(
+        { error: "This payment link has expired. Please contact us and we'll send you a fresh one." },
+        { status: 400 }
+      );
     }
 
     // Charge the request's quoted amount (server-side source of truth — admins can

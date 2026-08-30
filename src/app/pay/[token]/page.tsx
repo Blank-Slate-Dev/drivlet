@@ -177,7 +177,18 @@ function PaymentPageContent() {
           return;
         }
         if (!res.ok) {
-          setError("This payment link is no longer valid.");
+          // Distinguish a lapsed link (7-day TTL, 2026-08-30) from a dead one
+          let apiError: string | undefined;
+          try {
+            apiError = (await res.json())?.error;
+          } catch {
+            /* no body */
+          }
+          setError(
+            apiError === "expired"
+              ? "This payment link has expired. Reply to your confirmation email or contact us and we'll send you a fresh one."
+              : "This payment link is no longer valid."
+          );
           return;
         }
         const json = await res.json();

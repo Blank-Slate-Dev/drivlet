@@ -83,13 +83,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // Declined requests must NEVER convert (re-audit S-1): a customer with
-    // the pay page already open could complete the PI after an admin
-    // declined. Decline now cancels the PI too, but if the payment slipped
+    // Declined/expired requests must NEVER convert (re-audit S-1; expired
+    // added 2026-08-30 with the payment-link TTL): a customer with the pay
+    // page already open could complete the PI after an admin declined or the
+    // link lapsed. Both paths cancel the PI too, but if the payment slipped
     // through first, refuse conversion and flag for a manual refund.
-    if (requestDoc.status === "declined") {
+    if (requestDoc.status === "declined" || requestDoc.status === "expired") {
       console.error(
-        "request-payment-webhook: payment received for DECLINED request — manual refund needed",
+        `request-payment-webhook: payment received for ${requestDoc.status.toUpperCase()} request — manual refund needed`,
         bookingRequestId, paymentIntent.id
       );
       await db.collection("bookingrequests").updateOne(
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
         {
           $set: {
             paymentIntentId: paymentIntent.id,
-            adminNotes: `${requestDoc.adminNotes || ""}\nPayment ${paymentIntent.id} received AFTER decline — refund manually in Stripe.`.trim(),
+            adminNotes: `${requestDoc.adminNotes || ""}\nPayment ${paymentIntent.id} received AFTER ${requestDoc.status} — refund manually in Stripe.`.trim(),
             updatedAt: new Date(),
           },
         }

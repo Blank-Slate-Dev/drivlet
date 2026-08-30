@@ -4,6 +4,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 import { sendConfirmationWithPayLink } from "@/lib/requestConfirmationEmail";
+import { isPaymentLinkExpired } from "@/lib/paymentLinkExpiry";
 import crypto from "crypto";
 
 export async function POST(
@@ -32,14 +33,19 @@ export async function POST(
     // included in OPEN_REQUEST_STATUSES, so those rows render a "Send Link"
     // button on /admin/bookings — but this route rejected them, making the row
     // a dead end.
-    if (!["approved", "payment_link_sent", "accepted_awaiting_payment"].includes(bookingRequest.status)) {
+    // "expired" allowed since 2026-08-30: resending is the admin's way to
+    // REVIVE a lapsed payment link (7-day TTL) — a fresh token is issued below.
+    if (!["approved", "payment_link_sent", "accepted_awaiting_payment", "expired"].includes(bookingRequest.status)) {
       return NextResponse.json(
         { error: `Cannot send payment link for status "${bookingRequest.status}"` },
         { status: 400 }
       );
     }
 
-    if (!bookingRequest.paymentToken) {
+    // Regenerate when the token is missing (never issued, or nulled by
+    // expiry/decline of a previous link) or past its TTL — the resent email
+    // must never carry a link that dies on arrival.
+    if (!bookingRequest.paymentToken || isPaymentLinkExpired(bookingRequest)) {
       bookingRequest.paymentToken = crypto.randomBytes(32).toString("hex");
       bookingRequest.paymentTokenCreatedAt = new Date();
     }
