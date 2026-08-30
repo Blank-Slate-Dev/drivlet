@@ -541,16 +541,20 @@ export async function POST(request: NextRequest) {
         booking.pickupDriver.collectedAt = now;
       }
 
+      // Audit entry FIRST, customer-facing message LAST: notifyBookingUpdate
+      // promotes the latest update whose stage matches currentStage into the
+      // customer's stage email — with the old order every "Car Picked Up"
+      // email carried the internal QA text (re-audit 2026-08-30).
       booking.updates.push({
         stage: "car_picked_up",
         timestamp: now,
-        message: "Vehicle has been picked up. Heading to garage.",
+        message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed. Status advanced to collected.`,
         updatedBy: "driver",
       });
       booking.updates.push({
         stage: "car_picked_up",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}) and pickup consent form signed. Status advanced to collected.`,
+        message: "Vehicle has been picked up. Heading to garage.",
         updatedBy: "driver",
       });
       // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
@@ -587,16 +591,18 @@ export async function POST(request: NextRequest) {
         booking.pickupDriver.completedAt = now;
       }
 
+      // Audit entry FIRST, customer-facing message LAST — see the matching
+      // comment on the 'collected' action (re-audit 2026-08-30).
       booking.updates.push({
         stage: "at_garage",
         timestamp: now,
-        message: "Vehicle has arrived at the garage. Pickup leg complete.",
+        message: `Photo requirements verified (${gate.present}/${gate.required}). Status advanced to dropped off.`,
         updatedBy: "driver",
       });
       booking.updates.push({
         stage: "at_garage",
         timestamp: now,
-        message: `Photo requirements verified (${gate.present}/${gate.required}). Status advanced to dropped off.`,
+        message: "Vehicle has arrived at the garage. Pickup leg complete.",
         updatedBy: "driver",
       });
       // validateModifiedOnly: pre-existing invalid data (e.g. a legacy timeline
