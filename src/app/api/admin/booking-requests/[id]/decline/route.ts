@@ -72,26 +72,48 @@ export async function POST(
 
     const now = new Date();
     const adminEmail = adminCheck.session.user?.email || "admin";
-    bookingRequest.status = "declined";
-    bookingRequest.declineReason = reason;
-    bookingRequest.reviewedBy = null;
-    bookingRequest.reviewedAt = now;
-    bookingRequest.adminNotes = [bookingRequest.adminNotes, `Declined by ${adminEmail}`]
-      .filter(Boolean)
-      .join("\n");
-    // Invalidate any previously issued payment link
-    bookingRequest.paymentToken = null;
 
-    await bookingRequest.save();
+    // Atomic transition (re-audit 2026-08-30): the status must still be
+    // declinable AT WRITE TIME. The old read-check-then-save let a decline
+    // racing the payment webhook overwrite status "paid" with "declined" —
+    // which then released a genuinely redeemed promo code (double-spend) and
+    // emailed "you haven't been charged" to a customer who just paid. If the
+    // guarded update matches nothing, the request changed underneath us.
+    const declinedRequest = await BookingRequest.findOneAndUpdate(
+      {
+        _id: id,
+        status: { $in: ["pending_review", "approved", "payment_link_sent"] },
+      },
+      {
+        $set: {
+          status: "declined",
+          declineReason: reason,
+          reviewedBy: null,
+          reviewedAt: now,
+          adminNotes: [bookingRequest.adminNotes, `Declined by ${adminEmail}`]
+            .filter(Boolean)
+            .join("\n"),
+          // Invalidate any previously issued payment link
+          paymentToken: null,
+        },
+      },
+      { new: true }
+    );
+    if (!declinedRequest) {
+      return NextResponse.json(
+        { error: "This request's status just changed (it may have been paid or actioned by someone else). Refresh and review before declining." },
+        { status: 409 }
+      );
+    }
 
     // Cancel the live PaymentIntent too (re-audit S-1): nulling the token
     // doesn't stop a customer whose /pay page is ALREADY open (client secret
     // loaded) from completing the payment after decline. Best effort — a
     // PI that's already succeeded/cancelled throws and is ignored; the
     // webhook's declined-status refusal is the backstop.
-    if (bookingRequest.paymentIntentId) {
+    if (declinedRequest.paymentIntentId) {
       try {
-        await stripe.paymentIntents.cancel(bookingRequest.paymentIntentId);
+        await stripe.paymentIntents.cancel(declinedRequest.paymentIntentId);
       } catch {
         // Already succeeded, already cancelled, or transient — webhook guard
         // handles the residual case
@@ -99,24 +121,24 @@ export async function POST(
     }
 
     // Free the promo code — the customer never got the discount
-    if (bookingRequest.promoCode) {
+    if (declinedRequest.promoCode) {
       await releasePromoCodeForUsage({
-        code: bookingRequest.promoCode,
-        requestId: bookingRequest._id,
+        code: declinedRequest.promoCode,
+        requestId: declinedRequest._id,
       });
     }
 
     // Notify the customer (non-blocking result — decline succeeds even if email fails)
-    const firstName = bookingRequest.userName.split(" ")[0];
+    const firstName = declinedRequest.userName.split(" ")[0];
     const details = {
-      vehicleRegistration: bookingRequest.vehicleRegistration,
-      serviceType: getServiceTypeByValue(bookingRequest.serviceType)?.label || bookingRequest.serviceType,
-      serviceDate: bookingRequest.serviceDate,
-      pickupTime: bookingRequest.pickupTimeSlot ? getPickupSlotLabel(bookingRequest.pickupTimeSlot) : undefined,
-      pickupAddress: bookingRequest.pickupAddress,
+      vehicleRegistration: declinedRequest.vehicleRegistration,
+      serviceType: getServiceTypeByValue(declinedRequest.serviceType)?.label || declinedRequest.serviceType,
+      serviceDate: declinedRequest.serviceDate,
+      pickupTime: declinedRequest.pickupTimeSlot ? getPickupSlotLabel(declinedRequest.pickupTimeSlot) : undefined,
+      pickupAddress: declinedRequest.pickupAddress,
     };
 
-    const subject = `Update on your drivlet booking request (${bookingRequest.vehicleRegistration})`;
+    const subject = `Update on your drivlet booking request (${declinedRequest.vehicleRegistration})`;
 
     const textContent = [
       `Hi ${firstName},`,
@@ -173,8 +195,8 @@ export async function POST(
 </html>`.trim();
 
     const emailSent = await sendEmail({
-      to: bookingRequest.userEmail,
-      toName: bookingRequest.userName,
+      to: declinedRequest.userEmail,
+      toName: declinedRequest.userName,
       subject,
       textContent,
       htmlContent,
@@ -183,7 +205,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       emailSent,
-      request: bookingRequest,
+      request: declinedRequest,
     });
   } catch (error) {
     console.error("Failed to decline booking request:", error);
