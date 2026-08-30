@@ -196,12 +196,39 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const unsetData: Record<string, number> = {
       [fieldPath]: 1,
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updates entries share the booking timeline shape
+    const auditEntries: any[] = [
+      {
+        stage: `${leg}_driver_unassigned`,
+        timestamp: now,
+        message: `Admin unassigned ${leg} driver.`,
+        // MUST never be undefined: $push skips validation, and an updates
+        // entry missing required fields breaks every later booking.save()
+        // (drivers get "Failed to process job action"). Bug fixed 2026-07-24.
+        updatedBy: adminCheck.session?.user?.id || "admin",
+      },
+    ];
 
     // For pickup leg, also clear legacy fields
     if (leg === "pickup") {
       unsetData.assignedDriverId = 1;
       unsetData.driverAssignedAt = 1;
       unsetData.driverAcceptedAt = 1;
+
+      // Ported from the dispatch route (re-audit 2026-08-30): unassigning the
+      // pickup driver must also clear an un-started return assignment, or the
+      // return driver keeps a ghost "Waiting for pickup to complete" job and
+      // the booking looks return-covered while sitting in unassigned pickups.
+      if (booking.returnDriverId && !booking.returnDriver?.startedAt) {
+        unsetData.returnDriverId = 1;
+        unsetData.returnDriver = 1;
+        auditEntries.push({
+          stage: "return_driver_auto_cleared",
+          timestamp: now,
+          message: "Return assignment cleared because pickup driver was unassigned.",
+          updatedBy: adminCheck.session?.user?.id || "admin",
+        });
+      }
     }
 
     // Mirror of the assign fix (2026-07-29): returnDriverId must be cleared
@@ -213,15 +240,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     await Booking.findByIdAndUpdate(id, {
       $unset: unsetData,
       $push: {
-        updates: {
-          stage: `${leg}_driver_unassigned`,
-          timestamp: now,
-          message: `Admin unassigned ${leg} driver.`,
-          // MUST never be undefined: $push skips validation, and an updates
-          // entry missing required fields breaks every later booking.save()
-          // (drivers get "Failed to process job action"). Bug fixed 2026-07-24.
-          updatedBy: adminCheck.session?.user?.id || "admin",
-        },
+        updates: { $each: auditEntries },
       },
     });
 
