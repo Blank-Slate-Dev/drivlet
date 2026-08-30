@@ -348,10 +348,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (data.serviceType !== undefined) {
       booking.serviceType = data.serviceType;
     }
+    // Vehicle fields (re-audit 2026-08-30): the Edit Booking modal has always
+    // SENT vehicleYear/vehicleModel, but this handler silently dropped them —
+    // the admin saw "updated successfully" and the edit reverted on re-sync.
+    if (typeof data.vehicleYear === "string") {
+      booking.vehicleYear = data.vehicleYear.replace(/\D/g, "").slice(0, 4) || undefined;
+    }
+    if (typeof data.vehicleModel === "string") {
+      booking.vehicleModel = data.vehicleModel.trim().slice(0, 100) || undefined;
+    }
 
     booking.updatedAt = new Date();
     await booking.save({ validateModifiedOnly: true });
-    
+
     // Notify connected clients of the update
     notifyBookingUpdate(booking);
 
