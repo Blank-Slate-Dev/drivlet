@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireValidOrigin } from "@/lib/validation";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { calculateDistance, getDistanceZone } from "@/lib/distanceZones";
 import { DRIVLET_PRICE } from "@/lib/stripe";
 import { getServerSession } from "next-auth";
@@ -22,6 +23,18 @@ export async function POST(request: NextRequest) {
   const originCheck = requireValidOrigin(request);
   if (!originCheck.valid) {
     return NextResponse.json({ error: originCheck.error }, { status: 403 });
+  }
+
+  // Rate limit (re-audit 2026-08-30): this unauthenticated endpoint creates a
+  // DB document, notifies admins, and sends an acknowledgement email to a
+  // caller-supplied address — the origin check alone is spoofable by any
+  // non-browser client, so throttle per IP like the other public POSTs.
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.booking, "booking-request");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 }
+    );
   }
 
   let body;
