@@ -21,6 +21,11 @@ import {
 } from "lucide-react";
 import { usePhotoUpload } from "@/hooks/usePhotoUpload";
 import { CheckpointType, PhotoType } from "@/models/VehiclePhoto";
+import {
+  PHOTO_REQUIREMENTS,
+  validateCheckpointPhotos,
+  type GatedCheckpoint,
+} from "@/lib/photoRequirements";
 
 interface PhotoUploadModalProps {
   isOpen: boolean;
@@ -84,15 +89,33 @@ const PHOTO_TYPES: { type: PhotoType; label: string; icon: string }[] = [
   { type: "odometer", label: "Odometer", icon: "🔢" },
 ];
 
-const REQUIRED_PHOTO_TYPES: PhotoType[] = ["front", "back", "left_side", "right_side"];
+// Completeness follows the SHARED custody rules (src/lib/photoRequirements.ts)
+// for the three gated checkpoints — the modal previously demanded 4 exterior
+// photos at EVERY checkpoint, which contradicted the server's 1-photo rule for
+// service_dropoff and permanently locked the return leg's Service Pickup
+// section behind it (LB-A, re-audit 2026-08-30). final_delivery is not a
+// gated checkpoint; its (display-only, it's last so it never locks anything)
+// completeness stays the 4-exterior convention.
+const FINAL_DELIVERY_SLOTS: PhotoType[] = ["front", "back", "left_side", "right_side"];
+
+// Per-checkpoint required photo count, for the header count + progress bar.
+const REQUIRED_COUNT: Record<CheckpointType, number> = {
+  pre_pickup: PHOTO_REQUIREMENTS.pre_pickup.min,
+  service_dropoff: PHOTO_REQUIREMENTS.service_dropoff.min,
+  service_pickup: PHOTO_REQUIREMENTS.service_pickup.min,
+  final_delivery: FINAL_DELIVERY_SLOTS.length,
+};
 
 function isCheckpointComplete(
   checkpoint: CheckpointType,
   photos: Array<{ checkpointType: CheckpointType; photoType: PhotoType }>
 ): boolean {
-  return REQUIRED_PHOTO_TYPES.every((pt) =>
-    photos.some((p) => p.checkpointType === checkpoint && p.photoType === pt)
-  );
+  if (checkpoint === "final_delivery") {
+    return FINAL_DELIVERY_SLOTS.every((pt) =>
+      photos.some((p) => p.checkpointType === checkpoint && p.photoType === pt)
+    );
+  }
+  return validateCheckpointPhotos(photos, checkpoint as GatedCheckpoint).valid;
 }
 
 function isCheckpointUnlocked(
@@ -218,7 +241,11 @@ export default function PhotoUploadModal({
     if (!(wasLoading && !loading)) return;
 
     const stageCheckpoint = getCheckpointFromStage(currentStage);
-    if (stageCheckpoint && isCheckpointUnlocked(stageCheckpoint, photos)) {
+    if (
+      stageCheckpoint &&
+      isCheckpointUnlocked(stageCheckpoint, photos) &&
+      !isCheckpointComplete(stageCheckpoint, photos)
+    ) {
       setExpandedCheckpoint(stageCheckpoint);
       return;
     }
@@ -275,8 +302,12 @@ export default function PhotoUploadModal({
     if (!stage) return null;
     if (["driver_en_route", "car_picked_up"].includes(stage)) return "pre_pickup";
     if (["at_garage", "service_in_progress"].includes(stage)) return "service_dropoff";
-    if (["awaiting_payment", "ready_for_return"].includes(stage)) return "service_pickup";
-    if (["driver_returning", "delivered"].includes(stage)) return "final_delivery";
+    // driver_returning: the driver's next photo gate is collecting from the
+    // workshop (service_pickup) — final_delivery photos come later in the
+    // same stage, and the auto-expand falls through to the first incomplete
+    // checkpoint once service_pickup is done (LB-A follow-up).
+    if (["awaiting_payment", "ready_for_return", "driver_returning"].includes(stage)) return "service_pickup";
+    if (stage === "delivered") return "final_delivery";
     return null;
   };
 
@@ -481,12 +512,14 @@ export default function PhotoUploadModal({
   };
 
   const getTotalProgress = () => {
-    const total =
-      checkpointStatus.pre_pickup +
-      checkpointStatus.service_dropoff +
-      checkpointStatus.service_pickup +
-      checkpointStatus.final_delivery;
-    return Math.round((total / 20) * 100);
+    // Cap each checkpoint at its own requirement so extra photos (e.g. more
+    // than the 1 required drop-off proof) can't push the bar past 100%.
+    const total = (Object.keys(REQUIRED_COUNT) as CheckpointType[]).reduce(
+      (sum, cp) => sum + Math.min(checkpointStatus[cp], REQUIRED_COUNT[cp]),
+      0
+    );
+    const required = Object.values(REQUIRED_COUNT).reduce((a, b) => a + b, 0);
+    return Math.round((total / required) * 100);
   };
 
   if (!isOpen) return null;
@@ -978,7 +1011,7 @@ function CheckpointSection({
               isComplete ? "text-emerald-600" : "text-slate-500"
             }`}
           >
-            {count}/5
+            {count}/{REQUIRED_COUNT[checkpoint.type]}
           </span>
           {!isLocked &&
             (isExpanded ? (
