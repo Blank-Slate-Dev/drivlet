@@ -46,11 +46,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const guestRego = searchParams.get("rego");
 
     let hasAccess = false;
+    let isAdminViewer = false;
 
     if (session?.user?.id) {
       // Authenticated user access
       const user = await User.findById(session.user.id).lean();
       const isAdmin = user?.role === "admin";
+      isAdminViewer = isAdmin;
       const isOwner =
         booking.userId?.toString() === session.user.id ||
         booking.userEmail?.toLowerCase() === session.user.email?.toLowerCase();
@@ -78,6 +80,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
         { error: "You do not have permission to view this photo" },
         { status: 403 }
       );
+    }
+
+    // Superseded (removed/replaced) photos are archive-only (re-audit
+    // 2026-08-30 RB-1): they no longer appear in any listing, and a saved
+    // URL must not keep serving them to customers/guests/drivers. Admins
+    // retain access for dispute review.
+    if (photo.superseded === true && !isAdminViewer) {
+      return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
 
     // Stream the file through this authenticated route. Redirecting handed

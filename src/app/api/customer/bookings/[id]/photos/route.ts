@@ -59,9 +59,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { searchParams } = new URL(request.url);
     const checkpoint = searchParams.get("checkpoint") as CheckpointType | null;
 
-    // Build query
+    // Build query. superseded filter (re-audit 2026-08-30 RB-1): driver
+    // "delete" now supersedes instead of hard-deleting, so without this
+    // filter removed/replaced photos reappeared to customers.
     const query: Record<string, unknown> = {
       bookingId: new mongoose.Types.ObjectId(bookingId),
+      superseded: { $ne: true },
     };
     if (checkpoint && CHECKPOINT_TYPES.includes(checkpoint)) {
       query.checkpointType = checkpoint;

@@ -84,9 +84,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build photo query
+    // Build photo query. superseded filter (re-audit 2026-08-30 RB-1):
+    // driver "delete" now supersedes instead of hard-deleting, so without
+    // this filter removed/replaced photos reappeared to guests.
     const query: Record<string, unknown> = {
       bookingId: new mongoose.Types.ObjectId(String(booking._id)),
+      superseded: { $ne: true },
     };
 
     // Optional checkpoint filter
