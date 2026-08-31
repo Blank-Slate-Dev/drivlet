@@ -427,6 +427,21 @@ export default function AdminBookingsPage() {
           </button>
         );
       }
+      if (st === "expired") {
+        // Revival path (re-audit 2026-08-30 RB-2): the API re-checks slot
+        // capacity and re-claims the promo, then issues a fresh 7-day link.
+        // Without this button an expired request was an admin dead-end.
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleSendPaymentLink(row.id); }}
+            disabled={sendingLink === row.id}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50"
+          >
+            {sendingLink === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Revive Link
+          </button>
+        );
+      }
       if (st === "pending_review") {
         return (
           <button

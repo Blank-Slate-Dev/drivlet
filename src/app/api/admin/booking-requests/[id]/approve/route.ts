@@ -3,54 +3,13 @@ import { requireAdmin } from "@/lib/admin";
 import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
-import Booking from "@/models/Booking";
 import { MAX_BOOKINGS_PER_SLOT } from "@/config/timeSlots";
 import crypto from "crypto";
 import { sendConfirmationWithPayLink } from "@/lib/requestConfirmationEmail";
 import { notifyAdmin } from "@/lib/notifications";
-import { PAYMENT_LINK_TTL_MS } from "@/lib/paymentLinkExpiry";
-
-// Statuses (besides live bookings) that already hold a slot for a date.
-const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepted_awaiting_payment"];
-
-// Count how many bookings + slot-holding requests already occupy a given slot on a date,
-// excluding the request currently being approved.
-async function countSlotUsage(
-  serviceDate: Date,
-  slotField: "pickupTimeSlot" | "dropoffTimeSlot",
-  slotValue: string,
-  excludeRequestId: string
-): Promise<number> {
-  const startOfDay = new Date(serviceDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(serviceDate);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const [bookingCount, requestCount] = await Promise.all([
-    Booking.countDocuments({
-      serviceDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $ne: "cancelled" },
-      [slotField]: slotValue,
-    }),
-    BookingRequest.countDocuments({
-      _id: { $ne: excludeRequestId },
-      serviceDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: SLOT_HOLDING_REQUEST_STATUSES },
-      [slotField]: slotValue,
-      // Payment-link TTL (2026-08-30): a request whose link has lapsed no
-      // longer holds the slot, even before the lazy expiry has flipped its
-      // status. Requests without a token timestamp (legacy / not yet sent)
-      // still count.
-      $or: [
-        { paymentTokenCreatedAt: null },
-        { paymentTokenCreatedAt: { $exists: false } },
-        { paymentTokenCreatedAt: { $gte: new Date(Date.now() - PAYMENT_LINK_TTL_MS) } },
-      ],
-    }),
-  ]);
-
-  return bookingCount + requestCount;
-}
+// Slot counting shared with the resend/revival route (re-audit 2026-08-30
+// RB-2) — includes the payment-link-TTL exclusion for lapsed holders.
+import { countSlotUsage } from "@/lib/slotCapacity";
 
 export async function POST(
   request: NextRequest,

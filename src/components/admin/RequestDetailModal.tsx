@@ -339,7 +339,7 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
 
         <div className="space-y-5 p-6">
           {/* Action Buttons */}
-          {(req.status === "pending_review" || req.status === "approved" || req.status === "payment_link_sent") && (
+          {(req.status === "pending_review" || req.status === "approved" || req.status === "payment_link_sent" || req.status === "expired") && (
             <div className="flex flex-wrap gap-3">
               {req.status === "pending_review" && (
                 <button
@@ -355,7 +355,7 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
                   Approve Request
                 </button>
               )}
-              {(req.status === "approved" || req.status === "payment_link_sent") && (
+              {(req.status === "approved" || req.status === "payment_link_sent" || req.status === "expired") && (
                 <button
                   onClick={handleSendPaymentLink}
                   disabled={actionLoading === "send-link"}
@@ -366,25 +366,39 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  {req.status === "payment_link_sent" ? "Resend Payment Link" : "Send Payment Link"}
+                  {/* "expired" → revival (re-audit 2026-08-30 RB-2): the API
+                      re-checks slot capacity + re-claims the promo, then
+                      issues a fresh 7-day link */}
+                  {req.status === "expired"
+                    ? "Revive & Resend Payment Link"
+                    : req.status === "payment_link_sent"
+                    ? "Resend Payment Link"
+                    : "Send Payment Link"}
                 </button>
               )}
-              <button
-                onClick={() => (showEditForm ? setShowEditForm(false) : openEditForm())}
-                disabled={actionLoading !== null}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Request
-              </button>
-              <button
-                onClick={() => { setShowDeclineForm((v) => !v); setActionError(null); }}
-                disabled={actionLoading !== null}
-                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
-              >
-                <XCircle className="h-4 w-4" />
-                Decline Request
-              </button>
+              {/* Edit/Decline hidden for "expired": the decline route's
+                  atomic status filter rejects expired requests (revive first
+                  or leave it lapsed), and edits should follow a revival. */}
+              {req.status !== "expired" && (
+                <>
+                  <button
+                    onClick={() => (showEditForm ? setShowEditForm(false) : openEditForm())}
+                    disabled={actionLoading !== null}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit Request
+                  </button>
+                  <button
+                    onClick={() => { setShowDeclineForm((v) => !v); setActionError(null); }}
+                    disabled={actionLoading !== null}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Decline Request
+                  </button>
+                </>
+              )}
             </div>
           )}
 
