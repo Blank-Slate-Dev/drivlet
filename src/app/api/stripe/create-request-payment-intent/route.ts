@@ -95,7 +95,19 @@ export async function POST(request: NextRequest) {
     if (bookingRequest.paymentIntentId) {
       try {
         const existingPI = await stripe.paymentIntents.retrieve(bookingRequest.paymentIntentId);
-        if (existingPI.status !== "succeeded" && existingPI.status !== "canceled") {
+        // A SUCCEEDED PI must never fall through to minting a second one
+        // (re-audit 2026-08-30 RB-3): in the window between Stripe confirming
+        // the payment and the webhook flipping the request to "paid", the DB
+        // status check above passes — reloading /pay and clicking "Proceed"
+        // used to create a fresh PI the customer could pay AGAIN, and each PI
+        // converts to its own booking. Stripe is the source of truth here.
+        if (existingPI.status === "succeeded") {
+          return NextResponse.json(
+            { error: "This booking has already been paid." },
+            { status: 409 }
+          );
+        }
+        if (existingPI.status !== "canceled") {
           // If the admin edited the quoted amount after this intent was created,
           // bring the intent in line so the customer is charged the current quote.
           if (existingPI.amount !== serverAmount) {
