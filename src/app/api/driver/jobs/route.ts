@@ -510,6 +510,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
       }
 
+      // Leg-order guard (re-audit 2026-08-30 BA-1): steps advance in order.
+      // The UI enforces this; the API must too, or a direct call could skip
+      // ahead.
+      if (!booking.pickupDriver?.startedAt) {
+        return NextResponse.json(
+          { error: "Start the pickup leg before marking the vehicle collected." },
+          { status: 400 }
+        );
+      }
+
       // GATE: compulsory pickup photos (4 exterior wides + odometer/fuel = 5)
       const gate = await runPhotoGate(bookingId, "pre_pickup");
       if (!gate.valid) {
@@ -570,6 +580,16 @@ export async function POST(request: NextRequest) {
     if (action === "dropped_at_workshop" || action === "at_garage") {
       if (!isPickupDriver) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
+      }
+
+      // Leg-order guard (re-audit 2026-08-30 BA-1): 'collected' holds the
+      // 5-photo pre_pickup gate AND the signed pickup consent form — the
+      // custody controls. Calling this action directly used to skip both.
+      if (!booking.pickupDriver?.collectedAt) {
+        return NextResponse.json(
+          { error: "Mark the vehicle collected (photos + consent form) before completing the drop-off." },
+          { status: 400 }
+        );
       }
 
       // GATE: compulsory proof-of-drop-off photo (1 minimum)
@@ -662,6 +682,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to return" }, { status: 403 });
       }
 
+      // Leg-order guard (re-audit 2026-08-30 BA-1)
+      if (!booking.returnDriver?.startedAt) {
+        return NextResponse.json(
+          { error: "Start the return leg before marking the vehicle collected from the workshop." },
+          { status: 400 }
+        );
+      }
+
       // GATE: compulsory return-pickup photos (4 exterior wides)
       const gate = await runPhotoGate(bookingId, "service_pickup");
       if (!gate.valid) {
@@ -708,6 +736,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to return" }, { status: 403 });
       }
 
+      // Leg-order guard (re-audit 2026-08-30 BA-1): workshop collection holds
+      // the 4-photo service_pickup gate — it must not be skippable.
+      if (!booking.returnDriver?.collectedAt) {
+        return NextResponse.json(
+          { error: "Confirm collection from the workshop (with photos) before heading to the customer." },
+          { status: 400 }
+        );
+      }
+
       if (booking.returnDriver) {
         booking.returnDriver.arrivedAt = now;
       }
@@ -735,9 +772,34 @@ export async function POST(request: NextRequest) {
       // NOTE: payment is NOT a gate here either — customers usually pay the
       // service centre directly; the payment link is a backup. (2026-07-17)
 
-      // Must be return driver OR pickup driver (if same driver doing both)
-      if (!isReturnDriver && !isPickupDriver) {
+      // Must be the return driver. The pickup driver is only accepted when NO
+      // return driver is assigned at all (legacy single-driver bookings) — on
+      // split bookings a pickup driver could previously complete the other
+      // driver's leg, stamping their completedAt and mis-crediting
+      // completedJobs (re-audit 2026-08-30 BA-1). Same-driver-both-legs
+      // bookings pass isReturnDriver anyway.
+      if (!isReturnDriver && !(isPickupDriver && !booking.returnDriverId)) {
         return NextResponse.json({ error: "You are not assigned to this delivery" }, { status: 403 });
+      }
+
+      // Replay guard (re-audit 2026-08-30 BA-1): 'delivered' used to be
+      // repeatable — each replay re-sent the delivered email/SMS and
+      // incremented completedJobs. (Undo of 'delivered' restores
+      // status "in_progress", so undo→redo still works.)
+      if (booking.status === "completed") {
+        return NextResponse.json(
+          { error: "This booking is already completed." },
+          { status: 400 }
+        );
+      }
+
+      // Leg-order guard: when a return leg exists it must actually be
+      // underway — the workshop-collection step holds the photo gate.
+      if (booking.returnDriver && !booking.returnDriver.collectedAt) {
+        return NextResponse.json(
+          { error: "Confirm collection from the workshop (with photos) before marking the vehicle delivered." },
+          { status: 400 }
+        );
       }
 
       // GATE: signed return confirmation form (or refused-to-sign dispute record)
