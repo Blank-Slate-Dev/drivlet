@@ -87,6 +87,150 @@ four risky ones. **No regressions introduced by the batch were found.**
 > serviceDate rather than a flat 7 days. Run `npm run build` locally before
 > pushing — the sandbox can only run `tsc` (clean).
 
+---
+
+## 🔁 RE-VERIFICATION 2026-08-30 (post-commit, commits 5e5f6a0..bf0decb)
+
+All 10 commits verified landed cleanly (per-commit file lists match intent,
+tree clean, `tsc` clean, nothing half-staged). Each of the 9 fixes re-verified
+AS COMMITTED and regression-hunted, plus one more full fresh-eyes flow sweep.
+The 9 fixes are implemented as described and internally sound; the regression
+hunt found **2 regressions of the batch, 1 pre-existing money-path blocker,
+and a batch of new should-fixes**. No code changes made this pass.
+
+> **FIX BATCH 2 — 2026-08-30 (after the re-verification below):** RB-1, RB-2,
+> RB-3 and BA-1 are now FIXED in code. RB-1: superseded filter added to the
+> guest + customer photo listings, and `/api/photos/[id]` now serves
+> superseded photos to admins only (archive access preserved). RB-2: expired
+> rows get a "Revive Link" button (bookings page + detail modal); the resend
+> route re-runs the slot-capacity check and atomically re-claims the promo
+> before reviving (409 with a clear next step if either fails), stamping the
+> promo usage trail; slot counting extracted to `src/lib/slotCapacity.ts`
+> shared by approve + resend. RB-3: a retrieved PI in status "succeeded"
+> now returns the 409 already-paid response instead of falling through to
+> mint a second PaymentIntent. BA-1: leg-order guards on collected /
+> dropped_at_workshop / collected_from_workshop / delivering / delivered
+> (each requires the prior timestamp, closing the consent/photo-gate
+> bypass), delivered now requires the return driver (pickup driver accepted
+> only when no return driver is assigned) and has a replay guard
+> (undo→redo verified safe — undo restores status "in_progress").
+> `tsc` clean. Deliberately NOT done (unchanged should-fixes): drivers-screen
+> suspend vs accountStatus sync (product call — roster-suspend and
+> app-ban are currently different concepts), and everything in the
+> should-fix list below.
+
+### 🔴 REMAINING CODE BLOCKERS — ALL FIXED IN FIX BATCH 2 (see note above)
+
+**RB-1 (regression of the supersede fix). Driver-"deleted" photos are now
+visible to customers and guests.** `bookings/track/photos/route.ts:98` and
+`customer/bookings/[id]/photos/route.ts:71` query VehiclePhoto with no
+`superseded: {$ne: true}` filter (verified). Hard-delete used to keep these
+consistent; supersede-on-delete means a photo the driver removed (wrong car,
+accidental capture) reappears in the guest/customer viewers — and their
+`completedCount` (decremented) now contradicts the photo list. Admin tracking
+route filters correctly; these two were missed. One-line filter in each.
+Companion policy call: `photos/[id]/route.ts:29` still streams superseded
+content to owners/guests who kept the URL.
+
+**RB-2 (gap in the expiry feature). Expired requests are an admin dead-end.**
+The API allows revival (`send-payment-link` accepts status "expired") but no
+UI offers it: the bookings-page RowAction gives expired rows only "View"
+(`admin/bookings/page.tsx:406-447`, verified), and RequestDetailModal's action
+bar is gated on pending_review/approved/payment_link_sent — an expired request
+shows zero actions, while the customer-facing expired message promises "we'll
+send you a fresh one". Fix together with the two revival gaps found in the
+same hunt: revival must RE-CLAIM the promo code (lazy expiry released it, but
+quotedAmount stays discounted — double-spend) and re-run the slot-capacity
+check (the freed slot may have been refilled).
+
+**RB-3 (pre-existing, found by the fresh-eyes sweep). Succeeded-PI
+fall-through mints a second PaymentIntent — double-charge window.**
+`create-request-payment-intent/route.ts:95-120` (verified): the existing-PI
+branch returns early only for statuses other than succeeded/canceled. A PI
+that has SUCCEEDED but whose webhook hasn't yet flipped the request to "paid"
+falls through to `paymentIntents.create` — a customer reloading /pay in that
+window can pay twice, and each PI converts to its own booking (webhook upserts
+per paymentId). Fix: return the 409 already-paid response when the retrieved
+PI is succeeded.
+
+### 🟠 BLOCKER-ADJACENT (judgment call — deliberate out-of-app API use by an
+assigned driver, UI enforces order; recommend fixing pre-launch, cheap)
+
+**BA-1. Driver stage actions don't enforce leg order server-side.**
+`driver/jobs/route.ts`: `dropped_at_workshop` (:566+) requires only the
+1-photo drop-off gate — calling it directly skips `collected` and with it the
+5-photo pre_pickup gate AND the signed pickup consent form (the custody
+controls). `delivered` (:739, verified) accepts the PICKUP driver on
+split-driver bookings (mis-credits completedJobs, stamps the other driver's
+completedAt) and is replayable (no completed-status guard → duplicate
+delivered emails/SMS + metric inflation on every replay). Fixes: require the
+prior leg timestamp before each advance; require isReturnDriver for
+`delivered` unless no return driver exists; add a completed-status guard.
+
+### 🟠 NEW SHOULD-FIXES (fresh-eyes sweep; top ones first)
+
+1. **Drivers-screen suspend doesn't trip the new suspension gate** —
+   `admin/drivers/route.ts:167-213` sets Driver.status/canAcceptJobs but not
+   User.accountStatus, which is all `driverSuspensionResponse` checks. The
+   two admin suspend paths now enforce differently; sync them.
+2. **Service-payment webhook duplicate delivery marks the WRONG extra charge
+   paid** (`service-payment-webhook/route.ts:70-95`) — dup retry falls back to
+   "oldest pending"; check the sessionId against already-paid entries first.
+3. **Guest review POST is email-only** (`reviews/route.ts:113-126`) — no rego
+   factor, created status:"approved", instantly mutates driver averageRating.
+   Forgeable driver ratings; add the rego factor + moderation.
+4. **Approve/row Send-Link UIs swallow `emailSent:false`** — Mailjet failure
+   shows "sent!" while the customer got nothing
+   (`RequestDetailModal.tsx:261-267`, `admin/bookings/page.tsx:336-339`).
+5. **TTL-boundary race**: the post-payment tracking poll hits the pay GET and
+   can lazy-expire a just-paid request before the webhook lands (promo
+   released + manual-refund flag for a good payment). Narrow window; skip the
+   expiry flip when a non-cancelable PI exists, and check existing-booking
+   BEFORE the webhook's refusal branch.
+6. **`slot-availability` route lacks the TTL exclusion** the approve route got
+   — customer-facing availability can show a slot full that admin can fill.
+7. **Webhook conversion email still fire-and-forget** + no amount-vs-quote
+   cross-check at conversion (both carried from the previous pass).
+8. **Pricing trusts client garage coords** (surcharge/red-zone bypass);
+   serviceDate/slot/phone validation gaps; UTC min-date same-day skew.
+9. **Return driver earns $0** — earnings query only assignedDriverId
+   (`driver/earnings/route.ts:100-103`).
+10. **Password policy drift** — reset + dashboard change-password accept any
+    8 chars, bypassing registration's complexity policy.
+11. **Admin force clock-out records jobsCompleted:0** (queries nonexistent
+    `driverId` path — same bug the cron route already fixed).
+12. **`/api/health` leaks raw error messages + env presence** unauthenticated.
+13. **`send-payment-link` still read-then-save** (make atomic like
+    approve/decline); non-stage admin/dispatch notifies re-send stage
+    emails (suppress like the driver sub-steps); photo-audit updates can
+    still reach customer emails via the customMessage heuristic (flag
+    audit entries explicitly to kill the class).
+14. Minor cluster: 100%-promo confirmation screen shows full price; modal
+    photo grid implies 5 slots needed at 1/4-photo checkpoints and overall
+    progress tops out at 71%; guest/customer listings hardcode requiredCount
+    5; PUT sibling of the fixed PATCH still drops vehicle fields; register
+    enumeration 409; "TEMPORARY DEBUG" email-test route shipped; extra-charge
+    "PI-stamp recovery" comment describes code that doesn't exist; CSRF
+    origin-check drift on ~10 mutating routes; assignment races and
+    cancelled-booking assignment; timeline shows raw ObjectId author for
+    modal-route entries.
+
+### ✅ VERIFIED SOLID THIS PASS
+
+All 9 fixes hold as committed: photo-modal two-leg happy path traced clean
+(the LB-A return-leg lock is genuinely gone); expiry TTL boundary math exactly
+complements the approve-route cutoff; atomic approve/decline close the
+decline-overwrites-paid double-spend, race loser gets a surfaced 409;
+suspension gate cannot 403 a non-suspended driver and covers all four photo
+handlers + calls + forms both verbs; supersede-delete rollback paths intact,
+checkpointStatus can't drift, usePhotoUpload unaffected; bcrypt-first login
+with missing-hash guard, auto-login path untouched; jobs-route push order
+correct and `collected_from_workshop`'s remaining audit-last push is provably
+harmless (suppressed + stage mismatch); $unset+$push{$each} valid; vehicle
+fields round-trip. Also verified: wizard rate-limit buckets disjoint (normal
+use can't trip 5/min); webhook signatures/idempotency; admin coverage on all
+45 admin routes; no IDOR on customer surfaces; promo claim/release atomic.
+
 ## 🔴 CURRENT LAUNCH BLOCKERS — CODE (all fixed 2026-08-30, see note above)
 
 **LB-A. Photo modal checkpoint-unlock rule contradicts the server gate —
