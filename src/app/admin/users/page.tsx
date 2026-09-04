@@ -486,8 +486,13 @@ export default function AdminUsersPage() {
         {/* User Details Modal */}
         {selectedUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 rounded-t-3xl">
+            {/* Viewport-constrained (bug 2026-08-30): the panel had no
+                max-height or overflow, so on laptop/mobile heights everything
+                below the fold was unreachable. dvh (not vh) excludes iOS
+                browser chrome; the wrapper's p-4 keeps it clear of screen
+                edges/safe areas; header stays pinned, body scrolls. */}
+            <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-3xl bg-white shadow-2xl">
+              <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 rounded-t-3xl">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold text-slate-900">
                     User Details
@@ -521,7 +526,7 @@ export default function AdminUsersPage() {
                 </button>
               </div>
 
-              <div className="space-y-5 p-6">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
                 <div className="flex justify-center">
                   <div className={`flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold ${
                     selectedUser.isGuest 
@@ -748,7 +753,7 @@ export default function AdminUsersPage() {
         {/* Confirmation Dialogs */}
         {confirmDialog.type && confirmDialog.user && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="max-w-md w-full rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="max-h-[calc(100dvh-2rem)] max-w-md w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
               {confirmDialog.type === "suspend" ? (
                 <>
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">

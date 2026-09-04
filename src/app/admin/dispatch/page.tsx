@@ -699,7 +699,7 @@ export default function DispatchPage() {
               </button>
             </div>
 
-            <div className="max-h-[60vh] overflow-y-auto p-4">
+            <div className="max-h-[60dvh] overflow-y-auto p-4">
               {/* Booking summary */}
               <div className="mb-4 rounded-lg bg-slate-50 p-3 text-sm">
                 <div className="flex items-center gap-2">

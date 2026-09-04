@@ -558,7 +558,7 @@ function AdminGaragesPageInner() {
         {/* Garage Details Modal */}
         {selectedGarage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            <div className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-3xl bg-white shadow-2xl">
               <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -837,7 +837,7 @@ function AdminGaragesPageInner() {
         {/* Rejection Reason Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Reject Application</h3>
               <p className="text-sm text-slate-600 mb-4">
                 Please provide a reason for rejecting this application. This will be visible to the applicant.

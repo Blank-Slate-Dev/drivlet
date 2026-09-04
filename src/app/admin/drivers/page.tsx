@@ -704,7 +704,10 @@ export default function AdminDriversPage() {
         {/* Driver Details Modal */}
         {selectedDriver && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            {/* dvh, not vh (modal sweep 2026-08-30): on iOS the browser chrome
+                sits inside 100vh, so 90vh could clip the bottom of the modal —
+                incl. the Account access card */}
+            <div className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-3xl bg-white shadow-2xl">
               <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-3xl">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -1351,7 +1354,7 @@ export default function AdminDriversPage() {
         {/* Rejection Reason Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Reject Application</h3>
               <p className="text-sm text-slate-600 mb-4">
                 Please provide a reason for rejecting this application. This will be visible to the applicant.
@@ -1389,7 +1392,7 @@ export default function AdminDriversPage() {
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
                   <AlertTriangle className="h-6 w-6 text-red-600" />
