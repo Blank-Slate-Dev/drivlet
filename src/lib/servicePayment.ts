@@ -19,9 +19,14 @@ export async function markServicePaymentPaid(params: {
 
   await connectDB();
 
-  // Always record the payment (idempotent — skips if already paid)…
+  // Always record the payment (idempotent — skips if already paid).
+  // $nin, not $ne (re-audit 2026-09-11): the old `$ne: "paid"` filter
+  // MATCHED "refunded", so a late duplicate webhook — or the guest-reachable
+  // confirm-service-payment endpoint retrieving a PI that stays "succeeded"
+  // in Stripe after a refund — silently flipped an admin refund back to
+  // "paid". A refunded service payment must never be overwritten here.
   const booking = await Booking.findOneAndUpdate(
-    { _id: bookingId, servicePaymentStatus: { $ne: "paid" } },
+    { _id: bookingId, servicePaymentStatus: { $nin: ["paid", "refunded"] } },
     {
       $set: {
         servicePaymentStatus: "paid",
@@ -42,10 +47,18 @@ export async function markServicePaymentPaid(params: {
   );
 
   if (!booking) {
-    // Either not found, or already paid (duplicate webhook) — check which
+    // Not found, already paid (duplicate webhook), or refunded — check which
     const existing = await Booking.findById(bookingId).select("servicePaymentStatus");
     if (existing?.servicePaymentStatus === "paid") {
       console.log("Service payment already recorded for booking:", bookingId);
+      return true;
+    }
+    if (existing?.servicePaymentStatus === "refunded") {
+      // Acknowledge the event but never resurrect a refunded payment
+      console.warn(
+        "markServicePaymentPaid: booking is REFUNDED — ignoring paid event:",
+        bookingId, paymentId
+      );
       return true;
     }
     console.error("markServicePaymentPaid: booking not found:", bookingId);

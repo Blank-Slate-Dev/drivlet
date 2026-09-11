@@ -14,11 +14,12 @@ export interface BookingEventData {
   servicePaymentUrl?: string;
   servicePaymentMethod?: string;
   updatedAt: Date;
+  // updatedBy deliberately excluded (re-audit 2026-09-11): SSE payloads
+  // reach guest-credentialed trackers and must not carry internal identities
   latestUpdate?: {
     stage: string;
     timestamp: Date;
     message: string;
-    updatedBy: string;
   };
   /** Signed handover forms — lets the tracker hide "signature required"
    *  prompts once the driver has completed the form in person. */

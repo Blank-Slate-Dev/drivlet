@@ -118,13 +118,10 @@ export function LocalBusinessJsonLd({
         closes: '14:00',
       },
     ],
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '47',
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // aggregateRating removed pre-launch (2026-09-11): the previous 4.8/47
+    // values were placeholders with no real reviews behind them — fabricated
+    // ratings in structured data are an ACCC/Google-penalty risk. Reinstate
+    // ONLY when computed from genuine customer reviews.
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
       name: 'Car Service Transport',

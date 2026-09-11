@@ -45,7 +45,7 @@ const faqs = [
   {
     question: 'Can I cancel or reschedule?',
     answer:
-      'Yes. More than 3 hours before pick-up start = full refund or reschedule (subject to availability). Within 3 hours = no refund. Full rules are in our Cancellation & Refunds Policy.',
+      'Yes. More than 24 hours before pick-up = full refund or free reschedule. Less than 24 hours before pick-up = 50% refund. After the pick-up time = no refund. Full rules are in our Cancellation & Refunds Policy.',
   },
 ];
 

@@ -40,6 +40,8 @@ export default function robots(): MetadataRoute.Robots {
           '/register/',
           '/auth/',
           '/payment/',
+          // Tokenised pay pages: booking details + card form (2026-09-11)
+          '/pay/',
           '/booking/success/',
           '/booking/cancelled/',
           '/review/',

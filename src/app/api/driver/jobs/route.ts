@@ -452,6 +452,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
       }
 
+      // Order/replay guards (re-audit 2026-09-11, completing BA-1): a direct
+      // API replay could previously regress a COMPLETED booking back to
+      // in_progress/driver_en_route and re-send the stage notification.
+      // (Undo of "Started pickup" clears startedAt, so undo→redo still works.)
+      if (booking.status === "completed") {
+        return NextResponse.json(
+          { error: "This booking is already completed." },
+          { status: 400 }
+        );
+      }
+      if (booking.pickupDriver?.startedAt) {
+        return NextResponse.json(
+          { error: "The pickup leg has already been started." },
+          { status: 400 }
+        );
+      }
+
       booking.status = "in_progress";
       booking.currentStage = "driver_en_route";
       booking.overallProgress = 28;
@@ -480,6 +497,16 @@ export async function POST(request: NextRequest) {
     if (action === "arrived_pickup") {
       if (!isPickupDriver) {
         return NextResponse.json({ error: "You are not assigned to pickup" }, { status: 403 });
+      }
+
+      // Order guard (re-audit 2026-09-11): arrival is a sub-step of a
+      // STARTED pickup leg. driverStartedAt fallback covers legacy bookings
+      // that predate the pickupDriver subdoc.
+      if (!booking.pickupDriver?.startedAt && !booking.driverStartedAt) {
+        return NextResponse.json(
+          { error: "Start the pickup leg before marking arrival." },
+          { status: 400 }
+        );
       }
 
       if (booking.pickupDriver) {
@@ -512,8 +539,9 @@ export async function POST(request: NextRequest) {
 
       // Leg-order guard (re-audit 2026-08-30 BA-1): steps advance in order.
       // The UI enforces this; the API must too, or a direct call could skip
-      // ahead.
-      if (!booking.pickupDriver?.startedAt) {
+      // ahead. driverStartedAt fallback covers legacy bookings that predate
+      // the pickupDriver subdoc (2026-09-11).
+      if (!booking.pickupDriver?.startedAt && !booking.driverStartedAt) {
         return NextResponse.json(
           { error: "Start the pickup leg before marking the vehicle collected." },
           { status: 400 }
@@ -646,6 +674,23 @@ export async function POST(request: NextRequest) {
       if (!booking.pickupDriver?.completedAt) {
         return NextResponse.json(
           { error: "Cannot start return yet - pickup is not complete" },
+          { status: 400 }
+        );
+      }
+
+      // Order/replay guards (re-audit 2026-09-11, completing BA-1): a replay
+      // after workshop collection/delivery used to rewind the stage to
+      // driver_returning and overwrite startedAt (breaking undo ordering).
+      // (Undo of "Started return" clears startedAt, so undo→redo works.)
+      if (booking.status === "completed") {
+        return NextResponse.json(
+          { error: "This booking is already completed." },
+          { status: 400 }
+        );
+      }
+      if (booking.returnDriver?.startedAt) {
+        return NextResponse.json(
+          { error: "The return leg has already been started." },
           { status: 400 }
         );
       }
@@ -1027,6 +1072,22 @@ export async function POST(request: NextRequest) {
         updatedBy: "driver",
       });
       await booking.save({ validateModifiedOnly: true });
+
+      // Kill the live Stripe Checkout link (re-audit 2026-09-11): the emailed
+      // link stayed payable for its 24h Stripe lifetime after a phone
+      // payment — a customer (or family member) paying it afterwards would
+      // be charged real money that the app then DISCARDED (the webhook's
+      // already-paid guard drops the event). Best effort: only "open"
+      // sessions can be expired; anything else is ignored.
+      if (hadPendingLink && booking.servicePaymentSessionId) {
+        try {
+          await stripe.checkout.sessions.expire(booking.servicePaymentSessionId);
+          console.log(`Expired unused checkout session ${booking.servicePaymentSessionId} after phone payment`);
+        } catch {
+          // Already completed/expired or transient — nothing to do
+        }
+      }
+
       // SSE only — closes the payment section on the customer tracker without
       // sending a stage email (the stage didn't change).
       notifyBookingUpdate(booking, { suppressCustomerNotifications: true });

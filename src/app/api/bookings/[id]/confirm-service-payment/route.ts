@@ -66,6 +66,17 @@ export async function POST(
       });
     }
 
+    // Refunded is terminal here (re-audit 2026-09-11): the PI stays
+    // "succeeded" in Stripe after a refund, so without this guard any caller
+    // with the booking id could re-verify and flip an admin refund back to
+    // "paid". markServicePaymentPaid has a matching $nin filter as backstop.
+    if (booking.servicePaymentStatus === 'refunded') {
+      return NextResponse.json(
+        { error: 'This service payment has been refunded. Please contact support if you believe this is wrong.' },
+        { status: 409 }
+      );
+    }
+
     // Resolve a PaymentIntent to verify: prefer the stored PI id; fall back
     // to looking it up via the Checkout session (Checkout creates the PI
     // lazily, so the id is often unknown at link-generation time).

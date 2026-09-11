@@ -54,7 +54,7 @@ export default function SubscriptionCancelledPage() {
             <p className="text-sm text-slate-500 text-center flex items-center justify-center gap-2">
               <MessageCircle className="h-4 w-4" />
               Questions?{" "}
-              <a href="mailto:support@drivlet.com" className="text-emerald-600 hover:underline">
+              <a href="mailto:support@drivlet.com.au" className="text-emerald-600 hover:underline">
                 Contact support
               </a>
             </p>

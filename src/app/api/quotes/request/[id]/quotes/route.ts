@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/mongodb";
 import QuoteRequest from "@/models/QuoteRequest";
 import Quote from "@/models/Quote";
 import mongoose from "mongoose";
+import { quoteSystemGate } from "@/lib/quoteSystem";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -13,6 +14,9 @@ interface RouteContext {
 
 // GET /api/quotes/request/[id]/quotes - Fetch quotes for a specific request
 export async function GET(request: NextRequest, context: RouteContext) {
+  // PHASE 1: quote system dormant (re-audit 2026-09-11) — see quoteSystem.ts
+  const gate = quoteSystemGate();
+  if (gate) return gate;
   try {
     const { id: quoteRequestId } = await context.params;
 

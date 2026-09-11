@@ -1,7 +1,7 @@
 // src/app/booking/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -527,8 +527,8 @@ export default function BookingPage() {
                 <div><p className="font-medium text-emerald-900">{session?.user?.username || 'User'}</p><p className="text-sm text-emerald-700">{session?.user?.email}</p></div>
               </div>
               <div className="mt-3">
-                <label className="text-xs font-medium text-emerald-700">Phone (for driver contact)</label>
-                <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="0412 345 678" className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                <label htmlFor="booking-phone" className="text-xs font-medium text-emerald-700">Phone (for driver contact)</label>
+                <input id="booking-phone" type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="0412 345 678" className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
               </div>
             </div>
           )}
@@ -573,8 +573,9 @@ export default function BookingPage() {
                     details with you.
                   </p>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Workshop name *</label>
+                    <label htmlFor="booking-workshop-name" className="block text-xs font-medium text-slate-600 mb-1">Workshop name *</label>
                     <input
+                      id="booking-workshop-name"
                       type="text"
                       value={garageSearch}
                       onChange={(e) => setGarageSearch(e.target.value.slice(0, 80))}
@@ -605,14 +606,14 @@ export default function BookingPage() {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Your Booking Time at Garage *</label>
-              <select value={garageBookingTime} onChange={(e) => setGarageBookingTime(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+              <label htmlFor="booking-garage-time" className="block text-sm font-medium text-slate-700 mb-1.5">Your Booking Time at Garage *</label>
+              <select id="booking-garage-time" value={garageBookingTime} onChange={(e) => setGarageBookingTime(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
                 {garageBookingTimeOptions.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Additional Notes</label>
-              <textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} rows={2} placeholder="Any special instructions for our driver..." className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" />
+              <label htmlFor="booking-notes" className="block text-sm font-medium text-slate-700 mb-1.5">Additional Notes</label>
+              <textarea id="booking-notes" value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} rows={2} placeholder="Any special instructions for our driver..." className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" />
             </div>
           </div>
 
@@ -641,10 +642,10 @@ export default function BookingPage() {
           </div>
           <div className={`space-y-6 transition-opacity ${isHighValueVehicle ? 'opacity-40 pointer-events-none' : ''}`}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="block text-xs font-medium text-slate-600 mb-1">Registration *</label><input type="text" placeholder="ABC123" maxLength={6} value={regoPlate} onChange={(e) => setRegoPlate(e.target.value.toUpperCase().slice(0, 6))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base uppercase tracking-wider text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
-              <div><label className="block text-xs font-medium text-slate-600 mb-1">State *</label><select value={regoState} onChange={(e) => setRegoState(e.target.value as StateCode)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">{(['NSW','QLD','VIC','SA','WA','TAS','NT','ACT'] as StateCode[]).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-              <div><label className="block text-xs font-medium text-slate-600 mb-1">Year *</label><input type="text" placeholder="2020" maxLength={4} value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
-              <div><label className="block text-xs font-medium text-slate-600 mb-1">Make & Model *</label><input type="text" placeholder="Toyota Camry" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
+              <div><label htmlFor="booking-rego" className="block text-xs font-medium text-slate-600 mb-1">Registration *</label><input id="booking-rego" type="text" placeholder="ABC123" maxLength={6} value={regoPlate} onChange={(e) => setRegoPlate(e.target.value.toUpperCase().slice(0, 6))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base uppercase tracking-wider text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
+              <div><label htmlFor="booking-state" className="block text-xs font-medium text-slate-600 mb-1">State *</label><select id="booking-state" value={regoState} onChange={(e) => setRegoState(e.target.value as StateCode)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">{(['NSW','QLD','VIC','SA','WA','TAS','NT','ACT'] as StateCode[]).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+              <div><label htmlFor="booking-year" className="block text-xs font-medium text-slate-600 mb-1">Year *</label><input id="booking-year" type="text" placeholder="2020" maxLength={4} value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
+              <div><label htmlFor="booking-model" className="block text-xs font-medium text-slate-600 mb-1">Make & Model *</label><input id="booking-model" type="text" placeholder="Toyota Camry" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition" /></div>
             </div>
             {regoPlate && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center"><RegistrationPlate plate={regoPlate} state={regoState} /></motion.div>)}
             <div>
@@ -936,7 +937,7 @@ export default function BookingPage() {
             <h2 className="mt-6 text-2xl font-bold text-slate-900">Booking Confirmed!</h2>
             <p className="mt-2 text-slate-600">We&apos;ve received your booking and payment.</p>
             <div className="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left"><div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-slate-500">Vehicle</span><span className="font-medium text-slate-900">{regoPlate.toUpperCase()} ({regoState})</span></div><div className="flex justify-between"><span className="text-slate-500">Date</span><span className="font-medium text-slate-900">{formatDateDisplay(serviceDate)}</span></div><div className="flex justify-between"><span className="text-slate-500">Garage</span><span className="font-medium text-slate-900">{garageSearch}</span></div><div className="flex justify-between"><span className="text-slate-500">Pickup</span><span className="font-medium text-slate-900">{getPickupSlotLabel(selectedPickupSlot)}</span></div></div></div>
-            {trackingCode && (<div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl"><p className="text-sm text-emerald-700 mb-2 font-medium">Your Tracking Code</p><div className="flex items-center justify-center gap-2"><span className="text-3xl font-mono font-bold tracking-[0.3em] text-emerald-700">{trackingCode}</span><button type="button" onClick={() => navigator.clipboard.writeText(trackingCode)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"><Copy className="h-5 w-5" /></button></div><p className="text-xs text-emerald-600 mt-2">Save this code to track your booking</p></div>)}
+            {trackingCode && (<div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl"><p className="text-sm text-emerald-700 mb-2 font-medium">Your Tracking Code</p><div className="flex items-center justify-center gap-2"><span className="text-3xl font-mono font-bold tracking-[0.3em] text-emerald-700">{trackingCode}</span><button type="button" aria-label="Copy tracking code" onClick={() => navigator.clipboard.writeText(trackingCode)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition"><Copy className="h-5 w-5" /></button></div><p className="text-xs text-emerald-600 mt-2">Save this code to track your booking</p></div>)}
             <p className="mt-4 text-sm text-slate-500">Confirmation sent to <span className="font-medium">{customerEmail}</span></p>
             <div className="mt-6 space-y-3"><Link href={trackingUrl} className="flex items-center justify-center gap-2 w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-500"><MapPin className="h-4 w-4" /> Track Your Booking</Link><Link href="/" className="block w-full rounded-full border border-slate-200 px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 text-center">Back to Home</Link></div>
           </div>
@@ -993,5 +994,7 @@ export default function BookingPage() {
 }
 
 function FieldInput({ label, value, onChange, placeholder, type = 'text', icon }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string; icon?: React.ReactNode; }) {
-  return (<div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label><div className="relative">{icon && <div className="absolute left-4 top-1/2 -translate-y-1/2">{icon}</div>}<input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`w-full rounded-xl border border-slate-300 bg-white py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition ${icon ? 'pl-12 pr-4' : 'px-4'}`} /></div></div>);
+  // useId associates label↔input for screen readers (a11y, 2026-09-11)
+  const inputId = useId();
+  return (<div><label htmlFor={inputId} className="block text-xs font-medium text-slate-600 mb-1">{label}</label><div className="relative">{icon && <div className="absolute left-4 top-1/2 -translate-y-1/2">{icon}</div>}<input id={inputId} type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`w-full rounded-xl border border-slate-300 bg-white py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition ${icon ? 'pl-12 pr-4' : 'px-4'}`} /></div></div>);
 }

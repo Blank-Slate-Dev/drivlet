@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/mongodb";
 import Quote from "@/models/Quote";
 import QuoteRequest from "@/models/QuoteRequest";
 import mongoose from "mongoose";
+import { quoteSystemGate } from "@/lib/quoteSystem";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  // PHASE 1: quote system dormant (re-audit 2026-09-11) — see quoteSystem.ts
+  const gate = quoteSystemGate();
+  if (gate) return gate;
   try {
     const session = await getServerSession(authOptions);
 

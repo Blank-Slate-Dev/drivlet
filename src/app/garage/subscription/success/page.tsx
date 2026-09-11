@@ -153,8 +153,8 @@ function SubscriptionSuccessContent() {
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <p className="text-sm text-slate-500 text-center">
               Questions? Contact us at{" "}
-              <a href="mailto:support@drivlet.com" className="text-emerald-600 hover:underline">
-                support@drivlet.com
+              <a href="mailto:support@drivlet.com.au" className="text-emerald-600 hover:underline">
+                support@drivlet.com.au
               </a>
             </p>
           </div>

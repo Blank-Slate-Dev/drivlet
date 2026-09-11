@@ -24,7 +24,12 @@ export async function processRefund(
   paymentIntentId: string,
   refundAmount: number,
   reason: string,
-  metadata?: Record<string, string>
+  metadata?: Record<string, string>,
+  /** Stripe idempotency key — dedupes accidental double-submits (re-audit
+   *  2026-09-11). When omitted, a 60-second time-bucketed key is derived so
+   *  a double-click can never create two refunds, while a deliberate repeat
+   *  of the same amount later still works. */
+  idempotencyKey?: string
 ): Promise<RefundResult> {
   try {
     // Validate payment intent ID format
@@ -46,17 +51,23 @@ export async function processRefund(
       };
     }
 
-    // Create the refund
-    const refund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: refundAmount,
-      reason: 'requested_by_customer',
-      metadata: {
-        cancellation_reason: reason,
-        cancelled_at: new Date().toISOString(),
-        ...metadata,
+    // Create the refund (idempotent — see param doc)
+    const key =
+      idempotencyKey ||
+      `refund:${paymentIntentId}:${refundAmount}:${Math.floor(Date.now() / 60000)}`;
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: paymentIntentId,
+        amount: refundAmount,
+        reason: 'requested_by_customer',
+        metadata: {
+          cancellation_reason: reason,
+          cancelled_at: new Date().toISOString(),
+          ...metadata,
+        },
       },
-    });
+      { idempotencyKey: key }
+    );
 
     // Estimate arrival time (typically 5-10 business days)
     const arrivalDate = new Date();

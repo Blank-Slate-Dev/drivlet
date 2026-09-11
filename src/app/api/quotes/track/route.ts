@@ -4,6 +4,8 @@ import { connectDB } from "@/lib/mongodb";
 import QuoteRequest from "@/models/QuoteRequest";
 import Quote from "@/models/Quote";
 import { isValidQuoteTrackingCodeFormat } from "@/lib/trackingCode";
+import { quoteSystemGate } from "@/lib/quoteSystem";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 // Force dynamic rendering - this route uses request.url for query params
 export const dynamic = 'force-dynamic';
@@ -23,6 +25,15 @@ export const dynamic = 'force-dynamic';
  * their tracking code.
  */
 export async function GET(request: NextRequest) {
+  // PHASE 1: quote system dormant (re-audit 2026-09-11) — see quoteSystem.ts
+  const gate = quoteSystemGate();
+  if (gate) return gate;
+
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.form, "quote-track");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code")?.toUpperCase().trim();

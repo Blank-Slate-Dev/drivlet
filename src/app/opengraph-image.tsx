@@ -127,8 +127,9 @@ export default async function Image() {
           <span style={{ fontSize: '20px', color: '#a7f3d0' }}>
             Newcastle &amp; Canberra
           </span>
+          {/* fabricated "4.8/5 rating" removed pre-launch (2026-09-11) */}
           <span style={{ fontSize: '20px', color: '#6ee7b7' }}>
-            4.8/5 rating
+            Fully insured
           </span>
         </div>
       </div>

@@ -3,15 +3,32 @@
 // Change the cutoff here and it updates the booking page, emails,
 // customer cancel flow, and admin tooling together.
 
+// ── REFUND POLICY DECISION (2026-09-11) ─────────────────────────────────
+// The site previously showed THREE different refund policies at once. All
+// copy is now aligned to what the code actually implements
+// (src/lib/refund-calculator.ts):
+//   • More than 24h before pickup  → 100% refund
+//   • Less than 24h, before pickup → 50% refund
+//   • After pickup time            → no refund
+// CANCELLATION_CUTOFF_HOURS (3) is a SEPARATE mechanism: the window for
+// self-service change/cancel requests online; inside it, customers call.
+// ⚠️ Gerome: if you'd rather run the simpler 3h/full-refund policy instead,
+// change refund-calculator.ts + REFUND_* constants below together — do NOT
+// let copy and calculator drift apart again.
 export const CANCELLATION_CUTOFF_HOURS = 3;
+
+// Refund tiers — MUST mirror src/lib/refund-calculator.ts
+export const REFUND_FULL_HOURS = 24;
+export const REFUND_LATE_PERCENT = 50;
 
 export const SUPPORT_PHONE = "1300 470 886";
 export const SUPPORT_PHONE_HREF = "tel:1300470886";
 export const SUPPORT_EMAIL = "support@drivlet.com.au";
 
 export const CANCELLATION_POLICY_TEXT =
-  `Changes or cancellations can be requested up to ${CANCELLATION_CUTOFF_HOURS} hours before your scheduled pickup. ` +
-  `Within ${CANCELLATION_CUTOFF_HOURS} hours of pickup, please call ${SUPPORT_PHONE}. Changes at this stage are at drivlet's discretion and may not be refundable.`;
+  `Cancel more than ${REFUND_FULL_HOURS} hours before your scheduled pickup for a full refund; ` +
+  `within ${REFUND_FULL_HOURS} hours of pickup a ${REFUND_LATE_PERCENT}% cancellation fee applies, and after the pickup time the fee is non-refundable (except as required under Australian Consumer Law). ` +
+  `Changes and cancellations can be requested online up to ${CANCELLATION_CUTOFF_HOURS} hours before pickup — after that, please call ${SUPPORT_PHONE}.`;
 
 // Returns true while the customer can still request changes/cancellation online.
 export function isBeforeCancellationCutoff(pickupDateTime: Date, now: Date = new Date()): boolean {

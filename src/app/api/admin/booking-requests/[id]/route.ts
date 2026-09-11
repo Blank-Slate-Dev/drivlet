@@ -12,8 +12,11 @@ import { connectDB } from "@/lib/mongodb";
 import BookingRequest from "@/models/BookingRequest";
 import { PICKUP_SLOT_VALUES, DROPOFF_SLOT_VALUES } from "@/config/timeSlots";
 
-// Statuses in which the request can still be edited (payment not yet made)
-const EDITABLE_STATUSES = ["pending_review", "approved", "payment_link_sent"];
+// Statuses in which the request can still be edited (payment not yet made).
+// "expired" added 2026-09-11: when a revival 409s (slot refilled / promo
+// re-used elsewhere) the admin's remedy IS editing the request — excluding
+// expired made those requests a permanent dead-end.
+const EDITABLE_STATUSES = ["pending_review", "approved", "payment_link_sent", "expired"];
 
 const MIN_QUOTED_AMOUNT = 1000;   // $10.00
 const MAX_QUOTED_AMOUNT = 100000; // $1,000.00

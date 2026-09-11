@@ -66,7 +66,9 @@ export async function sendServicePaymentSMS(
 ): Promise<boolean> {
   const amountFormatted = (amount / 100).toFixed(2);
 
-  const message = `Hi ${customerName}, the service on your car (${vehicleRego}) is complete. Pay the $${amountFormatted} service amount securely and our driver will return it to you: ${paymentUrl} - drivlet`;
+  // Copy corrected 2026-09-11: the link can be generated mid-service and
+  // payment is not a return gate — no "complete"/withholding claims.
+  const message = `Hi ${customerName}, here's the secure link to pay the $${amountFormatted} service amount for your car (${vehicleRego}): ${paymentUrl} You can also pay the service centre directly. - drivlet`;
 
   return sendSMS(phoneNumber, message);
 }
@@ -84,15 +86,7 @@ export async function sendBookingConfirmationSMS(
   return sendSMS(phoneNumber, message);
 }
 
-// Driver en route SMS
-export async function sendDriverEnRouteSMS(
-  phoneNumber: string,
-  customerName: string,
-  driverName: string
-): Promise<boolean> {
-  const businessNumber = process.env.TWILIO_PHONE_NUMBER || 'our business number';
-  
-  const message = `Hi ${customerName}! Your driver ${driverName} is on the way. To call them, dial ${businessNumber} - drivlet`;
-  
-  return sendSMS(phoneNumber, message);
-}
+// sendDriverEnRouteSMS REMOVED (2026-09-11): it was dead code (no callers)
+// and interpolated the raw Twilio E.164 number — or the literal string
+// "our business number" — into the message. If a driver-en-route SMS is
+// ever wanted, build it around the masked-call flow, not the raw number.

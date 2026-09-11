@@ -62,8 +62,12 @@ export async function POST(
       return NextResponse.json({ error: "Booking request not found" }, { status: 404 });
     }
 
-    // Only unpaid requests can be declined. Paid/converted go through cancel + refund instead.
-    if (!["pending_review", "approved", "payment_link_sent"].includes(bookingRequest.status)) {
+    // Only unpaid requests can be declined. Paid/converted go through cancel
+    // + refund instead. "expired" added 2026-09-11: declining is the clean
+    // close-out for a lapsed request whose revival isn't wanted or 409'd
+    // (promo release is usage-ref-matched, so it's a safe no-op when expiry
+    // already released the code; the PI is already cancelled).
+    if (!["pending_review", "approved", "payment_link_sent", "expired"].includes(bookingRequest.status)) {
       return NextResponse.json(
         { error: `Cannot decline a request with status "${bookingRequest.status}"` },
         { status: 400 }
@@ -82,7 +86,7 @@ export async function POST(
     const declinedRequest = await BookingRequest.findOneAndUpdate(
       {
         _id: id,
-        status: { $in: ["pending_review", "approved", "payment_link_sent"] },
+        status: { $in: ["pending_review", "approved", "payment_link_sent", "expired"] },
       },
       {
         $set: {

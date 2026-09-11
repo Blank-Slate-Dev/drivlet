@@ -74,8 +74,14 @@ export async function GET(
           servicePaymentUrl: booking.servicePaymentUrl,
           servicePaymentMethod: booking.servicePaymentMethod,
           updatedAt: booking.updatedAt,
+          // Projected (re-audit 2026-09-11): never leak updatedBy (admin
+          // emails / raw ObjectIds) to the guest-credentialed stream
           latestUpdate: booking.updates?.length > 0
-            ? booking.updates[booking.updates.length - 1]
+            ? {
+                stage: booking.updates[booking.updates.length - 1].stage,
+                timestamp: booking.updates[booking.updates.length - 1].timestamp,
+                message: booking.updates[booking.updates.length - 1].message,
+              }
             : undefined,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           signedForms: (booking.signedForms || []).map((f: any) => ({

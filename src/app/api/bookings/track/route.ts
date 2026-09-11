@@ -159,7 +159,15 @@ export async function GET(request: NextRequest) {
       // Incident visibility (no internal details exposed)
       hasActiveIncident: booking.hasActiveIncident || false,
       incidentExceptionState: booking.incidentExceptionState || 'none',
-      updates: booking.updates,
+      // Projected (re-audit 2026-09-11): updatedBy carries internal
+      // identities (admin login emails, raw driver/user ObjectIds) and must
+      // never reach guest surfaces.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      updates: (booking.updates || []).map((u: any) => ({
+        stage: u.stage,
+        timestamp: u.timestamp,
+        message: u.message,
+      })),
       createdAt: booking.createdAt,
       // Service payment fields (if applicable)
       servicePaymentStatus: booking.servicePaymentStatus,

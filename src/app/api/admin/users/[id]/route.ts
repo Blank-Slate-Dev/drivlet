@@ -3,8 +3,37 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import Driver from "@/models/Driver";
 import { requireAdmin } from "@/lib/admin";
 import { requireValidOrigin } from "@/lib/validation";
+
+// Users-page suspend/delete must also update driver DISPATCHABILITY
+// (re-audit 2026-09-11): dispatch eligibility filters on Driver.canAcceptJobs,
+// not User.accountStatus — a driver suspended/deleted here previously stayed
+// assignable while every driver API 403'd them (job silently stalled).
+// Mirrors admin/drivers/[id]/account: suspend clears canAcceptJobs;
+// reactivate restores it only when onboarding is complete.
+async function syncDriverDispatchability(
+  user: { driverProfile?: mongoose.Types.ObjectId | null },
+  action: "suspend" | "reactivate"
+): Promise<void> {
+  if (!user.driverProfile) return;
+  try {
+    if (action === "suspend") {
+      await Driver.updateOne(
+        { _id: user.driverProfile },
+        { $set: { canAcceptJobs: false } }
+      );
+    } else {
+      await Driver.updateOne(
+        { _id: user.driverProfile, onboardingStatus: "active" },
+        { $set: { canAcceptJobs: true } }
+      );
+    }
+  } catch (err) {
+    console.error("Failed to sync driver dispatchability:", err);
+  }
+}
 
 // PATCH /api/admin/users/[id] - Update user account status (suspend/reactivate)
 export async function PATCH(
@@ -141,6 +170,9 @@ export async function PATCH(
 
     await user.save();
 
+    // Keep dispatch eligibility in step with account status (see helper)
+    await syncDriverDispatchability(user, action as "suspend" | "reactivate");
+
     // Return sanitized user data (exclude password)
     const userObj = user.toObject();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -245,6 +277,9 @@ export async function DELETE(
     user.suspensionInfo = undefined;
 
     await user.save();
+
+    // A deleted driver account must never remain dispatchable (see helper)
+    await syncDriverDispatchability(user, "suspend");
 
     console.log(`[ADMIN ACTION] User ${user._id} soft deleted by admin ${adminUserId}`);
 

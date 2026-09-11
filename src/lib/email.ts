@@ -65,6 +65,12 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
             Email: fromEmail,
             Name: 'drivlet',
           },
+          // Every customer email footer invites "reply to this email" — replies
+          // must reach support, not bounce off noreply@ (re-audit 2026-09-11)
+          ReplyTo: {
+            Email: process.env.EMAIL_REPLY_TO || 'support@drivlet.com.au',
+            Name: 'drivlet support',
+          },
           To: [
             {
               Email: options.to,
@@ -353,21 +359,25 @@ export async function sendServicePaymentEmail(
     trackingCode,
   };
 
-  const subject = `Your car is ready: service payment of $${amountFormatted} due (${vehicleRego})`;
+  // Copy corrected 2026-09-11: this link can be generated MID-SERVICE (stage
+  // service_in_progress), so "service is complete" was often false; and
+  // payment is deliberately NOT a return gate (most customers pay the
+  // service centre directly) — threatening to withhold the car was both
+  // wrong and legally risky.
+  const subject = `Service payment of $${amountFormatted} for your car (${vehicleRego})`;
 
   const textContent = `
 Hi ${customerName},
 
-Good news: the service on your car is complete.
+Here's the secure link to pay for your car's service.
 
 ${bookingDetailsText(details)}
 
-How to pay and get your car back:
+How to pay:
 1. Open your tracking page: ${payLink}
 2. Review the service amount and pay securely by card.
-3. Once payment is confirmed, our driver will return your car to you.
 
-Please note: your vehicle can only be returned once the service is paid for. Until payment is made (online or directly to the service centre), your car will need to remain at the service centre.
+You can also pay the service centre directly (for example over the phone) — whichever is easier. Your driver will confirm the details at handover.
 
 ${emailPolicyFooterText()}
 
@@ -387,15 +397,15 @@ The drivlet team
     <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #059669 0%, #0d9488 100%); padding: 32px; text-align: center;">
-        <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">Your car is ready 🚗</h1>
-        <p style="margin: 8px 0 0; color: #d1fae5; font-size: 14px;">Service payment of $${amountFormatted} due</p>
+        <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">Service payment 🚗</h1>
+        <p style="margin: 8px 0 0; color: #d1fae5; font-size: 14px;">$${amountFormatted} for your car's service</p>
       </div>
 
       <!-- Content -->
       <div style="padding: 32px;">
         <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi ${safeCustomerName},</p>
 
-        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">Good news: the service on your car is complete. Once the service payment below is confirmed, our driver will return your car to you.</p>
+        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">Here's the secure link to pay for your car's service.</p>
 
         ${bookingDetailsHtml(details)}
 
@@ -410,9 +420,9 @@ The drivlet team
 
         <div style="margin: 0 0 24px; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
           <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-            Please note: your vehicle can only be returned once the service is paid for.
-            Until payment is made (online or directly to the service centre), your car
-            will need to remain at the service centre.
+            You can also pay the service centre directly (for example over the
+            phone) — whichever is easier. Your driver will confirm the details
+            at handover.
           </p>
         </div>
 

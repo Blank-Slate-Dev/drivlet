@@ -36,7 +36,10 @@ export async function generateMetadata({
   params: Promise<{ city: string; suburb: string }>;
 }): Promise<Metadata> {
   const { city, suburb: suburbSlug } = await params;
-  const location = LOCATIONS[city];
+  // Own-property check (2026-09-11) — see [city]/page.tsx
+  const location = Object.prototype.hasOwnProperty.call(LOCATIONS, city)
+    ? LOCATIONS[city]
+    : undefined;
   if (!location) return {};
 
   const suburb = location.suburbs.find((s) => s.slug === suburbSlug);
@@ -77,7 +80,10 @@ export default async function SuburbPage({
   params: Promise<{ city: string; suburb: string }>;
 }) {
   const { city, suburb: suburbSlug } = await params;
-  const location = LOCATIONS[city];
+  // Own-property check (2026-09-11) — see [city]/page.tsx
+  const location = Object.prototype.hasOwnProperty.call(LOCATIONS, city)
+    ? LOCATIONS[city]
+    : undefined;
   if (!location) notFound();
 
   const suburb = location.suburbs.find((s) => s.slug === suburbSlug);

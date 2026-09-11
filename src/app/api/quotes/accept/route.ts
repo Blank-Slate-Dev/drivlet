@@ -6,9 +6,13 @@ import { connectDB } from "@/lib/mongodb";
 import QuoteRequest from "@/models/QuoteRequest";
 import Quote from "@/models/Quote";
 import mongoose from "mongoose";
+import { quoteSystemGate } from "@/lib/quoteSystem";
 
 // POST /api/quotes/accept - Accept a quote
 export async function POST(request: NextRequest) {
+  // PHASE 1: quote system dormant (re-audit 2026-09-11) — see quoteSystem.ts
+  const gate = quoteSystemGate();
+  if (gate) return gate;
   try {
     const session = await getServerSession(authOptions);
 

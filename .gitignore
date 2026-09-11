@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 _to_delete/
+
+# customer vehicle photos — NEVER commit (12 real custody JPEGs were
+# tracked here until 2026-09-11; de-indexed via git rm --cached, history
+# scrub pending — see PRE_LAUNCH_AUDIT.md)
+/uploads/

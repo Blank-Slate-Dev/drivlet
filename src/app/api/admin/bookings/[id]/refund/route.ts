@@ -10,7 +10,7 @@ import { requireValidOrigin } from "@/lib/validation";
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { processRefund } from "@/lib/stripe-refund";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
 
 export async function POST(
   request: NextRequest,
@@ -138,7 +138,7 @@ export async function POST(
           `The drivlet team`,
         ].join("\n"),
         htmlContent: [
-          `<p>Hi ${firstName},</p>`,
+          `<p>Hi ${escapeHtml(firstName)},</p>`,
           `<p>We've processed a refund of <strong>${amountDisplay} AUD</strong> to your original payment method for booking <strong>${booking.trackingCode || booking.vehicleRegistration}</strong>.</p>`,
           `<p>Refunds usually appear on your statement within 5–10 business days.</p>`,
           `<p style="margin-top:24px;color:#94a3b8;font-size:12px">The drivlet team</p>`,

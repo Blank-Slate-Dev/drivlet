@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import QuoteRequest, { ServiceCategory, UrgencyLevel } from "@/models/QuoteRequest";
 import { generateUniqueQuoteTrackingCode } from "@/lib/trackingCode";
+import { quoteSystemGate } from "@/lib/quoteSystem";
+import { withRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import mongoose from "mongoose";
 
 /**
@@ -18,6 +20,19 @@ import mongoose from "mongoose";
  * This will allow customers to easily check back on their quotes.
  */
 export async function POST(request: NextRequest) {
+  // PHASE 1: quote system dormant (re-audit 2026-09-11) — see quoteSystem.ts
+  const gate = quoteSystemGate();
+  if (gate) return gate;
+
+  // Unauthenticated DB-write endpoint — throttle like booking-requests
+  const rateLimit = await withRateLimit(request, RATE_LIMITS.booking, "quote-request");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 }
+    );
+  }
+
   try {
     const session = await getServerSession(authOptions);
     const body = await request.json();
@@ -145,6 +160,8 @@ export async function POST(request: NextRequest) {
 
 // GET /api/quotes/request - Fetch user's quote requests
 export async function GET(request: NextRequest) {
+  const gate = quoteSystemGate();
+  if (gate) return gate;
   try {
     const session = await getServerSession(authOptions);
 

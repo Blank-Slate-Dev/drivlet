@@ -15,97 +15,10 @@ interface Testimonial {
   serviceType?: string;
 }
 
-// Placeholder testimonials shown when no real ones exist in the database
-const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
-  // Newcastle
-  {
-    _id: "placeholder-1",
-    customerName: "Emily R.",
-    customerLocation: "Charlestown, Newcastle",
-    rating: 5,
-    review:
-      "Sharjeel picked up my car right on time and kept me updated the whole way. Didn't have to take a minute off work!",
-    vehicleType: "Toyota Corolla",
-    serviceType: "Regular Service",
-  },
-  // Newcastle
-  {
-    _id: "placeholder-2",
-    customerName: "James T.",
-    customerLocation: "Mayfield, Newcastle",
-    rating: 5,
-    review:
-      "Booked online in two minutes and Oakley had my car collected and back by the afternoon. Super convenient.",
-    vehicleType: "Mazda CX-5",
-    serviceType: "Major Service",
-  },
-  // Canberra
-  {
-    _id: "placeholder-3",
-    customerName: "Priya M.",
-    customerLocation: "Belconnen, Canberra",
-    rating: 5,
-    review:
-      "Was nervous about someone else driving my car but Hanzla was so careful and communicative. Seamless from start to finish.",
-    vehicleType: "Kia Sportage",
-    serviceType: "Regular Service",
-  },
-  // Newcastle
-  {
-    _id: "placeholder-4",
-    customerName: "Sarah K.",
-    customerLocation: "Lambton, Newcastle",
-    rating: 5,
-    review:
-      "Really impressed with the service. Gerome even sent me photos when the car arrived at the mechanic. Great for busy parents!",
-    vehicleType: "Hyundai Tucson",
-    serviceType: "Quick Service",
-  },
-  // Newcastle
-  {
-    _id: "placeholder-5",
-    customerName: "Daniel W.",
-    customerLocation: "Merewether, Newcastle",
-    rating: 5,
-    review:
-      "Needed a major service and didn't have to rearrange my day. Raheel handled everything perfectly and the tracking feature is brilliant.",
-    vehicleType: "Ford Ranger",
-    serviceType: "Major Service",
-  },
-  // Newcastle
-  {
-    _id: "placeholder-6",
-    customerName: "Chris B.",
-    customerLocation: "Adamstown, Newcastle",
-    rating: 5,
-    review:
-      "Tom was great. On time, polite, and my car came back spotless. Easiest service experience I've ever had.",
-    vehicleType: "Volkswagen Golf",
-    serviceType: "Regular Service",
-  },
-  // Newcastle
-  {
-    _id: "placeholder-7",
-    customerName: "Lauren P.",
-    customerLocation: "Jesmond, Newcastle",
-    rating: 5,
-    review:
-      "The whole process was so smooth. Matt kept me in the loop the entire time and even called to confirm drop-off. Will use Drivlet every time now.",
-    vehicleType: "Honda CR-V",
-    serviceType: "Quick Service",
-  },
-  // Canberra
-  {
-    _id: "placeholder-8",
-    customerName: "Nathan S.",
-    customerLocation: "Woden, Canberra",
-    rating: 5,
-    review:
-      "Picked up my car early and had it back ahead of schedule. Abdul was incredibly professional. Can't wait for Drivlet to grow here!",
-    vehicleType: "Subaru Outback",
-    serviceType: "Major Service",
-  },
-];
+// Fabricated placeholder testimonials REMOVED pre-launch (2026-09-11): they
+// presented fictional customers reviewing real drivers by name — fake-review
+// territory (ACCC). The section now renders only genuine testimonials from
+// the database and hides itself entirely while there are none.
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -222,16 +135,13 @@ export default function TestimonialsSection() {
         const res = await fetch("/api/testimonials");
         if (res.ok) {
           const data = await res.json();
-          const fetched = data.testimonials || [];
-          setTestimonials(
-            fetched.length > 0 ? fetched : PLACEHOLDER_TESTIMONIALS
-          );
+          setTestimonials(data.testimonials || []);
         } else {
-          setTestimonials(PLACEHOLDER_TESTIMONIALS);
+          setTestimonials([]);
         }
       } catch {
-        console.error("Failed to fetch testimonials, using placeholders");
-        setTestimonials(PLACEHOLDER_TESTIMONIALS);
+        console.error("Failed to fetch testimonials");
+        setTestimonials([]);
       } finally {
         setLoading(false);
       }
@@ -292,6 +202,12 @@ export default function TestimonialsSection() {
     currentPage * itemsPerPage,
     currentPage * itemsPerPage + itemsPerPage
   );
+
+  // No real testimonials yet → render nothing (never show fabricated ones).
+  // The section reappears automatically once genuine reviews exist in the DB.
+  if (!loading && testimonials.length === 0) {
+    return null;
+  }
 
   // Slide variants for left/right transition
   const slideVariants = {

@@ -159,7 +159,8 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
     quotedDollars: "",
   });
 
-  const isEditable = ["pending_review", "approved", "payment_link_sent"].includes(req.status);
+  // "expired" editable since 2026-09-11 — the remedy when a revival 409s
+  const isEditable = ["pending_review", "approved", "payment_link_sent", "expired"].includes(req.status);
 
   const openEditForm = () => {
     setEditData({
@@ -376,29 +377,25 @@ export function RequestDetailModal({ request, onClose, onRefresh, onRequestUpdat
                     : "Send Payment Link"}
                 </button>
               )}
-              {/* Edit/Decline hidden for "expired": the decline route's
-                  atomic status filter rejects expired requests (revive first
-                  or leave it lapsed), and edits should follow a revival. */}
-              {req.status !== "expired" && (
-                <>
-                  <button
-                    onClick={() => (showEditForm ? setShowEditForm(false) : openEditForm())}
-                    disabled={actionLoading !== null}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit Request
-                  </button>
-                  <button
-                    onClick={() => { setShowDeclineForm((v) => !v); setActionError(null); }}
-                    disabled={actionLoading !== null}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Decline Request
-                  </button>
-                </>
-              )}
+              {/* Edit + Decline are available for "expired" too (2026-09-11):
+                  when a revival 409s (slot refilled / promo re-used) these
+                  are the admin's remedies — both routes now accept expired. */}
+              <button
+                onClick={() => (showEditForm ? setShowEditForm(false) : openEditForm())}
+                disabled={actionLoading !== null}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit Request
+              </button>
+              <button
+                onClick={() => { setShowDeclineForm((v) => !v); setActionError(null); }}
+                disabled={actionLoading !== null}
+                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
+              >
+                <XCircle className="h-4 w-4" />
+                Decline Request
+              </button>
             </div>
           )}
 

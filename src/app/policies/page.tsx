@@ -235,8 +235,11 @@ const policies: PolicySection[] = [
         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-5 mb-8">
           <h4 className="font-semibold text-emerald-900 mb-3">At a glance</h4>
           <ul className="space-y-2 text-sm text-emerald-800">
-            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>More than 3 hours before pick-up:</strong> full refund / free reschedule.</li>
-            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Within 3 hours of pick-up:</strong> generally non-refundable, except where required under Australian Consumer Law.</li>
+            {/* Aligned to the implemented refund scheme (refund-calculator.ts)
+                2026-09-11 — see src/lib/policy.ts for the decision note */}
+            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>More than 24 hours before pick-up:</strong> full refund / free reschedule.</li>
+            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Within 24 hours of pick-up (before the pick-up time):</strong> 50% cancellation fee applies.</li>
+            <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>After the pick-up time:</strong> generally non-refundable, except where required under Australian Consumer Law.</li>
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>No-show / not reachable / car not accessible:</strong> generally non-refundable.</li>
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>If Drivlet cancels:</strong> full refund or reschedule.</li>
             <li className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span><strong>Workshop charges:</strong> paid directly to the workshop. Their terms are separate.</li>
@@ -253,7 +256,7 @@ const policies: PolicySection[] = [
           </PolicyClause>
 
           <PolicyClause title="Refund and Rescheduling Rules">
-            <p><strong>Before pick-up happens:</strong> the 3-hour rule above applies based on the start of your pick-up time window (subject to Australian Consumer Law).</p>
+            <p><strong>Before pick-up happens:</strong> the refund tiers above apply, measured against the start of your pick-up time window (subject to Australian Consumer Law). Changes and cancellations can be requested online up to 3 hours before pick-up; inside 3 hours, please call us.</p>
             <p className="mt-3"><strong>After pick-up is completed:</strong> the Drivlet service fee is generally non-refundable because the service has already been performed and costs have been incurred, except where required under Australian Consumer Law.</p>
             <p className="mt-3"><strong>Return timing changes:</strong> if the workshop is not ready when expected, we will coordinate a revised return window. This is usually treated as a reschedule (no extra charge where reasonable, subject to availability).</p>
           </PolicyClause>

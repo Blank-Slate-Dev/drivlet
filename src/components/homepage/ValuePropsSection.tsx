@@ -5,7 +5,11 @@ import { motion } from 'framer-motion';
 import { Users, Gauge, ShieldCheck, Car, Clock } from 'lucide-react';
 import { FEATURES } from '@/lib/featureFlags';
 
-// Marketplace value props (when full service features are enabled)
+// Marketplace value props (when full service features are enabled).
+// ⚠️ Pre-Phase-2 review needed (2026-09-11): "in-house experts", "we
+// negotiate rates" and the "30% cheaper than main dealerships" figure are
+// unsubstantiated claims — verify or rewrite BEFORE enabling
+// FEATURES.SERVICE_SELECTION (not rendered in Phase 1).
 const marketplaceValueProps = [
   {
     icon: Users,

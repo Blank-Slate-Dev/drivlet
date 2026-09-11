@@ -1,5 +1,243 @@
 # Drivlet Pre-Launch Audit
 
+---
+
+## ✅ LAUNCH BATCH 2026-09-11 — pass-4 blockers + top should-fixes FIXED
+
+Everything sandbox-fixable from pass 4 is now in code (12 commits, see git
+log). Summary: fabricated ratings/ride-counts/testimonials removed sitewide
+(hero, JSON-LD aggregateRating, OG image, empty-DB fallbacks, seed data
+neutralised — testimonials section now hides until real reviews exist);
+**refund policy unified on the implemented 24h-full / <24h-50% / after-none
+scheme** across policies page, email footers (policy.ts now carries
+REFUND_* constants + a dated decision note) and homepage FAQ — ⚠️ Gerome to
+confirm this is the policy he wants (switching to 3h/full means changing
+refund-calculator.ts + policy.ts together); payment-link email/SMS no longer
+claim "service complete" or threaten to withhold the car; fake 1300 123 456
+→ 1300 470 886 and @drivlet.com → @drivlet.com.au; Mailjet ReplyTo set
+(EMAIL_REPLY_TO env overridable, default support@); refund/verification/
+cancel-request email names now escaped (refund route done here; others per
+list); uploads/ gitignored + custody photos de-indexed (HISTORY SCRUB is an
+external step); **all 21 npm vulnerabilities resolved lockfile-only** (next
+16.3.4, next-auth 4.24.15, mongoose 9.10.0, axios 1.20.0 — within existing
+semver ranges; run npm ci + build locally); refunded→paid flip closed
+($nin + confirm-service-payment 409); charge.refunded webhook reconciliation
+handler added (dedupes admin-initiated refunds by refundId); Stripe refund
+idempotency keys; mark_paid_phone now expires the live Checkout session;
+quote APIs Phase-1 gated (quoteSystemGate) + rate-limited; updatedBy
+scrubbed from guest tracker/SSE payloads (projection + type); BA-1 completed
+(start_pickup/arrived_pickup/start_return order+replay guards, with legacy
+driverStartedAt fallback); Users-page suspend/delete now syncs
+Driver.canAcceptJobs (reactivate restores only when onboarding active);
+revival dead-end fixed (edit + decline accept "expired"; resend slot
+re-check keys on TTL not status; promo re-claim recovers its own prior
+claim; token persisted before emailing); robots disallows /pay/; per-page
+canonicals for /track, /policies, /driver/join; branded not-found.tsx;
+[city] prototype-key 500→404; booking wizard label/input associations +
+copy-button aria-label. `tsc` clean.
+
+**Deliberately NOT done here (external or deferred):** git history scrub of
+the photos; npm ci/build; debug email route + uploads de-index (in the
+commit script via git rm); maintenance-page fake form; global-error CSS;
+remaining minor list from pass 4.
+
+---
+
+## 🔴 FULL AUDIT PASS 4 (HEAD 238304e, code unchanged since pass 3)
+
+Tree state: pass-3 doc addendum still uncommitted; NO code changes since
+238304e, so every pass-3 should-fix was re-confirmed standing (all five
+spot-verified at current line numbers: quotes APIs ungated/unthrottled;
+updatedBy staff-email/id leak to guests; start_pickup/arrived_pickup/
+start_return unguarded — start_pickup regresses a COMPLETED booking;
+users-page suspend (and DELETE) leaves canAcceptJobs true → still
+dispatchable; revival dead-end + lapsed-unflipped resend skips the slot
+re-check). Pass 4 covered the never-reviewed surface: email/SMS content,
+cron, error/404 pages, SEO/sitemap, accessibility, repo hygiene, and
+`npm audit`.
+
+### 🔴 LAUNCH BLOCKERS — CONTENT / LEGAL / DATA (flows work; these don't)
+
+**P4-1. Fabricated ratings and reviews, sitewide.** `JsonLd.tsx:121-126`
+hardcodes `aggregateRating 4.8 / reviewCount 47` into LocalBusiness schema
+on every city/suburb page; hero claims "4.8 out of 5 · 200+ rides"
+(`HeroSection.tsx:81`); the OG share image bakes in "4.8/5"; hardcoded
+fictional testimonials (naming the real drivers as if customers reviewed
+them) render whenever the DB is empty (`TestimonialsSection.tsx:18-66`),
+plus a seed route for more. Zero completed rides at launch. ACCC
+fake-reviews exposure + Google penalty risk, and the numbers contradict
+each other (47 vs 200+). Remove all of it before go-live.
+
+**P4-2. Three contradictory cancellation/refund policies are live at
+once.** Official policy (policies page, every email footer via
+`policy.ts:6-14`, homepage FAQ): >3h = full refund, <3h = none. But
+`seo-data.ts:136` (rendered on city pages AND emitted as FAQPage JSON-LD)
+says >24h full / <24h 50% / after none — and `refund-calculator.ts:74-172`
++ the cancel-eligibility GET actually IMPLEMENT the 24h/50% scheme. A
+customer can read three different policies. Pick one; fix seo-data +
+refund-calculator + cancel route copy.
+
+**P4-3. Payment-link email/SMS make false claims** — "the service on your
+car is complete" (sent while stage is service_in_progress, whose own email
+says mechanics are still working) and "your vehicle can only be returned
+once the service is paid for" (payment is explicitly NOT a return gate,
+`driver/jobs/route.ts:228`). Threatening to withhold a car over a payment
+the system doesn't require is a legal risk, not just bad copy.
+`email.ts:356-415`, `sms.ts:69`.
+
+**P4-4. Placeholder contact details on live pages.** `1300 123 456`
+(obviously fake) on garage/driver pending pages; `partners@drivlet.com` and
+`support@drivlet.com` (wrong domain, likely nonexistent) on
+garage-pending/subscription pages. The real-looking `1300 470 886` appears
+19× across 11 files — confirm it's live or replace (ops item, now fully
+scoped).
+
+**P4-5. Real customer vehicle photos are committed to git.** 12 tracked
+JPEGs under `uploads/vehicle-photos/<bookingId>/…` (Dec-2025 custody photos
+of actual customers' cars) ship with every clone and deploy. Gitignore
+`uploads/`, remove from the index, and scrub history before the repo
+touches any new collaborator/CI.
+
+**P4-6. Dependency vulnerabilities: 21 (2 critical, 12 high).**
+`next-auth` ≤4.24.14 CRITICAL (email homoglyph normalization bypass +
+getToken crash); `next` range includes an App Router **middleware/proxy
+bypass via segment-prefetch** — directly relevant because Phase-1
+page-gating of garage/quotes lives in `src/proxy.ts` (the API-level gates
+are independent and verified, so exposure is page shells, but patch
+anyway); `mongoose` $nor sanitizeFilter injection (high); `axios` high.
+All have fixes: run `npm audit fix`, then `npm run build` + retest, before
+launch.
+
+### 🟠 NEW SHOULD-FIXES (pass 4)
+
+1. **Refunded→paid flip, guest-reachable** — `servicePayment.ts:24` filter
+   `$ne: "paid"` matches "refunded"; `confirm-service-payment` (guest-
+   allowed, booking _id exposed by the tracker) retrieves the still-
+   `succeeded` PI and overwrites an admin refund back to "paid". One-line
+   fix: `$nin: ["paid","refunded"]`. Strongest new code item.
+2. **Money reconciliation gaps (consolidated):** no refund webhook handler
+   (dashboard refunds never reach the app); refund recorded non-
+   transactionally after Stripe succeeds, with no idempotency key (double-
+   click = double partial refund); `mark_paid_phone` never expires the live
+   Checkout session (customer can pay Stripe AFTER paying by phone — money
+   collected, event discarded); pending extra-charges have no
+   reconciliation or void path.
+3. **Booking-modal assign/unassign not atomic** — races the dispatch board
+   (which IS atomic); last write silently replaces the other driver's
+   assignment; metrics drift by surface. Point the modal at the dispatch
+   route or add the same guarded filters.
+4. **Email infrastructure:** no Reply-To while every footer says "reply to
+   this email" (replies to noreply@ vanish — also breaks the contact-form
+   relay); unescaped names in verification, cancel-request ×2, and
+   service-payment receipt emails (refund email already tracked); 7-day
+   pay-link TTL never disclosed in the email; `sendDriverEnRouteSMS`
+   interpolates the raw Twilio number (dead code — delete).
+5. **SEO/pages:** root canonical collapses /track + /policies + /driver/join
+   to the homepage (sitemap-vs-canonical contradiction); `/pay/` missing
+   from robots disallow; no `not-found.tsx` (unbranded 404 via the [city]
+   catch-all); [city] route 500s on prototype-key paths like /constructor
+   (use `Object.hasOwn`); maintenance page has a fake "Notify Me" form that
+   discards addresses; marketing copy describes the Phase-2 marketplace
+   ("in-house experts", "30% cheaper") and misstates the payment flow;
+   Sydney placeholder text in driver onboarding.
+6. **Accessibility:** booking wizard has zero label/input associations and
+   zero aria-labels (screen readers announce unlabeled fields); icon-only
+   copy button unnamed. Track/pay pages are fine — port their pattern.
+7. **Ops-view truthfulness:** only one cron exists (auto-clockout);
+   pay-link expiry and quote expiry are lazy-only, so abandoned
+   payment_link_sent requests sit in admin lists until touched — a daily
+   sweep cron would keep dashboards honest; PreJobAlert is client-polling
+   only (a driver who never opens the app gets no alert).
+8. Minor: `global-error.tsx` renders unstyled (no CSS import) with no home
+   link; verification code in email subject (lock-screen visible); emails
+   hardcode drivlet.com.au instead of getAppUrl (wrong links from preview
+   envs); driver hard-delete history check misses returnDriverId +
+   "pending" status; two-device delivered/mark_paid_phone replays
+   duplicate notifications (read-then-save guards); `.env` hygiene OK
+   (never committed — verified across full history).
+
+### Verified clean this pass
+
+All 21 garage API files still gated (re-counted); promo deactivate refuses
+used codes; user soft-delete lifecycle sound; no garage-doc dangling refs;
+dispatch-board assign atomic; generate_payment atomic claim holds; no
+secrets in repo history; sitemap contains only public routes, all
+existing; pricing claims match constants end-to-end ($119 / $29 / $49);
+Queensland "coming soon" consistent; no serverless-incompatible
+schedulers; error pages leak nothing; SMS stage map matches email copy;
+no `{variable}` leaks in any template; JSON-LD escapes; [city] routes have
+no injection surface (static content, JSX-escaped).
+
+---
+
+## ✅ FULL AUDIT PASS 3 — VERDICT AT 238304e (superseded by pass 4 above)
+
+All three fix batches verified AS COMMITTED (per-commit contents match intent,
+tree clean, `tsc` clean): the 9-fix batch, fix batch 2 (RB-1..3 + BA-1), and
+the admin-modal viewport sweep. Full end-to-end re-sweep (booking → payment /
+promo / expiry-revival → dispatch → driver legs / photos / forms / undo →
+delivery → feedback; admin incl. the fixed modals; driver portal incl.
+alerts; customer surfaces; auth + both suspension paths) plus a security
+spot-check of every not-yet-re-reviewed corner (garage gate: 30/30 handlers
+still gated, mechanically counted; cron; SSE; analytics; storage layer;
+headers; quotes; account; injection surface; env fallbacks).
+
+**CODE BLOCKERS: NONE.** Undo→redo traced safe against every new guard; no
+UI-reachable path hits the new 400s; the revive→pay→convert path works end
+to end; no Mongoose injection; no hardcoded secrets.
+
+### Top should-fixes (new this pass, ranked — none blocking)
+
+1. **Quote APIs are live + unthrottled in Phase 1** — pages are
+   proxy-blocked but `/api/quotes/request` accepts unauthenticated writes
+   with no rate limit and no feature gate. Add a `quoteSystemGate()` like
+   the garage pattern + `withRateLimit`.
+2. **Staff emails / driver IDs leak to guests** — `updates[].updatedBy`
+   (admin login email, raw driver ids) is returned verbatim by the guest
+   tracker (`bookings/track/route.ts:162`) and SSE stream. Project updates
+   to {stage,timestamp,message} on guest surfaces.
+3. **Revival dead-end when the 409 fires** — if a revive fails (slot
+   refilled / promo re-used), the guidance says "edit or decline" but both
+   routes and the UI reject status "expired": the request becomes
+   unactionable. Allow edit/decline on expired (atomic filters make it
+   safe). Also: no serviceDate-in-future check on revival — a months-old
+   request can be revived into a past-dated booking.
+4. **Lapsed-but-unflipped links resent without the slot re-check** — the
+   revival guards key on status "expired", but a link can lapse while
+   status stays payment_link_sent (customer never re-opened it); a plain
+   Resend then re-arms a slot capacity already gave away. Gate the re-check
+   on `isPaymentLinkExpired()` at resend time, not status.
+5. **BA-1 leftovers: `start_pickup` / `arrived_pickup` / `start_return`
+   have no order/replay guards** — a direct API call can re-start a
+   delivered booking (completed→in_progress regression + duplicate
+   notifications). Same 3-line guard pattern as the rest of BA-1.
+6. **Users-screen suspend leaves the driver dispatchable** — it sets
+   `accountStatus` only; dispatch eligibility filters on
+   `canAcceptJobs`/`isActive`, so a Users-page-suspended driver can still
+   be assigned while every driver API 403s them (job silently stalls).
+   Mirror the driver-account path (clear canAcceptJobs) or join dispatch
+   eligibility against accountStatus. (Companion to the known
+   drivers-screen item — the two suspend paths and two admin screens all
+   need one coherent story.)
+
+Minor (new): revival promo re-claim commits before save (let the claim also
+match own usedByRequestId; save before emailing); create-PI catch can mint a
+second PI when an amount-update on a "processing" intent throws; revive-409
+message clearable by the bookings page auto-refresh; legacy
+no-return-driver delivered+undo leaves completed@car_picked_up (deny
+delivered without a return leg, or reset status in the undo branch);
+auto-login token path skips status checks (5-min single-use window,
+session-callback backstop); CRON_SECRET compare not timing-safe; CSP allows
+unsafe-inline/eval (decorative vs XSS); profile-photo uploads skip
+magic-byte validation and return raw public blob URLs; unescaped admin
+testimonials $regex; account/auth change-password duplication.
+
+All previously-tracked should-fixes remain as listed in the passes below.
+Ops checklist unchanged (bottom of this file) + add: gate/throttle the
+quote APIs (item 1) before or at launch.
+
+---
+
 **Re-verified 2026-08-30** (prior audits 2026-08-02, 2026-08-16). Scope of this
 pass: verify the 18-commit fix batch (`8b2e6c7..dabcbac`) holds, hunt
 regressions it may have introduced, full end-to-end re-sweep of every major

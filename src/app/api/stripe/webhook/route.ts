@@ -6,6 +6,9 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { generateUniqueTrackingCode } from '@/lib/trackingCode';
 import { sendBookingStageEmail } from '@/lib/email';
 import { markServicePaymentPaid } from '@/lib/servicePayment';
+// Mongoose path used by the charge.refunded reconciliation handler
+import { connectDB } from '@/lib/mongodb';
+import Booking from '@/models/Booking';
 
 export async function POST(request: NextRequest) {
   console.log('🔔 Webhook received!');
@@ -702,6 +705,92 @@ export async function POST(request: NextRequest) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log('❌ Payment failed:', paymentIntent.id);
       console.log('❌ Error:', paymentIntent.last_payment_error?.message);
+      break;
+    }
+
+    // Refund reconciliation (re-audit 2026-09-11): refunds issued from the
+    // Stripe Dashboard previously never reached the app — booking state
+    // stayed "paid" forever. Admin-initiated refunds also emit this event;
+    // the per-refund-id dedupe below makes those a no-op (the admin route
+    // already recorded them).
+    case 'charge.refunded': {
+      const charge = event.data.object as Stripe.Charge;
+      const piId =
+        typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : charge.payment_intent?.id || null;
+      if (!piId) break;
+
+      try {
+        await connectDB();
+        // Which payment is this? Transport (paymentId) or service payment.
+        let target: 'transport' | 'service' | null = null;
+        let booking = await Booking.findOne({ paymentId: piId });
+        if (booking) {
+          target = 'transport';
+        } else {
+          booking = await Booking.findOne({ servicePaymentId: piId });
+          if (booking) target = 'service';
+        }
+        if (!booking || !target) {
+          console.log('ℹ️ charge.refunded: no booking for PI', piId);
+          break;
+        }
+
+        const now = new Date();
+        const existingIds = new Set(
+          (booking.refunds || []).map((r) => r.refundId).filter(Boolean)
+        );
+        // Per-refund objects ride along on the charge in this event; record
+        // any we haven't seen (dedupes admin-initiated refunds cleanly).
+        const incoming = (charge.refunds?.data || []).filter(
+          (r) => r.id && !existingIds.has(r.id)
+        );
+
+        let changed = false;
+        if (incoming.length > 0) {
+          booking.refunds = booking.refunds || [];
+          for (const r of incoming) {
+            booking.refunds.push({
+              target,
+              amount: r.amount,
+              refundId: r.id,
+              reason: 'Refund received from Stripe (webhook)',
+              processedBy: 'stripe_webhook',
+              processedAt: now,
+            });
+            booking.updates.push({
+              stage: 'refund_processed',
+              timestamp: now,
+              message: `${target === 'transport' ? 'Transport' : 'Service'} payment refund of $${(r.amount / 100).toFixed(2)} recorded from Stripe.`,
+              updatedBy: 'system',
+            });
+            changed = true;
+          }
+        }
+
+        // Fully refunded per Stripe → reflect it in status regardless of
+        // whether we could enumerate the individual refund objects.
+        if (charge.refunded === true) {
+          if (target === 'transport' && booking.paymentStatus !== 'refunded') {
+            booking.paymentStatus = 'refunded';
+            changed = true;
+          }
+          if (target === 'service' && booking.servicePaymentStatus !== 'refunded') {
+            booking.servicePaymentStatus = 'refunded';
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          await booking.save({ validateModifiedOnly: true });
+          console.log(`✅ charge.refunded reconciled for booking ${booking._id} (${target})`);
+        } else {
+          console.log('ℹ️ charge.refunded: already recorded, skipping', piId);
+        }
+      } catch (err) {
+        console.error('charge.refunded handling failed:', err);
+      }
       break;
     }
 

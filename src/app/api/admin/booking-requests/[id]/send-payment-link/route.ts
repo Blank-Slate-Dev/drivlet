@@ -54,7 +54,15 @@ export async function POST(
     //     discounted. Atomically re-claim it; if someone else has redeemed
     //     it since, refuse with a clear next step instead of silently
     //     double-spending the discount.
-    if (bookingRequest.status === "expired") {
+    // Slot re-check applies whenever the OLD link had lapsed past the TTL —
+    // not only when lazy expiry has already flipped the status. A link can
+    // lapse while status stays payment_link_sent (customer never re-opened
+    // it); slot counting stopped counting this request the moment its TTL
+    // passed, so a plain Resend used to silently re-arm a slot capacity had
+    // already given away (re-audit 2026-09-11).
+    const isRevival =
+      bookingRequest.status === "expired" || isPaymentLinkExpired(bookingRequest);
+    if (isRevival) {
       if (bookingRequest.pickupTimeSlot) {
         const pickupUsage = await countSlotUsage(
           bookingRequest.serviceDate,
@@ -84,8 +92,20 @@ export async function POST(
         }
       }
 
-      if (bookingRequest.promoCode) {
-        const reclaimed = await claimPromoCode(bookingRequest.promoCode);
+      // Promo re-claim only applies when lazy expiry actually RELEASED the
+      // code (status "expired"); a lapsed-but-unflipped request still holds
+      // its claim.
+      if (bookingRequest.status === "expired" && bookingRequest.promoCode) {
+        let reclaimed = await claimPromoCode(bookingRequest.promoCode);
+        if (!reclaimed) {
+          // Recovery path: a previous revival may have claimed the code but
+          // failed before saving — a code already used BY THIS REQUEST is ours.
+          reclaimed = await PromoCode.findOne({
+            code: bookingRequest.promoCode.trim().toUpperCase(),
+            status: "used",
+            usedByRequestId: bookingRequest._id,
+          });
+        }
         if (!reclaimed) {
           return NextResponse.json(
             { error: `Promo code ${bookingRequest.promoCode} was released when the link expired and has since been used elsewhere. Edit the request's quote (remove the discount) or decline it before resending.` },
@@ -105,7 +125,7 @@ export async function POST(
         ).catch((err) => console.error("Failed to record promo usage on revival:", err));
       }
 
-      bookingRequest.adminNotes = [bookingRequest.adminNotes, "Expired link revived by admin resend"]
+      bookingRequest.adminNotes = [bookingRequest.adminNotes, "Lapsed link revived by admin resend"]
         .filter(Boolean)
         .join("\n");
     }
@@ -117,6 +137,10 @@ export async function POST(
       bookingRequest.paymentToken = crypto.randomBytes(32).toString("hex");
       bookingRequest.paymentTokenCreatedAt = new Date();
     }
+
+    // Persist the token BEFORE emailing (re-audit 2026-09-11): if the save
+    // failed after the send, the customer held a link that 404'd forever.
+    await bookingRequest.save();
 
     // Shared email builder (same one approval sends automatically)
     const { sent: emailSent, payLink } = await sendConfirmationWithPayLink(bookingRequest);

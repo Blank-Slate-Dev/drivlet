@@ -75,8 +75,14 @@ export function notifyBookingUpdate(booking: BookingDocument, options: NotifyOpt
     servicePaymentUrl: booking.servicePaymentUrl,
     servicePaymentMethod: booking.servicePaymentMethod,
     updatedAt: booking.updatedAt,
+    // Projected (re-audit 2026-09-11): SSE events reach guest-credentialed
+    // trackers — never include updatedBy (admin emails / raw ObjectIds)
     latestUpdate: booking.updates && booking.updates.length > 0
-      ? booking.updates[booking.updates.length - 1]
+      ? {
+          stage: booking.updates[booking.updates.length - 1].stage,
+          timestamp: booking.updates[booking.updates.length - 1].timestamp,
+          message: booking.updates[booking.updates.length - 1].message,
+        }
       : undefined,
     signedForms: booking.signedForms?.map((f) => ({
       formType: f.formType,

@@ -34,7 +34,12 @@ export async function generateMetadata({
   params: Promise<{ city: string }>;
 }): Promise<Metadata> {
   const { city } = await params;
-  const location = LOCATIONS[city];
+  // Own-property check (2026-09-11): paths like /constructor matched
+  // inherited Object.prototype members (truthy functions) and 500'd instead
+  // of 404ing
+  const location = Object.prototype.hasOwnProperty.call(LOCATIONS, city)
+    ? LOCATIONS[city]
+    : undefined;
   if (!location) return {};
 
   return {
@@ -72,7 +77,12 @@ export default async function CityPage({
   params: Promise<{ city: string }>;
 }) {
   const { city } = await params;
-  const location = LOCATIONS[city];
+  // Own-property check (2026-09-11): paths like /constructor matched
+  // inherited Object.prototype members (truthy functions) and 500'd instead
+  // of 404ing
+  const location = Object.prototype.hasOwnProperty.call(LOCATIONS, city)
+    ? LOCATIONS[city]
+    : undefined;
   if (!location) notFound();
 
   const faqs = getLocationFAQs(location.name);
