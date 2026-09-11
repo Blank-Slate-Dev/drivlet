@@ -8,8 +8,10 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Garage from "@/models/Garage";
-import Booking from "@/models/Booking";
+import Booking, { IBooking } from "@/models/Booking";
 import { garagePortalGate } from "@/lib/garagePortal";
+// mongoose 9.x renamed FilterQuery → QueryFilter
+import type { QueryFilter } from "mongoose";
 
 // Force dynamic rendering - this route uses headers via getServerSession
 export const dynamic = 'force-dynamic';
@@ -59,7 +61,11 @@ export async function GET() {
 
     // Build query for NEW bookings only (not yet acknowledged)
     // Match by: assignedGarageId OR (garagePlaceId/garageName match AND no assignment)
-    const query = {
+    // Explicit QueryFilter<IBooking> (2026-09-11): mongoose 9.10's stricter
+    // typings reject the widened types TS infers from this conditionally-
+    // spread literal (e.g. status $nin as string[]); contextual typing
+    // against QueryFilter keeps the literals narrow.
+    const query: QueryFilter<IBooking> = {
       $and: [
         {
           $or: [

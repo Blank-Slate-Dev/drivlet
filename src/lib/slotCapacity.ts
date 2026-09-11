@@ -8,11 +8,13 @@ import BookingRequest from "@/models/BookingRequest";
 import { PAYMENT_LINK_TTL_MS } from "@/lib/paymentLinkExpiry";
 
 // Statuses (besides live bookings) that already hold a slot for a date.
+// `as const` (2026-09-11): mongoose 9.10's stricter query typings require
+// literal-union arrays for $in on enum-typed schema fields.
 export const SLOT_HOLDING_REQUEST_STATUSES = [
   "approved",
   "payment_link_sent",
   "accepted_awaiting_payment",
-];
+] as const;
 
 /**
  * Count how many bookings + slot-holding requests already occupy a given slot

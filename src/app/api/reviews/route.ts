@@ -322,7 +322,9 @@ export async function GET(request: NextRequest) {
 
       const query = {
         driverId: new mongoose.Types.ObjectId(driverId),
-        status: "approved",
+        // `as const` (2026-09-11): mongoose 9.10's stricter typings need the
+        // literal, not a widened string
+        status: "approved" as const,
       };
 
       let sortOrder: Record<string, 1 | -1> = { createdAt: -1 };
@@ -363,7 +365,8 @@ export async function GET(request: NextRequest) {
 
       const query = {
         garageId: new mongoose.Types.ObjectId(garageId!),
-        status: "approved",
+        // `as const` (2026-09-11): mongoose 9.10 strictness — see above
+        status: "approved" as const,
       };
 
       let sortOrder: Record<string, 1 | -1> = { createdAt: -1 };

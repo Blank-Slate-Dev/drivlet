@@ -10,7 +10,9 @@ import { withRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 // awaiting payment on. Pending (unreviewed) and rejected/expired requests do NOT hold
 // a slot. Once a request is paid it converts to a booking (status paid/converted) and
 // only the booking counts — so those statuses are excluded here to avoid double-counting.
-const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepted_awaiting_payment"];
+// `as const` (2026-09-11): mongoose 9.10's stricter query typings require
+// literal-union arrays for $in on enum-typed schema fields
+const SLOT_HOLDING_REQUEST_STATUSES = ["approved", "payment_link_sent", "accepted_awaiting_payment"] as const;
 
 // Force dynamic rendering - this route uses request.url for query params
 export const dynamic = 'force-dynamic';
